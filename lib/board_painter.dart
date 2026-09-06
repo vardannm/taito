@@ -1,0 +1,316 @@
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+
+import 'game.dart';
+
+const cream = Color(0xFFF2ECDD);
+const ink = Color(0xFF163D3B);
+const orange = Color(0xFFCD542F);
+const brass = Color(0xFFD9AE65);
+
+class BoardPainter extends CustomPainter {
+  BoardPainter(this.game, {this.reducedMotion = false, Listenable? repaint})
+    : super(repaint: repaint);
+  final BalanceGame game;
+  final bool reducedMotion;
+
+  void text(
+    Canvas c,
+    String value,
+    Offset point,
+    double size,
+    Color color, {
+    FontWeight weight = FontWeight.w600,
+    double spacing = 0,
+    bool centered = true,
+  }) {
+    final p = TextPainter(
+      text: TextSpan(
+        text: value,
+        style: TextStyle(
+          fontFamily: 'monospace',
+          fontSize: size,
+          color: color,
+          fontWeight: weight,
+          letterSpacing: spacing,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    p.paint(c, point - Offset(centered ? p.width / 2 : 0, p.height / 2));
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.scale(size.width / 360, size.height / 560);
+    final outer = RRect.fromRectAndRadius(
+      const Rect.fromLTWH(0, 0, 360, 560),
+      const Radius.circular(22),
+    );
+    canvas.drawRRect(outer, Paint()..color = ink);
+    canvas.drawRRect(
+      outer.deflate(2),
+      Paint()
+        ..color = brass
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+    final field = RRect.fromRectAndRadius(
+      const Rect.fromLTWH(10, 10, 340, 540),
+      const Radius.circular(15),
+    );
+    canvas.drawRRect(
+      field,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFF7E1AA), Color(0xFFE1BC77), Color(0xFFC49350)],
+        ).createShader(field.outerRect),
+    );
+    canvas.save();
+    canvas.clipRRect(field);
+    // Fine machined surface, concentric engraving, and calibrated side rails.
+    final grain = Paint()
+      ..color = const Color(0xFF533E20).withAlpha(13)
+      ..strokeWidth = .45;
+    for (double y = 12; y < 550; y += 4) {
+      canvas.drawLine(Offset(10, y), Offset(350, y), grain);
+    }
+    final ring = Paint()
+      ..color = ink.withAlpha(16)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    for (double r = 80; r < 460; r += 28) {
+      canvas.drawCircle(const Offset(180, 270), r, ring);
+    }
+    text(
+      canvas,
+      'G',
+      const Offset(180, 270),
+      240,
+      ink.withAlpha(9),
+      weight: FontWeight.w900,
+    );
+    for (final x in [20.0, 340.0]) {
+      canvas.drawLine(
+        Offset(x, 26),
+        Offset(x, 534),
+        Paint()
+          ..color = const Color(0xFF574A31)
+          ..strokeWidth = 5,
+      );
+      canvas.drawLine(
+        Offset(x - 1, 26),
+        Offset(x - 1, 534),
+        Paint()
+          ..color = const Color(0xFFEEE7CC)
+          ..strokeWidth = 1,
+      );
+      for (double y = 32; y < 530; y += 10) {
+        canvas.drawLine(
+          Offset(x == 20 ? 26 : 329, y),
+          Offset(x == 20 ? 30 : 333, y),
+          grain..color = ink.withAlpha(75),
+        );
+      }
+    }
+    for (final hole in game.board) {
+      final p = Offset(hole.x, hole.y);
+      final active = hole.target == game.target.clamp(1, 10);
+      final done = hole.target > 0 && hole.target < game.target;
+      if (active) {
+        final pulse = reducedMotion ? .5 : (math.sin(game.clock * 3.5) + 1) / 2;
+        canvas.drawCircle(
+          p,
+          23 + pulse * 3,
+          Paint()
+            ..color = const Color(0xFFEAFFF3).withAlpha(90)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 9),
+        );
+        canvas.drawCircle(
+          p,
+          18 + pulse * 2,
+          Paint()
+            ..color = ink.withAlpha(120)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = .8,
+        );
+        for (int i = 0; i < 4; i++) {
+          final angle = i * math.pi / 2;
+          canvas.drawLine(
+            p + Offset(math.cos(angle) * 22, math.sin(angle) * 22),
+            p + Offset(math.cos(angle) * 25, math.sin(angle) * 25),
+            Paint()
+              ..color = ink
+              ..strokeWidth = 1.5,
+          );
+        }
+      }
+      canvas.drawCircle(
+        p + const Offset(0, 1.5),
+        13.5,
+        Paint()..color = const Color(0xFFFFE9B7),
+      );
+      canvas.drawCircle(
+        p,
+        12.8,
+        Paint()
+          ..shader = const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF77542F), Color(0xFFC29251)],
+          ).createShader(Rect.fromCircle(center: p, radius: 13)),
+      );
+      canvas.drawCircle(p, 10.4, Paint()..color = const Color(0xFF192F2D));
+      canvas.drawCircle(
+        p - const Offset(0, 2),
+        8,
+        Paint()..color = const Color(0xFF102422),
+      );
+      if (active || done)
+        canvas.drawCircle(
+          p,
+          12.3,
+          Paint()
+            ..color = active ? const Color(0xFFDCFAD9) : ink.withAlpha(150)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = active ? 2.5 : 1.5,
+        );
+      if (hole.target > 0)
+        text(
+          canvas,
+          done ? '·' : '${hole.target}'.padLeft(2, '0'),
+          p,
+          9,
+          active ? const Color(0xFFE7FFD7) : brass,
+          weight: FontWeight.w700,
+        );
+    }
+    // Baseline and maker's mark remain below the hazards.
+    text(
+      canvas,
+      'PRECISION IS EVERYTHING',
+      const Offset(180, 545),
+      6.5,
+      ink.withAlpha(180),
+      spacing: 2,
+    );
+    final a = Offset(20, game.left), b = Offset(340, game.right);
+    canvas.drawLine(
+      a + const Offset(0, 6),
+      b + const Offset(0, 6),
+      Paint()
+        ..color = Colors.black.withAlpha(70)
+        ..strokeWidth = 8
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+    );
+    canvas.drawLine(
+      a,
+      b,
+      Paint()
+        ..color = const Color(0xFF2C3A37)
+        ..strokeWidth = 7
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.drawLine(
+      a - const Offset(0, 1),
+      b - const Offset(0, 1),
+      Paint()
+        ..color = const Color(0xFFB9C5BA)
+        ..strokeWidth = 4
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.drawLine(
+      a - const Offset(0, 2.5),
+      b - const Offset(0, 2.5),
+      Paint()
+        ..color = const Color(0xFFFFFFE8)
+        ..strokeWidth = 1.2,
+    );
+    for (final p in [a, b]) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: p, width: 12, height: 19),
+          const Radius.circular(3),
+        ),
+        Paint()..color = ink,
+      );
+      canvas.drawCircle(p, 2, Paint()..color = brass);
+    }
+    if (game.ballScale > 0) {
+      final p = Offset(game.visualX, game.visualY);
+      canvas.drawCircle(
+        p + const Offset(2, 4),
+        7 * game.ballScale,
+        Paint()
+          ..color = Colors.black38
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
+      );
+      canvas.drawCircle(
+        p,
+        7 * game.ballScale,
+        Paint()
+          ..shader =
+              const RadialGradient(
+                center: Alignment(-.4, -.5),
+                radius: .85,
+                colors: [
+                  Color(0xFFFFFFFF),
+                  Color(0xFFE6E8DF),
+                  Color(0xFF778B88),
+                  Color(0xFF1C3234),
+                ],
+                stops: [0, .2, .5, 1],
+              ).createShader(
+                Rect.fromCircle(center: p, radius: 7 * game.ballScale),
+              ),
+      );
+    }
+    if (game.phase == GamePhase.sinking && !reducedMotion) {
+      final t = (game.phaseTime / .7).clamp(0.0, 1.0);
+      final p = Offset(game.captureX, game.captureY);
+      final color = game.lastSuccess ? const Color(0xFFEEFFE4) : orange;
+      canvas.drawCircle(
+        p,
+        12 + t * 35,
+        Paint()
+          ..color = color.withAlpha(((1 - t) * 200).round())
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2 * (1 - t),
+      );
+      if (game.lastSuccess)
+        for (var i = 0; i < 12; i++) {
+          final a = i * math.pi / 6;
+          canvas.drawCircle(
+            p + Offset(math.cos(a), math.sin(a)) * (15 + t * 50),
+            2 * (1 - t),
+            Paint()..color = color.withAlpha(((1 - t) * 255).round()),
+          );
+        }
+    }
+    canvas.restore();
+    for (final p in [
+      const Offset(7, 20),
+      const Offset(353, 20),
+      const Offset(7, 540),
+      const Offset(353, 540),
+    ]) {
+      canvas.drawCircle(p, 2.3, Paint()..color = brass);
+      canvas.drawLine(
+        p - const Offset(1.4, 0),
+        p + const Offset(1.4, 0),
+        Paint()
+          ..color = ink
+          ..strokeWidth = .8,
+      );
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant BoardPainter oldDelegate) =>
+      oldDelegate.game != game || reducedMotion != oldDelegate.reducedMotion;
+}

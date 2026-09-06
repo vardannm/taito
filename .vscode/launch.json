@@ -1,0 +1,7 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    { "name": "GILT • Browser preview", "request": "launch", "type": "dart", "deviceId": "chrome" },
+    { "name": "GILT • iPhone (on Mac)", "request": "launch", "type": "dart" }
+  ]
+}

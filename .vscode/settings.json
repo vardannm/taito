@@ -1,0 +1,6 @@
+{
+  "dart.flutterSdkPath": ".tools/flutter",
+  "dart.env": { "PUB_CACHE": "C:\\Users\\User\\Desktop\\Taito\\.pub-cache" },
+  "files.watcherExclude": { "**/.tools/**": true, "**/.pub-cache/**": true },
+  "search.exclude": { "**/.tools": true, "**/.pub-cache": true, "**/build": true }
+}

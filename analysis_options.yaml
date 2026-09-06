@@ -1,0 +1,7 @@
+analyzer:
+  exclude:
+    - .tools/**
+    - .pub-cache/**
+    - build/**
+    - ios/**
+    - web/**
