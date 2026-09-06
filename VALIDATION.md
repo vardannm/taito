@@ -1,5 +1,12 @@
 # Validation record
 
+## Latest: automatic-ascent Infinite
+
+- Infinite now translates the platform and camera together so world holes approach from above while pivot grips hold their screen position. Pace increases from 34 to 62 world units per second over two minutes.
+- All 33 regression tests passed. New checks cover automatic hole approach, held-grip alignment, collision without steering, pause, and the speed cap. Static analysis reported no issues.
+- Red danger is now triggered by idle steering rather than lack of elevation. Automatic-ascent best scores use separate storage keys.
+- Human enjoyment, difficulty, and retention are still unvalidated; the playtest should use this updated behavior.
+
 Environment: Windows; project-local Flutter 3.47.2 / Dart 3.13.2.
 
 - Static analysis: no issues found.

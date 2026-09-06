@@ -49,6 +49,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     final boundary = GlobalKey();
     final profile = PlayerProfile()
+      ..tutorialSeen = true
       ..sound = false
       ..haptics = false;
     await tester.pumpWidget(

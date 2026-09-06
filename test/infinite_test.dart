@@ -7,7 +7,8 @@ import 'package:balance_arcade/profile.dart';
 import 'game_test.dart' show advance, placeAt;
 
 void placeAtSafeHeight(BalanceGame game, double height) {
-  final y = 519 - height;
+  final y = BalanceGame.infiniteStart - BalanceGame.ballRadius - height;
+  game.cameraOffset = math.max(0, 300 - y);
   final x = [180.0, 70.0, 290.0, 120.0, 240.0].firstWhere(
     (x) => game.board.every(
       (h) => math.pow(x - h.x, 2) + math.pow(y - h.y, 2) > 18 * 18,
@@ -46,7 +47,7 @@ void main() {
       expect(game.won, isFalse);
       expect(game.score, 500);
       expect(game.cameraOffset, greaterThan(4500));
-      expect(game.screenY(game.ballY), closeTo(320, .01));
+      expect(game.screenY(game.ballY), closeTo(300, .01));
       expect(game.board.length, lessThan(40));
       expect(game.board.every((h) => h.target == 0), isTrue);
     },
@@ -55,7 +56,7 @@ void main() {
     final game = BalanceGame()..start(gameMode: GameMode.infinite);
     advance(game, 2.8);
     expect(game.dangerActive, isFalse);
-    expect(game.score, 0);
+    expect(game.score, greaterThan(0));
     advance(game, .5);
     expect(game.dangerActive, isTrue);
     expect(game.dangerY, lessThan(580));
@@ -68,28 +69,35 @@ void main() {
     final game = BalanceGame()..start(gameMode: GameMode.infinite);
     placeAtSafeHeight(game, 60);
     advance(game, 1.5);
+    final peakScore = game.score;
     for (int i = 0; i < 30; i++) {
       placeAtSafeHeight(game, i.isEven ? 30 : 60);
       advance(game, .06);
     }
-    expect(game.score, 6);
+    expect(game.score, peakScore);
     expect(game.dangerActive, isTrue);
   });
-  test('new height stops red growth; pause freezes the danger timer', () {
-    final game = BalanceGame()..start(gameMode: GameMode.infinite);
-    advance(game, 3.2);
-    game.setPaused(true);
-    final red = game.dangerY, stall = game.stallTime;
-    advance(game, 6);
-    expect(game.dangerY, red);
-    expect(game.stallTime, stall);
-    game.setPaused(false);
-    placeAtSafeHeight(game, 40);
-    expect(game.dangerActive, isFalse);
-    final recoveredRed = game.dangerY;
-    advance(game, .3);
-    expect(game.dangerY, recoveredRed);
-  });
+  test(
+    'deliberate steering stops red growth; pause freezes the danger timer',
+    () {
+      final game = BalanceGame()..start(gameMode: GameMode.infinite);
+      advance(game, 3.2);
+      game.setPaused(true);
+      final red = game.dangerY, stall = game.stallTime;
+      advance(game, 6);
+      expect(game.dangerY, red);
+      expect(game.stallTime, stall);
+      game.setPaused(false);
+      game.grabPivot(0);
+      game.dragPivot(0, -10);
+      advance(game, .05);
+      game.releasePivot(0);
+      expect(game.dangerActive, isFalse);
+      final recoveredRed = game.screenY(game.dangerY);
+      advance(game, .3);
+      expect(game.screenY(game.dangerY), closeTo(recoveredRed, .001));
+    },
+  );
   test(
     'every hole ends Infinite immediately and replay starts at ground level',
     () {
@@ -134,13 +142,14 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       final profile = PlayerProfile()
+        ..tutorialSeen = true
         ..sound = false
         ..haptics = false;
       await tester.pumpWidget(ArcadeApp(profile: profile));
       await tester.tap(find.text('INFINITE'));
       await tester.pump();
       expect(find.text('HEIGHT / METERS'), findsOneWidget);
-      expect(find.text('KEEP CLIMBING'), findsOneWidget);
+      expect(find.text('TILT TO DODGE'), findsOneWidget);
       expect(find.textContaining('HOLE 01'), findsNothing);
       expect(find.byType(PivotBoard), findsOneWidget);
       expect(tester.takeException(), isNull);

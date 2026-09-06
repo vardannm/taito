@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'board_painter.dart';
 import 'game.dart';
 import 'profile.dart';
+import 'tutorial.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -64,11 +65,13 @@ class _GameScreenState extends State<GameScreen>
   Duration? previous;
   double accumulator = 0;
   bool recorded = false, newBest = false;
+  late bool tutorialOpen;
   PlayerProfile get profile => widget.profile;
 
   @override
   void initState() {
     super.initState();
+    tutorialOpen = !profile.tutorialSeen;
     WidgetsBinding.instance.addObserver(this);
     HardwareKeyboard.instance.addHandler(onKey);
     ticker = createTicker(tick)..start();
@@ -192,6 +195,14 @@ class _GameScreenState extends State<GameScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (tutorialOpen) {
+      return FirstPlayTutorial(
+        onDone: () {
+          unawaited(profile.completeTutorial());
+          setState(() => tutorialOpen = false);
+        },
+      );
+    }
     if (game.started) return playScreen(context);
     return Scaffold(
       body: SafeArea(
@@ -471,7 +482,7 @@ class _GameScreenState extends State<GameScreen>
       ),
       Text(
         game.infinite
-            ? (game.dangerActive ? 'RED RISING' : 'KEEP CLIMBING')
+            ? (game.dangerActive ? 'RED RISING' : 'TILT TO DODGE')
             : 'HOLE ${game.target.clamp(1, 10).toString().padLeft(2, '0')} / 10',
         style: label(game.dangerActive ? orange : ink),
       ),
@@ -698,7 +709,7 @@ class _GameScreenState extends State<GameScreen>
               guideRow(
                 '01',
                 'Two thumbs. One bar.',
-                'Drag either end of the platform up or down. Use two fingers to move both ends. Release to hold. Lift and grab again to keep climbing.',
+                'Drag either end of the platform up or down. Use two fingers to move both ends. Release to hold its screen position.',
               ),
               guideRow(
                 '02',
@@ -713,7 +724,7 @@ class _GameScreenState extends State<GameScreen>
               guideRow(
                 '04',
                 'Go beyond ten.',
-                'Climb endlessly with one ball. Every hole is a trap. Score comes from height. After three seconds without progress, the red floor rises. Keep climbing!',
+                'The board moves down continuously as you ascend. Tilt the platform to dodge approaching holes. The pace gradually increases. Score comes from height. After three seconds without steering, the red floor rises. Keep moving!',
               ),
               const Text(
                 'Desktop: W / S = left end. ↑ / ↓ = right end. Esc = pause.',
@@ -724,6 +735,13 @@ class _GameScreenState extends State<GameScreen>
                 Navigator.pop(context);
                 start(GameMode.practice);
               }),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  setState(() => tutorialOpen = true);
+                },
+                child: const Text('REPLAY QUICK TUTORIAL'),
+              ),
             ],
           ),
         ),

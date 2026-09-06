@@ -60,7 +60,12 @@ class BalanceGame {
   final List<Hole> _endlessHoles = [];
   int _nextRow = 0;
   double cameraOffset = 0, maxHeight = 0, stallTime = 0, dangerY = 580;
-  double _progressAnchor = 0;
+  double _steeringDistance = 0;
+  static const infiniteStart = 440.0;
+  static const firstRow = 300.0;
+
+  /// Brisk initial pace, reaching the cap after one minute of survival.
+  double get ascentSpeed => 54 + math.min(elapsed / 60, 1) * 36;
   bool get infinite => mode == GameMode.infinite;
   bool get practice => mode == GameMode.practice;
   List<Hole> get board => infinite ? _endlessHoles : holes;
@@ -70,7 +75,7 @@ class BalanceGame {
   double get dangerDistance => dangerY - ballY;
 
   void _extendBoard() {
-    while (420 - _nextRow * 72 >= -cameraOffset - 120) {
+    while (firstRow - _nextRow * 72 >= -cameraOffset - 120) {
       final row = _nextRow++;
       final corridor = 180 + 78 * math.sin(row * .65);
       final random = math.Random(731 + row * 7919);
@@ -85,28 +90,27 @@ class BalanceGame {
           selected.add(x);
       }
       for (final x in selected) {
-        _endlessHoles.add(Hole(x, 420 - row * 72.0));
+        _endlessHoles.add(Hole(x, firstRow - row * 72.0));
       }
     }
     _endlessHoles.removeWhere((hole) => screenY(hole.y) > 620);
   }
 
   void _updateClimb(double dt) {
-    maxHeight = math.max(maxHeight, 519 - ballY);
+    maxHeight = math.max(maxHeight, infiniteStart - ballRadius - ballY);
     score = (maxHeight / 10).floor();
-    if (maxHeight >= _progressAnchor + 4) {
-      _progressAnchor = maxHeight;
+    if (leftInput != 0 || rightInput != 0) {
       stallTime = 0;
     } else {
       stallTime += dt;
     }
-    cameraOffset = math.max(cameraOffset, 320 - ballY);
-    // The floor follows below the viewport but only enters it when progress stalls.
+    // A manual climb may also move the camera; automatic ascent runs every tick.
+    cameraOffset = math.max(cameraOffset, 240 - ballY);
     dangerY = math.min(dangerY, 580 - cameraOffset);
     if (dangerActive) dangerY -= (24 + math.min(stallTime - 3, 5) * 16) * dt;
     message = dangerActive
-        ? 'KEEP CLIMBING! The red is rising.'
-        : 'Climb higher. Every hole is a trap.';
+        ? 'KEEP STEERING! The red is rising.'
+        : 'Tilt to dodge. The board keeps moving.';
     _extendBoard();
     if (ballY + ballRadius >= dangerY) {
       _loseClimb('The red caught you. Keep moving next time.');
@@ -163,9 +167,19 @@ class BalanceGame {
   void dragPivot(int side, double delta) {
     if (!canControl || !delta.isFinite || pivotTargets[side] == null) return;
     final other = side == 0 ? right : left;
-    final minimum = infinite ? other - 180 : 30.0;
-    final maximum = infinite ? math.min(526.0, other + 180) : 526.0;
-    pivotTargets[side] = (pivotTargets[side]! + delta).clamp(minimum, maximum);
+    final minimum = infinite ? math.max(other - 180, 40 - cameraOffset) : 30.0;
+    final maximum = infinite
+        ? math.min(526 - cameraOffset, other + 180)
+        : 526.0;
+    final previous = pivotTargets[side]!;
+    pivotTargets[side] = (previous + delta).clamp(minimum, maximum);
+    if (infinite) {
+      _steeringDistance += (pivotTargets[side]! - previous).abs();
+      if (_steeringDistance >= 8) {
+        stallTime = 0;
+        _steeringDistance = 0;
+      }
+    }
   }
 
   void releasePivot(int side) {
@@ -189,7 +203,7 @@ class BalanceGame {
   }
 
   void resetBall() {
-    left = right = 526;
+    left = right = infinite ? infiniteStart : 526;
     ballX = 180;
     velocity = leftSpeed = rightSpeed = 0;
     legTime = 0;
@@ -198,7 +212,7 @@ class BalanceGame {
 
   void start({GameMode gameMode = GameMode.classic}) {
     mode = gameMode;
-    cameraOffset = maxHeight = stallTime = _progressAnchor = 0;
+    cameraOffset = maxHeight = stallTime = _steeringDistance = 0;
     dangerY = 580;
     _nextRow = 0;
     _endlessHoles.clear();
@@ -212,7 +226,7 @@ class BalanceGame {
     phase = GamePhase.playing;
     event = null;
     message = infinite
-        ? 'Climb higher. Every hole is a trap.'
+        ? 'Tilt to dodge. The board keeps moving.'
         : 'Raise both ends. Find the glowing 01.';
     resetBall();
   }
@@ -267,6 +281,20 @@ class BalanceGame {
     elapsed += dt;
     legTime += dt;
     final oldX = ballX, oldY = ballY;
+    if (infinite) {
+      // Translate the platform and camera equally: grips stay under the fingers
+      // while stationary world hazards approach from above. Keep the old world
+      // ball position for swept collision against those approaching hazards.
+      final travel = ascentSpeed * dt;
+      cameraOffset += travel;
+      left -= travel;
+      right -= travel;
+      dangerY -= travel;
+      for (var side = 0; side < 2; side++) {
+        if (pivotTargets[side] != null)
+          pivotTargets[side] = pivotTargets[side]! - travel;
+      }
+    }
     // Motor easing removes abrupt starts; near-immediate braking keeps it precise.
     final response = 1 - math.exp(-22 * dt);
     final motor = practice ? 78.0 : 91.0;
@@ -280,9 +308,10 @@ class BalanceGame {
     if (pivotTargets[1] != null) {
       rightSpeed = ((pivotTargets[1]! - right) / dt).clamp(-300.0, 300.0);
     }
-    final minimum = infinite ? double.negativeInfinity : 30.0;
-    left = (left + leftSpeed * dt).clamp(minimum, 526.0);
-    right = (right + rightSpeed * dt).clamp(minimum, 526.0);
+    final minimum = infinite ? 40 - cameraOffset : 30.0;
+    final maximum = infinite ? 526 - cameraOffset : 526.0;
+    left = (left + leftSpeed * dt).clamp(minimum, maximum);
+    right = (right + rightSpeed * dt).clamp(minimum, maximum);
     if (infinite && (right - left).abs() > 180) {
       if (left < right) {
         left = right - 180;

@@ -17,6 +17,7 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       final profile = PlayerProfile()
+        ..tutorialSeen = true
         ..sound = false
         ..haptics = false;
       await tester.pumpWidget(ArcadeApp(profile: profile));
@@ -89,6 +90,7 @@ void main() {
     await tester.pumpWidget(
       ArcadeApp(
         profile: PlayerProfile()
+          ..tutorialSeen = true
           ..sound = false
           ..haptics = false,
       ),

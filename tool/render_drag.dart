@@ -64,6 +64,15 @@ void main() {
       await tester.runAsync(() => saveImage(image, 'artifacts/$name.png'));
     }
 
+    await capture('tutorial-controls');
+    await tester.tap(find.text('NEXT'));
+    await tester.pump();
+    await capture('tutorial-classic');
+    await tester.tap(find.text('NEXT'));
+    await tester.pump();
+    await capture('tutorial-infinite');
+    await tester.tap(find.text("LET'S PLAY"));
+    await tester.pump();
     await capture('drag-home');
     await tester.tap(find.text('CLASSIC'));
     await tester.pump(const Duration(milliseconds: 100));
@@ -78,6 +87,15 @@ void main() {
     await tester.tap(find.byTooltip('Pause'));
     await tester.pump(const Duration(milliseconds: 100));
     await capture('drag-pause');
+    await tester.tap(find.text('BACK TO CLUB'));
+    await tester.pump();
+    await tester.tap(find.text('INFINITE'));
+    await tester.pump();
+    await capture('ascent-start');
+    for (var i = 0; i < 40; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await capture('ascent-moving');
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

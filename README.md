@@ -29,11 +29,11 @@ Scoring: `(target number × 100 + max(0, 35 − climb seconds) × 10) × multipl
 
 ## Infinite mode
 
-Choose **INFINITE** on the home screen. This is one continuous survival climb with one ball. There are no numbered targets or resets: every hole is a trap. The field scrolls upward without a height limit and generates hazards ahead while discarding offscreen rows.
+Choose **INFINITE** on the home screen. The platform automatically ascends while the holes move down toward it. Drag the platform grips to tilt and dodge. There are no numbered targets or resets: every hole is a trap. The platform holds its screen height when released, including while the board scrolls. Hazards are generated ahead and offscreen rows are discarded. Ascent starts at 54 world units per second and gradually reaches a cap of 90 after one minute.
 
-Score is your highest elevation (one point per ten world units, displayed as meters). Going down and back up cannot earn the same height twice. After three seconds without gaining at least four new world units, the red floor starts rising. Climbing new ground stops its active rise; the floor never retreats. A trap or contact with red ends the run. Pausing freezes the simulation and the danger timer.
+Score is your highest elevation (one point per ten world units, displayed as meters), including automatic ascent. Going down and back up cannot earn the same height twice. After three seconds without steering, the red floor starts rising. Moving the pivot targets by eight accumulated world units or using keyboard steering stops its active rise; the floor never retreats on screen. A trap or contact with red ends the run. Pausing freezes ascent, simulation, scoring and the danger timer.
 
-Infinite height records are separate from Classic scores. Records from the earlier experimental round-based Infinite implementation use different storage keys and are not mixed with climb scores.
+Infinite height records are separate from Classic scores. The automatic-ascent variant uses its own record keys so scores from previous manual-climb and round-based versions are not mixed with this different challenge.
 
 ## Android build and installation
 

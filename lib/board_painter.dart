@@ -236,7 +236,9 @@ class BoardPainter extends CustomPainter {
         mark < (game.maxHeight / 100).floor() + 7;
         mark++
       ) {
-        final y = game.screenY(519 - mark * 100.0);
+        final y = game.screenY(
+          BalanceGame.infiniteStart - BalanceGame.ballRadius - mark * 100.0,
+        );
         if (mark >= 0 && y > 28 && y < 530) {
           text(canvas, '${mark * 10}m', Offset(315, y), 7, ink.withAlpha(145));
           canvas.drawLine(
@@ -269,7 +271,7 @@ class BoardPainter extends CustomPainter {
         );
         text(
           canvas,
-          'KEEP CLIMBING',
+          'KEEP STEERING',
           Offset(180, math.min(top + 18, 530)),
           9,
           cream,
