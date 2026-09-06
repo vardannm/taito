@@ -1,7 +1,16 @@
 {
   "version": "0.2.0",
   "configurations": [
-    { "name": "GILT • Browser preview", "request": "launch", "type": "dart", "deviceId": "chrome" },
-    { "name": "GILT • iPhone (on Mac)", "request": "launch", "type": "dart" }
+    {
+      "name": "GILT \u2022 Browser preview",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "chrome"
+    },
+    {
+      "name": "GILT \u2022 Connected mobile device",
+      "request": "launch",
+      "type": "dart"
+    }
   ]
 }

@@ -1,0 +1,7 @@
+<resources>
+  <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+    <item name="android:windowSplashScreenBackground">#F2ECDD</item>
+    <item name="android:windowSplashScreenAnimatedIcon">@drawable/gilt_icon</item>
+    <item name="android:windowBackground">#F2ECDD</item>
+  </style>
+</resources>

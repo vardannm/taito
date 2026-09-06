@@ -7,7 +7,7 @@ import 'game.dart';
 class PlayerProfile {
   late final SharedPreferencesAsync storage = SharedPreferencesAsync();
   int best = 0, runs = 0;
-  int infiniteBest = 0, infiniteRuns = 0, infiniteRound = 0;
+  int infiniteBest = 0, infiniteRuns = 0;
   bool sound = true, haptics = true;
   bool available = true;
   bool recordResult(BalanceGame game) {
@@ -16,7 +16,6 @@ class PlayerProfile {
       infiniteRuns++;
       final improved = game.score > infiniteBest;
       if (improved) infiniteBest = game.score;
-      if (game.round > infiniteRound) infiniteRound = game.round;
       return improved;
     }
     runs++;
@@ -29,9 +28,8 @@ class PlayerProfile {
     try {
       best = await storage.getInt('gilt.best') ?? 0;
       runs = await storage.getInt('gilt.runs') ?? 0;
-      infiniteBest = await storage.getInt('gilt.infinite.best') ?? 0;
-      infiniteRuns = await storage.getInt('gilt.infinite.runs') ?? 0;
-      infiniteRound = await storage.getInt('gilt.infinite.round') ?? 0;
+      infiniteBest = await storage.getInt('gilt.climb.best') ?? 0;
+      infiniteRuns = await storage.getInt('gilt.climb.runs') ?? 0;
       sound = await storage.getBool('gilt.sound') ?? true;
       haptics = await storage.getBool('gilt.haptics') ?? true;
     } catch (_) {
@@ -43,9 +41,8 @@ class PlayerProfile {
     try {
       await storage.setInt('gilt.best', best);
       await storage.setInt('gilt.runs', runs);
-      await storage.setInt('gilt.infinite.best', infiniteBest);
-      await storage.setInt('gilt.infinite.runs', infiniteRuns);
-      await storage.setInt('gilt.infinite.round', infiniteRound);
+      await storage.setInt('gilt.climb.best', infiniteBest);
+      await storage.setInt('gilt.climb.runs', infiniteRuns);
       await storage.setBool('gilt.sound', sound);
       await storage.setBool('gilt.haptics', haptics);
     } catch (_) {

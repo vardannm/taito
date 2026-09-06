@@ -12,16 +12,16 @@ Alternatively:
 .\scripts\flutter.ps1 run -d chrome
 ```
 
-Controls: hold the upper half of each bottom rocker to raise that end; slide through the center dead zone to the lower half to lower it. Release to stop the motor. Both thumbs work simultaneously. On desktop use **W/S** for the left end, **Up/Down** for the right, and **Esc** to pause.
+Controls: drag the left or right grip on the platform up and down. Both fingers work independently; release to hold that pivot. In Infinite, release and grab again for another upward swipe. The playfield scales uniformly to the largest size that fits below the compact HUD inside the device safe area. Extra space surrounds the board when the viewport has a different aspect ratio; holes and the ball remain circular. On desktop use **W/S** for the left end, **Up/Down** for the right, and **Esc** to pause.
 
 ## What is implemented
 
 - Original ivory, brass, and deep-teal art direction; procedural engraved playfield and original app icons.
 - Fixed 120 Hz physics with rolling-sphere acceleration, motor smoothing, inertia, speed limits, and swept hole collision detection.
 - Ten targets in sequence. Each capture animates the ball sinking and the bar returning to the launch position.
-- Three-ball Classic; endless Infinite rounds; and unlimited-attempt Practice with slower motors and slightly more forgiving target capture.
+- Three-ball Classic; an endless Infinite climb; and unlimited-attempt Practice with slower motors and slightly more forgiving target capture.
 - Streak multipliers up to 4× and speed bonuses. Time rewards precision without ending slow runs.
-- Original synthesized audio, optional haptics, separate persistent Classic/Infinite records and run counts, plus the furthest Infinite round.
+- Original synthesized audio, optional haptics, separate persistent Classic/Infinite records and run counts.
 - Tutorial, settings, pause, replay, lifecycle pause, input cancellation, and reduced-motion support for board effects.
 - iOS project with portrait orientation and GILT branding; web build support with bundled renderer assets.
 
@@ -29,7 +29,22 @@ Scoring: `(target number × 100 + max(0, 35 − climb seconds) × 10) × multipl
 
 ## Infinite mode
 
-Choose **INFINITE** on the home screen. Clear holes 1–10 to start another round. Score, streak, and remaining balls carry over; the run ends only when all three balls are lost. Each completed round adds a bonus of 1,000 × its round number. Routes alternate between the original board and its horizontal mirror. Motor speed and rolling acceleration increase 5% per round, capped at +40% from round 9 onward. Target sizes and life count stay consistent. Infinite records are separate from Classic, and Practice never affects either record.
+Choose **INFINITE** on the home screen. This is one continuous survival climb with one ball. There are no numbered targets or resets: every hole is a trap. The field scrolls upward without a height limit and generates hazards ahead while discarding offscreen rows.
+
+Score is your highest elevation (one point per ten world units, displayed as meters). Going down and back up cannot earn the same height twice. After three seconds without gaining at least four new world units, the red floor starts rising. Climbing new ground stops its active rise; the floor never retreats. A trap or contact with red ends the run. Pausing freezes the simulation and the danger timer.
+
+Infinite height records are separate from Classic scores. Records from the earlier experimental round-based Infinite implementation use different storage keys and are not mixed with climb scores.
+
+## Android build and installation
+
+The project-local Android SDK is in `.tools/android-sdk`. The Flutter wrapper selects it automatically. Enable USB debugging and authorize the connected computer on the phone, then run:
+
+```powershell
+.\scripts\flutter.ps1 build apk --release
+.\scripts\flutter.ps1 install -d YOUR_DEVICE_ID
+```
+
+The APK is generated at `build/app/outputs/flutter-apk/app-release.apk`. This device-test build uses the generated development signing key, not a Play Store release key. Android has the GILT display name, original vector launcher icon, matching splash colors, and portrait orientation.
 
 ## Validate and build
 

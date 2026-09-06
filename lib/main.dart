@@ -192,7 +192,7 @@ class _GameScreenState extends State<GameScreen>
 
   @override
   Widget build(BuildContext context) {
-    final playing = game.started;
+    if (game.started) return playScreen(context);
     return Scaffold(
       body: SafeArea(
         child: LayoutBuilder(
@@ -218,7 +218,7 @@ class _GameScreenState extends State<GameScreen>
                           SizedBox(height: height > 760 ? 16 : 8),
                           header(),
                           SizedBox(height: height > 760 ? 22 : 12),
-                          if (!playing) ...[
+                          ...[
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
@@ -288,8 +288,7 @@ class _GameScreenState extends State<GameScreen>
                                 ),
                               ],
                             ),
-                          ] else
-                            scoreboard(),
+                          ],
                           const SizedBox(height: 14),
                           Expanded(
                             child: Center(
@@ -329,7 +328,7 @@ class _GameScreenState extends State<GameScreen>
                             ),
                           ),
                           const SizedBox(height: 12),
-                          if (!playing) ...[
+                          ...[
                             Text(
                               'Guide the steel ball. Chase the glow.',
                               style: TextStyle(
@@ -385,80 +384,6 @@ class _GameScreenState extends State<GameScreen>
                                 ),
                               ],
                             ),
-                          ] else ...[
-                            status(),
-                            const SizedBox(height: 10),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                ThumbRocker(
-                                  key: ValueKey('left-${game.inputEpoch}'),
-                                  label: 'LEFT',
-                                  enabled: game.canControl,
-                                  onChanged: (v) => input(0, v),
-                                ),
-                                Expanded(
-                                  child: Column(
-                                    children: [
-                                      AnimatedBuilder(
-                                        animation: frame,
-                                        builder: (context, _) =>
-                                            Transform.rotate(
-                                              angle:
-                                                  math.atan2(
-                                                    game.right - game.left,
-                                                    320,
-                                                  ) *
-                                                  .6,
-                                              child: Container(
-                                                width: 44,
-                                                height: 3,
-                                                decoration: BoxDecoration(
-                                                  color: orange,
-                                                  borderRadius:
-                                                      BorderRadius.circular(2),
-                                                ),
-                                              ),
-                                            ),
-                                      ),
-                                      const SizedBox(height: 15),
-                                      Text(
-                                        'HOLD TO LIFT',
-                                        style: label(ink.withAlpha(130))
-                                            .copyWith(
-                                              fontSize: 8,
-                                              letterSpacing: 1,
-                                            ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'Slide down to lower',
-                                        style: TextStyle(
-                                          fontSize: 9,
-                                          color: ink.withAlpha(130),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        game.practice
-                                            ? 'NO LIFE LIMIT'
-                                            : '${game.multiplier}× MULTIPLIER',
-                                        style: label(
-                                          orange,
-                                        ).copyWith(fontSize: 9),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                ThumbRocker(
-                                  key: ValueKey('right-${game.inputEpoch}'),
-                                  label: 'RIGHT',
-                                  enabled: game.canControl,
-                                  onChanged: (v) => input(1, v),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
                           ],
                         ],
                       ),
@@ -511,99 +436,90 @@ class _GameScreenState extends State<GameScreen>
   );
 
   Widget scoreboard() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('SCORE', style: label(ink.withAlpha(140))),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    game.score.toString().padLeft(5, '0'),
-                    style: const TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 33,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -1.5,
-                    ),
+                Text(
+                  game.infinite ? 'HEIGHT / METERS' : 'SCORE',
+                  style: label(),
+                ),
+                Text(
+                  game.score.toString().padLeft(5, '0'),
+                  style: const TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'monospace',
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                game.practice
-                    ? 'PRACTICE'
-                    : game.infinite
-                    ? 'INFINITE'
-                    : 'BALLS LEFT',
-                style: label(ink.withAlpha(140)),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: List.generate(
-                  3,
-                  (i) => Padding(
-                    padding: const EdgeInsets.only(left: 6),
-                    child: Icon(
-                      Icons.circle,
-                      size: 14,
-                      color: game.practice || i < game.lives
-                          ? orange
-                          : ink.withAlpha(30),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-            ],
-          ),
-        ],
-      ),
-      const SizedBox(height: 10),
-      Row(
-        children: [
           Text(
-            '${game.infinite ? 'R${game.round} / ' : ''}HOLE ${game.target.clamp(1, 10).toString().padLeft(2, '0')}',
+            game.infinite
+                ? 'INFINITE'
+                : game.practice
+                ? 'PRACTICE'
+                : '${game.lives} BALLS',
             style: label(),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Row(
-              children: List.generate(
-                10,
-                (i) => Expanded(
-                  child: Container(
-                    height: 4,
-                    margin: const EdgeInsets.only(right: 3),
-                    decoration: BoxDecoration(
-                      color: i < game.roundCompleted
-                          ? ink
-                          : i == game.roundCompleted
-                          ? orange
-                          : ink.withAlpha(25),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text('10', style: label(ink.withAlpha(120))),
         ],
       ),
+      Text(
+        game.infinite
+            ? (game.dangerActive ? 'RED RISING' : 'KEEP CLIMBING')
+            : 'HOLE ${game.target.clamp(1, 10).toString().padLeft(2, '0')} / 10',
+        style: label(game.dangerActive ? orange : ink),
+      ),
     ],
+  );
+
+  Widget playScreen(BuildContext context) => Scaffold(
+    body: SafeArea(
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
+            child: Row(
+              children: [
+                Expanded(
+                  child: AnimatedBuilder(
+                    animation: frame,
+                    builder: (context, _) => scoreboard(),
+                  ),
+                ),
+                IconButton(
+                  tooltip: game.paused ? 'Resume' : 'Pause',
+                  onPressed: pause,
+                  icon: Icon(
+                    game.paused
+                        ? Icons.play_arrow_rounded
+                        : Icons.pause_rounded,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                PivotBoard(
+                  key: ValueKey(game.inputEpoch),
+                  game: game,
+                  frame: frame,
+                ),
+                if (game.paused || game.finished) boardOverlay(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
   );
 
   Widget status() => SizedBox(
@@ -717,7 +633,7 @@ class _GameScreenState extends State<GameScreen>
                 ),
                 Text(
                   game.infinite
-                      ? 'Round ${game.round}  •  ${game.completed} holes cleared'
+                      ? '${game.score} meters climbed. One ball. No limits.'
                       : '${game.completed}/10 holes  •  ${game.bestStreak} best streak',
                   style: const TextStyle(
                     fontSize: 12,
@@ -782,7 +698,7 @@ class _GameScreenState extends State<GameScreen>
               guideRow(
                 '01',
                 'Two thumbs. One bar.',
-                'Hold the upper half of each control to lift that end. Slide to the lower half to lower it. Release to stop the motor.',
+                'Drag either end of the platform up or down. Use two fingers to move both ends. Release to hold. Lift and grab again to keep climbing.',
               ),
               guideRow(
                 '02',
@@ -797,7 +713,7 @@ class _GameScreenState extends State<GameScreen>
               guideRow(
                 '04',
                 'Go beyond ten.',
-                'Infinite keeps going until all three balls are lost. Each cleared round mirrors the board and increases speed up to a fair cap. Score and streak carry over, with a 1,000 × round-number bonus for clearing all ten.',
+                'Climb endlessly with one ball. Every hole is a trap. Score comes from height. After three seconds without progress, the red floor rises. Keep climbing!',
               ),
               const Text(
                 'Desktop: W / S = left end. ↑ / ↓ = right end. Esc = pause.',
@@ -890,7 +806,7 @@ class _GameScreenState extends State<GameScreen>
               ),
               const SizedBox(height: 8),
               Text(
-                'Infinite best ${profile.infiniteBest}  •  Round ${profile.infiniteRound}',
+                'Infinite best ${profile.infiniteBest}m',
                 style: label().copyWith(fontSize: 9, letterSpacing: 1),
               ),
               if (!profile.available)
@@ -914,131 +830,74 @@ class _GameScreenState extends State<GameScreen>
   );
 }
 
-/// Single-pointer rocker per thumb: slide across the neutral zone without lifting.
-class ThumbRocker extends StatefulWidget {
-  const ThumbRocker({
-    super.key,
-    required this.label,
-    required this.enabled,
-    required this.onChanged,
-  });
-  final String label;
-  final bool enabled;
-  final ValueChanged<double> onChanged;
+/// Pointer ownership stays with the grabbed pivot through crossing and release.
+class PivotBoard extends StatefulWidget {
+  const PivotBoard({super.key, required this.game, required this.frame});
+  final BalanceGame game;
+  final Listenable frame;
   @override
-  State<ThumbRocker> createState() => _ThumbRockerState();
+  State<PivotBoard> createState() => _PivotBoardState();
 }
 
-class _ThumbRockerState extends State<ThumbRocker> {
-  int? pointer;
-  double value = 0;
-  void move(double y) {
-    final next = y < 49
-        ? -1.0
-        : y > 63
-        ? 1.0
-        : 0.0;
-    if (next != value) {
-      setState(() => value = next);
-      widget.onChanged(next);
-    }
-  }
-
-  void release() {
-    pointer = null;
-    setState(() => value = 0);
-    widget.onChanged(0);
-  }
-
+class _PivotBoardState extends State<PivotBoard> {
+  final pointers = <int, int>{};
+  final lastY = <int, double>{};
   @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      Semantics(
-        label:
-            '${widget.label} bar control. Hold top to raise, bottom to lower.',
-        child: Listener(
-          behavior: HitTestBehavior.opaque,
-          onPointerDown: (e) {
-            if (widget.enabled && pointer == null) {
-              pointer = e.pointer;
-              move(e.localPosition.dy);
-            }
-          },
-          onPointerMove: (e) {
-            if (e.pointer == pointer) move(e.localPosition.dy);
-          },
-          onPointerUp: (e) {
-            if (e.pointer == pointer) release();
-          },
-          onPointerCancel: (e) {
-            if (e.pointer == pointer) release();
-          },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 80),
-            width: 86,
-            height: 112,
-            decoration: BoxDecoration(
-              color: widget.enabled ? ink : ink.withAlpha(100),
-              borderRadius: BorderRadius.circular(23),
-              border: Border.all(color: brass.withAlpha(140)),
-              boxShadow: [
-                BoxShadow(
-                  color: ink.withAlpha(35),
-                  offset: const Offset(0, 4),
-                  blurRadius: 6,
-                ),
-              ],
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, bounds) {
+      final game = widget.game;
+      final viewport = BoardViewport(bounds.biggest);
+      void release(PointerEvent event) {
+        final side = pointers.remove(event.pointer);
+        lastY.remove(event.pointer);
+        if (side != null) game.releasePivot(side);
+      }
+
+      return Listener(
+        behavior: HitTestBehavior.opaque,
+        onPointerDown: (event) {
+          if (!game.canControl) return;
+          if (!viewport.rect.contains(event.localPosition)) return;
+          final side = event.localPosition.dx < viewport.rect.center.dx ? 0 : 1;
+          final pivot = viewport.project(
+            Offset(
+              side == 0 ? 20 : 340,
+              game.screenY(side == 0 ? game.left : game.right),
             ),
-            child: Column(
-              children: [
-                Expanded(
-                  child: Container(
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: value < 0 ? brass : Colors.transparent,
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(22),
-                      ),
-                    ),
-                    child: Icon(
-                      Icons.keyboard_arrow_up_rounded,
-                      color: value < 0 ? ink : cream,
-                      size: 32,
-                    ),
-                  ),
-                ),
-                Container(width: 26, height: 1, color: cream.withAlpha(45)),
-                Expanded(
-                  child: Container(
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: value > 0 ? brass : Colors.transparent,
-                      borderRadius: const BorderRadius.vertical(
-                        bottom: Radius.circular(22),
-                      ),
-                    ),
-                    child: Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      color: value > 0 ? ink : cream,
-                      size: 32,
-                    ),
-                  ),
-                ),
-              ],
+          );
+          final x = pivot.dx, y = pivot.dy;
+          if ((event.localPosition.dx - x).abs() > 44 ||
+              (event.localPosition.dy - y).abs() > 48 ||
+              pointers.containsValue(side))
+            return;
+          pointers[event.pointer] = side;
+          lastY[event.pointer] = event.localPosition.dy;
+          game.grabPivot(side);
+        },
+        onPointerMove: (event) {
+          final side = pointers[event.pointer];
+          if (side == null || !game.canControl) return;
+          final delta =
+              (event.localPosition.dy - lastY[event.pointer]!) / viewport.scale;
+          lastY[event.pointer] = event.localPosition.dy;
+          game.dragPivot(side, delta);
+        },
+        onPointerUp: release,
+        onPointerCancel: release,
+        child: Semantics(
+          label: 'Drag the left and right ends of the platform up or down',
+          child: RepaintBoundary(
+            child: CustomPaint(
+              painter: BoardPainter(
+                game,
+                repaint: widget.frame,
+                reducedMotion: MediaQuery.of(context).disableAnimations,
+              ),
+              child: const SizedBox.expand(),
             ),
           ),
         ),
-      ),
-      const SizedBox(height: 7),
-      Text(
-        widget.label,
-        style: TextStyle(
-          fontSize: 9,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 2,
-          color: ink.withAlpha(160),
-        ),
-      ),
-    ],
+      );
+    },
   );
 }

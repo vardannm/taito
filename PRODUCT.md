@@ -6,7 +6,7 @@ A beautiful pocket machine you can understand in seconds and keep trying to mast
 
 ## The first release
 
-Classic is the central challenge: clear ten holes with three balls. Practice teaches the mechanics without punishing experimentation. Infinite adds an endless sequence of mirrored rounds with a capped difficulty ramp and a separate record. The current version includes all three modes. Before adding content, watch first-time players on real phones: can they move both ends, understand the lit target, and explain why they lost a ball?
+Classic is the central challenge: clear ten holes with three balls. Practice teaches the mechanics without punishing experimentation. Infinite is a continuous upward survival climb: avoid all holes, score new height, and stay ahead of a red floor that rises when progress stalls. It has one ball and a separate height record. The current version includes all three modes. Before adding content, watch first-time players on real phones: can they move both ends, understand the lit target, and explain why they lost a ball?
 
 Tune motor speed, inertia, target capture radius, and trap spacing from those sessions. Geometric path tests prove routes exist; they do not prove a comfortable human difficulty curve. Prefer a repeatable, legible challenge over excessive random failures.
 

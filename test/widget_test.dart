@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/profile.dart';
+import 'package:balance_arcade/game.dart';
+import 'package:balance_arcade/board_painter.dart';
 
 void main() {
   for (final size in [
@@ -31,52 +33,75 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.text('PRACTICE'), findsOneWidget);
-      expect(find.byType(ThumbRocker), findsNWidgets(2));
+      expect(find.byType(PivotBoard), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
     });
   }
-  testWidgets('two thumbs can independently hold and release rocker controls', (
-    tester,
-  ) async {
-    final values = [0.0, 0.0];
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: Row(
-            children: [
-              ThumbRocker(
-                label: 'LEFT',
-                enabled: true,
-                onChanged: (v) => values[0] = v,
-              ),
-              ThumbRocker(
-                label: 'RIGHT',
-                enabled: true,
-                onChanged: (v) => values[1] = v,
-              ),
-            ],
+  testWidgets(
+    'pivot drags are independent, cancel safely and do not jump on grab',
+    (tester) async {
+      final game = BalanceGame()..start(gameMode: GameMode.practice);
+      final frame = ValueNotifier(0);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SizedBox.expand(
+            child: PivotBoard(game: game, frame: frame),
           ),
         ),
+      );
+      final rect = tester.getRect(find.byType(PivotBoard));
+      Offset point(double x, double y) =>
+          rect.topLeft + BoardViewport(rect.size).project(Offset(x, y));
+      final left = await tester.startGesture(point(20, 526), pointer: 1);
+      final right = await tester.startGesture(point(340, 526), pointer: 2);
+      expect(game.left, 526);
+      await left.moveBy(Offset(0, -20 * BoardViewport(rect.size).scale));
+      await right.moveBy(Offset(0, -10 * BoardViewport(rect.size).scale));
+      for (int i = 0; i < 20; i++) {
+        game.step(1 / 120);
+      }
+      expect(game.left, closeTo(506, .01));
+      expect(game.right, closeTo(516, .01));
+      await left.up();
+      expect(game.pivotTargets[0], isNull);
+      expect(game.pivotTargets[1], isNotNull);
+      await right.cancel();
+      expect(game.pivotTargets, [null, null]);
+      game.setPaused(true);
+      await tester.tapAt(point(20, 506));
+      expect(game.pivotTargets, [null, null]);
+      await tester.pumpWidget(const SizedBox());
+      frame.dispose();
+    },
+  );
+
+  testWidgets('gameplay viewport respects tablet safe area', (tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1;
+    tester.view.padding = FakeViewPadding(
+      top: 44,
+      bottom: 34,
+      left: 12,
+      right: 12,
+    );
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      ArcadeApp(
+        profile: PlayerProfile()
+          ..sound = false
+          ..haptics = false,
       ),
     );
-    final a = tester.getTopLeft(find.byType(ThumbRocker).first);
-    final b = tester.getTopLeft(find.byType(ThumbRocker).last);
-    final left = await tester.startGesture(
-      a + const Offset(40, 20),
-      pointer: 1,
-    );
-    final right = await tester.startGesture(
-      b + const Offset(40, 20),
-      pointer: 2,
-    );
-    expect(values, [-1, -1]);
-    await left.moveTo(a + const Offset(40, 90));
-    expect(values, [1, -1]);
-    await left.up();
-    expect(values, [0, -1]);
-    await right.cancel();
-    expect(values, [0, 0]);
+    await tester.tap(find.text('CLASSIC'));
+    await tester.pump();
+    final rect = tester.getRect(find.byType(PivotBoard));
+    expect(rect.left, 12);
+    expect(rect.right, 788);
+    expect(rect.bottom, 1166);
+    expect(rect.top, greaterThanOrEqualTo(44));
+    expect(rect.height, greaterThan(1000));
     expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
   });
 }

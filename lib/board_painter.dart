@@ -9,6 +9,36 @@ const ink = Color(0xFF163D3B);
 const orange = Color(0xFFCD542F);
 const brass = Color(0xFFD9AE65);
 
+/// One transform shared by rendering and pointer hit testing.
+class BoardViewport {
+  BoardViewport(Size size)
+    : scale = math.min(
+        size.width / BalanceGame.width,
+        size.height / BalanceGame.height,
+      ),
+      offset = Offset(
+        (size.width -
+                BalanceGame.width *
+                    math.min(
+                      size.width / BalanceGame.width,
+                      size.height / BalanceGame.height,
+                    )) /
+            2,
+        (size.height -
+                BalanceGame.height *
+                    math.min(
+                      size.width / BalanceGame.width,
+                      size.height / BalanceGame.height,
+                    )) /
+            2,
+      );
+  final double scale;
+  final Offset offset;
+  Offset project(Offset point) => offset + point * scale;
+  Rect get rect =>
+      offset & Size(BalanceGame.width * scale, BalanceGame.height * scale);
+}
+
 class BoardPainter extends CustomPainter {
   BoardPainter(this.game, {this.reducedMotion = false, Listenable? repaint})
     : super(repaint: repaint);
@@ -44,7 +74,9 @@ class BoardPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
-    canvas.scale(size.width / 360, size.height / 560);
+    final viewport = BoardViewport(size);
+    canvas.translate(viewport.offset.dx, viewport.offset.dy);
+    canvas.scale(viewport.scale);
     final outer = RRect.fromRectAndRadius(
       const Rect.fromLTWH(0, 0, 360, 560),
       const Radius.circular(22),
@@ -118,8 +150,8 @@ class BoardPainter extends CustomPainter {
       }
     }
     for (final hole in game.board) {
-      final p = Offset(hole.x, hole.y);
-      final active = hole.target == game.target.clamp(1, 10);
+      final p = Offset(hole.x, game.screenY(hole.y));
+      final active = !game.infinite && hole.target == game.target.clamp(1, 10);
       final done = hole.target > 0 && hole.target < game.target;
       if (active) {
         final pulse = reducedMotion ? .5 : (math.sin(game.clock * 3.5) + 1) / 2;
@@ -198,7 +230,55 @@ class BoardPainter extends CustomPainter {
       ink.withAlpha(180),
       spacing: 2,
     );
-    final a = Offset(20, game.left), b = Offset(340, game.right);
+    if (game.infinite) {
+      for (
+        int mark = (game.maxHeight / 100).floor() - 4;
+        mark < (game.maxHeight / 100).floor() + 7;
+        mark++
+      ) {
+        final y = game.screenY(519 - mark * 100.0);
+        if (mark >= 0 && y > 28 && y < 530) {
+          text(canvas, '${mark * 10}m', Offset(315, y), 7, ink.withAlpha(145));
+          canvas.drawLine(
+            Offset(30, y),
+            Offset(42, y),
+            Paint()
+              ..color = ink.withAlpha(90)
+              ..strokeWidth = 1,
+          );
+        }
+      }
+      final top = game.screenY(game.dangerY).clamp(10.0, 550.0);
+      if (top < 550) {
+        final danger = Rect.fromLTRB(10, top, 350, 550);
+        canvas.drawRect(
+          danger,
+          Paint()
+            ..shader = const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0x88F24B38), Color(0xE0AC231C)],
+            ).createShader(danger),
+        );
+        canvas.drawLine(
+          Offset(10, top),
+          Offset(350, top),
+          Paint()
+            ..color = const Color(0xFFFF6852)
+            ..strokeWidth = 3,
+        );
+        text(
+          canvas,
+          'KEEP CLIMBING',
+          Offset(180, math.min(top + 18, 530)),
+          9,
+          cream,
+          spacing: 2,
+        );
+      }
+    }
+    final a = Offset(20, game.screenY(game.left)),
+        b = Offset(340, game.screenY(game.right));
     canvas.drawLine(
       a + const Offset(0, 6),
       b + const Offset(0, 6),
@@ -233,15 +313,30 @@ class BoardPainter extends CustomPainter {
     for (final p in [a, b]) {
       canvas.drawRRect(
         RRect.fromRectAndRadius(
-          Rect.fromCenter(center: p, width: 12, height: 19),
+          Rect.fromCenter(
+            center: p,
+            width: game.started ? 27 : 12,
+            height: game.started ? 32 : 19,
+          ),
           const Radius.circular(3),
         ),
         Paint()..color = ink,
       );
       canvas.drawCircle(p, 2, Paint()..color = brass);
+      if (game.started) {
+        for (final dy in [-7.0, 7.0]) {
+          canvas.drawLine(
+            p + Offset(-6, dy),
+            p + Offset(6, dy),
+            Paint()
+              ..color = brass
+              ..strokeWidth = 1.5,
+          );
+        }
+      }
     }
     if (game.ballScale > 0) {
-      final p = Offset(game.visualX, game.visualY);
+      final p = Offset(game.visualX, game.screenY(game.visualY));
       canvas.drawCircle(
         p + const Offset(2, 4),
         7 * game.ballScale,
@@ -271,7 +366,7 @@ class BoardPainter extends CustomPainter {
     }
     if (game.phase == GamePhase.sinking && !reducedMotion) {
       final t = (game.phaseTime / .7).clamp(0.0, 1.0);
-      final p = Offset(game.captureX, game.captureY);
+      final p = Offset(game.captureX, game.screenY(game.captureY));
       final color = game.lastSuccess ? const Color(0xFFEEFFE4) : orange;
       canvas.drawCircle(
         p,

@@ -56,18 +56,76 @@ class BalanceGame {
     Hole(308, 53),
   ];
 
-  static final _mirroredHoles = List<Hole>.unmodifiable(
-    holes.map((hole) => Hole(width - hole.x, hole.y, target: hole.target)),
-  );
   GameMode mode = GameMode.classic;
-  int round = 1;
-  bool _nextRound = false;
+  final List<Hole> _endlessHoles = [];
+  int _nextRow = 0;
+  double cameraOffset = 0, maxHeight = 0, stallTime = 0, dangerY = 580;
+  double _progressAnchor = 0;
   bool get infinite => mode == GameMode.infinite;
   bool get practice => mode == GameMode.practice;
-  List<Hole> get board => infinite && round.isEven ? _mirroredHoles : holes;
-  int get roundCompleted => infinite ? completed - (round - 1) * 10 : completed;
-  // Difficulty grows for eight rounds, then stays challenging but controllable.
-  double get difficulty => infinite ? 1 + math.min(round - 1, 8) * .05 : 1;
+  List<Hole> get board => infinite ? _endlessHoles : holes;
+  int get roundCompleted => completed;
+  double screenY(double worldY) => worldY + (infinite ? cameraOffset : 0);
+  bool get dangerActive => infinite && stallTime >= 3;
+  double get dangerDistance => dangerY - ballY;
+
+  void _extendBoard() {
+    while (420 - _nextRow * 72 >= -cameraOffset - 120) {
+      final row = _nextRow++;
+      final corridor = 180 + 78 * math.sin(row * .65);
+      final random = math.Random(731 + row * 7919);
+      final selected = <double>[];
+      // Seal alternating edges and vary x positions so no straight safe lane repeats forever.
+      if (row % 4 == 0) selected.add(28);
+      if (row % 4 == 1) selected.add(332);
+      for (int attempt = 0; attempt < 60 && selected.length < 3; attempt++) {
+        final x = 28 + random.nextDouble() * 304;
+        if ((x - corridor).abs() > 54 &&
+            selected.every((other) => (other - x).abs() > 27))
+          selected.add(x);
+      }
+      for (final x in selected) {
+        _endlessHoles.add(Hole(x, 420 - row * 72.0));
+      }
+    }
+    _endlessHoles.removeWhere((hole) => screenY(hole.y) > 620);
+  }
+
+  void _updateClimb(double dt) {
+    maxHeight = math.max(maxHeight, 519 - ballY);
+    score = (maxHeight / 10).floor();
+    if (maxHeight >= _progressAnchor + 4) {
+      _progressAnchor = maxHeight;
+      stallTime = 0;
+    } else {
+      stallTime += dt;
+    }
+    cameraOffset = math.max(cameraOffset, 320 - ballY);
+    // The floor follows below the viewport but only enters it when progress stalls.
+    dangerY = math.min(dangerY, 580 - cameraOffset);
+    if (dangerActive) dangerY -= (24 + math.min(stallTime - 3, 5) * 16) * dt;
+    message = dangerActive
+        ? 'KEEP CLIMBING! The red is rising.'
+        : 'Climb higher. Every hole is a trap.';
+    _extendBoard();
+    if (ballY + ballRadius >= dangerY) {
+      _loseClimb('The red caught you. Keep moving next time.');
+    }
+  }
+
+  void _loseClimb(String reason, {Hole? hole}) {
+    captureX = hole?.x ?? ballX;
+    captureY = hole?.y ?? ballY;
+    lives = 0;
+    misses++;
+    lastSuccess = false;
+    message = reason;
+    event = GameEvent.miss;
+    clearInput();
+    velocity = leftSpeed = rightSpeed = 0;
+    phase = GamePhase.sinking;
+    phaseTime = 0;
+  }
 
   double left = 526, right = 526, ballX = 180, velocity = 0;
   double leftSpeed = 0, rightSpeed = 0;
@@ -95,7 +153,32 @@ class BalanceGame {
       : 1;
   int get multiplier => (1 + streak ~/ 3).clamp(1, 4);
 
+  final pivotTargets = <double?>[null, null];
+
+  void grabPivot(int side) {
+    if (!canControl) return;
+    pivotTargets[side] = side == 0 ? left : right;
+  }
+
+  void dragPivot(int side, double delta) {
+    if (!canControl || !delta.isFinite || pivotTargets[side] == null) return;
+    final other = side == 0 ? right : left;
+    final minimum = infinite ? other - 180 : 30.0;
+    final maximum = infinite ? math.min(526.0, other + 180) : 526.0;
+    pivotTargets[side] = (pivotTargets[side]! + delta).clamp(minimum, maximum);
+  }
+
+  void releasePivot(int side) {
+    pivotTargets[side] = null;
+    if (side == 0) {
+      leftSpeed = 0;
+    } else {
+      rightSpeed = 0;
+    }
+  }
+
   void clearInput() {
+    pivotTargets.fillRange(0, 2, null);
     leftInput = rightInput = 0;
     inputEpoch++;
   }
@@ -115,10 +198,13 @@ class BalanceGame {
 
   void start({GameMode gameMode = GameMode.classic}) {
     mode = gameMode;
-    round = 1;
-    _nextRound = false;
+    cameraOffset = maxHeight = stallTime = _progressAnchor = 0;
+    dangerY = 580;
+    _nextRow = 0;
+    _endlessHoles.clear();
+    if (infinite) _extendBoard();
     target = 1;
-    lives = 3;
+    lives = infinite ? 1 : 3;
     score = streak = bestStreak = completed = misses = 0;
     elapsed = phaseTime = 0;
     won = paused = false;
@@ -126,7 +212,7 @@ class BalanceGame {
     phase = GamePhase.playing;
     event = null;
     message = infinite
-        ? 'Round 01. How far can you go?'
+        ? 'Climb higher. Every hole is a trap.'
         : 'Raise both ends. Find the glowing 01.';
     resetBall();
   }
@@ -172,13 +258,6 @@ class BalanceGame {
       left = returnLeft + (526 - returnLeft) * ease;
       right = returnRight + (526 - returnRight) * ease;
       if (t >= 1) {
-        if (_nextRound) {
-          round++;
-          target = 1;
-          _nextRound = false;
-          message =
-              'Round ${round.toString().padLeft(2, '0')}. New route. Stay steady.';
-        }
         resetBall();
         phase = GamePhase.playing;
         phaseTime = 0;
@@ -190,14 +269,30 @@ class BalanceGame {
     final oldX = ballX, oldY = ballY;
     // Motor easing removes abrupt starts; near-immediate braking keeps it precise.
     final response = 1 - math.exp(-22 * dt);
-    final motor = practice ? 78.0 : 91.0 * difficulty;
+    final motor = practice ? 78.0 : 91.0;
     leftSpeed += ((leftInput.clamp(-1, 1) * motor) - leftSpeed) * response;
     rightSpeed += ((rightInput.clamp(-1, 1) * motor) - rightSpeed) * response;
-    left = (left + leftSpeed * dt).clamp(30.0, 526.0);
-    right = (right + rightSpeed * dt).clamp(30.0, 526.0);
+    // Follow the finger through fixed physics steps, preserving swept collisions.
+    // Cap catch-up speed so a fast swipe cannot teleport through hazards.
+    if (pivotTargets[0] != null) {
+      leftSpeed = ((pivotTargets[0]! - left) / dt).clamp(-300.0, 300.0);
+    }
+    if (pivotTargets[1] != null) {
+      rightSpeed = ((pivotTargets[1]! - right) / dt).clamp(-300.0, 300.0);
+    }
+    final minimum = infinite ? double.negativeInfinity : 30.0;
+    left = (left + leftSpeed * dt).clamp(minimum, 526.0);
+    right = (right + rightSpeed * dt).clamp(minimum, 526.0);
+    if (infinite && (right - left).abs() > 180) {
+      if (left < right) {
+        left = right - 180;
+      } else {
+        right = left - 180;
+      }
+    }
     // A rolling sphere: 5/7 of gravity projected onto the bar, then onto x.
     final slope = (right - left) / 320;
-    velocity += (5 / 7) * 660 * difficulty * slope / (1 + slope * slope) * dt;
+    velocity += (5 / 7) * 660 * slope / (1 + slope * slope) * dt;
     velocity *= math.exp(-.48 * dt);
     velocity = velocity.clamp(-245.0, 245.0);
     ballX += velocity * dt;
@@ -208,6 +303,10 @@ class BalanceGame {
     if (ballX > 332) {
       ballX = 332;
       velocity = -velocity.abs() * .22;
+    }
+    if (infinite) {
+      _updateClimb(dt);
+      if (phase != GamePhase.playing) return;
     }
     for (final hole in board) {
       // Swept segment collision prevents fast balls skipping a hole between frames.
@@ -229,6 +328,10 @@ class BalanceGame {
   }
 
   void _capture(Hole hole) {
+    if (infinite) {
+      _loseClimb('Into a trap. One more climb?', hole: hole);
+      return;
+    }
     captureX = hole.x;
     captureY = hole.y;
     lastSuccess = hole.target == target;
@@ -238,17 +341,13 @@ class BalanceGame {
       completed++;
       final timeBonus = (math.max(0, 35 - legTime) * 10).round();
       lastAward = (target * 100 + timeBonus) * multiplier;
-      if (infinite && target == 10) lastAward += round * 1000;
       score += lastAward;
       target++;
-      _nextRound = infinite && target > 10;
-      won = !infinite && target > 10;
-      message = _nextRound
-          ? 'Round $round clear! +$lastAward. Keep climbing.'
-          : won
+      won = target > 10;
+      message = won
           ? 'All ten. Beautifully done.'
           : '+$lastAward  /  ${streak > 1 ? '$streak in a row' : 'Beautifully balanced'}';
-      event = won || _nextRound ? GameEvent.complete : GameEvent.target;
+      event = won ? GameEvent.complete : GameEvent.target;
     } else {
       misses++;
       streak = 0;
