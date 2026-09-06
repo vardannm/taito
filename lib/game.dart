@@ -65,7 +65,7 @@ class BalanceGame {
   static const firstRow = 300.0;
 
   /// Brisk initial pace, reaching the cap after one minute of survival.
-  double get ascentSpeed => 54 + math.min(elapsed / 60, 1) * 36;
+  double get ascentSpeed => 60 + math.min(elapsed / 25, 1) * 60;
   bool get infinite => mode == GameMode.infinite;
   bool get practice => mode == GameMode.practice;
   List<Hole> get board => infinite ? _endlessHoles : holes;
