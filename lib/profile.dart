@@ -11,6 +11,8 @@ class PlayerProfile {
   bool sound = true, haptics = true;
   bool available = true;
   bool tutorialSeen = false;
+  ControlMode controlMode = ControlMode.twoFinger;
+  int classicLevel = 1;
 
   Future<void> completeTutorial() async {
     tutorialSeen = true;
@@ -38,6 +40,13 @@ class PlayerProfile {
   Future<void> load() async {
     try {
       tutorialSeen = await storage.getBool('gilt.tutorial.v1.seen') ?? false;
+      controlMode = await storage.getBool('gilt.oneFinger') == true
+          ? ControlMode.oneFinger
+          : ControlMode.twoFinger;
+      classicLevel = (await storage.getInt('gilt.classicLevel') ?? 1).clamp(
+        1,
+        30,
+      );
       best = await storage.getInt('gilt.best') ?? 0;
       runs = await storage.getInt('gilt.runs') ?? 0;
       infiniteBest = await storage.getInt('gilt.ascent.best') ?? 0;
@@ -57,6 +66,11 @@ class PlayerProfile {
       await storage.setInt('gilt.ascent.runs', infiniteRuns);
       await storage.setBool('gilt.sound', sound);
       await storage.setBool('gilt.haptics', haptics);
+      await storage.setBool(
+        'gilt.oneFinger',
+        controlMode == ControlMode.oneFinger,
+      );
+      await storage.setInt('gilt.classicLevel', classicLevel);
     } catch (_) {
       available = false;
     }

@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/profile.dart';
+import 'package:balance_arcade/hazards.dart';
+import 'package:balance_arcade/game.dart';
 
 Future<void> saveImage(ui.Image image, String path) async {
   final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
@@ -75,8 +77,22 @@ void main() {
     await tester.pump();
     await capture('drag-home');
     await tester.tap(find.text('CLASSIC'));
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await capture('classic-levels');
+    await tester.tap(find.text('First steps'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     await capture('drag-game');
+    final classic = tester.widget<PivotBoard>(find.byType(PivotBoard)).game;
+    classic.setControlMode(ControlMode.oneFinger);
+    classic.start();
+    await tester.pump(const Duration(milliseconds: 16));
+    await capture('one-finger-classic');
+    classic.setControlPosition(.65);
+    await tester.pump(const Duration(milliseconds: 16));
+    await capture('one-finger-tilted');
+    classic.setControlMode(ControlMode.twoFinger);
     tester.view.physicalSize = const Size(1130, 900);
     tester.view.padding = FakeViewPadding();
     await tester.pump();
@@ -96,6 +112,21 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
     }
     await capture('ascent-moving');
+    // Stage each hazard state for visual QA, without claiming a human playthrough.
+    final game = tester.widget<PivotBoard>(find.byType(PivotBoard)).game;
+    for (final kind in HazardKind.values) {
+      final hazard = SpecialHazard(kind, x: 100, y: 260);
+      game.specialHazards
+        ..clear()
+        ..add(hazard);
+      game.stallTime = 0;
+      hazard.step(1, 0);
+      await tester.pump(const Duration(milliseconds: 16));
+      await capture('hazard-${kind.name}-warning');
+      hazard.step(1.1, 0);
+      await tester.pump(const Duration(milliseconds: 16));
+      await capture('hazard-${kind.name}-active');
+    }
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

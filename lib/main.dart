@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 
 import 'board_painter.dart';
 import 'game.dart';
+import 'levels.dart';
 import 'profile.dart';
 import 'tutorial.dart';
 
@@ -155,8 +156,40 @@ class _GameScreenState extends State<GameScreen>
   void start(GameMode mode) => setState(() {
     clearControls();
     recorded = newBest = false;
-    game.start(gameMode: mode);
+    game.setControlMode(profile.controlMode);
+    game.start(gameMode: mode, levelNumber: profile.classicLevel);
   });
+  Future<void> selectLevel() => showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: cream,
+    showDragHandle: true,
+    builder: (context) => SafeArea(
+      child: ListView.builder(
+        itemCount: 30,
+        itemBuilder: (context, index) => ListTile(
+          leading: Text('${index + 1}'.padLeft(2, '0'), style: label()),
+          title: Text(ClassicLevels.names[index]),
+          subtitle: Text(
+            [
+              'Beginner',
+              'Easy',
+              'Medium',
+              'Medium / Hard',
+              'Hard',
+              'Expert',
+            ][index ~/ 5],
+          ),
+          selected: profile.classicLevel == index + 1,
+          onTap: () {
+            profile.classicLevel = index + 1;
+            unawaited(profile.save());
+            Navigator.pop(context);
+            start(GameMode.classic);
+          },
+        ),
+      ),
+    ),
+  );
   void pause() => setState(() {
     clearControls();
     game.setPaused(!game.paused);
@@ -353,8 +386,8 @@ class _GameScreenState extends State<GameScreen>
                                 Expanded(
                                   child: primary(
                                     'CLASSIC',
-                                    () => start(GameMode.classic),
-                                    trailing: '10',
+                                    selectLevel,
+                                    trailing: '30',
                                   ),
                                 ),
                                 const SizedBox(width: 10),
@@ -482,9 +515,15 @@ class _GameScreenState extends State<GameScreen>
       ),
       Text(
         game.infinite
-            ? (game.dangerActive ? 'RED RISING' : 'TILT TO DODGE')
-            : 'HOLE ${game.target.clamp(1, 10).toString().padLeft(2, '0')} / 10',
-        style: label(game.dangerActive ? orange : ink),
+            ? (game.dangerActive
+                  ? 'RED RISING'
+                  : game.hazardLabel.isNotEmpty
+                  ? game.hazardLabel
+                  : 'TILT TO DODGE')
+            : 'L${game.level.toString().padLeft(2, '0')}  •  HOLE ${game.target.clamp(1, 10).toString().padLeft(2, '0')} / 10',
+        style: label(
+          game.dangerActive || game.hazardLabel.isNotEmpty ? orange : ink,
+        ),
       ),
     ],
   );
@@ -644,7 +683,7 @@ class _GameScreenState extends State<GameScreen>
                 ),
                 Text(
                   game.infinite
-                      ? '${game.score} meters climbed. One ball. No limits.'
+                      ? game.message
                       : '${game.completed}/10 holes  •  ${game.bestStreak} best streak',
                   style: const TextStyle(
                     fontSize: 12,
@@ -666,9 +705,27 @@ class _GameScreenState extends State<GameScreen>
                     backgroundColor: brass,
                     foregroundColor: ink,
                   ),
-                  onPressed: game.paused ? pause : () => start(game.mode),
+                  onPressed: game.paused
+                      ? pause
+                      : () {
+                          if (game.won &&
+                              !game.infinite &&
+                              !game.practice &&
+                              game.level < 30) {
+                            profile.classicLevel = game.level + 1;
+                            unawaited(profile.save());
+                          }
+                          start(game.mode);
+                        },
                   child: Text(
-                    game.paused ? 'RESUME RUN' : 'ONE MORE RUN',
+                    game.paused
+                        ? 'RESUME RUN'
+                        : game.won &&
+                              !game.infinite &&
+                              !game.practice &&
+                              game.level < 30
+                        ? 'NEXT LEVEL'
+                        : 'ONE MORE RUN',
                     style: label(),
                   ),
                 ),
@@ -730,6 +787,11 @@ class _GameScreenState extends State<GameScreen>
                 'Desktop: W / S = left end. ↑ / ↓ = right end. Esc = pause.',
                 style: TextStyle(fontSize: 12, height: 1.5),
               ),
+              guideRow(
+                '05',
+                'Watch the warnings.',
+                'Infinite starts with open spaces and builds difficulty with height. Warning holes unlock at 180m, moving holes at 350m, lasers at 600m and platform gaps at 900m. Move away from red warnings before they activate.',
+              ),
               const SizedBox(height: 20),
               primary('TRY PRACTICE', () {
                 Navigator.pop(context);
@@ -789,58 +851,88 @@ class _GameScreenState extends State<GameScreen>
     showDragHandle: true,
     builder: (context) => StatefulBuilder(
       builder: (context, update) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Make yourself at home.',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 14),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Arcade sounds'),
-                value: profile.sound,
-                onChanged: (v) {
-                  update(() => profile.sound = v);
-                  unawaited(profile.save());
-                },
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Haptic feedback'),
-                value: profile.haptics,
-                onChanged: (v) {
-                  update(() => profile.haptics = v);
-                  unawaited(profile.save());
-                },
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Classic best ${profile.best}  •  ${profile.runs} runs',
-                style: label(),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Infinite best ${profile.infiniteBest}m',
-                style: label().copyWith(fontSize: 9, letterSpacing: 1),
-              ),
-              if (!profile.available)
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Make yourself at home.',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 14),
+                DropdownButtonFormField<ControlMode>(
+                  isExpanded: true,
+                  initialValue: profile.controlMode,
+                  decoration: const InputDecoration(labelText: 'Control mode'),
+                  items: const [
+                    DropdownMenuItem(
+                      value: ControlMode.twoFinger,
+                      child: Text('Two-Finger Control'),
+                    ),
+                    DropdownMenuItem(
+                      value: ControlMode.oneFinger,
+                      child: Text('One-Finger Control'),
+                    ),
+                  ],
+                  onChanged: (mode) {
+                    if (mode == null) return;
+                    update(() => profile.controlMode = mode);
+                    game.setControlMode(mode);
+                    unawaited(profile.save());
+                  },
+                ),
                 const Padding(
-                  padding: EdgeInsets.only(top: 10),
+                  padding: EdgeInsets.only(top: 8),
                   child: Text(
-                    'Local storage is unavailable. Records will last for this session.',
-                    textAlign: TextAlign.center,
+                    'One finger: slide the short lower handle left or right to tilt. In Classic the platform rises automatically.',
+                    style: TextStyle(fontSize: 12),
                   ),
                 ),
-              const SizedBox(height: 12),
-              const Text(
-                'GILT / No rush. Just precision.',
-                style: TextStyle(fontSize: 11),
-              ),
-            ],
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Arcade sounds'),
+                  value: profile.sound,
+                  onChanged: (v) {
+                    update(() => profile.sound = v);
+                    unawaited(profile.save());
+                  },
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Haptic feedback'),
+                  value: profile.haptics,
+                  onChanged: (v) {
+                    update(() => profile.haptics = v);
+                    unawaited(profile.save());
+                  },
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Classic best ${profile.best}  •  ${profile.runs} runs',
+                  style: label(),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Infinite best ${profile.infiniteBest}m',
+                  style: label().copyWith(fontSize: 9, letterSpacing: 1),
+                ),
+                if (!profile.available)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 10),
+                    child: Text(
+                      'Local storage is unavailable. Records will last for this session.',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                const Text(
+                  'GILT / No rush. Just precision.',
+                  style: TextStyle(fontSize: 11),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -860,15 +952,21 @@ class PivotBoard extends StatefulWidget {
 class _PivotBoardState extends State<PivotBoard> {
   final pointers = <int, int>{};
   final lastY = <int, double>{};
+  int epoch = -1;
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, bounds) {
       final game = widget.game;
+      if (epoch != game.inputEpoch) {
+        pointers.clear();
+        lastY.clear();
+        epoch = game.inputEpoch;
+      }
       final viewport = BoardViewport(bounds.biggest);
       void release(PointerEvent event) {
         final side = pointers.remove(event.pointer);
         lastY.remove(event.pointer);
-        if (side != null) game.releasePivot(side);
+        if (side != null && side < 2) game.releasePivot(side);
       }
 
       return Listener(
@@ -876,6 +974,22 @@ class _PivotBoardState extends State<PivotBoard> {
         onPointerDown: (event) {
           if (!game.canControl) return;
           if (!viewport.rect.contains(event.localPosition)) return;
+          if (epoch != game.inputEpoch) {
+            pointers.clear();
+            lastY.clear();
+            epoch = game.inputEpoch;
+          }
+          if (game.oneFinger) {
+            final point =
+                (event.localPosition - viewport.offset) / viewport.scale;
+            if (pointers.isNotEmpty ||
+                (point.dy - game.controlY).abs() > 30 ||
+                (point.dx - (180 + game.controlPosition * 110)).abs() > 32)
+              return;
+            pointers[event.pointer] = 2;
+            lastY[event.pointer] = point.dx - game.controlPosition * 110;
+            return;
+          }
           final side = event.localPosition.dx < viewport.rect.center.dx ? 0 : 1;
           final pivot = viewport.project(
             Offset(
@@ -894,7 +1008,14 @@ class _PivotBoardState extends State<PivotBoard> {
         },
         onPointerMove: (event) {
           final side = pointers[event.pointer];
-          if (side == null || !game.canControl) return;
+          if (side == null || !game.canControl || epoch != game.inputEpoch)
+            return;
+          if (side == 2) {
+            final x =
+                (event.localPosition.dx - viewport.offset.dx) / viewport.scale;
+            game.setControlPosition((x - lastY[event.pointer]!) / 110);
+            return;
+          }
           final delta =
               (event.localPosition.dy - lastY[event.pointer]!) / viewport.scale;
           lastY[event.pointer] = event.localPosition.dy;
@@ -903,7 +1024,9 @@ class _PivotBoardState extends State<PivotBoard> {
         onPointerUp: release,
         onPointerCancel: release,
         child: Semantics(
-          label: 'Drag the left and right ends of the platform up or down',
+          label: game.oneFinger
+              ? 'Drag the short lower handle left or right to tilt'
+              : 'Drag the left and right ends of the platform up or down',
           child: RepaintBoundary(
             child: CustomPaint(
               painter: BoardPainter(

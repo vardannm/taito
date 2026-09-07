@@ -6,9 +6,19 @@ import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/profile.dart';
 import 'game_test.dart' show advance, placeAt;
 
+// Isolate score/idle-floor tests from the independent trap collision system.
+void advanceWithoutTraps(BalanceGame game, double seconds) {
+  for (var i = 0; i < (seconds * 120).round(); i++) {
+    game.board.clear();
+    game.specialHazards.clear();
+    game.step(1 / 120);
+  }
+}
+
 void placeAtSafeHeight(BalanceGame game, double height) {
   final y = BalanceGame.infiniteStart - BalanceGame.ballRadius - height;
   game.cameraOffset = math.max(0, 300 - y);
+  game.ensureInfiniteBoard();
   final x = [180.0, 70.0, 290.0, 120.0, 240.0].firstWhere(
     (x) => game.board.every(
       (h) => math.pow(x - h.x, 2) + math.pow(y - h.y, 2) > 18 * 18,
@@ -41,6 +51,8 @@ void main() {
     () {
       final game = BalanceGame()..start(gameMode: GameMode.infinite);
       for (int i = 1; i <= 1000; i++) {
+        game.specialHazards.clear();
+        game.stallTime = 0;
         placeAtSafeHeight(game, i * 5.0);
       }
       expect(game.finished, isFalse);
@@ -54,13 +66,13 @@ void main() {
   );
   test('staying still raises the red floor and ends the run', () {
     final game = BalanceGame()..start(gameMode: GameMode.infinite);
-    advance(game, 2.8);
+    advanceWithoutTraps(game, 2.8);
     expect(game.dangerActive, isFalse);
     expect(game.score, greaterThan(0));
-    advance(game, .5);
+    advanceWithoutTraps(game, .5);
     expect(game.dangerActive, isTrue);
     expect(game.dangerY, lessThan(580));
-    advance(game, 8);
+    advanceWithoutTraps(game, 8);
     expect(game.finished, isTrue);
     expect(game.lives, 0);
     expect(game.message, contains('red caught'));
@@ -68,11 +80,15 @@ void main() {
   test('old-height movement cannot farm score or reset the stall timer', () {
     final game = BalanceGame()..start(gameMode: GameMode.infinite);
     placeAtSafeHeight(game, 60);
-    advance(game, 1.5);
+    advanceWithoutTraps(game, 1.5);
     final peakScore = game.score;
     for (int i = 0; i < 30; i++) {
+      game.board.clear();
+      game.specialHazards.clear();
+      // Keep the floor offscreen while this test teleports the camera backward.
+      game.dangerY = 580;
       placeAtSafeHeight(game, i.isEven ? 30 : 60);
-      advance(game, .06);
+      advanceWithoutTraps(game, .06);
     }
     expect(game.score, peakScore);
     expect(game.dangerActive, isTrue);

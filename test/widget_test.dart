@@ -97,6 +97,9 @@ void main() {
     );
     await tester.tap(find.text('CLASSIC'));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('First steps'));
+    await tester.pump();
     final rect = tester.getRect(find.byType(PivotBoard));
     expect(rect.left, 12);
     expect(rect.right, 788);

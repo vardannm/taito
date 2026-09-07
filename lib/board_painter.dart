@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'game.dart';
+import 'hazards.dart';
+import 'hazard_painter.dart';
 
 const cream = Color(0xFFF2ECDD);
 const ink = Color(0xFF163D3B);
@@ -279,6 +281,19 @@ class BoardPainter extends CustomPainter {
         );
       }
     }
+    paintSpecialHazards(canvas, game, reducedMotion);
+    canvas.save();
+    for (final gap in game.specialHazards.where(
+      (h) => h.kind == HazardKind.platformGap && h.active,
+    )) {
+      canvas.clipPath(
+        Path.combine(
+          PathOperation.difference,
+          Path()..addRect(const Rect.fromLTWH(0, 0, 360, 560)),
+          Path()..addRect(Rect.fromLTRB(gap.gapLeft, 0, gap.gapRight, 560)),
+        ),
+      );
+    }
     final a = Offset(20, game.screenY(game.left)),
         b = Offset(340, game.screenY(game.right));
     canvas.drawLine(
@@ -312,6 +327,51 @@ class BoardPainter extends CustomPainter {
         ..color = const Color(0xFFFFFFE8)
         ..strokeWidth = 1.2,
     );
+    canvas.restore();
+    paintGapWarning(canvas, game, reducedMotion);
+    if (game.oneFinger && game.started) {
+      final y = game.controlY;
+      final x = 180 + game.controlPosition * 110;
+      canvas.drawLine(
+        Offset(70, y),
+        Offset(290, y),
+        Paint()
+          ..color = ink.withAlpha(100)
+          ..strokeWidth = 2,
+      );
+      canvas.drawLine(
+        Offset(180, game.screenY((game.left + game.right) / 2)),
+        Offset(x, y),
+        Paint()
+          ..color = ink.withAlpha(130)
+          ..strokeWidth = 2,
+      );
+      for (final end in [70.0, 180.0, 290.0]) {
+        canvas.drawLine(
+          Offset(end, y - 4),
+          Offset(end, y + 4),
+          Paint()
+            ..color = ink
+            ..strokeWidth = 2,
+        );
+      }
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: Offset(x, y), width: 18, height: 30),
+          const Radius.circular(5),
+        ),
+        Paint()..color = ink,
+      );
+      for (final dy in [-5.0, 0.0, 5.0]) {
+        canvas.drawLine(
+          Offset(x - 4, y + dy),
+          Offset(x + 4, y + dy),
+          Paint()
+            ..color = brass
+            ..strokeWidth = 1.5,
+        );
+      }
+    }
     for (final p in [a, b]) {
       canvas.drawRRect(
         RRect.fromRectAndRadius(

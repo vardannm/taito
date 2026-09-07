@@ -73,8 +73,10 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.byType(FirstPlayTutorial), findsOneWidget);
+    await tester.ensureVisible(find.text('NEXT'));
     await tester.tap(find.text('NEXT'));
     await tester.pump();
+    await tester.ensureVisible(find.text('BACK'));
     await tester.tap(find.text('BACK'));
     await tester.pump();
     expect(find.text('Two fingers. One platform.'), findsOneWidget);

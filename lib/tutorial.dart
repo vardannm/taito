@@ -25,7 +25,7 @@ class _FirstPlayTutorialState extends State<FirstPlayTutorial>
   static const descriptions = [
     'Drag the left and right grips up or down. Tilt to roll the ball. Raise both ends to lift it. Release to hold.',
     'In Classic, reach the glowing numbered hole. Avoid the others. Clear all ten with three balls.',
-    'In Infinite, holes move down toward you. Tilt to dodge every hole and earn height. Stop steering and the red floor rises.',
+    'In Infinite, dodge the holes moving toward you. Red warnings signal new traps, lasers and platform gaps. Stop steering and the red floor rises.',
   ];
   @override
   void dispose() {

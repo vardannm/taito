@@ -50,10 +50,10 @@ void main() {
 
   test('ascent accelerates gradually and has a fixed speed cap', () {
     final game = BalanceGame()..start(gameMode: GameMode.infinite);
-    expect(game.ascentSpeed, 54);
-    game.elapsed = 30;
-    expect(game.ascentSpeed, 72);
-    game.elapsed = 10000;
-    expect(game.ascentSpeed, 90);
+    expect(game.ascentSpeed, 60);
+    game.maxHeight = 4500;
+    expect(game.ascentSpeed, 120);
+    game.maxHeight = 100000;
+    expect(game.ascentSpeed, 180);
   });
 }

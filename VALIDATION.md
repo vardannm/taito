@@ -1,5 +1,31 @@
 # Validation record
 
+## Scattered Infinite placement — 2026-09-08
+
+- Removed left/right section templates and aligned hole rows. Each hole receives independent x/y placement with minimum separation and a narrower, more mobile reserved route. Recent placement history rejects a fourth consecutive placement on the same half.
+- Preserved the user's tuning: speed 60–180, full difficulty at 900m, density 2–4, section spacing 120–140 down to 75–95, and first section at 300–320.
+- All 60 tests passed. Updated route checks scan the two-dimensional field at 40 seeds/five difficulty stages; distribution checks cover 60 seeds/four stages, all three horizontal zones, both board halves and minimum separation. Actual phone render reviewed.
+- Final static analysis is clean. Web and ARM64 APK releases rebuilt successfully (APK 16.8 MB); no device installation performed.
+
+## Progression, 30 levels and control options — 2026-09-08
+
+- Infinite uses a smooth height-based speed curve (38–180 world units/second), sparse early rows, randomized spacing and patterns, and a bounded wandering clear corridor. Special hazards unlock at 180 / 350 / 600 / 900m.
+- Classic has 30 distinct authored target routes with increasing trap density, a level picker and next-level action. Scoring and three lives remain per board; Practice retains the original layout.
+- Saved one-finger control uses a short vertical handle dragged horizontally. Classic lifts automatically and waits at the current target height. Both control methods use the same ball physics, with approximately 8% higher acceleration/speed cap.
+- Touch input consumes the newest target on the next physics tick, preserves quick released swipes, and checks the first swept collision. Pause/control changes clear residual motor velocity.
+- Automated checks cover all 30 boards' completion in both controls and geometric target reachability; 40 seeds at five Infinite difficulty stages; actual small-phone Settings and level-30 selection; simultaneous touch, one-finger fast drags, limits, pause, persistence and idle detection.
+- Final full regression suite: 59 tests passed.
+- Final static analysis: no issues. Bundled web release and ARM64 Android release built successfully; APK is 16.8 MB. This update was built, not installed on a device.
+- Phone renders inspected for the level picker and the one-finger platform/handle. Human difficulty balance and physical-device touch latency remain unmeasured.
+
+## Infinite hazards and first-launch tutorial — 2026-09-07
+
+- Ascent now accelerates from 80 to 180 world units per second over 15 seconds. Blinking forming holes, moving holes, lasers, and temporary platform gaps unlock at scores 30, 70, 110, and 160, with warning time and one special hazard at a time.
+- All 47 regression tests passed; static analysis reported no issues. Checks cover warning/live/expired collision boundaries, swept laser and moving-hole contact, gap lifetime, milestone scheduling, pause/replay isolation, and first-launch tutorial completion/skip persistence and replay.
+- Actual Flutter renders verified the three-step tutorial and phone gameplay, including laser warning/live states, a forming-hole warning, and the open platform gap. The render script also exports all four hazard warning/live states. These are staged visual checks, not a human survival playthrough.
+- Tutorial and game layout checks include small phones, safe-area insets, and preserved board proportions. Human difficulty and fairness still need playtesting at the new pace.
+- Bundled web release and ARM64 Android release built successfully. Updated APK: `build/app/outputs/flutter-apk/app-release.apk` (16.4 MB). No new device installation is claimed.
+
 ## Latest: automatic-ascent Infinite
 
 - Infinite now translates the platform and camera together so world holes approach from above while pivot grips hold their screen position. Pace increases from 34 to 62 world units per second over two minutes.

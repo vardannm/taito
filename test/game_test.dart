@@ -60,7 +60,7 @@ void main() {
       final game = BalanceGame()
         ..start(gameMode: practice ? GameMode.practice : GameMode.classic);
       for (int i = 0; i < 3; i++) {
-        placeAt(game, BalanceGame.holes.firstWhere((h) => h.target == 0));
+        placeAt(game, game.board.firstWhere((h) => h.target == 0));
         advance(game, 1.5);
       }
       expect(game.finished, !practice);
