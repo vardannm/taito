@@ -16,7 +16,32 @@ void paintSpecialHazards(Canvas c, BalanceGame game, bool reducedMotion) {
       ..strokeWidth = 2;
     final p = Offset(h.x, h.y);
     if (h.kind == HazardKind.platformGap) continue;
+    if (h.zigzag && h.warning) {
+      final path = Path()..moveTo(h.x, h.y);
+      for (var i = 1; i <= 4; i++) {
+        path.lineTo(180 + (i.isOdd ? 125 : -125), h.y + i * 70);
+      }
+      c.drawPath(
+        path,
+        Paint()
+          ..color = _red.withAlpha(65)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2,
+      );
+    }
     if (h.kind == HazardKind.laser) {
+      if (h.sweeping) {
+        c.drawLine(
+          Offset(h.originX - 65, 48),
+          Offset(h.originX + 65, 48),
+          warning,
+        );
+        for (final direction in [-1.0, 1.0]) {
+          final tip = Offset(h.originX + direction * 65, 48);
+          c.drawLine(tip, tip + Offset(-direction * 6, -5), warning);
+          c.drawLine(tip, tip + Offset(-direction * 6, 5), warning);
+        }
+      }
       if (h.warning) {
         c.drawRect(
           Rect.fromLTRB(h.x - 10, 35, h.x + 10, 535),

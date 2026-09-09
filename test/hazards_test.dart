@@ -3,6 +3,71 @@ import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/hazards.dart';
 
 void main() {
+  test('sweeping laser warns still and detects its own sweep over a ball', () {
+    final h = SpecialHazard(
+      HazardKind.laser,
+      x: 180,
+      y: 55,
+      sweeping: true,
+      liveSeconds: 3.5,
+    );
+    h.step(2, 100);
+    expect(h.x, 180);
+    expect(h.hits(210, 300, 210, 300), isFalse);
+    h.step(.5, 100);
+    expect(h.x, greaterThan(220));
+    expect(h.hits(210, 300, 210, 300), isTrue);
+    expect(h.hits(300, 300, 300, 300), isFalse);
+  });
+  test(
+    'zigzag enters from above, reverses horizontally and stays in bounds',
+    () {
+      final h = SpecialHazard(
+        HazardKind.movingHole,
+        x: 180,
+        y: 55,
+        zigzag: true,
+        liveSeconds: 4,
+      );
+      h.step(2, 100);
+      expect(h.y, 55);
+      h.step(.5, 100);
+      final right = h.x;
+      expect(right, greaterThan(180));
+      expect(h.y, closeTo(140, .001));
+      for (var i = 0; i < 120; i++) {
+        h.step(1 / 120, 100);
+        expect(h.x, inInclusiveRange(55, 305));
+      }
+      expect(h.x, lessThan(right));
+      expect(h.y, greaterThan(140));
+    },
+  );
+  test('hard variants alternate only in late encounter sections', () {
+    for (final height in [9000.0, 12600.0, 13500.0, 12000.0]) {
+      final g = BalanceGame(seed: 42)..start(gameMode: GameMode.infinite);
+      final variants = <bool>[];
+      for (var i = 0; i < 10; i++) {
+        g.maxHeight = height;
+        g.elapsed += 20;
+        g.specialHazards.clear();
+        g.board.clear();
+        g.stallTime = 0;
+        g.step(1 / 120);
+        for (final h in g.specialHazards) {
+          if (h.sweeping || h.zigzag) variants.add(h.sweeping);
+        }
+      }
+      if (height == 12000) {
+        expect(variants.length, greaterThan(2));
+        for (var i = 1; i < variants.length; i++) {
+          expect(variants[i], !variants[i - 1]);
+        }
+      } else {
+        expect(variants, isEmpty);
+      }
+    }
+  });
   for (final kind in HazardKind.values) {
     test(
       '$kind is harmless throughout warning and lethal after activation',

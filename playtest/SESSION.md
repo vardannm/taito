@@ -56,3 +56,22 @@ Most important issue to investigate:
 Was the session interrupted or materially assisted? Describe:
 
 Do not classify stated replay intention as an observed replay or a next-day return.
+
+## Mastery update observations
+
+Control mode used:
+Board number / Daily UTC date:
+Stars explained correctly without help: completion / no misses / active-time goal
+Optional coins noticed / deliberately collected:
+Best successful active time / displayed time target:
+Attempts before that successful time:
+Coins pursued on that timed run:
+Next choice made before prompting: retry / next level / Daily / Cabinet / stop
+Understood separate control records:
+Understood Daily's fixed board and midnight UTC change:
+Cabinet unlock rule and identical handling understood:
+Finale briefing read:
+Warning recognized before activation:
+Loss explanation for finale or spider:
+Infinite sections actually reached (with heights):
+Any unfair-feeling transition or obstruction:

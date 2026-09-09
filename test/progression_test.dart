@@ -36,7 +36,7 @@ void main() {
     g.setControlPosition(.8);
     expect(g.controlPosition, .1);
   });
-  testWidgets('small-phone settings select one finger and launch level 30', (
+  testWidgets('small-phone settings select one finger and launch level 50', (
     tester,
   ) async {
     SharedPreferencesAsyncPlatform.instance =
@@ -67,22 +67,25 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await tester.scrollUntilVisible(
-      find.text('Masterwork'),
+      find.byKey(const ValueKey('level-50')),
       250,
       scrollable: find.byType(Scrollable).last,
       maxScrolls: 30,
     );
     await tester.pump(const Duration(milliseconds: 200));
-    await tester.drag(find.byType(ListView).last, const Offset(0, -180));
+    await tester.drag(
+      find.byType(CustomScrollView).last,
+      const Offset(0, -180),
+    );
     await tester.pump(const Duration(milliseconds: 400));
-    await tester.tap(find.text('Masterwork'));
+    await tester.tap(find.byKey(const ValueKey('level-50')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     final g = tester.widget<PivotBoard>(find.byType(PivotBoard)).game;
-    expect(g.level, 30);
+    expect(g.level, 50);
     expect(g.oneFinger, isTrue);
     expect(g.lives, 3);
-    expect(find.textContaining('L30'), findsOneWidget);
+    expect(find.textContaining('L50'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });
@@ -91,8 +94,8 @@ void main() {
     final g = BalanceGame()
       ..setControlMode(ControlMode.oneFinger)
       ..start();
-    g.ballX = 300;
-    g.board.removeWhere((h) => h.target == 0);
+    g.ballX = g.activeHole.x < 180 ? 300 : 60;
+    g.board.removeWhere((h) => h.target != 1);
     advance(g, 8);
     expect(
       (g.left + g.right) / 2,
@@ -169,10 +172,10 @@ void main() {
   });
 
   test(
-    'all 30 levels are distinct and all targets complete in both controls',
+    'all 50 levels are distinct and all targets complete in both controls',
     () {
       final layouts = <String>{};
-      for (var level = 1; level <= 30; level++) {
+      for (var level = 1; level <= ClassicLevels.count; level++) {
         final board = ClassicLevels.build(level);
         layouts.add(board.map((h) => '${h.x},${h.y}').join('/'));
         expect(board.where((h) => h.target > 0).length, 10);
@@ -227,7 +230,7 @@ void main() {
           );
         }
       }
-      expect(layouts.length, 30);
+      expect(layouts.length, ClassicLevels.count);
       expect(
         ClassicLevels.build(30).length,
         greaterThan(ClassicLevels.build(1).length + 15),

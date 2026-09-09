@@ -1,8 +1,11 @@
 import 'dart:math' as math;
 import 'game.dart';
+import 'spiders.dart';
+import 'rewards.dart';
 
-/// Thirty authored route profiles. Trap placement is deterministic per level.
+/// Reproducible scattered boards; target order is independent of height.
 class ClassicLevels {
+  static const count = 50;
   static const names = [
     'First steps',
     'Gentle bend',
@@ -34,79 +37,196 @@ class ClassicLevels {
     'Pendulum',
     'Final ascent',
     'Masterwork',
+    'Silken threshold',
+    'Quiet legs',
+    'The watchful corner',
+    'Thread crossing',
+    'First bite',
+    'Two keepers',
+    'Dust and silk',
+    'Hidden courtyard',
+    'Tangled brass',
+    'Patient hunters',
+    'The long web',
+    'Narrow escape',
+    'Three sentinels',
+    'Silk labyrinth',
+    'Midnight patrol',
+    'Crossed territories',
+    'The gathering',
+    'Last safe passage',
+    'Widow gallery',
+    'Heart of the web',
   ];
-  static const routes = <List<double>>[
-    [160, 180, 200, 180, 160],
-    [140, 150, 180, 210, 220],
-    [210, 180, 140, 170, 210],
-    [150, 190, 160, 200, 180],
-    [140, 170, 200, 220, 180],
-    [100, 120, 160, 130, 110],
-    [250, 230, 190, 220, 250],
-    [120, 210, 130, 220, 150],
-    [110, 150, 230, 190, 120],
-    [100, 140, 200, 250, 200],
-    [100, 230, 120, 240, 130],
-    [120, 200, 250, 200, 120],
-    [110, 180, 250, 180, 110],
-    [90, 130, 180, 220, 260],
-    [230, 130, 200, 100, 220],
-    [95, 180, 260, 170, 105],
-    [100, 240, 110, 250, 120],
-    [140, 260, 200, 90, 170],
-    [250, 190, 110, 160, 240],
-    [170, 90, 180, 270, 190],
-    [90, 250, 110, 260, 100],
-    [250, 180, 90, 170, 270],
-    [110, 240, 180, 90, 250],
-    [260, 120, 200, 90, 240],
-    [90, 190, 270, 160, 100],
-    [80, 250, 110, 270, 100],
-    [250, 90, 240, 110, 260],
-    [90, 260, 100, 250, 90],
-    [260, 180, 80, 200, 270],
-    [85, 255, 110, 270, 90],
-  ];
-  static List<Hole> build(int number) {
-    final level = number.clamp(1, 30);
-    final route = routes[level - 1];
-    final targets = List<Hole>.generate(10, (i) {
-      final t = i / 9 * 4;
-      final k = math.min(t.floor(), 3);
-      return Hole(
-        route[k] + (route[k + 1] - route[k]) * (t - k),
-        462 - i * 46,
-        target: i + 1,
-      );
-    });
-    final result = <Hole>[...targets];
-    final random = math.Random(1907 + level * 811);
-    final count = 4 + level;
-    final clearance = 65 - level * .8;
+  static List<Hole> build(int number, {int? dailySeed}) {
+    final level = number.clamp(1, count);
+    final random = dailySeed == null
+        ? math.Random(1907 + level * 811)
+        : DailyRandom(dailySeed);
+    final slots = level <= 5
+        ? [9, 7, 8, 5, 6, 3, 4, 1, 2, 0]
+        : ([for (var i = 0; i < 9; i++) i]..shuffle(random));
+    if (level > 5) slots.insert(0, 9);
+    final result = <Hole>[];
+    for (var i = 0; i < 10; i++) {
+      for (var attempt = 0; attempt < 1000; attempt++) {
+        final x = 44 + random.nextDouble() * 272;
+        final y = 54 + slots[i] * 44 + random.nextDouble() * 20 - 10;
+        if (result.isNotEmpty && (x - result.last.x).abs() < 75) continue;
+        if (result.any(
+          (h) => math.pow(h.x - x, 2) + math.pow(h.y - y, 2) < 52 * 52,
+        ))
+          continue;
+        result.add(Hole(x, y, target: i + 1));
+        break;
+      }
+    }
+    // Never ship an incomplete sequence if a future daily seed exhausts placement.
+    if (result.length != 10) return List<Hole>.of(BalanceGame.holes);
+    final trapCount = level <= 30 ? 4 + level : 26 + (level - 31) ~/ 3;
     for (
       var attempt = 0;
-      attempt < 2000 && result.length < 10 + count;
+      attempt < 3000 && result.length < 10 + trapCount;
       attempt++
     ) {
-      final x = 30 + random.nextDouble() * 300;
-      final y = 36 + random.nextDouble() * 448;
-      // Reserve a continuous route through the target sequence and launch.
-      final path = [const Hole(180, 519), ...targets];
-      var nearRoute = false;
-      for (var i = 1; i < path.length; i++) {
-        final a = path[i - 1], b = path[i];
-        final t = ((y - a.y) / (b.y - a.y)).clamp(0.0, 1.0);
-        if ((y - (a.y + (b.y - a.y) * t)).abs() < 28 &&
-            (x - (a.x + (b.x - a.x) * t)).abs() < clearance)
-          nearRoute = true;
-      }
-      if (!nearRoute &&
-          result.every(
-            (h) => math.pow(h.x - x, 2) + math.pow(h.y - y, 2) > 30 * 30,
-          )) {
+      final x = 34 + random.nextDouble() * 292;
+      final y = 36 + random.nextDouble() * 442;
+      if (result.every(
+        (h) => math.pow(h.x - x, 2) + math.pow(h.y - y, 2) > 38 * 38,
+      )) {
         result.add(Hole(x, y));
       }
     }
     return result;
+  }
+
+  static List<BoardSpider> spidersFor(int level, List<Hole> board) {
+    if (level < 31) return [];
+    final random = math.Random(8917 + level * 97);
+    final result = <BoardSpider>[];
+    final wanted = level < 36
+        ? 1
+        : level < 43
+        ? 2
+        : 3;
+    for (var attempt = 0; attempt < 1200 && result.length < wanted; attempt++) {
+      final keeper = (level == 40 || level == 50) && result.isEmpty;
+      final radius = 38.0 + (level - 31) * .4 + (keeper ? 10 : 0);
+      final x = 52 + random.nextDouble() * 256,
+          y = 82 + random.nextDouble() * 336;
+      if (board
+          .where((h) => h.target > 0)
+          .any(
+            (h) =>
+                math.pow(h.x - x, 2) + math.pow(h.y - y, 2) <
+                math.pow(radius + 24, 2),
+          ))
+        continue;
+      if (result.any(
+        (s) =>
+            math.pow(s.homeX - x, 2) + math.pow(s.homeY - y, 2) <
+            math.pow(radius + s.zoneRadius + 30, 2),
+      ))
+        continue;
+      final candidate = BoardSpider(
+        x,
+        y,
+        radius,
+        phase: random.nextDouble() * math.pi * 2,
+        chaseSpeed: 65 + (level - 31),
+        bodyRadius: keeper ? 11 : 6,
+      );
+      if (!hasSafeRoutes(board, [...result, candidate])) continue;
+      result.add(candidate);
+    }
+    return result;
+  }
+
+  static List<BrassCoin> coinsFor(List<Hole> board, List<BoardSpider> spiders) {
+    final result = <BrassCoin>[];
+    for (final trap in board.where((h) => h.target == 0)) {
+      for (var angle = 0; angle < 8; angle++) {
+        final x = trap.x + math.cos(angle * math.pi / 4) * 32;
+        final y = trap.y + math.sin(angle * math.pi / 4) * 32;
+        if (x < 44 || x > 316 || y < 55 || y > 470) continue;
+        if (board.any(
+          (h) =>
+              math.pow(h.x - x, 2) + math.pow(h.y - y, 2) <
+              math.pow(h.target > 0 ? 34 : 25, 2),
+        ))
+          continue;
+        if (spiders.any(
+          (s) =>
+              math.pow(s.homeX - x, 2) + math.pow(s.homeY - y, 2) <
+              math.pow(s.zoneRadius + 12, 2),
+        ))
+          continue;
+        if (result.any(
+          (c) => math.pow(c.x - x, 2) + math.pow(c.y - y, 2) < 100 * 100,
+        ))
+          continue;
+        result.add(BrassCoin(x, y));
+        break;
+      }
+      if (result.length == 3) break;
+    }
+    return result;
+  }
+
+  static String finaleTitle(int level) => switch (level) {
+    10 => 'The light gate',
+    20 => 'The wandering eye',
+    30 => 'Clockwork trial',
+    40 => 'The silk keeper',
+    50 => 'Heart of the web',
+    _ => '',
+  };
+  static String finaleRule(int level) => switch (level) {
+    10 => 'A red lane warns before the laser fires. Cross while it is dark.',
+    20 => 'A marked hole wakes and sweeps sideways. Watch its path.',
+    30 => 'Laser lanes and roaming holes take turns. Read each warning.',
+    40 =>
+      'A larger spider guards an expanded territory. Stay beyond the dashed circle.',
+    50 => 'The keeper and its spiders guard the web while laser lanes charge.',
+    _ => '',
+  };
+
+  /// Check connected space around all targets before accepting a territory.
+  static bool hasSafeRoutes(List<Hole> board, List<BoardSpider> spiders) {
+    const columns = 51, rows = 82;
+    final visited = List<bool>.filled(columns * rows, false);
+    final queue = <int>[80 * columns + 25];
+    visited[queue.first] = true;
+    for (var head = 0; head < queue.length; head++) {
+      final cell = queue[head], cx = cell % columns, cy = cell ~/ columns;
+      for (final (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)]) {
+        final nx = cx + dx, ny = cy + dy;
+        if (nx < 0 || nx >= columns || ny < 0 || ny >= rows) continue;
+        final next = ny * columns + nx;
+        if (visited[next]) continue;
+        final x = 30 + nx * 6.0, y = 36 + ny * 6.0;
+        if (board.any(
+              (h) => math.pow(h.x - x, 2) + math.pow(h.y - y, 2) < 14 * 14,
+            ) ||
+            spiders.any(
+              (s) =>
+                  math.pow(s.homeX - x, 2) + math.pow(s.homeY - y, 2) <
+                  math.pow(s.zoneRadius + 10, 2),
+            ))
+          continue;
+        visited[next] = true;
+        queue.add(next);
+      }
+    }
+    return board
+        .where((h) => h.target > 0)
+        .every(
+          (h) => queue.any(
+            (cell) =>
+                math.pow(30 + (cell % columns) * 6 - h.x, 2) +
+                    math.pow(36 + (cell ~/ columns) * 6 - h.y, 2) <
+                22 * 22,
+          ),
+        );
   }
 }

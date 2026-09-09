@@ -1,6 +1,9 @@
 import 'dart:math' as math;
 import 'hazards.dart';
 import 'levels.dart';
+import 'spiders.dart';
+import 'rewards.dart';
+import 'merge.dart';
 
 class Hole {
   const Hole(this.x, this.y, {this.target = 0});
@@ -10,19 +13,64 @@ class Hole {
 
 enum GamePhase { playing, sinking, returning, over }
 
-enum GameEvent { target, miss, complete }
+enum GameEvent { target, miss, complete, coin, merge }
 
-enum GameMode { classic, infinite, practice }
+enum GameMode { classic, infinite, practice, daily, merge2048 }
 
-enum ControlMode { twoFinger, oneFinger }
+enum ControlMode { twoFinger, oneFinger, analog }
+
+extension ControlModeLabel on ControlMode {
+  String get label => switch (this) {
+    ControlMode.twoFinger => 'Two-finger',
+    ControlMode.oneFinger => 'One-finger',
+    ControlMode.analog => 'Vertical analog',
+  };
+}
 
 /// Fixed-step simulation. No Flutter imports: physics can be tested in isolation.
 class BalanceGame {
   BalanceGame({int? seed}) : _random = math.Random(seed);
   final math.Random _random;
   ControlMode controlMode = ControlMode.twoFinger;
+  bool get analog => controlMode == ControlMode.analog;
+  final analogInputs = [0.0, 0.0];
+  void setAnalogInput(int side, double value) {
+    if (!canControl || !analog || side < 0 || side > 1 || !value.isFinite)
+      return;
+    analogInputs[side] = value.clamp(-1.0, 1.0);
+    if (value == 0) {
+      if (side == 0) {
+        leftSpeed = 0;
+      } else {
+        rightSpeed = 0;
+      }
+    }
+  }
+
   bool get oneFinger => controlMode == ControlMode.oneFinger;
-  int level = 1;
+  int level = 1, runSerial = 0;
+  CabinetStyle cabinet = CabinetStyle.brass;
+  DateTime? dailyDate;
+  bool get merging => mode == GameMode.merge2048;
+  MergeRun mergeRun = MergeRun();
+  bool get daily => mode == GameMode.daily;
+  String get dailyKey =>
+      dailyDate == null ? '' : DailyChallenge.key(dailyDate!);
+  bool get finale => mode == GameMode.classic && level % 10 == 0;
+  String get finaleTitle => finale ? ClassicLevels.finaleTitle(level) : '';
+  final coins = <BrassCoin>[];
+  int coinsCollected = 0;
+  double lastCoinAge = 99, lastCoinX = 0, lastCoinY = 0;
+  double targetTime = 180, _nextFinaleAt = 3;
+  int _finaleSequence = 0;
+  int get earnedStarMask => !finished || !won || practice || infinite || merging
+      ? 0
+      : 1 | (misses == 0 ? 2 : 0) | (elapsed <= targetTime ? 4 : 0);
+  InfiniteSection get section => sectionAt(maxHeight / 10);
+
+  final spiders = <BoardSpider>[];
+  bool caughtBySpider = false;
+  bool get spiderLevel => mode == GameMode.classic && level >= 31;
   List<Hole> _classicBoard = ClassicLevels.build(1);
   double controlPosition = 0;
   double get controlY => (screenY((left + right) / 2) + 38).clamp(65.0, 532.0);
@@ -104,7 +152,7 @@ class BalanceGame {
   double get ascentSpeed => 60 + 120 * difficulty;
   final specialHazards = <SpecialHazard>[];
   double _nextHazardTime = 0;
-  int _introducedHazards = 0, _hazardSequence = 0;
+  int _introducedHazards = 0, _hazardSequence = 0, _hardHazardSequence = 0;
   bool fellThroughGap = false;
   String get hazardLabel =>
       specialHazards.isEmpty ? '' : specialHazards.first.label;
@@ -124,7 +172,10 @@ class BalanceGame {
       }
     }
     specialHazards.removeWhere((h) => h.expired || h.y > 600);
-    if (specialHazards.isNotEmpty || elapsed < _nextHazardTime || score < 180)
+    if (specialHazards.isNotEmpty ||
+        elapsed < _nextHazardTime ||
+        score < 180 ||
+        section == InfiniteSection.breath)
       return;
     final unlocked = score >= 900
         ? 4
@@ -138,15 +189,30 @@ class BalanceGame {
         : (_hazardSequence + 1 + _random.nextInt(math.max(1, unlocked - 1))) %
               unlocked;
     _hazardSequence = index;
-    final kind = HazardKind.values[index];
+    final hard =
+        score >= 1200 &&
+        section == InfiniteSection.encounter &&
+        _introducedHazards >= 4;
+    final sweeping = hard && _hardHazardSequence.isEven;
+    final zigzag = hard && !sweeping;
+    if (hard) _hardHazardSequence++;
+    final kind = hard
+        ? (sweeping ? HazardKind.laser : HazardKind.movingHole)
+        : HazardKind.values[index];
     final lane = 95.0 + _random.nextDouble() * 170;
     specialHazards.add(
       SpecialHazard(
         kind,
-        x: lane,
-        y: (screenY(ballY) - 150).clamp(75.0, 300.0),
+        x: zigzag ? 180 : lane,
+        y: zigzag ? 55 : (screenY(ballY) - 150).clamp(75.0, 300.0),
+        sweeping: sweeping,
+        zigzag: zigzag,
         warningSeconds: kind == HazardKind.platformGap ? 2.4 : 2.0,
-        liveSeconds: kind == HazardKind.laser
+        liveSeconds: sweeping
+            ? 3.5
+            : zigzag
+            ? 550 / (ascentSpeed * 1.35 + 35)
+            : kind == HazardKind.laser
             ? 1.4
             : kind == HazardKind.platformGap
             ? 2.5
@@ -154,12 +220,19 @@ class BalanceGame {
       ),
     );
     // One special hazard at a time, with recovery time before the next warning.
-    _nextHazardTime = elapsed + 12 - 5.5 * difficulty;
+    _nextHazardTime =
+        elapsed +
+        (section == InfiniteSection.encounter ? 9 : 12) -
+        5.5 * difficulty;
   }
 
   bool get infinite => mode == GameMode.infinite;
   bool get practice => mode == GameMode.practice;
-  List<Hole> get board => infinite ? _endlessHoles : _classicBoard;
+  List<Hole> get board => merging
+      ? const []
+      : infinite
+      ? _endlessHoles
+      : _classicBoard;
   int get roundCompleted => completed;
   double screenY(double worldY) => worldY + (infinite ? cameraOffset : 0);
   bool get dangerActive => infinite && stallTime >= 3;
@@ -169,7 +242,9 @@ class BalanceGame {
     if (!infinite) return;
     while (_nextRowY >= -cameraOffset - 120) {
       final d = difficultyAt(math.max(0, (infiniteStart - _nextRowY) / 10));
-      final spacing = 120 - 45 * d + _random.nextDouble() * 20;
+      final stage = sectionAt(math.max(0, (infiniteStart - _nextRowY) / 10));
+      final spacing =
+          (120 - 45 * d + _random.nextDouble() * 20) * stage.spacingFactor;
       final previous = _corridor;
       final turn = math.min(52.0, spacing * .42);
       _corridor = (_corridor + (_random.nextDouble() * 2 - 1) * turn).clamp(
@@ -178,7 +253,7 @@ class BalanceGame {
       );
       final selected = <Hole>[];
       final recent = _endlessHoles.reversed.take(3).toList().reversed.toList();
-      final density = 2 + 2 * d;
+      final density = ((2 + 2 * d) * stage.densityFactor).clamp(1.0, 4.0);
       final count =
           density.floor() + (_random.nextDouble() < density % 1 ? 1 : 0);
       for (
@@ -270,7 +345,9 @@ class BalanceGame {
   double get visualY => phase == GamePhase.sinking
       ? captureY + (fellThroughGap ? 100 * phaseTime * phaseTime : 0)
       : ballY;
-  double get ballScale => phase == GamePhase.sinking
+  double get ballScale => caughtBySpider
+      ? 0
+      : phase == GamePhase.sinking
       ? (1 - phaseTime / .38).clamp(0.0, 1.0)
       : phase == GamePhase.returning
       ? 0
@@ -322,6 +399,7 @@ class BalanceGame {
     pivotTargets.fillRange(0, 2, null);
     _released.fillRange(0, 2, false);
     leftInput = rightInput = 0;
+    analogInputs.fillRange(0, 2, 0);
     inputEpoch++;
   }
 
@@ -331,6 +409,14 @@ class BalanceGame {
   }
 
   void resetBall() {
+    if (!infinite) {
+      specialHazards.clear();
+      _nextFinaleAt = 3;
+      _finaleSequence = 0;
+    }
+    for (final spider in spiders) {
+      spider.reset();
+    }
     left = right = infinite
         ? infiniteStart
         : oneFinger
@@ -343,34 +429,84 @@ class BalanceGame {
     clearInput();
   }
 
-  void start({GameMode gameMode = GameMode.classic, int levelNumber = 1}) {
+  void start({
+    GameMode gameMode = GameMode.classic,
+    int levelNumber = 1,
+    DateTime? challengeDate,
+  }) {
+    runSerial++;
     mode = gameMode;
-    level = levelNumber.clamp(1, 30);
+    if (merging) mergeRun = MergeRun(seed: _random.nextInt(1 << 30));
+    dailyDate = daily
+        ? DailyChallenge.day(challengeDate ?? DateTime.now())
+        : null;
+    level = daily ? 15 : levelNumber.clamp(1, ClassicLevels.count);
     _classicBoard = practice
         ? List<Hole>.of(holes)
-        : ClassicLevels.build(level);
+        : ClassicLevels.build(
+            level,
+            dailySeed: daily ? DailyChallenge.seed(dailyDate!) : null,
+          );
+    spiders.clear();
+    if (spiderLevel)
+      spiders.addAll(ClassicLevels.spidersFor(level, _classicBoard));
+    caughtBySpider = false;
+    coins.clear();
+    if (!infinite && !practice && !merging)
+      coins.addAll(ClassicLevels.coinsFor(_classicBoard, spiders));
+    coinsCollected = 0;
+    lastCoinAge = 99;
+    // Active-time targets: fixed lift time plus steering allowance and trap detours.
+    final launch = oneFinger ? 500.0 : 526.0;
+    final liftTime =
+        _classicBoard
+            .where((h) => h.target > 0)
+            .fold(
+              0.0,
+              (sum, h) => sum + (launch - h.y - ballRadius).clamp(0.0, 560.0),
+            ) /
+        (oneFinger ? 20 : 60);
+    targetTime =
+        (liftTime +
+                60 +
+                _classicBoard.where((h) => h.target == 0).length * .7 +
+                (spiderLevel ? 25 : 0) +
+                (finale ? 20 : 0))
+            .ceilToDouble();
     cameraOffset = maxHeight = stallTime = _steeringDistance = 0;
     dangerY = 580;
     _nextRowY = 300 + _random.nextDouble() * 20;
     _corridor = 150 + _random.nextDouble() * 60;
     specialHazards.clear();
     _nextHazardTime = 0;
-    _introducedHazards = _hazardSequence = 0;
+    _introducedHazards = _hazardSequence = _hardHazardSequence = 0;
     fellThroughGap = false;
     _endlessHoles.clear();
     if (infinite) ensureInfiniteBoard();
     target = 1;
-    lives = infinite ? 1 : 3;
+    lives = infinite || merging ? 1 : 3;
     score = streak = bestStreak = completed = misses = 0;
     elapsed = phaseTime = 0;
     won = paused = false;
     started = true;
     phase = GamePhase.playing;
     event = null;
-    message = infinite
+    message = merging
+        ? mergeRun.notice
+        : infinite
         ? 'Tilt to dodge. The board keeps moving.'
         : 'Raise both ends. Find the glowing 01.';
     resetBall();
+  }
+
+  void continueMerge() {
+    if (!merging || !won) return;
+    mergeRun.continueRun();
+    won = false;
+    phase = GamePhase.playing;
+    event = null;
+    message = mergeRun.notice;
+    clearInput();
   }
 
   void home() {
@@ -422,6 +558,7 @@ class BalanceGame {
       return;
     }
     elapsed += dt;
+    lastCoinAge += dt;
     legTime += dt;
     final oldX = ballX, oldY = ballY;
     final oldScreenY = screenY(ballY);
@@ -439,7 +576,7 @@ class BalanceGame {
           pivotTargets[side] = pivotTargets[side]! - travel;
       }
     }
-    // Motor easing removes abrupt starts; near-immediate braking keeps it precise.
+    // Keyboard motors retain easing. Touch targets below follow in one step.
     final response = 1 - math.exp(-22 * dt);
     final motor = practice ? 78.0 : 91.0;
     leftSpeed += ((leftInput.clamp(-1, 1) * motor) - leftSpeed) * response;
@@ -470,7 +607,7 @@ class BalanceGame {
       // Horizontal control changes tilt; Classic supplies the missing lift axis.
       final halfTilt = controlPosition * 70;
       final center =
-          (infinite
+          (infinite || merging
                   ? (left + right) / 2
                   : math.max(
                       activeHole.y + ballRadius,
@@ -505,7 +642,38 @@ class BalanceGame {
       _updateClimb(dt);
       if (phase != GamePhase.playing) return;
     }
+    if (merging) {
+      final collectedBefore = mergeRun.collected;
+      mergeRun.step(dt, oldX, oldY, ballX, ballY);
+      score = mergeRun.score;
+      message = mergeRun.notice;
+      if (mergeRun.collected != collectedBefore) event = GameEvent.merge;
+      if (mergeRun.ended) {
+        won = mergeRun.won;
+        phase = GamePhase.over;
+        if (!won) lives = 0;
+        event = won ? GameEvent.complete : GameEvent.miss;
+        velocity = 0;
+        clearInput();
+      }
+      return;
+    }
     Hole? hit;
+    for (final spider in spiders) {
+      if (spider.step(dt, oldX, oldY, ballX, ballY)) {
+        lives = 0;
+        misses++;
+        streak = 0;
+        lastSuccess = false;
+        caughtBySpider = true;
+        message = 'Caught by a spider. Stay outside its territory.';
+        event = GameEvent.miss;
+        phase = GamePhase.over;
+        velocity = 0;
+        clearInput();
+        return;
+      }
+    }
     var firstContact = double.infinity;
     for (final hole in board) {
       // Swept segment collision prevents fast balls skipping a hole between frames.
@@ -541,10 +709,88 @@ class BalanceGame {
         }
       }
     }
+    if (finale && hit == null) {
+      _updateFinale(dt, oldX, oldY);
+      if (phase != GamePhase.playing) return;
+    }
+    final fraction = firstContact.isFinite ? firstContact : 1.0;
+    _collectCoins(
+      oldX,
+      oldY,
+      oldX + (ballX - oldX) * fraction,
+      oldY + (ballY - oldY) * fraction,
+    );
     if (hit != null) _capture(hit);
     if (infinite && phase == GamePhase.playing) {
       _updateSpecialHazards(dt, oldX, oldScreenY);
     }
+  }
+
+  void _collectCoins(double ax, double ay, double bx, double by) {
+    final dx = bx - ax, dy = by - ay, length = dx * dx + dy * dy;
+    for (final coin in coins.where((c) => !c.collected)) {
+      final t = length == 0
+          ? 0.0
+          : (((coin.x - ax) * dx + (coin.y - ay) * dy) / length).clamp(
+              0.0,
+              1.0,
+            );
+      if (math.pow(ax + t * dx - coin.x, 2) +
+              math.pow(ay + t * dy - coin.y, 2) <=
+          12 * 12) {
+        coin.collected = true;
+        coinsCollected++;
+        score += 250;
+        lastCoinAge = 0;
+        lastCoinX = coin.x;
+        lastCoinY = coin.y;
+        event = GameEvent.coin;
+      }
+    }
+  }
+
+  void _updateFinale(double dt, double oldX, double oldY) {
+    if (level == 40) return;
+    for (final h in specialHazards) {
+      h.step(dt, 0);
+      if (h.hits(oldX, oldY, ballX, ballY)) {
+        captureX = ballX;
+        captureY = ballY;
+        lives--;
+        misses++;
+        streak = 0;
+        lastSuccess = false;
+        message = h.kind == HazardKind.laser
+            ? 'Laser hit. Cross while the lane is dark.'
+            : 'The wandering hole caught you.';
+        event = GameEvent.miss;
+        phase = GamePhase.sinking;
+        phaseTime = 0;
+        velocity = 0;
+        clearInput();
+        return;
+      }
+    }
+    specialHazards.removeWhere((h) => h.expired);
+    if (specialHazards.isNotEmpty || legTime < _nextFinaleAt) return;
+    final moving = level == 20 || (level == 30 && _finaleSequence.isOdd);
+    final lanes = [
+      90.0,
+      180.0,
+      270.0,
+    ].where((x) => (x - activeHole.x).abs() > (moving ? 72 : 32)).toList();
+    final x = lanes[_finaleSequence % lanes.length];
+    specialHazards.add(
+      SpecialHazard(
+        moving ? HazardKind.movingHole : HazardKind.laser,
+        x: x,
+        y: (activeHole.y - 55).clamp(65.0, 440.0),
+        warningSeconds: 2.4,
+        liveSeconds: moving ? 3 : 1.2,
+      ),
+    );
+    _finaleSequence++;
+    _nextFinaleAt = legTime + (level == 50 ? 7 : 9);
   }
 
   void _capture(Hole hole) {

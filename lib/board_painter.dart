@@ -1,3 +1,4 @@
+import 'merge_widgets.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -5,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'game.dart';
 import 'hazards.dart';
 import 'hazard_painter.dart';
+import 'spider_painter.dart';
+import 'cabinet.dart';
 
 const cream = Color(0xFFF2ECDD);
 const ink = Color(0xFF163D3B);
@@ -75,6 +78,8 @@ class BoardPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final palette = CabinetPalette.of(game.cabinet);
+    final ink = palette.frame, brass = palette.trim;
     canvas.save();
     final viewport = BoardViewport(size);
     canvas.translate(viewport.offset.dx, viewport.offset.dy);
@@ -98,10 +103,10 @@ class BoardPainter extends CustomPainter {
     canvas.drawRRect(
       field,
       Paint()
-        ..shader = const LinearGradient(
+        ..shader = LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFF7E1AA), Color(0xFFE1BC77), Color(0xFFC49350)],
+          colors: palette.field,
         ).createShader(field.outerRect),
     );
     canvas.save();
@@ -151,6 +156,21 @@ class BoardPainter extends CustomPainter {
         );
       }
     }
+    if (game.merging) {
+      for (final orb in game.mergeRun.orbs) {
+        paintNumberOrb(
+          canvas,
+          Offset(orb.x, orb.y),
+          orb.value,
+          15,
+          match: orb.value == game.mergeRun.top,
+        );
+      }
+      if (game.mergeRun.flash > 0) {
+        text(canvas, game.mergeRun.notice, const Offset(180, 28), 10, ink);
+      }
+    }
+    paintSpiderBackdrop(canvas, game);
     for (final hole in game.board) {
       final p = Offset(hole.x, game.screenY(hole.y));
       final active = !game.infinite && hole.target == game.target.clamp(1, 10);
@@ -281,7 +301,47 @@ class BoardPainter extends CustomPainter {
         );
       }
     }
+    for (final coin in game.coins.where((c) => !c.collected)) {
+      final p = Offset(coin.x, coin.y);
+      final r = reducedMotion
+          ? 6.0
+          : 6 + math.sin(game.clock * 3 + coin.x) * .5;
+      canvas.drawCircle(
+        p + const Offset(0, 1),
+        r + 1,
+        Paint()..color = const Color(0xFF604622),
+      );
+      canvas.drawCircle(p, r, Paint()..color = const Color(0xFFFFDA7B));
+      canvas.drawCircle(
+        p,
+        r - 1.5,
+        Paint()
+          ..color = const Color(0xFF957034)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = .8,
+      );
+      canvas.drawLine(
+        p - const Offset(0, 2.5),
+        p + const Offset(0, 2.5),
+        Paint()
+          ..color = const Color(0xFF604622)
+          ..strokeWidth = 1.5,
+      );
+    }
+    if (game.lastCoinAge < .7) {
+      text(
+        canvas,
+        '+250',
+        Offset(
+          game.lastCoinX,
+          game.lastCoinY - 12 - (reducedMotion ? 0 : game.lastCoinAge * 20),
+        ),
+        11,
+        ink,
+      );
+    }
     paintSpecialHazards(canvas, game, reducedMotion);
+    paintSpiders(canvas, game, reducedMotion);
     canvas.save();
     for (final gap in game.specialHazards.where(
       (h) => h.kind == HazardKind.platformGap && h.active,
@@ -316,7 +376,7 @@ class BoardPainter extends CustomPainter {
       a - const Offset(0, 1),
       b - const Offset(0, 1),
       Paint()
-        ..color = const Color(0xFFB9C5BA)
+        ..color = palette.bar
         ..strokeWidth = 4
         ..strokeCap = StrokeCap.round,
     );
@@ -397,7 +457,15 @@ class BoardPainter extends CustomPainter {
         }
       }
     }
-    if (game.ballScale > 0) {
+    if (game.merging) {
+      paintNumberOrb(
+        canvas,
+        Offset(game.visualX, game.visualY - 3),
+        game.mergeRun.top,
+        10,
+      );
+    }
+    if (!game.merging && game.ballScale > 0) {
       final p = Offset(game.visualX, game.screenY(game.visualY));
       canvas.drawCircle(
         p + const Offset(2, 4),
@@ -411,15 +479,10 @@ class BoardPainter extends CustomPainter {
         7 * game.ballScale,
         Paint()
           ..shader =
-              const RadialGradient(
+              RadialGradient(
                 center: Alignment(-.4, -.5),
                 radius: .85,
-                colors: [
-                  Color(0xFFFFFFFF),
-                  Color(0xFFE6E8DF),
-                  Color(0xFF778B88),
-                  Color(0xFF1C3234),
-                ],
+                colors: palette.ball,
                 stops: [0, .2, .5, 1],
               ).createShader(
                 Rect.fromCircle(center: p, radius: 7 * game.ballScale),

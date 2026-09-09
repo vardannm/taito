@@ -11,8 +11,11 @@ class SpecialHazard {
     required this.y,
     this.warningSeconds = 2.0,
     this.liveSeconds = 3.0,
+    this.sweeping = false,
+    this.zigzag = false,
   }) : originX = x;
   final HazardKind kind;
+  final bool sweeping, zigzag;
   final double originX, warningSeconds, liveSeconds;
   double x, y, age = 0;
   double _oldX = 0, _oldY = 0, _from = 0, _until = 0;
@@ -24,8 +27,14 @@ class SpecialHazard {
   double get gapRight => x + 30;
   String get label => switch (kind) {
     HazardKind.formingHole => warning ? 'HOLE OPENING' : 'HOLE OPEN',
-    HazardKind.movingHole => warning ? 'MOVING HOLE INCOMING' : 'MOVING HOLE',
-    HazardKind.laser => warning ? 'LASER CHARGING' : 'LASER LIVE',
+    HazardKind.movingHole =>
+      zigzag
+          ? (warning ? 'ZIGZAG INCOMING' : 'ZIGZAG HOLE')
+          : (warning ? 'MOVING HOLE INCOMING' : 'MOVING HOLE'),
+    HazardKind.laser =>
+      sweeping
+          ? (warning ? 'SWEEP LASER CHARGING' : 'SWEEP LASER LIVE')
+          : (warning ? 'LASER CHARGING' : 'LASER LIVE'),
     HazardKind.platformGap => warning ? 'PLATFORM BREAKING' : 'GAP OPEN',
   };
 
@@ -38,11 +47,19 @@ class SpecialHazard {
     _until = ((warningSeconds + liveSeconds - before) / dt).clamp(0.0, 1.0);
     final liveDt = math.max(0.0, _until - _from) * dt;
     if (kind == HazardKind.formingHole || kind == HazardKind.movingHole) {
-      y += scrollSpeed * liveDt;
+      y += (zigzag ? scrollSpeed * 1.35 + 35 : scrollSpeed) * liveDt;
     }
     if (kind == HazardKind.movingHole && liveDt > 0) {
       final liveAge = (age - warningSeconds).clamp(0.0, liveSeconds);
-      x = originX + 48 * math.sin(liveAge * 2.2);
+      x =
+          originX +
+          (zigzag
+              ? 125 * (2 / math.pi) * math.asin(math.sin(liveAge * 2.4))
+              : 48 * math.sin(liveAge * 2.2));
+    }
+    if (kind == HazardKind.laser && sweeping && liveDt > 0) {
+      final liveAge = (age - warningSeconds).clamp(0.0, liveSeconds);
+      x = originX + 65 * math.sin(liveAge * 1.6);
     }
   }
 
@@ -54,7 +71,7 @@ class SpecialHazard {
     final bx = oldX + (newX - oldX) * _until;
     final by = oldY + (newY - oldY) * _until;
     if (kind == HazardKind.laser) {
-      return _crossesRect(ax, ay, bx, by, x - 10, x + 10, 33, 537);
+      return _crossesRect(ax - _oldX, ay, bx - x, by, -10, 10, 33, 537);
     }
     if (kind == HazardKind.platformGap) {
       return math.max(ax, bx) > gapLeft + 3 && math.min(ax, bx) < gapRight - 3;

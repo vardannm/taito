@@ -100,6 +100,17 @@ void main() {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.padding = FakeViewPadding(top: 44, bottom: 34);
     await tester.pump();
+    classic.start(levelNumber:31);
+    await tester.pump(const Duration(milliseconds:16));
+    await capture('spider-level-31');
+    classic.start(levelNumber:50);
+    await tester.pump(const Duration(milliseconds:16));
+    await capture('spider-level-50');
+    classic.spiders.first.chasing=true;
+    await tester.pump(const Duration(milliseconds:16));
+    await capture('spider-alert');
+    classic.start();
+    await tester.pump(const Duration(milliseconds:16));
     await tester.tap(find.byTooltip('Pause'));
     await tester.pump(const Duration(milliseconds: 100));
     await capture('drag-pause');

@@ -165,7 +165,7 @@ void main() {
       await tester.tap(find.text('INFINITE'));
       await tester.pump();
       expect(find.text('HEIGHT / METERS'), findsOneWidget);
-      expect(find.text('TILT TO DODGE'), findsOneWidget);
+      expect(find.text('THE RUSH'), findsOneWidget);
       expect(find.textContaining('HOLE 01'), findsNothing);
       expect(find.byType(PivotBoard), findsOneWidget);
       expect(tester.takeException(), isNull);

@@ -8,8 +8,13 @@ import 'package:flutter/services.dart';
 import 'board_painter.dart';
 import 'game.dart';
 import 'levels.dart';
+import 'level_picker.dart';
 import 'profile.dart';
 import 'tutorial.dart';
+import 'rewards.dart';
+import 'mastery_widgets.dart';
+import 'analog_controls.dart';
+import 'merge_widgets.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -65,7 +70,8 @@ class _GameScreenState extends State<GameScreen>
   late final Ticker ticker;
   Duration? previous;
   double accumulator = 0;
-  bool recorded = false, newBest = false;
+  bool recorded = false, newBest = false, briefing = false;
+  List<CabinetStyle> newUnlocks = [];
   late bool tutorialOpen;
   PlayerProfile get profile => widget.profile;
 
@@ -73,6 +79,7 @@ class _GameScreenState extends State<GameScreen>
   void initState() {
     super.initState();
     tutorialOpen = !profile.tutorialSeen;
+    game.cabinet = profile.cabinet;
     WidgetsBinding.instance.addObserver(this);
     HardwareKeyboard.instance.addHandler(onKey);
     ticker = createTicker(tick)..start();
@@ -85,27 +92,33 @@ class _GameScreenState extends State<GameScreen>
     previous = now;
     accumulator += math.min(delta, .05);
     final before =
-        '${game.phase}/${game.target}/${game.lives}/${game.inputEpoch}';
+        '${game.phase}/${game.target}/${game.lives}/${game.inputEpoch}/$recorded';
     while (accumulator >= 1 / 120) {
       game.step(1 / 120);
       accumulator -= 1 / 120;
     }
     if (game.event != null) {
       unawaited(feedback.play(game.event!, profile));
+      if (game.event != GameEvent.coin && game.event != GameEvent.merge) {
+        touch.fillRange(0, 2, 0);
+        keyboard.fillRange(0, 2, 0);
+      }
       game.event = null;
-      touch.fillRange(0, 2, 0);
-      keyboard.fillRange(0, 2, 0);
     }
     if (game.finished && !recorded) {
       recorded = true;
       if (!game.practice) {
+        final locked = CabinetStyle.values
+            .where((c) => !profile.isUnlocked(c))
+            .toList();
         newBest = profile.recordResult(game);
+        newUnlocks = locked.where(profile.isUnlocked).toList();
         unawaited(profile.save());
       }
     }
     frame.value++;
     if (before !=
-        '${game.phase}/${game.target}/${game.lives}/${game.inputEpoch}')
+        '${game.phase}/${game.target}/${game.lives}/${game.inputEpoch}/$recorded')
       setState(() {});
   }
 
@@ -153,35 +166,37 @@ class _GameScreenState extends State<GameScreen>
     return true;
   }
 
-  void start(GameMode mode) => setState(() {
+  void start(GameMode mode, {DateTime? challengeDate}) => setState(() {
     clearControls();
     recorded = newBest = false;
     game.setControlMode(profile.controlMode);
-    game.start(gameMode: mode, levelNumber: profile.classicLevel);
+    game.cabinet = profile.cabinet;
+    newUnlocks = [];
+    game.start(
+      gameMode: mode,
+      levelNumber: profile.classicLevel,
+      challengeDate: challengeDate,
+    );
+    briefing = game.finale;
+    if (briefing) game.setPaused(true);
   });
   Future<void> selectLevel() => showModalBottomSheet<void>(
     context: context,
     backgroundColor: cream,
     showDragHandle: true,
-    builder: (context) => SafeArea(
-      child: ListView.builder(
-        itemCount: 30,
-        itemBuilder: (context, index) => ListTile(
-          leading: Text('${index + 1}'.padLeft(2, '0'), style: label()),
-          title: Text(ClassicLevels.names[index]),
-          subtitle: Text(
-            [
-              'Beginner',
-              'Easy',
-              'Medium',
-              'Medium / Hard',
-              'Hard',
-              'Expert',
-            ][index ~/ 5],
-          ),
-          selected: profile.classicLevel == index + 1,
-          onTap: () {
-            profile.classicLevel = index + 1;
+    isScrollControlled: true,
+    builder: (context) => SizedBox(
+      height: MediaQuery.sizeOf(context).height * .84,
+      child: SafeArea(
+        child: LevelPicker(
+          selected: profile.classicLevel,
+          records: {
+            for (var i = 1; i <= ClassicLevels.count; i++)
+              i: profile.levelRecord(i),
+          },
+          controlLabel: profile.controlMode.label,
+          onSelected: (number) {
+            profile.classicLevel = number;
             unawaited(profile.save());
             Navigator.pop(context);
             start(GameMode.classic);
@@ -190,7 +205,112 @@ class _GameScreenState extends State<GameScreen>
       ),
     ),
   );
+  Future<void> showMerge() => showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: cream,
+    showDragHandle: true,
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (context) => SafeArea(
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * .7,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '2048 / MERGE',
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Start with 2. Collect the top number to double it. Different numbers fill your six-slot stack. Matching neighbors chain together.',
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'A full stack is still safe: collect a match to make room. A different number ends the run. Glowing rings mark useful matches; missed orbs cost nothing.',
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'BEST ${profile.mergeBest}  ·  HIGHEST ${profile.mergeHighest}',
+                        style: label(),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    start(GameMode.merge2048);
+                  },
+                  child: const Text('PLAY 2048'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Future<void> showDaily() {
+    final date = DailyChallenge.day(DateTime.now());
+    return showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: cream,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.sizeOf(context).height * .84,
+          child: DailyCard(
+            date: date,
+            profile: profile,
+            onPlay: () {
+              Navigator.pop(context);
+              start(GameMode.daily, challengeDate: date);
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> showCabinet() => showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: cream,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (context) => SafeArea(
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * .84,
+        child: StatefulBuilder(
+          builder: (context, updateSheet) => CabinetPicker(
+            profile: profile,
+            onSelected: (style) {
+              if (!profile.selectCabinet(style)) return;
+              setState(() => game.cabinet = style);
+              updateSheet(() {});
+              unawaited(profile.save());
+            },
+          ),
+        ),
+      ),
+    ),
+  );
+
   void pause() => setState(() {
+    briefing = false;
     clearControls();
     game.setPaused(!game.paused);
   });
@@ -327,7 +447,9 @@ class _GameScreenState extends State<GameScreen>
                                 ),
                                 const SizedBox(width: 7),
                                 Text(
-                                  'TEN HOLES. NO LIMITS.',
+                                  profile.totalStars == 0
+                                      ? 'TEN HOLES. NO LIMITS.'
+                                      : '${profile.totalStars} / 150 CLASSIC STARS',
                                   style: label(ink.withAlpha(160)),
                                 ),
                               ],
@@ -387,7 +509,7 @@ class _GameScreenState extends State<GameScreen>
                                   child: primary(
                                     'CLASSIC',
                                     selectLevel,
-                                    trailing: '30',
+                                    trailing: '${ClassicLevels.count}',
                                   ),
                                 ),
                                 const SizedBox(width: 10),
@@ -396,6 +518,56 @@ class _GameScreenState extends State<GameScreen>
                                     'INFINITE',
                                     () => start(GameMode.infinite),
                                     trailing: '∞',
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: showMerge,
+                                icon: const Icon(Icons.auto_awesome, size: 17),
+                                label: const Text(
+                                  '2048  /  MERGE',
+                                  style: TextStyle(fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: showDaily,
+                                    icon: const Icon(
+                                      Icons.today_outlined,
+                                      size: 17,
+                                    ),
+                                    label: const Text(
+                                      'DAILY',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: showCabinet,
+                                    icon: const Icon(
+                                      Icons.palette_outlined,
+                                      size: 17,
+                                    ),
+                                    label: const Text(
+                                      'CABINET',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -489,7 +661,11 @@ class _GameScreenState extends State<GameScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  game.infinite ? 'HEIGHT / METERS' : 'SCORE',
+                  game.merging
+                      ? '2048 / SCORE'
+                      : game.infinite
+                      ? 'HEIGHT / METERS'
+                      : 'SCORE',
                   style: label(),
                 ),
                 Text(
@@ -504,7 +680,9 @@ class _GameScreenState extends State<GameScreen>
             ),
           ),
           Text(
-            game.infinite
+            game.merging
+                ? 'TOP ${game.mergeRun.highest}'
+                : game.infinite
                 ? 'INFINITE'
                 : game.practice
                 ? 'PRACTICE'
@@ -514,17 +692,37 @@ class _GameScreenState extends State<GameScreen>
         ],
       ),
       Text(
-        game.infinite
+        game.merging
+            ? (game.mergeRun.continued
+                  ? 'BEYOND 2048'
+                  : 'BUILD YOUR WAY TO 2048')
+            : game.infinite
             ? (game.dangerActive
                   ? 'RED RISING'
                   : game.hazardLabel.isNotEmpty
                   ? game.hazardLabel
-                  : 'TILT TO DODGE')
-            : 'L${game.level.toString().padLeft(2, '0')}  •  HOLE ${game.target.clamp(1, 10).toString().padLeft(2, '0')} / 10',
+                  : game.section.label)
+            : '${game.daily ? 'DAILY' : 'L${game.level.toString().padLeft(2, '0')}'}  •  HOLE ${game.target.clamp(1, 10).toString().padLeft(2, '0')} / 10',
         style: label(
           game.dangerActive || game.hazardLabel.isNotEmpty ? orange : ink,
         ),
       ),
+      if (!game.infinite && !game.practice && !game.merging)
+        Text(
+          '${formatRunTime(game.elapsed)} / ${formatRunTime(game.targetTime)}  ·  ${game.coinsCollected}/${game.coins.length} COINS',
+          style: TextStyle(fontSize: 10, color: ink.withAlpha(175)),
+        ),
+      if (game.finale)
+        Text(
+          game.hazardLabel.isEmpty
+              ? 'FINALE · ${game.finaleTitle}'
+              : game.hazardLabel,
+          style: const TextStyle(
+            fontSize: 10,
+            color: orange,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
     ],
   );
 
@@ -554,6 +752,15 @@ class _GameScreenState extends State<GameScreen>
               ],
             ),
           ),
+          if (game.merging)
+            AnimatedBuilder(
+              animation: frame,
+              builder: (context, _) => MergeTray(
+                run: game.mergeRun,
+                clock: game.clock,
+                reducedMotion: MediaQuery.disableAnimationsOf(context),
+              ),
+            ),
           Expanded(
             child: Stack(
               fit: StackFit.expand,
@@ -567,6 +774,14 @@ class _GameScreenState extends State<GameScreen>
               ],
             ),
           ),
+          if (game.analog)
+            SizedBox(
+              height: (MediaQuery.sizeOf(context).height * .19).clamp(
+                104.0,
+                140.0,
+              ),
+              child: AnalogControls(game: game, frame: frame),
+            ),
         ],
       ),
     ),
@@ -623,123 +838,169 @@ class _GameScreenState extends State<GameScreen>
         ),
       );
 
-  Widget boardOverlay() => Container(
-    decoration: BoxDecoration(
-      color: ink.withAlpha(235),
-      borderRadius: BorderRadius.circular(20),
-    ),
-    child: Center(
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(25),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                game.paused
-                    ? Icons.pause_circle_outline
-                    : game.won
-                    ? Icons.workspace_premium_outlined
-                    : Icons.refresh_rounded,
-                size: 43,
-                color: brass,
-              ),
-              const SizedBox(height: 14),
-              Text(
-                game.paused
-                    ? 'Take a breath.'
-                    : game.won
-                    ? 'Pure precision.'
-                    : 'So close.\nGo again.',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 30,
-                  color: cream,
-                  fontWeight: FontWeight.w800,
-                  height: 1.1,
-                  letterSpacing: -1,
-                ),
-              ),
-              const SizedBox(height: 12),
-              if (game.finished) ...[
-                Text(
-                  newBest
-                      ? 'NEW PERSONAL BEST'
-                      : game.practice
-                      ? 'PRACTICE COMPLETE'
-                      : game.infinite
-                      ? 'INFINITE RUN COMPLETE'
-                      : 'RUN COMPLETE',
-                  style: label(brass),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${game.score}',
-                  style: const TextStyle(
-                    fontSize: 42,
-                    fontFamily: 'monospace',
-                    color: cream,
-                  ),
-                ),
-                Text(
-                  game.infinite
-                      ? game.message
-                      : '${game.completed}/10 holes  •  ${game.bestStreak} best streak',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFFB5C5BB),
-                  ),
-                ),
-              ] else
-                const Text(
-                  'Your run is right where you left it.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Color(0xFFB5C5BB), fontSize: 12),
-                ),
-              const SizedBox(height: 22),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: brass,
-                    foregroundColor: ink,
-                  ),
-                  onPressed: game.paused
-                      ? pause
-                      : () {
-                          if (game.won &&
-                              !game.infinite &&
-                              !game.practice &&
-                              game.level < 30) {
-                            profile.classicLevel = game.level + 1;
-                            unawaited(profile.save());
-                          }
-                          start(game.mode);
-                        },
-                  child: Text(
-                    game.paused
-                        ? 'RESUME RUN'
-                        : game.won &&
-                              !game.infinite &&
-                              !game.practice &&
-                              game.level < 30
-                        ? 'NEXT LEVEL'
-                        : 'ONE MORE RUN',
-                    style: label(),
-                  ),
-                ),
-              ),
-              TextButton(
-                onPressed: home,
-                child: Text('BACK TO CLUB', style: label(cream.withAlpha(180))),
-              ),
-            ],
+  Widget boardOverlay() => game.merging && game.finished
+      ? MergeResult(
+          run: game.mergeRun,
+          newBest: newBest,
+          onContinue: () => setState(() {
+            recorded = newBest = false;
+            game.continueMerge();
+          }),
+          onRetry: () => start(GameMode.merge2048),
+          onHome: home,
+        )
+      : briefing
+      ? FinaleBriefing(game: game, onPlay: pause)
+      : Container(
+          decoration: BoxDecoration(
+            color: ink.withAlpha(235),
+            borderRadius: BorderRadius.circular(20),
           ),
-        ),
-      ),
-    ),
-  );
+          child: Center(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(25),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      game.paused
+                          ? Icons.pause_circle_outline
+                          : game.won
+                          ? Icons.workspace_premium_outlined
+                          : Icons.refresh_rounded,
+                      size: 43,
+                      color: brass,
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      game.paused
+                          ? 'Take a breath.'
+                          : game.won
+                          ? (game.merging
+                                ? '2048. You made it.'
+                                : 'Pure precision.')
+                          : 'So close.\nGo again.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 30,
+                        color: cream,
+                        fontWeight: FontWeight.w800,
+                        height: 1.1,
+                        letterSpacing: -1,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (game.finished) ...[
+                      Text(
+                        newBest
+                            ? 'NEW PERSONAL BEST'
+                            : game.practice
+                            ? 'PRACTICE COMPLETE'
+                            : game.infinite
+                            ? 'INFINITE RUN COMPLETE'
+                            : 'RUN COMPLETE',
+                        style: label(brass),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${game.score}',
+                        style: const TextStyle(
+                          fontSize: 42,
+                          fontFamily: 'monospace',
+                          color: cream,
+                        ),
+                      ),
+                      Text(
+                        !game.won || game.merging
+                            ? game.message
+                            : '${game.completed}/10 holes  •  ${game.bestStreak} best streak',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFFB5C5BB),
+                        ),
+                      ),
+                      if (!game.infinite && !game.practice && !game.merging)
+                        MasteryResult(
+                          game: game,
+                          record: game.daily
+                              ? profile.dailyRecord(
+                                  game.dailyKey,
+                                  game.controlMode,
+                                )
+                              : profile.levelRecord(
+                                  game.level,
+                                  game.controlMode,
+                                ),
+                          unlocks: newUnlocks,
+                        ),
+                    ] else
+                      const Text(
+                        'Your run is right where you left it.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Color(0xFFB5C5BB),
+                          fontSize: 12,
+                        ),
+                      ),
+                    const SizedBox(height: 22),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: brass,
+                          foregroundColor: ink,
+                        ),
+                        onPressed: game.merging && game.won
+                            ? () => setState(() {
+                                recorded = newBest = false;
+                                game.continueMerge();
+                              })
+                            : game.paused
+                            ? pause
+                            : () {
+                                if (game.won &&
+                                    game.mode == GameMode.classic &&
+                                    game.level < ClassicLevels.count) {
+                                  profile.classicLevel = game.level + 1;
+                                  unawaited(profile.save());
+                                }
+                                start(game.mode, challengeDate: game.dailyDate);
+                              },
+                        child: Text(
+                          game.merging && game.won
+                              ? 'CONTINUE TO 4096'
+                              : game.paused
+                              ? 'RESUME RUN'
+                              : game.won &&
+                                    game.mode == GameMode.classic &&
+                                    game.level < ClassicLevels.count
+                              ? 'NEXT LEVEL'
+                              : 'ONE MORE RUN',
+                          style: label(),
+                        ),
+                      ),
+                    ),
+                    if (game.won && !game.practice)
+                      TextButton(
+                        onPressed: () =>
+                            start(game.mode, challengeDate: game.dailyDate),
+                        child: Text('RETRY THIS BOARD', style: label(brass)),
+                      ),
+                    TextButton(
+                      onPressed: home,
+                      child: Text(
+                        'BACK TO CLUB',
+                        style: label(cream.withAlpha(180)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
 
   Future<void> showGuide() => showModalBottomSheet<void>(
     context: context,
@@ -792,7 +1053,27 @@ class _GameScreenState extends State<GameScreen>
                 'Watch the warnings.',
                 'Infinite starts with open spaces and builds difficulty with height. Warning holes unlock at 180m, moving holes at 350m, lasers at 600m and platform gaps at 900m. Move away from red warnings before they activate.',
               ),
+              guideRow(
+                '06',
+                'Stay out of the web.',
+                'Classic levels 31–50 have slow patrolling spiders. Enter a marked territory and its spider chases you. Contact ends the run immediately. Each successful target resets the spiders.',
+              ),
               const SizedBox(height: 20),
+              guideRow(
+                '07',
+                'Three ways to master it.',
+                'Earn a star for finishing, one for a finish without misses, and one for beating the active-time target in the HUD. Pauses and ball resets do not count. Stars and records are saved separately for each control mode.',
+              ),
+              guideRow(
+                '08',
+                'Take the detour.',
+                'Optional brass coins are worth 250 points. Each coin can be collected once per run. Classic stars unlock cabinet styles with identical handling. Every tenth Classic board introduces a finale; read its briefing before starting.',
+              ),
+              guideRow(
+                '09',
+                'Return for the daily.',
+                'The daily board changes at midnight UTC. Retry its fixed layout to improve your local record. Infinite alternates rushes, lighter stretches and encounters while speed keeps rising.',
+              ),
               primary('TRY PRACTICE', () {
                 Navigator.pop(context);
                 start(GameMode.practice);
@@ -875,6 +1156,10 @@ class _GameScreenState extends State<GameScreen>
                       value: ControlMode.oneFinger,
                       child: Text('One-Finger Control'),
                     ),
+                    DropdownMenuItem(
+                      value: ControlMode.analog,
+                      child: Text('Vertical Analog Control'),
+                    ),
                   ],
                   onChanged: (mode) {
                     if (mode == null) return;
@@ -886,7 +1171,7 @@ class _GameScreenState extends State<GameScreen>
                 const Padding(
                   padding: EdgeInsets.only(top: 8),
                   child: Text(
-                    'One finger: slide the short lower handle left or right to tilt. In Classic the platform rises automatically.',
+                    'One finger: slide the short lower handle left or right to tilt. In Classic the platform rises automatically. Vertical analog: drag either bottom joystick up or down; the platform follows your drag directly. Release to hold, then grab again to continue.',
                     style: TextStyle(fontSize: 12),
                   ),
                 ),
@@ -972,7 +1257,7 @@ class _PivotBoardState extends State<PivotBoard> {
       return Listener(
         behavior: HitTestBehavior.opaque,
         onPointerDown: (event) {
-          if (!game.canControl) return;
+          if (!game.canControl || game.analog) return;
           if (!viewport.rect.contains(event.localPosition)) return;
           if (epoch != game.inputEpoch) {
             pointers.clear();
@@ -1024,7 +1309,9 @@ class _PivotBoardState extends State<PivotBoard> {
         onPointerUp: release,
         onPointerCancel: release,
         child: Semantics(
-          label: game.oneFinger
+          label: game.analog
+              ? 'Use the bottom left and right vertical joysticks to move the platform ends'
+              : game.oneFinger
               ? 'Drag the short lower handle left or right to tilt'
               : 'Drag the left and right ends of the platform up or down',
           child: RepaintBoundary(

@@ -10,13 +10,17 @@ Classic is the central challenge: clear ten holes with three balls. Practice tea
 
 Tune motor speed, inertia, target capture radius, and trap spacing from those sessions. Geometric path tests prove routes exist; they do not prove a comfortable human difficulty curve. Prefer a repeatable, legible challenge over excessive random failures.
 
+## Current mastery update
+
+The build now includes per-board stars and personal records, optional risk–reward coins, five chapter finales, Infinite pressure sections, a deterministic UTC daily board with local records, and four cabinet palettes unlocked through Classic stars. The daily board has no online rankings; platform account setup is pending. Existing mechanics have automated checks, but time-star thresholds and human difficulty still need real-phone playtesting. Use `playtest/MASTERY.md` for the next 5–10 participants.
+
 ## A commercial path to test
 
 1. Validate the game with a small external iPhone playtest. Track tutorial completion, first-target completion, voluntary retries, session length, and next-day return only after a deliberate analytics/privacy implementation.
-2. Add two or three handcrafted boards with distinct routes and difficulty, then cosmetic cabinet finishes that keep target contrast and hitboxes identical.
+2. Tune the existing 50 boards, finale timings and star thresholds from playtest observations. Cabinet finishes are implemented; check target contrast and controls on physical phones.
 3. Test a paid full-game unlock or cosmetic pack after players demonstrate replay interest. The current build contains neither purchases nor paywalls.
 4. If testing advertising, prefer an optional placement between finished runs. Do not interrupt steering or require an ad to practice. A revived run would need a separate score category to keep records comparable.
-5. Add platform leaderboards and a deterministic daily board when the core game has been tuned. Server-backed competitive integrity and account services are separate work.
+5. Connect platform leaderboards to the implemented daily board after account setup and core tuning. Server-backed competitive integrity and account services remain separate work.
 
 Price, acquisition spend, and revenue projections should come from observed conversion and retention, not guesses. A polished game gives us something credible to test; it does not establish demand by itself.
 
@@ -28,3 +32,5 @@ Price, acquisition spend, and revenue projections should come from observed conv
 - Any selected purchase/ad/analytics integration, with restore and failure paths and the corresponding store disclosures.
 - A final accessibility and release QA pass. Reduced motion, safe-area layout, and 48+ point control halves are already addressed; the game remains a visual dexterity challenge.
 
+
+2048 / Merge adds a puzzle mode alongside Classic and Infinite: collect colored number orbs, combine matching values at the top of a six-slot stack, and avoid overflow. Reach 2048 and optionally continue. Matching orbs glow, records stay local, and every control scheme uses the same physical ball and platform.
