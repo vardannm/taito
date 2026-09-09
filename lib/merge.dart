@@ -1,5 +1,16 @@
 import 'dart:math' as math;
 
+String formatMergeNumber(int value) {
+  const suffixes = ['', 'k', 'm', 'b', 't', 'q'];
+  var unit = 0;
+  var divisor = 1;
+  while (unit < suffixes.length - 1 && value >= divisor * 1024) {
+    divisor *= 1024;
+    unit++;
+  }
+  return '${value ~/ divisor}${suffixes[unit]}';
+}
+
 class NumberOrb {
   NumberOrb(this.x, this.y, this.value);
   final double x;
@@ -7,7 +18,14 @@ class NumberOrb {
   final int value;
 }
 
-/// Six-slot merge puzzle; all positions use the same 360 x 560 board as physics.
+class MergeHole {
+  MergeHole(this.x, this.y);
+  final double x;
+  double y;
+}
+
+/// Values stay sorted largest to smallest; their positions alternate around
+/// the solid middle ball. Equal values merge across either side of the snake.
 class MergeRun {
   MergeRun({int? seed}) : random = math.Random(seed) {
     for (final y in [90.0, 210.0, 330.0]) {
@@ -15,108 +33,202 @@ class MergeRun {
     }
   }
   final math.Random random;
-  final stack = <int>[2];
+  static const platformLeft = 20.0, platformRight = 340.0;
+  static const ballRadius = 12.0, segmentSpacing = 26.0;
+  static const fallingRadius = 15.0, holeRadius = 13.0;
+  // Like Classic holes, the ball falls when its center enters the opening.
+  static const holeContactRadius = 9.0;
+  static const platformWidth = platformRight - platformLeft;
+  static const maxSegments =
+      1 + (platformWidth - 2 * ballRadius) ~/ segmentSpacing;
+  final segments = <int>[2];
   final orbs = <NumberOrb>[];
+  final holes = <MergeHole>[];
   int score = 0, highest = 2, lastChain = 0, collected = 0, lastMergeScore = 0;
-  bool overflow = false, continued = false;
+  bool overflow = false, hitHole = false;
   double spawnTime = 0, flash = 0;
-  String notice = 'Match the top number. Six slots. Reach 2048.';
-  int get top => stack.last;
-  bool get won => highest >= 2048 && !continued && !overflow;
-  bool get ended => overflow || won;
+  String notice =
+      'Merge matching numbers. Keep the middle ball clear of holes.';
+  int get head => segments.first;
+  int get tail => segments.last;
+  double get length => 2 * ballRadius + (segments.length - 1) * segmentSpacing;
+  bool get full => length + segmentSpacing > platformWidth;
+  bool get nearlyFull => segments.length >= maxSegments - 2;
+  bool get ended => overflow || hitHole;
+  bool canMerge(int value) => segments.contains(value);
   double get speed => (30 + (highest.bitLength - 2) * 3.0).clamp(30.0, 66.0);
+
+  // Fill each ring on both sides, reversing the first side on the next ring:
+  // 0, -1, +1, +2, -2, -3, +3 ... gives [2, 16, 32, 8, 4].
+  int segmentSlot(int index) {
+    if (index == 0) return 0;
+    final ring = (index + 1) ~/ 2;
+    final left = ring.isOdd == index.isOdd;
+    return left ? -ring : ring;
+  }
+
+  double get leftSpan {
+    var slots = 0;
+    for (var i = 1; i < segments.length; i++) {
+      slots = math.max(slots, -segmentSlot(i));
+    }
+    return slots * segmentSpacing;
+  }
+
+  double get rightSpan {
+    var slots = 0;
+    for (var i = 1; i < segments.length; i++) {
+      slots = math.max(slots, segmentSlot(i));
+    }
+    return slots * segmentSpacing;
+  }
+
+  double get minHeadX => ended && overflow
+      ? (platformLeft + platformRight) / 2
+      : platformLeft + ballRadius + leftSpan;
+  double get maxHeadX => ended && overflow
+      ? (platformLeft + platformRight) / 2
+      : platformRight - ballRadius - rightSpan;
+  double segmentX(double headX, int index) =>
+      headX + segmentSlot(index) * segmentSpacing;
 
   void collect(int value) {
     if (ended) return;
     lastChain = lastMergeScore = 0;
-    if (value != top && stack.length == 6) {
-      overflow = true;
-      notice = 'Stack full. You needed $top, but collected $value.';
-      return;
-    }
     collected++;
-    // A match is allowed even with all six slots occupied.
-    while (stack.isNotEmpty && stack.last == value) {
-      stack.removeLast();
+    // Carry through every equal value, regardless of which side displays it.
+    // Resolve all merges before checking whether the snake outgrew the bar.
+    var match = segments.indexOf(value);
+    while (match >= 0) {
+      segments.removeAt(match);
       value *= 2;
       score += value;
       lastMergeScore += value;
       lastChain++;
+      match = segments.indexOf(value);
     }
-    stack.add(value);
-    highest = math.max(highest, value);
+    segments.add(value);
+    segments.sort((a, b) => b.compareTo(a));
+    highest = math.max(highest, head);
+    overflow = length > platformWidth;
     flash = .8;
-    notice = won
-        ? '2048 reached! Keep building toward 4096.'
+    notice = overflow
+        ? 'Your snake outgrew the platform. Merge matching numbers to stay short.'
         : lastChain > 1
         ? '$lastChain CHAIN!  +$lastMergeScore'
         : lastChain == 1
-        ? 'MERGED $value'
-        : stack.length == 6
-        ? 'FULL STACK — collect $top to make space'
-        : 'Collect $top to merge';
-  }
-
-  void continueRun() {
-    if (won) {
-      continued = true;
-      notice = 'Keep going. Next stop: 4096.';
-    }
+        ? 'MERGED ${formatMergeNumber(value)}'
+        : full
+        ? 'PLATFORM FULL — match a number to make room'
+        : 'Collect ${formatMergeNumber(tail)} to start a chain';
   }
 
   void _row(double y) {
-    final xs = <double>[];
-    // Three separated choices, each with independent placement and height.
-    for (var i = 0; i < 3; i++) {
-      double x = 48 + random.nextDouble() * 264;
-      for (
-        var attempt = 0;
-        attempt < 60 && xs.any((v) => (v - x).abs() < 65);
-        attempt++
-      ) {
-        x = 48 + random.nextDouble() * 264;
+    // Three food choices and two holes per wave. One food matches the smallest
+    // segment and sits in the middle ball's current travel range.
+    final safeX = minHeadX + random.nextDouble() * (maxHeadX - minHeadX);
+    final xs = <double>[safeX];
+    for (var i = 1; i < 3; i++) {
+      final choices = <double>[];
+      for (var x = 36.0; x <= 324; x += 4) {
+        if (xs.every((other) => (other - x).abs() >= 60)) choices.add(x);
       }
-      if (xs.any((v) => (v - x).abs() < 55)) continue;
-      xs.add(x);
+      xs.add(choices[random.nextInt(choices.length)]);
     }
-    final match = random.nextInt(xs.length);
     final limit = math.min(7, math.max(2, highest.bitLength));
     for (var i = 0; i < xs.length; i++) {
-      final value = i == match ? top : 1 << (1 + random.nextInt(limit));
-      orbs.add(NumberOrb(xs[i], y + random.nextDouble() * 24, value));
+      final value = i == 0 ? tail : 1 << (1 + random.nextInt(limit));
+      orbs.add(NumberOrb(xs[i], y + random.nextDouble() * 18, value));
     }
+    final holeXs = <double>[];
+    for (var i = 0; i < 2; i++) {
+      final choices = <double>[];
+      for (var x = 36.0; x <= 324; x += 4) {
+        if ((x - safeX).abs() >= 40 &&
+            holeXs.every((other) => (other - x).abs() >= 64)) {
+          choices.add(x);
+        }
+      }
+      final x = choices[random.nextInt(choices.length)];
+      holeXs.add(x);
+      holes.add(MergeHole(x, y + 64 + random.nextDouble() * 8));
+    }
+  }
+
+  double? _contact(
+    double ax,
+    double ay,
+    double bx,
+    double by,
+    double x,
+    double y,
+    double travel,
+    double radius,
+  ) {
+    final ox = ax - x, oy = ay - y;
+    final dx = bx - ax, dy = by - ay - travel;
+    final length = dx * dx + dy * dy;
+    final c = ox * ox + oy * oy - radius * radius;
+    if (c <= 0) return 0;
+    if (length <= 0) return null;
+    final dot = ox * dx + oy * dy, disc = dot * dot - length * c;
+    if (disc < 0) return null;
+    final t = (-dot - math.sqrt(disc)) / length;
+    return t >= 0 && t <= 1 ? t : null;
   }
 
   void step(double dt, double ax, double ay, double bx, double by) {
     if (ended) return;
     flash = math.max(0, flash - dt);
     final travel = speed * dt;
-    final contacts = <(NumberOrb, double)>[];
+    final contacts = <(double, NumberOrb?, MergeHole?)>[];
     for (final orb in orbs) {
-      final ox = ax - orb.x, oy = ay - orb.y;
-      final dx = bx - ax, dy = by - ay - travel;
+      final contact = _contact(
+        ax,
+        ay,
+        bx,
+        by,
+        orb.x,
+        orb.y,
+        travel,
+        ballRadius + fallingRadius,
+      );
       orb.y += travel;
-      final length = dx * dx + dy * dy;
-      final c = ox * ox + oy * oy - 20 * 20;
-      double? contact;
-      if (c <= 0) {
-        contact = 0;
-      } else if (length > 0) {
-        final dot = ox * dx + oy * dy, disc = dot * dot - length * c;
-        if (disc >= 0) {
-          final t = (-dot - math.sqrt(disc)) / length;
-          if (t >= 0 && t <= 1) contact = t;
-        }
-      }
-      if (contact != null) contacts.add((orb, contact));
+      if (contact != null) contacts.add((contact, orb, null));
     }
-    contacts.sort((a, b) => a.$2.compareTo(b.$2));
+    for (final hole in holes) {
+      final contact = _contact(
+        ax,
+        ay,
+        bx,
+        by,
+        hole.x,
+        hole.y,
+        travel,
+        holeContactRadius,
+      );
+      hole.y += travel;
+      if (contact != null) contacts.add((contact, null, hole));
+    }
+    contacts.sort((a, b) {
+      final order = a.$1.compareTo(b.$1);
+      // A simultaneous hole takes priority over a pickup.
+      if (order != 0) return order;
+      if ((a.$3 != null) == (b.$3 != null)) return 0;
+      return a.$3 != null ? -1 : 1;
+    });
     for (final contact in contacts) {
-      collect(contact.$1.value);
-      orbs.remove(contact.$1);
+      if (contact.$3 != null) {
+        hitHole = true;
+        notice = 'Your middle ball fell into a hole.';
+        return;
+      }
+      collect(contact.$2!.value);
+      orbs.remove(contact.$2);
       if (ended) return;
     }
     orbs.removeWhere((orb) => orb.y > 580);
+    holes.removeWhere((hole) => hole.y > 580);
     spawnTime += dt;
     if (spawnTime >= 110 / speed) {
       spawnTime = 0;

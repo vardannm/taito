@@ -15,6 +15,9 @@ import 'rewards.dart';
 import 'mastery_widgets.dart';
 import 'analog_controls.dart';
 import 'merge_widgets.dart';
+import 'merge.dart';
+import 'laser_maze.dart';
+import 'laser_maze_widgets.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -174,7 +177,9 @@ class _GameScreenState extends State<GameScreen>
     newUnlocks = [];
     game.start(
       gameMode: mode,
-      levelNumber: profile.classicLevel,
+      levelNumber: mode == GameMode.laserMaze
+          ? profile.mazeLevel
+          : profile.classicLevel,
       challengeDate: challengeDate,
     );
     briefing = game.finale;
@@ -205,6 +210,32 @@ class _GameScreenState extends State<GameScreen>
       ),
     ),
   );
+  Future<void> selectMaze() => showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: cream,
+    showDragHandle: true,
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (context) => SizedBox(
+      height: MediaQuery.sizeOf(context).height * .84,
+      child: SafeArea(
+        child: LaserMazePicker(
+          selected: profile.mazeLevel,
+          control: profile.controlMode,
+          bestTimes: {
+            for (var i = 1; i <= LaserMazeRoute.count; i++)
+              if (profile.mazeBestTime(i) case final time?) i: time,
+          },
+          onSelected: (number) {
+            profile.mazeLevel = number;
+            unawaited(profile.save());
+            Navigator.pop(context);
+            start(GameMode.laserMaze);
+          },
+        ),
+      ),
+    ),
+  );
   Future<void> showMerge() => showModalBottomSheet<void>(
     context: context,
     backgroundColor: cream,
@@ -230,15 +261,15 @@ class _GameScreenState extends State<GameScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Start with 2. Collect the top number to double it. Different numbers fill your six-slot stack. Matching neighbors chain together.',
+                        'Steer the solid middle ball into numbers. The largest number stays in the middle, with smaller numbers connected on both sides. Matching values combine anywhere in the snake and can cascade into one bigger ball.',
                       ),
                       const SizedBox(height: 16),
                       const Text(
-                        'A full stack is still safe: collect a match to make room. A different number ends the run. Glowing rings mark useful matches; missed orbs cost nothing.',
+                        'Keep the snake shorter than the platform and dodge falling holes with the middle ball. Two holes appear for every three number balls. Glowing rings mark matches. Play keeps going past 2048 without stopping; big numbers use 1k, 2k, 1m and 2m.',
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'BEST ${profile.mergeBest}  ·  HIGHEST ${profile.mergeHighest}',
+                        'BEST ${profile.mergeBest}  ·  HIGHEST ${formatMergeNumber(profile.mergeHighest)}',
                         style: label(),
                       ),
                     ],
@@ -364,7 +395,7 @@ class _GameScreenState extends State<GameScreen>
             // Preserve usable controls in landscape and with larger accessibility text.
             final minHeight = MediaQuery.textScalerOf(context).scale(1) > 1.3
                 ? 800.0
-                : 520.0;
+                : 580.0;
             final height = math.max(viewport.maxHeight, minHeight);
             return SingleChildScrollView(
               physics: viewport.maxHeight < minHeight
@@ -446,11 +477,13 @@ class _GameScreenState extends State<GameScreen>
                                   ),
                                 ),
                                 const SizedBox(width: 7),
-                                Text(
-                                  profile.totalStars == 0
-                                      ? 'TEN HOLES. NO LIMITS.'
-                                      : '${profile.totalStars} / 150 CLASSIC STARS',
-                                  style: label(ink.withAlpha(160)),
+                                Expanded(
+                                  child: Text(
+                                    profile.totalStars == 0
+                                        ? 'TEN HOLES. NO LIMITS.'
+                                        : '${profile.totalStars} / 150 CLASSIC STARS',
+                                    style: label(ink.withAlpha(160)),
+                                  ),
                                 ),
                               ],
                             ),
@@ -530,6 +563,18 @@ class _GameScreenState extends State<GameScreen>
                                 icon: const Icon(Icons.auto_awesome, size: 17),
                                 label: const Text(
                                   '2048  /  MERGE',
+                                  style: TextStyle(fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: selectMaze,
+                                icon: const Icon(Icons.route_rounded, size: 17),
+                                label: const Text(
+                                  'LASER MAZE',
                                   style: TextStyle(fontWeight: FontWeight.w800),
                                 ),
                               ),
@@ -661,7 +706,9 @@ class _GameScreenState extends State<GameScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  game.merging
+                  game.maze
+                      ? 'LASER MAZE / ROUTE ${game.level}'
+                      : game.merging
                       ? '2048 / SCORE'
                       : game.infinite
                       ? 'HEIGHT / METERS'
@@ -669,7 +716,9 @@ class _GameScreenState extends State<GameScreen>
                   style: label(),
                 ),
                 Text(
-                  game.score.toString().padLeft(5, '0'),
+                  game.maze
+                      ? '${game.score}%'
+                      : game.score.toString().padLeft(5, '0'),
                   style: const TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.w800,
@@ -680,8 +729,10 @@ class _GameScreenState extends State<GameScreen>
             ),
           ),
           Text(
-            game.merging
-                ? 'TOP ${game.mergeRun.highest}'
+            game.maze
+                ? formatRunTime(game.elapsed)
+                : game.merging
+                ? 'TOP ${formatMergeNumber(game.mergeRun.highest)}'
                 : game.infinite
                 ? 'INFINITE'
                 : game.practice
@@ -692,10 +743,10 @@ class _GameScreenState extends State<GameScreen>
         ],
       ),
       Text(
-        game.merging
-            ? (game.mergeRun.continued
-                  ? 'BEYOND 2048'
-                  : 'BUILD YOUR WAY TO 2048')
+        game.maze
+            ? game.mazeRun.route.name.toUpperCase()
+            : game.merging
+            ? 'MERGE NUMBERS · DODGE HOLES'
             : game.infinite
             ? (game.dangerActive
                   ? 'RED RISING'
@@ -707,7 +758,7 @@ class _GameScreenState extends State<GameScreen>
           game.dangerActive || game.hazardLabel.isNotEmpty ? orange : ink,
         ),
       ),
-      if (!game.infinite && !game.practice && !game.merging)
+      if (!game.infinite && !game.practice && !game.merging && !game.maze)
         Text(
           '${formatRunTime(game.elapsed)} / ${formatRunTime(game.targetTime)}  ·  ${game.coinsCollected}/${game.coins.length} COINS',
           style: TextStyle(fontSize: 10, color: ink.withAlpha(175)),
@@ -755,11 +806,7 @@ class _GameScreenState extends State<GameScreen>
           if (game.merging)
             AnimatedBuilder(
               animation: frame,
-              builder: (context, _) => MergeTray(
-                run: game.mergeRun,
-                clock: game.clock,
-                reducedMotion: MediaQuery.disableAnimationsOf(context),
-              ),
+              builder: (context, _) => MergeStatus(run: game.mergeRun),
             ),
           Expanded(
             child: Stack(
@@ -838,14 +885,25 @@ class _GameScreenState extends State<GameScreen>
         ),
       );
 
-  Widget boardOverlay() => game.merging && game.finished
+  Widget boardOverlay() => game.maze && game.finished
+      ? LaserMazeResult(
+          game: game,
+          newBest: newBest,
+          onRetry: () => start(GameMode.laserMaze),
+          onNext: game.level < LaserMazeRoute.count
+              ? () {
+                  profile.mazeLevel = game.level + 1;
+                  unawaited(profile.save());
+                  start(GameMode.laserMaze);
+                }
+              : null,
+          onLevels: selectMaze,
+          onHome: home,
+        )
+      : game.merging && game.finished
       ? MergeResult(
           run: game.mergeRun,
           newBest: newBest,
-          onContinue: () => setState(() {
-            recorded = newBest = false;
-            game.continueMerge();
-          }),
           onRetry: () => start(GameMode.merge2048),
           onHome: home,
         )
@@ -920,7 +978,10 @@ class _GameScreenState extends State<GameScreen>
                           color: Color(0xFFB5C5BB),
                         ),
                       ),
-                      if (!game.infinite && !game.practice && !game.merging)
+                      if (!game.infinite &&
+                          !game.practice &&
+                          !game.merging &&
+                          !game.maze)
                         MasteryResult(
                           game: game,
                           record: game.daily
@@ -952,12 +1013,7 @@ class _GameScreenState extends State<GameScreen>
                           backgroundColor: brass,
                           foregroundColor: ink,
                         ),
-                        onPressed: game.merging && game.won
-                            ? () => setState(() {
-                                recorded = newBest = false;
-                                game.continueMerge();
-                              })
-                            : game.paused
+                        onPressed: game.paused
                             ? pause
                             : () {
                                 if (game.won &&
@@ -969,9 +1025,7 @@ class _GameScreenState extends State<GameScreen>
                                 start(game.mode, challengeDate: game.dailyDate);
                               },
                         child: Text(
-                          game.merging && game.won
-                              ? 'CONTINUE TO 4096'
-                              : game.paused
+                          game.paused
                               ? 'RESUME RUN'
                               : game.won &&
                                     game.mode == GameMode.classic &&
@@ -1073,6 +1127,11 @@ class _GameScreenState extends State<GameScreen>
                 '09',
                 'Return for the daily.',
                 'The daily board changes at midnight UTC. Retry its fixed layout to improve your local record. Infinite alternates rushes, lighter stretches and encounters while speed keeps rising.',
+              ),
+              guideRow(
+                '10',
+                'Follow the laser road.',
+                'Choose Laser Maze for ten winding routes. Keep the ball between the red laser walls and lift it to the checkered finish. Touching a wall ends the run. One-finger control supplies a slow automatic climb.',
               ),
               primary('TRY PRACTICE', () {
                 Navigator.pop(context);

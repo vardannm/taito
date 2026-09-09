@@ -19,97 +19,44 @@ Color numberColor(int value) {
   return colors[(value.bitLength - 2).clamp(0, 100) % colors.length];
 }
 
-class MergeTray extends StatelessWidget {
-  const MergeTray({
-    super.key,
-    required this.run,
-    required this.clock,
-    this.reducedMotion = false,
-  });
+class MergeStatus extends StatelessWidget {
+  const MergeStatus({super.key, required this.run});
   final MergeRun run;
-  final double clock;
-  final bool reducedMotion;
+
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
-    child: Column(
-      children: [
-        Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          spacing: 14,
-          runSpacing: 3,
-          children: [
-            Text(
-              run.stack.length == 6
-                  ? 'FULL — MATCH TO SURVIVE'
-                  : 'STACK  ${run.stack.length} / 6',
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w800,
-                color: run.stack.length == 6
-                    ? Colors.red.shade800
-                    : const Color(0xFF163D3B),
-              ),
+    padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
+    child: Semantics(
+      label:
+          'Snake from highest in the middle to smallest outside: ${run.segments.join(', ')}. '
+          '${run.segments.length} of ${MergeRun.maxSegments} balls. '
+          'Collect a matching number with the solid middle ball. Avoid holes.',
+      excludeSemantics: true,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            run.hitHole
+                ? 'FELL INTO A HOLE'
+                : run.overflow
+                ? 'SNAKE TOO LONG'
+                : run.full
+                ? 'PLATFORM FULL'
+                : 'SNAKE  ${run.segments.length} / ${MergeRun.maxSegments}',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: run.nearlyFull
+                  ? const Color(0xFFCD542F)
+                  : const Color(0xFF163D3B),
             ),
-            Text(
-              'MATCH ${run.top}',
-              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
-            ),
-          ],
-        ),
-        const SizedBox(height: 5),
-        Row(
-          children: List.generate(6, (i) {
-            final occupied = i < run.stack.length,
-                top = i == run.stack.length - 1;
-            return Expanded(
-              child: Semantics(
-                label: occupied
-                    ? 'Stack slot ${i + 1}: ${run.stack[i]}${top ? ', match this number' : ''}'
-                    : 'Empty stack slot ${i + 1}',
-                child: Container(
-                  height: 34,
-                  margin: const EdgeInsets.symmetric(horizontal: 2),
-                  decoration: BoxDecoration(
-                    color: occupied
-                        ? numberColor(run.stack[i])
-                        : const Color(0x16163D3B),
-                    borderRadius: BorderRadius.circular(7),
-                    border: Border.all(
-                      width: top ? 2 : 1,
-                      color: run.stack.length == 6
-                          ? Colors.red.withAlpha(
-                              reducedMotion
-                                  ? 230
-                                  : (175 + 70 * math.sin(clock * 7)).round(),
-                            )
-                          : top
-                          ? const Color(0xFFFFDF88)
-                          : const Color(0x22163D3B),
-                    ),
-                  ),
-                  alignment: Alignment.center,
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: FittedBox(
-                      child: Text(
-                        occupied ? '${run.stack[i]}' : '·',
-                        style: TextStyle(
-                          color: occupied
-                              ? Colors.white
-                              : const Color(0x55163D3B),
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }),
-        ),
-      ],
+          ),
+          Text(
+            'MATCH ${formatMergeNumber(run.tail)}',
+            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -120,35 +67,40 @@ void paintNumberOrb(
   int value,
   double radius, {
   bool match = false,
+  double opacity = 1,
 }) {
   if (match)
     canvas.drawCircle(
       center,
       radius + 4,
       Paint()
-        ..color = const Color(0xFFFFF4C9)
+        ..color = const Color(0xFFFFF4C9).withValues(alpha: opacity)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2,
     );
   canvas.drawCircle(
     center + const Offset(0, 2),
     radius,
-    Paint()..color = const Color(0x33000000),
+    Paint()..color = Colors.black.withValues(alpha: .2 * opacity),
   );
-  canvas.drawCircle(center, radius, Paint()..color = numberColor(value));
+  canvas.drawCircle(
+    center,
+    radius,
+    Paint()..color = numberColor(value).withValues(alpha: opacity),
+  );
   canvas.drawCircle(
     center - Offset(radius * .28, radius * .35),
     radius * .14,
-    Paint()..color = const Color(0x44FFFFFF),
+    Paint()..color = Colors.white.withValues(alpha: .27 * opacity),
   );
   final text = TextPainter(
     text: TextSpan(
-      text: '$value',
+      text: formatMergeNumber(value),
       style: TextStyle(
         fontFamily: 'sans-serif',
         fontSize: radius * .85,
         fontWeight: FontWeight.w900,
-        color: Colors.white,
+        color: opacity < 1 ? const Color(0xD9163D3B) : Colors.white,
       ),
     ),
     textDirection: TextDirection.ltr,
@@ -166,13 +118,12 @@ class MergeResult extends StatelessWidget {
     super.key,
     required this.run,
     required this.newBest,
-    required this.onContinue,
     required this.onRetry,
     required this.onHome,
   });
   final MergeRun run;
   final bool newBest;
-  final VoidCallback onContinue, onRetry, onHome;
+  final VoidCallback onRetry, onHome;
   @override
   Widget build(BuildContext context) => Container(
     decoration: BoxDecoration(
@@ -187,7 +138,7 @@ class MergeResult extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              run.won ? '2048. You made it.' : 'Stack full.',
+              run.hitHole ? 'Fell into a hole.' : 'Snake too long.',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Color(0xFFF2ECDD),
@@ -197,7 +148,7 @@ class MergeResult extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              '${newBest ? 'NEW BEST' : 'SCORE'} ${run.score}  ·  HIGHEST ${run.highest}',
+              '${newBest ? 'NEW BEST' : 'SCORE'} ${run.score}  ·  HIGHEST ${formatMergeNumber(run.highest)}',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Color(0xFFFFDF88),
@@ -213,8 +164,8 @@ class MergeResult extends StatelessWidget {
                   backgroundColor: const Color(0xFFFFDF88),
                   foregroundColor: const Color(0xFF163D3B),
                 ),
-                onPressed: run.won ? onContinue : onRetry,
-                child: Text(run.won ? 'CONTINUE TO 4096' : 'PLAY AGAIN'),
+                onPressed: onRetry,
+                child: const Text('PLAY AGAIN'),
               ),
             ),
             const SizedBox(height: 6),
@@ -226,14 +177,6 @@ class MergeResult extends StatelessWidget {
             Wrap(
               alignment: WrapAlignment.center,
               children: [
-                if (run.won)
-                  TextButton(
-                    onPressed: onRetry,
-                    child: const Text(
-                      'NEW RUN',
-                      style: TextStyle(color: Color(0xFFFFDF88)),
-                    ),
-                  ),
                 TextButton(
                   onPressed: onHome,
                   child: const Text(

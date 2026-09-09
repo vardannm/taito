@@ -1,4 +1,5 @@
 import 'merge_widgets.dart';
+import 'merge.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'hazards.dart';
 import 'hazard_painter.dart';
 import 'spider_painter.dart';
 import 'cabinet.dart';
+import 'laser_maze_painter.dart';
 
 const cream = Color(0xFFF2ECDD);
 const ink = Color(0xFF163D3B);
@@ -156,14 +158,16 @@ class BoardPainter extends CustomPainter {
         );
       }
     }
+    if (game.maze)
+      paintLaserMaze(canvas, game.mazeRun, game.clock, reducedMotion);
     if (game.merging) {
       for (final orb in game.mergeRun.orbs) {
         paintNumberOrb(
           canvas,
           Offset(orb.x, orb.y),
           orb.value,
-          15,
-          match: orb.value == game.mergeRun.top,
+          MergeRun.fallingRadius,
+          match: game.mergeRun.canMerge(orb.value),
         );
       }
       if (game.mergeRun.flash > 0) {
@@ -171,7 +175,10 @@ class BoardPainter extends CustomPainter {
       }
     }
     paintSpiderBackdrop(canvas, game);
-    for (final hole in game.board) {
+    final visibleHoles = game.merging
+        ? game.mergeRun.holes.map((hole) => Hole(hole.x, hole.y))
+        : game.board;
+    for (final hole in visibleHoles) {
       final p = Offset(hole.x, game.screenY(hole.y));
       final active = !game.infinite && hole.target == game.target.clamp(1, 10);
       final done = hole.target > 0 && hole.target < game.target;
@@ -244,14 +251,15 @@ class BoardPainter extends CustomPainter {
         );
     }
     // Baseline and maker's mark remain below the hazards.
-    text(
-      canvas,
-      'PRECISION IS EVERYTHING',
-      const Offset(180, 545),
-      6.5,
-      ink.withAlpha(180),
-      spacing: 2,
-    );
+    if (!game.maze)
+      text(
+        canvas,
+        'PRECISION IS EVERYTHING',
+        const Offset(180, 545),
+        6.5,
+        ink.withAlpha(180),
+        spacing: 2,
+      );
     if (game.infinite) {
       for (
         int mark = (game.maxHeight / 100).floor() - 4;
@@ -458,12 +466,52 @@ class BoardPainter extends CustomPainter {
       }
     }
     if (game.merging) {
-      paintNumberOrb(
-        canvas,
-        Offset(game.visualX, game.visualY - 3),
-        game.mergeRun.top,
-        10,
-      );
+      final run = game.mergeRun;
+      Offset segmentCenter(int i) {
+        final x = run.segmentX(game.visualX, i);
+        return Offset(x, game.screenY(game.platformY(x) - MergeRun.ballRadius));
+      }
+
+      if (run.nearlyFull) {
+        canvas.drawLine(
+          a + const Offset(0, 7),
+          b + const Offset(0, 7),
+          Paint()
+            ..color = orange.withAlpha(run.full ? 210 : 110)
+            ..strokeWidth = 3
+            ..strokeCap = StrokeCap.round,
+        );
+      }
+      if (run.segments.length > 1) {
+        final leftX = game.visualX - run.leftSpan;
+        final rightX = game.visualX + run.rightSpan;
+        canvas.drawLine(
+          Offset(
+            leftX,
+            game.screenY(game.platformY(leftX) - MergeRun.ballRadius),
+          ),
+          Offset(
+            rightX,
+            game.screenY(game.platformY(rightX) - MergeRun.ballRadius),
+          ),
+          Paint()
+            ..color = ink.withAlpha(85)
+            ..strokeWidth = 3
+            ..strokeCap = StrokeCap.round,
+        );
+      }
+      for (var i = run.segments.length - 1; i > 0; i--) {
+        paintNumberOrb(
+          canvas,
+          segmentCenter(i),
+          run.segments[i],
+          MergeRun.ballRadius - 1,
+          opacity: .38,
+          match: i == run.segments.length - 1,
+        );
+      }
+      if (!run.hitHole)
+        paintNumberOrb(canvas, segmentCenter(0), run.head, MergeRun.ballRadius);
     }
     if (!game.merging && game.ballScale > 0) {
       final p = Offset(game.visualX, game.screenY(game.visualY));

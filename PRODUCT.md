@@ -33,4 +33,6 @@ Price, acquisition spend, and revenue projections should come from observed conv
 - A final accessibility and release QA pass. Reduced motion, safe-area layout, and 48+ point control halves are already addressed; the game remains a visual dexterity challenge.
 
 
-2048 / Merge adds a puzzle mode alongside Classic and Infinite: collect colored number orbs, combine matching values at the top of a six-slot stack, and avoid overflow. Reach 2048 and optionally continue. Matching orbs glow, records stay local, and every control scheme uses the same physical ball and platform.
+2048 / Merge adds an endless puzzle mode alongside Classic and Infinite. The largest ball stays in the middle of a translucent snake, matching values combine across both sides, and the player must avoid growing beyond the platform or falling into a hole. Waves contain three number balls and two holes. Play continues past 2048 without interruption, with k/m labels for large numbers. Records stay local, and every control scheme uses the same simulation.
+
+Laser Maze adds ten finish-based routes: keep the ball inside a winding red laser corridor and climb to the checkered line. Touching a wall ends the run. The routes grow narrower and more winding, with local best times per route and control scheme. All existing controls remain available, with automatic ascent for one-finger play.

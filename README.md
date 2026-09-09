@@ -120,8 +120,24 @@ Infinite hard encounters: from 1,200 points, encounter sections alternate sidewa
 
 ## 2048 / Merge
 
-Choose **2048 / MERGE** from the home screen. Steer the numbered ball into descending colored orbs. The stack starts at 2 and has six slots, shown left-to-right with the current top highlighted. Matching the top number doubles it and can cascade into matching neighbors: [8, 4, 2] + 2 becomes [16]. Each intermediate merged value contributes to score. A nonmatching pickup fills another slot. At six slots, a match still saves you; a nonmatch ends the run. Missed orbs have no penalty.
+Choose **2048 / MERGE** from the home screen. Steer the solid middle ball into descending numbers. The largest value stays in the middle of a translucent snake, with smaller values arranged on both sides and the smallest at an outer end. The snake moves along the platform and follows its tilt. Values are sorted largest to smallest internally, and each pair of outer positions fills on opposite sides. This produces the layout **2, 16, 32, 8, 4**. Collecting another 2 combines all five matching powers into **64**.
 
-New rows include the stack's current matching value, with randomized separated positions and other number choices. A bright ring identifies current matches. Reach 2048 for a win screen, then continue toward 4096 and beyond or start fresh. This mode uses the selected control scheme, has its own local best score/highest tile/run count, and awards no Classic stars. Continued play counts as the same run.
+Matching values combine anywhere in the snake, including across opposite sides. Every intermediate merged value adds to score. Glowing rings mark numbers that match any current segment. The solid middle ball collects numbers; faint segments pass through numbers and holes.
 
-Tune spawn speed, spacing, number mix and stack logic in `lib/merge.dart`. Colors, slot tray, orb drawing and result UI are in `lib/merge_widgets.dart`. Phone layouts keep the tray above the uniformly fitted board and controls inside the safe area.
+The 320-unit platform still fits 12 balls at 26-unit spacing. The chain takes up space on both sides, reducing the middle ball's available travel range as it grows. A matching pickup can rescue a full snake; a pickup that leaves it longer than the platform ends the run. The platform turns orange as space runs low. The length/match label stays above the uniformly fitted board.
+
+Each new wave contains **three number balls and two falling holes**. Their positions are separated, with one reachable matching number and a clear lane through that wave's holes. The solid middle ball falls when its center enters a hole, ending the run. Missed numbers have no penalty. Pause freezes both streams, and replay resets them together.
+
+Play continues automatically through 2048 and beyond, without a win screen or confirmation. Number labels use 1024 = **1k**, 2048 = **2k**, 1,048,576 = **1m**, and 2,097,152 = **2m**; underlying values and merge scores remain exact. Records are local and separate from other modes, and the run is recorded when it ends.
+
+Tune number/hole spawning, merge logic, spacing and capacity in `lib/merge.dart`. `lib/board_painter.dart` draws the centered snake and holes; colors, compact labels, length status and loss UI are in `lib/merge_widgets.dart`. `tool/render_merge.dart` exports staged Flutter screenshots of the centered example, its merge to 64, active play past 2048, millions, length warning, and both loss conditions.
+
+## Laser Maze
+
+Choose **LASER MAZE** on the home screen for ten named routes. A dark road winds upward between two bright red laser walls, from a safe launch straight to a checkered finish. Early routes have gentle bends and wider lanes; later routes are narrower zigzags. Only the ball touches the walls; the platform can cross them. Contact with either laser ends the run immediately, and crossing the finish inside the road wins.
+
+Two-finger dragging, vertical analog controls, and desktop keyboard steering use the existing ball/platform physics. Lift both ends to climb and tilt through each bend. One-finger mode adds a slow 14-unit/second automatic climb while the lower handle controls tilt. There are no holes, spiders, number pickups, idle floor or Classic rewards in this mode.
+
+The HUD shows peak route progress and active time. Pause freezes the run and clears held input. Results offer retry, next route, all routes, and home; the last route returns to route selection. All ten routes are available from the picker. The selected route, attempt count and fastest finish for each route/control mode are saved locally in a separate record.
+
+`lib/laser_maze.dart` defines the ten paths, widths, swept ball-to-wall collision, finish ordering and progress. Wall collision includes the ball radius, beam thickness and rounded corners, so fast pivot swipes cannot jump through a bend. `lib/laser_maze_painter.dart` draws the road, red walls, direction arrows, finish and picker previews. `lib/laser_maze_widgets.dart` supplies the picker and result screens. Tune the widths and turn patterns in `LaserMazeRoute`; actual human difficulty still needs playtesting.

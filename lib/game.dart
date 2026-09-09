@@ -4,6 +4,7 @@ import 'levels.dart';
 import 'spiders.dart';
 import 'rewards.dart';
 import 'merge.dart';
+import 'laser_maze.dart';
 
 class Hole {
   const Hole(this.x, this.y, {this.target = 0});
@@ -15,7 +16,7 @@ enum GamePhase { playing, sinking, returning, over }
 
 enum GameEvent { target, miss, complete, coin, merge }
 
-enum GameMode { classic, infinite, practice, daily, merge2048 }
+enum GameMode { classic, infinite, practice, daily, merge2048, laserMaze }
 
 enum ControlMode { twoFinger, oneFinger, analog }
 
@@ -51,6 +52,8 @@ class BalanceGame {
   int level = 1, runSerial = 0;
   CabinetStyle cabinet = CabinetStyle.brass;
   DateTime? dailyDate;
+  bool get maze => mode == GameMode.laserMaze;
+  LaserMazeRun mazeRun = LaserMazeRun(1);
   bool get merging => mode == GameMode.merge2048;
   MergeRun mergeRun = MergeRun();
   bool get daily => mode == GameMode.daily;
@@ -63,7 +66,8 @@ class BalanceGame {
   double lastCoinAge = 99, lastCoinX = 0, lastCoinY = 0;
   double targetTime = 180, _nextFinaleAt = 3;
   int _finaleSequence = 0;
-  int get earnedStarMask => !finished || !won || practice || infinite || merging
+  int get earnedStarMask =>
+      !finished || !won || practice || infinite || merging || maze
       ? 0
       : 1 | (misses == 0 ? 2 : 0) | (elapsed <= targetTime ? 4 : 0);
   InfiniteSection get section => sectionAt(maxHeight / 10);
@@ -228,7 +232,7 @@ class BalanceGame {
 
   bool get infinite => mode == GameMode.infinite;
   bool get practice => mode == GameMode.practice;
-  List<Hole> get board => merging
+  List<Hole> get board => merging || maze
       ? const []
       : infinite
       ? _endlessHoles
@@ -340,7 +344,9 @@ class BalanceGame {
   bool get canControl => started && !paused && phase == GamePhase.playing;
   Hole get activeHole =>
       board.firstWhere((h) => h.target == target.clamp(1, 10));
-  double get ballY => left + (right - left) * ((ballX - 20) / 320) - ballRadius;
+  double get ballY =>
+      platformY(ballX) - (merging ? MergeRun.ballRadius : ballRadius);
+  double platformY(double x) => left + (right - left) * ((x - 20) / 320);
   double get visualX => phase == GamePhase.sinking ? captureX : ballX;
   double get visualY => phase == GamePhase.sinking
       ? captureY + (fellThroughGap ? 100 * phaseTime * phaseTime : 0)
@@ -417,7 +423,9 @@ class BalanceGame {
     for (final spider in spiders) {
       spider.reset();
     }
-    left = right = infinite
+    left = right = maze
+        ? 526
+        : infinite
         ? infiniteStart
         : oneFinger
         ? 500
@@ -440,7 +448,13 @@ class BalanceGame {
     dailyDate = daily
         ? DailyChallenge.day(challengeDate ?? DateTime.now())
         : null;
-    level = daily ? 15 : levelNumber.clamp(1, ClassicLevels.count);
+    level = daily
+        ? 15
+        : levelNumber.clamp(
+            1,
+            maze ? LaserMazeRoute.count : ClassicLevels.count,
+          );
+    if (maze) mazeRun = LaserMazeRun(level);
     _classicBoard = practice
         ? List<Hole>.of(holes)
         : ClassicLevels.build(
@@ -452,7 +466,7 @@ class BalanceGame {
       spiders.addAll(ClassicLevels.spidersFor(level, _classicBoard));
     caughtBySpider = false;
     coins.clear();
-    if (!infinite && !practice && !merging)
+    if (!infinite && !practice && !merging && !maze)
       coins.addAll(ClassicLevels.coinsFor(_classicBoard, spiders));
     coinsCollected = 0;
     lastCoinAge = 99;
@@ -484,29 +498,21 @@ class BalanceGame {
     _endlessHoles.clear();
     if (infinite) ensureInfiniteBoard();
     target = 1;
-    lives = infinite || merging ? 1 : 3;
+    lives = infinite || merging || maze ? 1 : 3;
     score = streak = bestStreak = completed = misses = 0;
     elapsed = phaseTime = 0;
     won = paused = false;
     started = true;
     phase = GamePhase.playing;
     event = null;
-    message = merging
+    message = maze
+        ? 'Stay between the red lasers. Reach the checkered finish.'
+        : merging
         ? mergeRun.notice
         : infinite
         ? 'Tilt to dodge. The board keeps moving.'
         : 'Raise both ends. Find the glowing 01.';
     resetBall();
-  }
-
-  void continueMerge() {
-    if (!merging || !won) return;
-    mergeRun.continueRun();
-    won = false;
-    phase = GamePhase.playing;
-    event = null;
-    message = mergeRun.notice;
-    clearInput();
   }
 
   void home() {
@@ -561,6 +567,7 @@ class BalanceGame {
     lastCoinAge += dt;
     legTime += dt;
     final oldX = ballX, oldY = ballY;
+    final oldLeft = left, oldRight = right;
     final oldScreenY = screenY(ballY);
     if (infinite) {
       // Translate the platform and camera equally: grips stay under the fingers
@@ -607,7 +614,12 @@ class BalanceGame {
       // Horizontal control changes tilt; Classic supplies the missing lift axis.
       final halfTilt = controlPosition * 70;
       final center =
-          (infinite || merging
+          (maze
+                  ? math.max(
+                      LaserMazeRoute.finishY + ballRadius,
+                      (left + right) / 2 - 14 * dt,
+                    )
+                  : infinite || merging
                   ? (left + right) / 2
                   : math.max(
                       activeHole.y + ballRadius,
@@ -630,29 +642,62 @@ class BalanceGame {
     velocity *= math.exp(-.48 * dt);
     velocity = velocity.clamp(-265.0, 265.0);
     ballX += velocity * dt;
-    if (ballX < 28) {
-      ballX = 28;
+    final minimumX = merging ? mergeRun.minHeadX : 28.0;
+    final maximumX = merging ? mergeRun.maxHeadX : 332.0;
+    if (ballX < minimumX) {
+      ballX = minimumX;
       velocity = velocity.abs() * .22;
     }
-    if (ballX > 332) {
-      ballX = 332;
+    if (ballX > maximumX) {
+      ballX = maximumX;
       velocity = -velocity.abs() * .22;
     }
     if (infinite) {
       _updateClimb(dt);
       if (phase != GamePhase.playing) return;
     }
+    if (maze) {
+      mazeRun.step(oldX, oldY, ballX, ballY, ballRadius);
+      score = (mazeRun.progress * 100).floor();
+      if (mazeRun.ended) {
+        won = mazeRun.won;
+        phase = GamePhase.over;
+        if (!won) {
+          lives = 0;
+          misses++;
+        }
+        // Stop the whole platform at the contact, not at the end of a fast drag.
+        final t = mazeRun.contactFraction;
+        left = oldLeft + (left - oldLeft) * t;
+        right = oldRight + (right - oldRight) * t;
+        ballX = mazeRun.contactX;
+        final alignment = mazeRun.contactY - ballY;
+        left += alignment;
+        right += alignment;
+        captureX = mazeRun.contactX;
+        captureY = mazeRun.contactY;
+        message = won
+            ? 'Finish reached. Beautifully balanced.'
+            : 'You touched a red laser.';
+        event = won ? GameEvent.complete : GameEvent.miss;
+        velocity = 0;
+        clearInput();
+      }
+      return;
+    }
     if (merging) {
       final collectedBefore = mergeRun.collected;
       mergeRun.step(dt, oldX, oldY, ballX, ballY);
+      // Make room for new segments without treating the attachment as a sweep.
+      ballX = ballX.clamp(mergeRun.minHeadX, mergeRun.maxHeadX);
       score = mergeRun.score;
       message = mergeRun.notice;
       if (mergeRun.collected != collectedBefore) event = GameEvent.merge;
       if (mergeRun.ended) {
-        won = mergeRun.won;
+        won = false;
         phase = GamePhase.over;
-        if (!won) lives = 0;
-        event = won ? GameEvent.complete : GameEvent.miss;
+        lives = 0;
+        event = GameEvent.miss;
         velocity = 0;
         clearInput();
       }

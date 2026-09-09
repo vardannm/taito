@@ -7,7 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/profile.dart';
 import 'package:balance_arcade/game.dart';
-import 'package:balance_arcade/merge.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
@@ -18,9 +17,7 @@ Future<void> saveImage(ui.Image image, String path) async {
 }
 
 void main() {
-  testWidgets('render 2048 snake gameplay, length warning and results', (
-    tester,
-  ) async {
+  testWidgets('render laser maze picker, routes and finish', (tester) async {
     for (final family in ['sans-serif', 'monospace', 'Roboto']) {
       final loader = FontLoader(family);
       loader.addFont(
@@ -73,108 +70,44 @@ void main() {
       await tester.runAsync(() => saveImage(image, 'artifacts/$name.png'));
     }
 
-    await capture('merge-home');
-    await tester.ensureVisible(find.text('2048  /  MERGE'));
-    await tester.tap(find.text('2048  /  MERGE'));
+    await capture('maze-home');
+    await tester.ensureVisible(find.text('LASER MAZE'));
+    await tester.tap(find.text('LASER MAZE'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    await capture('merge-guide');
-    await tester.tap(find.text('PLAY 2048'));
+    await capture('maze-picker');
+    await tester.ensureVisible(find.byKey(const ValueKey('maze-route-1')));
+    await tester.tap(find.byKey(const ValueKey('maze-route-1')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     final game = tester.widget<PivotBoard>(find.byType(PivotBoard)).game;
-    game.mergeRun.segments
-      ..clear()
-      ..addAll([32, 16, 8, 4, 2]);
-    game.mergeRun.highest = 32;
-    game.left = 480;
-    game.right = 480;
-    game.mergeRun.orbs
-      ..clear()
-      ..addAll([
-        NumberOrb(80, 110, 2),
-        NumberOrb(220, 85, 4),
-        NumberOrb(140, 205, 8),
-        NumberOrb(280, 270, 16),
-        NumberOrb(70, 315, 32),
-        NumberOrb(205, 390, 1024),
-        NumberOrb(110, 435, 2048),
-        NumberOrb(285, 150, 128),
-        NumberOrb(50, 215, 1048576),
-      ]);
-    game.mergeRun.holes
-      ..clear()
-      ..addAll([
-        MergeHole(315, 100),
-        MergeHole(75, 180),
-        MergeHole(205, 275),
-        MergeHole(140, 345),
-        MergeHole(300, 410),
-        MergeHole(45, 440),
-      ]);
-    await tester.pump(const Duration(milliseconds: 20));
-    await capture('merge-centered-phone');
-    game.mergeRun.orbs.add(NumberOrb(game.ballX, game.ballY, 2));
-    await tester.pump(const Duration(milliseconds: 20));
-    expect(game.mergeRun.segments, [64]);
-    await capture('merge-centered-64');
-
-    game.start(gameMode: GameMode.merge2048);
-    game.mergeRun.holes.clear();
-    game.mergeRun.segments
-      ..clear()
-      ..add(1024);
-    game.mergeRun.highest = 1024;
-    game.mergeRun.orbs
-      ..clear()
-      ..add(NumberOrb(game.ballX, game.ballY, 1024));
-    await tester.pump(const Duration(milliseconds: 20));
-    expect(game.finished, false);
-    await capture('merge-2k-running');
-    game.mergeRun.segments
-      ..clear()
-      ..addAll([2097152, 1048576, 2048, 1024, 512]);
-    game.mergeRun.highest = 2097152;
-    game.mergeRun.flash = 0;
-    game.mergeRun.orbs.addAll([
-      NumberOrb(95, 130, 1024),
-      NumberOrb(240, 230, 2048),
-      NumberOrb(150, 315, 1048576),
-      NumberOrb(260, 400, 2097152),
-    ]);
-    await tester.pump(const Duration(milliseconds: 20));
-    await capture('merge-millions');
-
-    game.mergeRun.orbs.clear();
-    game.mergeRun.segments
-      ..clear()
-      ..addAll(
-        List.generate(
-          MergeRun.maxSegments,
-          (i) => 1 << (MergeRun.maxSegments - i),
-        ),
-      );
-    game.mergeRun.highest = 4096;
-    game.left = 450;
-    game.right = 490;
+    await capture('maze-route-1');
     game.ballX = 180;
+    game.left = game.right = 60;
+    game.elapsed = 25;
+    for (var side = 0; side < 2; side++) {
+      game.grabPivot(side);
+      game.dragPivot(side, -25);
+    }
     await tester.pump(const Duration(milliseconds: 20));
-    await capture('merge-centered-full');
+    expect(game.won, true);
+    await capture('maze-finish');
+    await tester.tap(find.text('NEXT ROUTE'));
+    await tester.pump(const Duration(milliseconds: 30));
+    expect(game.level, 2);
+    game.start(gameMode: GameMode.laserMaze, levelNumber: 10);
+    await tester.pump(const Duration(milliseconds: 20));
+    await capture('maze-route-10');
     tester.view.physicalSize = const Size(320, 568);
     await tester.pump(const Duration(milliseconds: 20));
-    await capture('merge-centered-small');
-    game.mergeRun.collect(8192);
+    await capture('maze-small-phone');
+    for (var side = 0; side < 2; side++) {
+      game.grabPivot(side);
+      game.dragPivot(side, -480);
+    }
     await tester.pump(const Duration(milliseconds: 20));
-    await capture('merge-centered-overflow');
-
-    await tester.tap(find.text('PLAY AGAIN'));
-    await tester.pump(const Duration(milliseconds: 20));
-    game.mergeRun.orbs.clear();
-    game.mergeRun.holes
-      ..clear()
-      ..add(MergeHole(game.ballX, game.ballY));
-    await tester.pump(const Duration(milliseconds: 20));
-    await capture('merge-hole-loss');
+    expect(game.mazeRun.hitLaser, true);
+    await capture('maze-laser-contact');
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });
