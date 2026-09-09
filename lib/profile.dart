@@ -19,6 +19,7 @@ class PlayerProfile {
   ControlMode controlMode = ControlMode.twoFinger;
   int classicLevel = 1;
   int mazeLevel = 1, mazeRuns = 0;
+  int mazeEndlessBest = 0, mazeEndlessRuns = 0;
   final mazeBestTimes = <String, double>{};
   double? mazeBestTime(int route, [ControlMode? control]) =>
       mazeBestTimes[recordKey(route, control ?? controlMode)];
@@ -63,6 +64,14 @@ class PlayerProfile {
   }
 
   bool recordResult(BalanceGame game) {
+    if (game.mazeEndless) {
+      if (!game.finished || _recordedRuns[game] == game.runSerial) return false;
+      _recordedRuns[game] = game.runSerial;
+      mazeEndlessRuns++;
+      final improved = game.score > mazeEndlessBest;
+      if (improved) mazeEndlessBest = game.score;
+      return improved;
+    }
     if (game.maze) {
       if (!game.finished || _recordedRuns[game] == game.runSerial) return false;
       _recordedRuns[game] = game.runSerial;
@@ -158,6 +167,10 @@ class PlayerProfile {
         mazeLevel = (data['selected'] as int).clamp(1, LaserMazeRoute.count);
       if (data['runs'] is int)
         mazeRuns = (data['runs'] as int).clamp(0, 1 << 30);
+      if (data['endlessBest'] is int)
+        mazeEndlessBest = (data['endlessBest'] as int).clamp(0, 1 << 30);
+      if (data['endlessRuns'] is int)
+        mazeEndlessRuns = (data['endlessRuns'] as int).clamp(0, 1 << 30);
       final times = data['times'];
       if (times is! Map<String, dynamic>) return;
       for (final entry in times.entries) {
@@ -211,6 +224,8 @@ class PlayerProfile {
         jsonEncode({
           'selected': mazeLevel,
           'runs': mazeRuns,
+          'endlessBest': mazeEndlessBest,
+          'endlessRuns': mazeEndlessRuns,
           'times': mazeBestTimes,
         }),
       );

@@ -159,7 +159,13 @@ class BoardPainter extends CustomPainter {
       }
     }
     if (game.maze)
-      paintLaserMaze(canvas, game.mazeRun, game.clock, reducedMotion);
+      paintLaserMaze(
+        canvas,
+        game.mazeRun,
+        game.clock,
+        reducedMotion,
+        cameraOffset: game.mazeEndless ? game.cameraOffset : 0,
+      );
     if (game.merging) {
       for (final orb in game.mergeRun.orbs) {
         paintNumberOrb(

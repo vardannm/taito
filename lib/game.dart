@@ -16,7 +16,15 @@ enum GamePhase { playing, sinking, returning, over }
 
 enum GameEvent { target, miss, complete, coin, merge }
 
-enum GameMode { classic, infinite, practice, daily, merge2048, laserMaze }
+enum GameMode {
+  classic,
+  infinite,
+  practice,
+  daily,
+  merge2048,
+  laserMaze,
+  mazeEndless,
+}
 
 enum ControlMode { twoFinger, oneFinger, analog }
 
@@ -52,7 +60,12 @@ class BalanceGame {
   int level = 1, runSerial = 0;
   CabinetStyle cabinet = CabinetStyle.brass;
   DateTime? dailyDate;
-  bool get maze => mode == GameMode.laserMaze;
+  bool get maze => mode == GameMode.laserMaze || mazeEndless;
+  bool get mazeEndless => mode == GameMode.mazeEndless;
+  /// Modes whose camera follows the climb instead of holding the whole board.
+  bool get scrolling => infinite || mazeEndless;
+  double get minPivot => scrolling ? 40 - cameraOffset : 30.0;
+  double get maxPivot => scrolling ? 526 - cameraOffset : 526.0;
   LaserMazeRun mazeRun = LaserMazeRun(1);
   bool get merging => mode == GameMode.merge2048;
   MergeRun mergeRun = MergeRun();
@@ -98,6 +111,9 @@ class BalanceGame {
   }
 
   static const width = 360.0, height = 560.0, ballRadius = 7.0;
+  /// Road the automatic climb needs overhead before it lifts again. Larger
+  /// than the fatal contact distance, so the gate stops short of a beam.
+  static const mazeClearance = ballRadius + 9;
   static const holes = <Hole>[
     Hole(103, 461, target: 1),
     Hole(265, 417, target: 2),
@@ -238,7 +254,7 @@ class BalanceGame {
       ? _endlessHoles
       : _classicBoard;
   int get roundCompleted => completed;
-  double screenY(double worldY) => worldY + (infinite ? cameraOffset : 0);
+  double screenY(double worldY) => worldY + (scrolling ? cameraOffset : 0);
   bool get dangerActive => infinite && stallTime >= 3;
   double get dangerDistance => dangerY - ballY;
 
@@ -372,10 +388,12 @@ class BalanceGame {
   void dragPivot(int side, double delta) {
     if (!canControl || !delta.isFinite || pivotTargets[side] == null) return;
     final other = side == 0 ? right : left;
-    final minimum = infinite ? math.max(other - 180, 40 - cameraOffset) : 30.0;
+    final minimum = infinite
+        ? math.max(other - 180, minPivot)
+        : minPivot;
     final maximum = infinite
-        ? math.min(526 - cameraOffset, other + 180)
-        : 526.0;
+        ? math.min(maxPivot, other + 180)
+        : maxPivot;
     final previous = pivotTargets[side]!;
     pivotTargets[side] = (previous + delta).clamp(minimum, maximum);
     if (infinite) {
@@ -445,6 +463,7 @@ class BalanceGame {
     runSerial++;
     mode = gameMode;
     if (merging) mergeRun = MergeRun(seed: _random.nextInt(1 << 30));
+    if (mazeEndless) mazeRun = LaserMazeRun.endless(seed: _random.nextInt(1 << 30));
     dailyDate = daily
         ? DailyChallenge.day(challengeDate ?? DateTime.now())
         : null;
@@ -454,7 +473,7 @@ class BalanceGame {
             1,
             maze ? LaserMazeRoute.count : ClassicLevels.count,
           );
-    if (maze) mazeRun = LaserMazeRun(level);
+    if (mode == GameMode.laserMaze) mazeRun = LaserMazeRun(level);
     _classicBoard = practice
         ? List<Hole>.of(holes)
         : ClassicLevels.build(
@@ -497,6 +516,7 @@ class BalanceGame {
     fellThroughGap = false;
     _endlessHoles.clear();
     if (infinite) ensureInfiniteBoard();
+    if (mazeEndless) mazeRun.ensure(LaserMazeRoute.bottomY);
     target = 1;
     lives = infinite || merging || maze ? 1 : 3;
     score = streak = bestStreak = completed = misses = 0;
@@ -505,7 +525,9 @@ class BalanceGame {
     started = true;
     phase = GamePhase.playing;
     event = null;
-    message = maze
+    message = mazeEndless
+        ? 'Climb as far as you can. Every wall is fatal.'
+        : maze
         ? 'Stay between the red lasers. Reach the checkered finish.'
         : merging
         ? mergeRun.notice
@@ -595,8 +617,8 @@ class BalanceGame {
     if (pivotTargets[1] != null) {
       rightSpeed = (pivotTargets[1]! - right) / dt;
     }
-    final minimum = infinite ? 40 - cameraOffset : 30.0;
-    final maximum = infinite ? 526 - cameraOffset : 526.0;
+    final minimum = minPivot;
+    final maximum = maxPivot;
     left = (left + leftSpeed * dt).clamp(minimum, maximum);
     right = (right + rightSpeed * dt).clamp(minimum, maximum);
     for (var side = 0; side < 2; side++) {
@@ -613,11 +635,20 @@ class BalanceGame {
     if (oneFinger) {
       // Horizontal control changes tilt; Classic supplies the missing lift axis.
       final halfTilt = controlPosition * 70;
+      // The automatic climb only rises while there is road overhead, so a
+      // sideways leg holds its height until the ball reaches the next column.
+      final climbing =
+          !maze ||
+          mazeRun.corridor.canClimb(ballX, ballY, mazeClearance) ||
+          (!mazeEndless && ballY <= LaserMazeCorridor.finishY + mazeClearance);
+      final lift = climbing ? 14 * dt : 0.0;
       final center =
           (maze
                   ? math.max(
-                      LaserMazeRoute.finishY + ballRadius,
-                      (left + right) / 2 - 14 * dt,
+                      mazeEndless
+                          ? minimum
+                          : LaserMazeCorridor.finishY + ballRadius,
+                      (left + right) / 2 - lift,
                     )
                   : infinite || merging
                   ? (left + right) / 2
@@ -658,7 +689,6 @@ class BalanceGame {
     }
     if (maze) {
       mazeRun.step(oldX, oldY, ballX, ballY, ballRadius);
-      score = (mazeRun.progress * 100).floor();
       if (mazeRun.ended) {
         won = mazeRun.won;
         phase = GamePhase.over;
@@ -682,6 +712,18 @@ class BalanceGame {
         event = won ? GameEvent.complete : GameEvent.miss;
         velocity = 0;
         clearInput();
+      }
+      // Height and camera follow the corrected position, so a swipe that ends
+      // on a beam cannot bank the height beyond it.
+      if (mazeEndless) {
+        maxHeight = math.max(maxHeight, LaserMazeCorridor.startY - ballY);
+        score = (maxHeight / 10).floor();
+        if (!mazeRun.ended) {
+          cameraOffset = math.max(cameraOffset, 360 - ballY);
+          mazeRun.ensure(ballY);
+        }
+      } else {
+        score = (mazeRun.progress * 100).floor();
       }
       return;
     }

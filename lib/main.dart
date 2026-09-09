@@ -179,6 +179,8 @@ class _GameScreenState extends State<GameScreen>
       gameMode: mode,
       levelNumber: mode == GameMode.laserMaze
           ? profile.mazeLevel
+          : mode == GameMode.mazeEndless
+          ? 1
           : profile.classicLevel,
       challengeDate: challengeDate,
     );
@@ -222,6 +224,7 @@ class _GameScreenState extends State<GameScreen>
         child: LaserMazePicker(
           selected: profile.mazeLevel,
           control: profile.controlMode,
+          endlessBest: profile.mazeEndlessBest,
           bestTimes: {
             for (var i = 1; i <= LaserMazeRoute.count; i++)
               if (profile.mazeBestTime(i) case final time?) i: time,
@@ -231,6 +234,10 @@ class _GameScreenState extends State<GameScreen>
             unawaited(profile.save());
             Navigator.pop(context);
             start(GameMode.laserMaze);
+          },
+          onEndless: () {
+            Navigator.pop(context);
+            start(GameMode.mazeEndless);
           },
         ),
       ),
@@ -706,7 +713,9 @@ class _GameScreenState extends State<GameScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  game.maze
+                  game.mazeEndless
+                      ? 'LASER MAZE / ENDLESS'
+                      : game.maze
                       ? 'LASER MAZE / ROUTE ${game.level}'
                       : game.merging
                       ? '2048 / SCORE'
@@ -716,7 +725,9 @@ class _GameScreenState extends State<GameScreen>
                   style: label(),
                 ),
                 Text(
-                  game.maze
+                  game.mazeEndless
+                      ? '${game.score}m'
+                      : game.maze
                       ? '${game.score}%'
                       : game.score.toString().padLeft(5, '0'),
                   style: const TextStyle(
@@ -744,7 +755,7 @@ class _GameScreenState extends State<GameScreen>
       ),
       Text(
         game.maze
-            ? game.mazeRun.route.name.toUpperCase()
+            ? game.mazeRun.name.toUpperCase()
             : game.merging
             ? 'MERGE NUMBERS · DODGE HOLES'
             : game.infinite
@@ -889,8 +900,8 @@ class _GameScreenState extends State<GameScreen>
       ? LaserMazeResult(
           game: game,
           newBest: newBest,
-          onRetry: () => start(GameMode.laserMaze),
-          onNext: game.level < LaserMazeRoute.count
+          onRetry: () => start(game.mode),
+          onNext: !game.mazeEndless && game.level < LaserMazeRoute.count
               ? () {
                   profile.mazeLevel = game.level + 1;
                   unawaited(profile.save());
@@ -1131,7 +1142,7 @@ class _GameScreenState extends State<GameScreen>
               guideRow(
                 '10',
                 'Follow the laser road.',
-                'Choose Laser Maze for ten winding routes. Keep the ball between the red laser walls and lift it to the checkered finish. Touching a wall ends the run. One-finger control supplies a slow automatic climb.',
+                'Choose Laser Maze for ten right-angled routes plus an endless climb. Each route lifts, crosses sideways and lifts again between red laser walls, up to the checkered finish. Endless keeps generating corridor and scores the height you reach. Touching a wall ends the run. One-finger control supplies a slow automatic climb that waits whenever a sideways leg is overhead.',
               ),
               primary('TRY PRACTICE', () {
                 Navigator.pop(context);

@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/profile.dart';
 import 'package:balance_arcade/game.dart';
+import 'package:balance_arcade/laser_maze.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
@@ -82,8 +83,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     final game = tester.widget<PivotBoard>(find.byType(PivotBoard)).game;
     await capture('maze-route-1');
-    game.ballX = 180;
-    game.left = game.right = 60;
+    // The finish sits above the route's last lane, not above the launch column.
+    game.ballX = game.mazeRun.route!.finishX;
+    game.left = game.right = 62;
     game.elapsed = 25;
     for (var side = 0; side < 2; side++) {
       game.grabPivot(side);
@@ -98,6 +100,19 @@ void main() {
     game.start(gameMode: GameMode.laserMaze, levelNumber: 10);
     await tester.pump(const Duration(milliseconds: 20));
     await capture('maze-route-10');
+    game.start(gameMode: GameMode.mazeEndless);
+    await tester.pump(const Duration(milliseconds: 20));
+    await capture('maze-endless-start');
+    // Lift along the generated centerline so the scrolled corridor is visible.
+    final maze = game.mazeRun.corridor as EndlessMaze;
+    final high = maze.centers.firstWhere((p) => p.y < 240);
+    game.ballX = high.x;
+    game.left = game.right = high.y + BalanceGame.ballRadius;
+    game.maxHeight = LaserMazeCorridor.startY - high.y;
+    await tester.pump(const Duration(milliseconds: 20));
+    await capture('maze-endless-climb');
+    game.start(gameMode: GameMode.laserMaze, levelNumber: 10);
+    await tester.pump(const Duration(milliseconds: 20));
     tester.view.physicalSize = const Size(320, 568);
     await tester.pump(const Duration(milliseconds: 20));
     await capture('maze-small-phone');
