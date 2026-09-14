@@ -18,9 +18,7 @@ Future<void> saveImage(ui.Image image, String path) async {
 }
 
 void main() {
-  testWidgets('render 2048 snake gameplay, length warning and results', (
-    tester,
-  ) async {
+  testWidgets('render 2048 snake gameplay, gates and results', (tester) async {
     for (final family in ['sans-serif', 'monospace', 'Roboto']) {
       final loader = FontLoader(family);
       loader.addFont(
@@ -102,16 +100,7 @@ void main() {
         NumberOrb(285, 150, 128),
         NumberOrb(50, 215, 1048576),
       ]);
-    game.mergeRun.holes
-      ..clear()
-      ..addAll([
-        MergeHole(315, 100),
-        MergeHole(75, 180),
-        MergeHole(205, 275),
-        MergeHole(140, 345),
-        MergeHole(300, 410),
-        MergeHole(45, 440),
-      ]);
+    game.mergeRun.gates.add(MergeGate(64, y: 240));
     await tester.pump(const Duration(milliseconds: 20));
     await capture('merge-centered-phone');
     game.mergeRun.orbs.add(NumberOrb(game.ballX, game.ballY, 2));
@@ -120,7 +109,7 @@ void main() {
     await capture('merge-centered-64');
 
     game.start(gameMode: GameMode.merge2048);
-    game.mergeRun.holes.clear();
+    game.mergeRun.gates.clear();
     game.mergeRun.segments
       ..clear()
       ..add(1024);
@@ -165,16 +154,14 @@ void main() {
     await capture('merge-centered-small');
     game.mergeRun.collect(8192);
     await tester.pump(const Duration(milliseconds: 20));
-    await capture('merge-centered-overflow');
+    await capture('merge-large-number-loss');
 
     await tester.tap(find.text('PLAY AGAIN'));
     await tester.pump(const Duration(milliseconds: 20));
     game.mergeRun.orbs.clear();
-    game.mergeRun.holes
-      ..clear()
-      ..add(MergeHole(game.ballX, game.ballY));
+    game.mergeRun.gates.add(MergeGate(4096, y: game.ballY));
     await tester.pump(const Duration(milliseconds: 20));
-    await capture('merge-hole-loss');
+    await capture('merge-gate-loss');
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

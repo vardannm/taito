@@ -1,3 +1,8 @@
+import 'control_options.dart';
+import 'infinite_painter.dart';
+import 'ball_cosmetics.dart';
+import 'ball_shop.dart';
+import 'infinite_progress.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -18,6 +23,7 @@ import 'merge_widgets.dart';
 import 'merge.dart';
 import 'laser_maze.dart';
 import 'laser_maze_widgets.dart';
+import 'maze_editor.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -76,6 +82,7 @@ class _GameScreenState extends State<GameScreen>
   bool recorded = false, newBest = false, briefing = false;
   List<CabinetStyle> newUnlocks = [];
   late bool tutorialOpen;
+  bool commandOpen = false;
   PlayerProfile get profile => widget.profile;
 
   @override
@@ -83,6 +90,13 @@ class _GameScreenState extends State<GameScreen>
     super.initState();
     tutorialOpen = !profile.tutorialSeen;
     game.cabinet = profile.cabinet;
+    game.cosmetic = profile.selectedBall;
+    game.platformStyle = profile.selectedPlatform;
+    game.analogSensitivity = profile.analogSensitivity;
+    game.twoFingerSensitivity = profile.twoFingerSensitivity;
+    game.infiniteStartingPace = InfiniteTuning.startingPace(
+      profile.infiniteBest,
+    );
     WidgetsBinding.instance.addObserver(this);
     HardwareKeyboard.instance.addHandler(onKey);
     ticker = createTicker(tick)..start();
@@ -100,6 +114,7 @@ class _GameScreenState extends State<GameScreen>
       game.step(1 / 120);
       accumulator -= 1 / 120;
     }
+    profile.bankCoins(game);
     if (game.event != null) {
       unawaited(feedback.play(game.event!, profile));
       if (game.event != GameEvent.coin && game.event != GameEvent.merge) {
@@ -143,6 +158,7 @@ class _GameScreenState extends State<GameScreen>
   }
 
   bool onKey(KeyEvent event) {
+    if (commandOpen) return false;
     final key = event.logicalKey;
     const controlKeys = [
       LogicalKeyboardKey.keyW,
@@ -174,6 +190,13 @@ class _GameScreenState extends State<GameScreen>
     recorded = newBest = false;
     game.setControlMode(profile.controlMode);
     game.cabinet = profile.cabinet;
+    game.cosmetic = profile.selectedBall;
+    game.platformStyle = profile.selectedPlatform;
+    game.analogSensitivity = profile.analogSensitivity;
+    game.twoFingerSensitivity = profile.twoFingerSensitivity;
+    game.infiniteStartingPace = InfiniteTuning.startingPace(
+      profile.infiniteBest,
+    );
     newUnlocks = [];
     game.start(
       gameMode: mode,
@@ -227,7 +250,8 @@ class _GameScreenState extends State<GameScreen>
           endlessBest: profile.mazeEndlessBest,
           bestTimes: {
             for (var i = 1; i <= LaserMazeRoute.count; i++)
-              if (profile.mazeBestTime(i) case final time?) i: time,
+              if (profile.mazeBestTime(i, profile.controlMode) case final time?)
+                i: time,
           },
           onSelected: (number) {
             profile.mazeLevel = number;
@@ -272,7 +296,7 @@ class _GameScreenState extends State<GameScreen>
                       ),
                       const SizedBox(height: 16),
                       const Text(
-                        'Keep the snake shorter than the platform and dodge falling holes with the middle ball. Two holes appear for every three number balls. Glowing rings mark matches. Play keeps going past 2048 without stopping; big numbers use 1k, 2k, 1m and 2m.',
+                        'Collect equal or smaller numbers with the middle ball. Touching a larger number ends the run: dodge the red rings! Every 400 score sends a numbered gate down from the top. Your main ball must be strictly greater than its number to pass. Matching values merge anywhere in the snake. Play continues beyond 2048.',
                       ),
                       const SizedBox(height: 16),
                       Text(
@@ -347,6 +371,24 @@ class _GameScreenState extends State<GameScreen>
     ),
   );
 
+  Future<void> showBallShop() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: cream,
+      builder: (_) => FractionallySizedBox(
+        heightFactor: .85,
+        child: BallShop(profile: profile),
+      ),
+    );
+    if (mounted)
+      setState(() {
+        game.cosmetic = profile.selectedBall;
+        game.platformStyle = profile.selectedPlatform;
+      });
+  }
+
   void pause() => setState(() {
     briefing = false;
     clearControls();
@@ -354,6 +396,7 @@ class _GameScreenState extends State<GameScreen>
   });
   void home() => setState(() {
     clearControls();
+    profile.bankCoins(game);
     game.home();
   });
 
@@ -369,6 +412,7 @@ class _GameScreenState extends State<GameScreen>
 
   @override
   void dispose() {
+    profile.bankCoins(game);
     WidgetsBinding.instance.removeObserver(this);
     HardwareKeyboard.instance.removeHandler(onKey);
     ticker.dispose();
@@ -608,13 +652,13 @@ class _GameScreenState extends State<GameScreen>
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: OutlinedButton.icon(
-                                    onPressed: showCabinet,
+                                    onPressed: showBallShop,
                                     icon: const Icon(
                                       Icons.palette_outlined,
                                       size: 17,
                                     ),
                                     label: const Text(
-                                      'CABINET',
+                                      'GEAR SHOP',
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w700,
@@ -720,7 +764,7 @@ class _GameScreenState extends State<GameScreen>
                       : game.merging
                       ? '2048 / SCORE'
                       : game.infinite
-                      ? 'HEIGHT / METERS'
+                      ? 'INFINITE / POINTS'
                       : 'SCORE',
                   style: label(),
                 ),
@@ -745,7 +789,7 @@ class _GameScreenState extends State<GameScreen>
                 : game.merging
                 ? 'TOP ${formatMergeNumber(game.mergeRun.highest)}'
                 : game.infinite
-                ? 'INFINITE'
+                ? '${game.metres}m'
                 : game.practice
                 ? 'PRACTICE'
                 : '${game.lives} BALLS',
@@ -757,7 +801,7 @@ class _GameScreenState extends State<GameScreen>
         game.maze
             ? game.mazeRun.name.toUpperCase()
             : game.merging
-            ? 'MERGE NUMBERS · DODGE HOLES'
+            ? 'MERGE SMALL · DODGE BIG'
             : game.infinite
             ? (game.dangerActive
                   ? 'RED RISING'
@@ -769,6 +813,50 @@ class _GameScreenState extends State<GameScreen>
           game.dangerActive || game.hazardLabel.isNotEmpty ? orange : ink,
         ),
       ),
+      if (game.infinite) ...[
+        Wrap(
+          spacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Semantics(
+              label: '${game.lives} of 3 hearts',
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < 3; i++)
+                    Icon(
+                      i < game.lives ? Icons.favorite : Icons.favorite_border,
+                      color: orange,
+                      size: 16,
+                    ),
+                ],
+              ),
+            ),
+            Text(
+              'PACE x${game.paceLevel} · COMBO x${game.survival.combo}',
+              style: label(),
+            ),
+          ],
+        ),
+        SizedBox(
+          height: 14,
+          child: Text(
+            game.survival.noticeTime > 0
+                ? game.survival.notice
+                : 'GEAR x${formatBoost(game.survival.scoreBoost)} · Gold: combo · Blue: shield · Red: heart',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 10, color: ink),
+          ),
+        ),
+        if (game.survival.protected)
+          Text(
+            game.survival.shield > 0
+                ? 'SHIELD ${game.survival.shield.ceil()}s'
+                : 'RECOVERY ${game.survival.recovery.ceil()}s',
+            style: label(ink),
+          ),
+      ],
       if (!game.infinite && !game.practice && !game.merging && !game.maze)
         Text(
           '${formatRunTime(game.elapsed)} / ${formatRunTime(game.targetTime)}  ·  ${game.coinsCollected}/${game.coins.length} COINS',
@@ -789,59 +877,74 @@ class _GameScreenState extends State<GameScreen>
   );
 
   Widget playScreen(BuildContext context) => Scaffold(
-    body: SafeArea(
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
-            child: Row(
-              children: [
-                Expanded(
-                  child: AnimatedBuilder(
-                    animation: frame,
-                    builder: (context, _) => scoreboard(),
-                  ),
-                ),
-                IconButton(
-                  tooltip: game.paused ? 'Resume' : 'Pause',
-                  onPressed: pause,
-                  icon: Icon(
-                    game.paused
-                        ? Icons.play_arrow_rounded
-                        : Icons.pause_rounded,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (game.merging)
-            AnimatedBuilder(
-              animation: frame,
-              builder: (context, _) => MergeStatus(run: game.mergeRun),
-            ),
-          Expanded(
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                PivotBoard(
-                  key: ValueKey(game.inputEpoch),
-                  game: game,
-                  frame: frame,
-                ),
-                if (game.paused || game.finished) boardOverlay(),
-              ],
-            ),
-          ),
-          if (game.analog)
-            SizedBox(
-              height: (MediaQuery.sizeOf(context).height * .19).clamp(
-                104.0,
-                140.0,
+    body: Stack(
+      fit: StackFit.expand,
+      children: [
+        if (game.infinite)
+          RepaintBoundary(
+            child: CustomPaint(
+              painter: InfiniteBackdropPainter(
+                game,
+                reducedMotion: MediaQuery.disableAnimationsOf(context),
+                repaint: frame,
               ),
-              child: AnalogControls(game: game, frame: frame),
             ),
-        ],
-      ),
+          ),
+        SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: AnimatedBuilder(
+                        animation: frame,
+                        builder: (context, _) => scoreboard(),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: game.paused ? 'Resume' : 'Pause',
+                      onPressed: pause,
+                      icon: Icon(
+                        game.paused
+                            ? Icons.play_arrow_rounded
+                            : Icons.pause_rounded,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (game.merging)
+                AnimatedBuilder(
+                  animation: frame,
+                  builder: (context, _) => MergeStatus(run: game.mergeRun),
+                ),
+              Expanded(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    PivotBoard(
+                      key: ValueKey(game.inputEpoch),
+                      game: game,
+                      frame: frame,
+                    ),
+                    if (game.paused || game.finished) boardOverlay(),
+                  ],
+                ),
+              ),
+              if (game.analog)
+                SizedBox(
+                  height: (MediaQuery.sizeOf(context).height * .19).clamp(
+                    104.0,
+                    140.0,
+                  ),
+                  child: AnalogControls(game: game, frame: frame),
+                ),
+            ],
+          ),
+        ),
+      ],
     ),
   );
 
@@ -982,7 +1085,9 @@ class _GameScreenState extends State<GameScreen>
                       ),
                       Text(
                         !game.won || game.merging
-                            ? game.message
+                            ? (game.infinite
+                                  ? '${game.metres}m · Best combo x${game.survival.bestCombo}\n${game.message}  ${game.coinsCollected} coins saved.'
+                                  : game.message)
                             : '${game.completed}/10 holes  •  ${game.bestStreak} best streak',
                         style: const TextStyle(
                           fontSize: 12,
@@ -1107,7 +1212,7 @@ class _GameScreenState extends State<GameScreen>
               guideRow(
                 '04',
                 'Go beyond ten.',
-                'The board moves down continuously as you ascend. Tilt the platform to dodge approaching holes. The pace gradually increases. Score comes from height. After three seconds without steering, the red floor rises. Keep moving!',
+                'Infinite begins with three hearts. A hit costs a heart and resets your combo; a nearby safe landing gives 2.5 seconds of protection while preserving the course. Gold crystals build combos up to x5. Blue shields protect for 10 seconds. Rare hearts restore a life. Keep steering to escape the rising red floor.',
               ),
               const Text(
                 'Desktop: W / S = left end. ↑ / ↓ = right end. Esc = pause.',
@@ -1132,17 +1237,17 @@ class _GameScreenState extends State<GameScreen>
               guideRow(
                 '08',
                 'Take the detour.',
-                'Optional brass coins are worth 250 points. Each coin can be collected once per run. Classic stars unlock cabinet styles with identical handling. Every tenth Classic board introduces a finale; read its briefing before starting.',
+                'Classic and Daily brass coins are worth 250 points. Infinite and Laser Endless coins save to your local wallet immediately. Open the Gear Shop for balls and platforms that add Infinite point multipliers; handling stays the same. Each coin can be collected once. Classic stars unlock cabinet styles with identical handling.',
               ),
               guideRow(
                 '09',
                 'Return for the daily.',
-                'The daily board changes at midnight UTC. Retry its fixed layout to improve your local record. Infinite alternates rushes, lighter stretches and encounters while speed keeps rising.',
+                'The daily board changes at midnight UTC. Retry its fixed layout to improve your local record. Infinite pace rises smoothly from x1 to x5, increasing speed, distance points and obstacle frequency. A best of 150m starts future runs at x2; 450m starts at x3. Combo crystals award 50 × combo × pace points. Missing a crystal keeps your combo; losing a heart resets it.',
               ),
               guideRow(
                 '10',
                 'Follow the laser road.',
-                'Choose Laser Maze for ten right-angled routes plus an endless climb. Each route lifts, crosses sideways and lifts again between red laser walls, up to the checkered finish. Endless keeps generating corridor and scores the height you reach. Touching a wall ends the run. One-finger control supplies a slow automatic climb that waits whenever a sideways leg is overhead.',
+                'Laser Maze uses your selected controls, including responsive Vertical Analog. Follow arrows up, sideways and down. Gold shortcuts are narrow; wide detours reconnect. In Endless, bugs patrol outside the road. Amber circles warn for two seconds; red areas overlapping the road catch the ball. The center of every route stays clear.',
               ),
               primary('TRY PRACTICE', () {
                 Navigator.pop(context);
@@ -1196,10 +1301,36 @@ class _GameScreenState extends State<GameScreen>
     ),
   );
 
+  Future<void> openCommandPanel() async {
+    commandOpen = true;
+    clearControls();
+    ticker.stop();
+    try {
+      await showMazeEditorCommand(
+        context,
+        control: profile.controlMode,
+        analogSensitivity: profile.analogSensitivity,
+        twoFingerSensitivity: profile.twoFingerSensitivity,
+      );
+    } finally {
+      if (mounted) {
+        commandOpen = false;
+        previous = null;
+        accumulator = 0;
+        ticker.start();
+      }
+    }
+  }
+
   Future<void> showSettings() => showModalBottomSheet<void>(
     context: context,
     backgroundColor: cream,
     showDragHandle: true,
+    isScrollControlled: true,
+    useSafeArea: true,
+    constraints: BoxConstraints(
+      maxHeight: MediaQuery.sizeOf(context).height * .9,
+    ),
     builder: (context) => StatefulBuilder(
       builder: (context, update) => SafeArea(
         child: SingleChildScrollView(
@@ -1213,37 +1344,40 @@ class _GameScreenState extends State<GameScreen>
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 14),
-                DropdownButtonFormField<ControlMode>(
-                  isExpanded: true,
-                  initialValue: profile.controlMode,
-                  decoration: const InputDecoration(labelText: 'Control mode'),
-                  items: const [
-                    DropdownMenuItem(
-                      value: ControlMode.twoFinger,
-                      child: Text('Two-Finger Control'),
-                    ),
-                    DropdownMenuItem(
-                      value: ControlMode.oneFinger,
-                      child: Text('One-Finger Control'),
-                    ),
-                    DropdownMenuItem(
-                      value: ControlMode.analog,
-                      child: Text('Vertical Analog Control'),
-                    ),
-                  ],
+                ControlOptions(
+                  value: profile.controlMode,
                   onChanged: (mode) {
-                    if (mode == null) return;
                     update(() => profile.controlMode = mode);
                     game.setControlMode(mode);
                     unawaited(profile.save());
                   },
                 ),
-                const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: Text(
-                    'One finger: slide the short lower handle left or right to tilt. In Classic the platform rises automatically. Vertical analog: drag either bottom joystick up or down; the platform follows your drag directly. Release to hold, then grab again to continue.',
-                    style: TextStyle(fontSize: 12),
-                  ),
+                const SizedBox(height: 8),
+                SensitivitySetting(
+                  id: 'analog-sensitivity',
+                  title: 'Vertical Analog sensitivity',
+                  value: profile.analogSensitivity,
+                  onChanged: (value) {
+                    update(() => profile.analogSensitivity = value);
+                    game.analogSensitivity = value;
+                    game.clearInput();
+                  },
+                  onChangeEnd: () => unawaited(profile.save()),
+                ),
+                SensitivitySetting(
+                  id: 'two-finger-sensitivity',
+                  title: 'Two-Finger sensitivity',
+                  value: profile.twoFingerSensitivity,
+                  onChanged: (value) {
+                    update(() => profile.twoFingerSensitivity = value);
+                    game.twoFingerSensitivity = value;
+                    game.clearInput();
+                  },
+                  onChangeEnd: () => unawaited(profile.save()),
+                ),
+                const Text(
+                  '0 = no touch movement · 1 = full response. Lower values make smaller adjustments. Sensitivity does not add delay.',
+                  style: TextStyle(fontSize: 11, height: 1.4),
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
@@ -1286,6 +1420,23 @@ class _GameScreenState extends State<GameScreen>
                   'GILT / No rush. Just precision.',
                   style: TextStyle(fontSize: 11),
                 ),
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    showCabinet();
+                  },
+                  icon: const Icon(Icons.palette_outlined),
+                  label: const Text('Cabinet styles'),
+                ),
+                TextButton.icon(
+                  key: const ValueKey('open-command'),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    unawaited(openCommandPanel());
+                  },
+                  icon: const Icon(Icons.terminal, size: 18),
+                  label: const Text('Command'),
+                ),
               ],
             ),
           ),
@@ -1322,6 +1473,7 @@ class _PivotBoardState extends State<PivotBoard> {
         final side = pointers.remove(event.pointer);
         lastY.remove(event.pointer);
         if (side != null && side < 2) game.releasePivot(side);
+        if (side == 2) game.releaseControl();
       }
 
       return Listener(
@@ -1343,6 +1495,7 @@ class _PivotBoardState extends State<PivotBoard> {
               return;
             pointers[event.pointer] = 2;
             lastY[event.pointer] = point.dx - game.controlPosition * 110;
+            game.grabControl();
             return;
           }
           final side = event.localPosition.dx < viewport.rect.center.dx ? 0 : 1;
@@ -1369,6 +1522,7 @@ class _PivotBoardState extends State<PivotBoard> {
             final x =
                 (event.localPosition.dx - viewport.offset.dx) / viewport.scale;
             game.setControlPosition((x - lastY[event.pointer]!) / 110);
+            game.dragControlVertical(event.localDelta.dy / viewport.scale);
             return;
           }
           final delta =
@@ -1382,7 +1536,7 @@ class _PivotBoardState extends State<PivotBoard> {
           label: game.analog
               ? 'Use the bottom left and right vertical joysticks to move the platform ends'
               : game.oneFinger
-              ? 'Drag the short lower handle left or right to tilt'
+              ? 'Drag the lower handle left or right to tilt, up to lift, down to lower'
               : 'Drag the left and right ends of the platform up or down',
           child: RepaintBoundary(
             child: CustomPaint(

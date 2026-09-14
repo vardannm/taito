@@ -43,19 +43,17 @@ class LaserMazePicker extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Stay inside the red laser road and climb to the checkered finish. Every route climbs, crosses sideways and climbs again. Touch a wall and the run ends.',
+                    'Follow the road to the finish, including downward returns. Gold arrows mark narrow shortcuts; the wider route takes longer. Both paths reconnect. Touching a laser ends the run.',
                     style: TextStyle(fontSize: 13, height: 1.4),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    control == ControlMode.oneFinger
-                        ? 'One finger: steer the tilt. The automatic climb waits while a sideways leg is overhead.'
-                        : 'Lift both platform ends to climb, and tilt to cross each sideways leg.',
+                    'Your selected controls work here. Raise or lower both ends to follow the arrows; tilt to cross. Vertical Analog responds immediately.',
                     style: const TextStyle(fontSize: 12, height: 1.4),
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    '10 ROUTES + ENDLESS · ${control.label.toUpperCase()}',
+                    '${LaserMazeRoute.count} ROUTES + ENDLESS · ${control.label.toUpperCase()}',
                     style: const TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
@@ -111,7 +109,7 @@ class LaserMazePicker extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 4),
                                 const Text(
-                                  'One corridor with no finish. It keeps turning and narrowing as you climb.',
+                                  'Random branches, loops and downward returns. Bugs stay outside: amber warns, red zones catch. Collect coins along the road.',
                                   style: TextStyle(
                                     fontSize: 11,
                                     height: 1.35,
@@ -208,7 +206,11 @@ class LaserMazePicker extends StatelessWidget {
                             const SizedBox(height: 4),
                             Text(
                               best == null
-                                  ? 'REACH THE FINISH'
+                                  ? (number > 20
+                                        ? 'CUSTOM ROUTE'
+                                        : number > 10
+                                        ? 'EXPERT / SCROLLING'
+                                        : 'REACH THE FINISH')
                                   : 'BEST ${formatRunTime(best)}',
                               style: TextStyle(
                                 fontSize: 9,
@@ -301,6 +303,15 @@ class LaserMazeResult extends StatelessWidget {
               style: const TextStyle(fontSize: 12, color: Color(0xFFCAD5CD)),
             ),
             const SizedBox(height: 18),
+            if (game.mazeEndless)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  '${game.coinsCollected} coins · ${game.caughtBySpider ? 'Caught by a spider' : 'Laser contact'}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 12, color: brass),
+                ),
+              ),
             SizedBox(
               width: double.infinity,
               child: FilledButton(

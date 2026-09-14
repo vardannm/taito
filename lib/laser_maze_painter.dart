@@ -15,11 +15,16 @@ void paintLaserMaze(
   // One filled path unions the overlapping legs, so corners blend once only.
   final road = Path();
   for (final rect in corridor.rects) {
+    if (rect.bottom + cameraOffset < 12 || rect.top + cameraOffset > 548)
+      continue;
     road.addRect(Rect.fromLTRB(rect.left, rect.top, rect.right, rect.bottom));
   }
   canvas.drawPath(road, Paint()..color = const Color(0xF21A3738));
   final beams = Path();
   for (final wall in corridor.walls) {
+    if (math.max(wall.a.y, wall.b.y) + cameraOffset < 12 ||
+        math.min(wall.a.y, wall.b.y) + cameraOffset > 548)
+      continue;
     beams
       ..moveTo(wall.a.x, wall.a.y)
       ..lineTo(wall.b.x, wall.b.y);
@@ -58,8 +63,11 @@ void paintLaserMaze(
     ..strokeWidth = 1.5
     ..style = PaintingStyle.stroke
     ..strokeCap = StrokeCap.round;
-  for (var i = 1; i < corridor.centers.length; i++) {
-    final a = corridor.centers[i - 1], b = corridor.centers[i];
+  for (final leg in corridor.legs) {
+    final a = leg.a, b = leg.b;
+    arrow.color = leg.primary
+        ? const Color(0x889FCFC2)
+        : const Color(0xDDFFD078);
     final dx = b.x - a.x, dy = b.y - a.y;
     final length = math.sqrt(dx * dx + dy * dy);
     if (length < 34) continue;
@@ -77,6 +85,26 @@ void paintLaserMaze(
       );
     }
   }
+  for (final branch in corridor.branches) {
+    final a = branch.points[0], b = branch.points[1];
+    final label = TextPainter(
+      text: const TextSpan(
+        text: 'SHORT',
+        style: TextStyle(
+          fontFamily: 'sans-serif',
+          fontSize: 6,
+          fontWeight: FontWeight.w800,
+          color: Color(0xFFFFD078),
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    canvas.save();
+    canvas.translate((a.x + b.x) / 2, (a.y + b.y) / 2);
+    if (a.x == b.x) canvas.rotate(-math.pi / 2);
+    label.paint(canvas, Offset(-label.width / 2, -label.height / 2));
+    canvas.restore();
+  }
   if (run.route case final route?) {
     final finishLeft = route.finishX - route.halfWidth + 6;
     final finishWidth = route.halfWidth * 2 - 12;
@@ -85,7 +113,7 @@ void paintLaserMaze(
         canvas.drawRect(
           Rect.fromLTWH(
             finishLeft + col * finishWidth / 10,
-            LaserMazeCorridor.finishY - 5 + row * 5,
+            route.finishLineY - 5 + row * 5,
             finishWidth / 10,
             5,
           ),
@@ -116,7 +144,10 @@ void paintLaserMaze(
   }
 
   if (run.route case final route?) {
-    label('FINISH', route.finishX, 31, 8, const Color(0xFFFFF0C9));
+    final y = route.finishLineY - 13 + cameraOffset;
+    if (y > 16 && y < 542) {
+      label('FINISH', route.finishX, y, 8, const Color(0xFFFFF0C9));
+    }
   }
   final start = 537 + cameraOffset;
   if (start > 24 && start < 542) {
@@ -135,13 +166,42 @@ void paintLaserMaze(
 }
 
 class MazeRoutePreview extends CustomPainter {
-  MazeRoutePreview(this.number);
+  MazeRoutePreview(this.number) : route = LaserMazeRoute(number);
   final int number;
+  final LaserMazeRoute route;
   @override
   void paint(Canvas canvas, Size size) {
-    final route = LaserMazeRoute(number);
+    if (route.tall) {
+      // A constant-width route diagram stays legible for multi-screen towers.
+      Offset project(MazePoint p) => Offset(
+        p.x / 360 * size.width,
+        (p.y - route.routeTop + 12) / route.mapHeight * size.height,
+      );
+      for (final leg in route.legs) {
+        canvas.drawLine(
+          project(leg.a),
+          project(leg.b),
+          Paint()
+            ..color = leg.primary
+                ? const Color(0xFFDD5960)
+                : const Color(0xFFB78B37)
+            ..strokeWidth = leg.primary ? 1.25 : .85
+            ..strokeCap = StrokeCap.round,
+        );
+      }
+      for (final p in [route.centers.first, route.centers.last]) {
+        canvas.drawCircle(
+          project(p),
+          2,
+          Paint()..color = const Color(0xFF388B7D),
+        );
+      }
+      return;
+    }
     canvas.save();
-    canvas.scale(size.width / 360, size.height / 560);
+    canvas.clipRect(Offset.zero & size);
+    canvas.scale(size.width / 360, size.height / route.mapHeight);
+    canvas.translate(0, 12 - route.routeTop);
     final beams = Path();
     for (final wall in route.walls) {
       beams
@@ -195,5 +255,6 @@ class EndlessMazePreview extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(EndlessMazePreview oldDelegate) => seed != oldDelegate.seed;
+  bool shouldRepaint(EndlessMazePreview oldDelegate) =>
+      seed != oldDelegate.seed;
 }

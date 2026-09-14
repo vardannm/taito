@@ -26,6 +26,7 @@ void main() {
 
   test('an approaching hole catches a ball even without any steering', () {
     final game = BalanceGame()..start(gameMode: GameMode.infinite);
+    game.lives = 1; // Exercise final-life capture.
     final hole = game.board.first;
     game.left = game.right = hole.y + 30;
     game.ballX = hole.x;
@@ -50,10 +51,10 @@ void main() {
 
   test('ascent accelerates gradually and has a fixed speed cap', () {
     final game = BalanceGame()..start(gameMode: GameMode.infinite);
-    expect(game.ascentSpeed, 60);
+    expect(game.ascentSpeed, 68);
     game.maxHeight = 4500;
-    expect(game.ascentSpeed, 120);
+    expect(game.ascentSpeed, 151);
     game.maxHeight = 100000;
-    expect(game.ascentSpeed, 180);
+    expect(game.ascentSpeed, 216);
   });
 }

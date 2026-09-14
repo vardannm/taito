@@ -5,6 +5,10 @@ import 'spiders.dart';
 import 'rewards.dart';
 import 'merge.dart';
 import 'laser_maze.dart';
+import 'infinite_progress.dart';
+import 'ball_cosmetics.dart';
+import 'platforms.dart';
+part 'infinite_gameplay.dart';
 
 class Hole {
   const Hole(this.x, this.y, {this.target = 0});
@@ -40,7 +44,15 @@ extension ControlModeLabel on ControlMode {
 class BalanceGame {
   BalanceGame({int? seed}) : _random = math.Random(seed);
   final math.Random _random;
+  InfiniteProgress survival = InfiniteProgress();
+  int infiniteStartingPace = 1;
+  BallCosmetic cosmetic = BallCosmetic.steel;
+  PlatformStyle platformStyle = PlatformStyle.classic;
+  double analogSensitivity = 1, twoFingerSensitivity = 1;
+  double get equipmentMultiplier =>
+      1 + cosmetic.scoreBonus + platformStyle.scoreBonus;
   ControlMode controlMode = ControlMode.twoFinger;
+  ControlMode preferredControlMode = ControlMode.twoFinger;
   bool get analog => controlMode == ControlMode.analog;
   final analogInputs = [0.0, 0.0];
   void setAnalogInput(int side, double value) {
@@ -62,8 +74,10 @@ class BalanceGame {
   DateTime? dailyDate;
   bool get maze => mode == GameMode.laserMaze || mazeEndless;
   bool get mazeEndless => mode == GameMode.mazeEndless;
+
   /// Modes whose camera follows the climb instead of holding the whole board.
-  bool get scrolling => infinite || mazeEndless;
+  bool get scrolling =>
+      infinite || mazeEndless || (maze && mazeRun.route!.tall);
   double get minPivot => scrolling ? 40 - cameraOffset : 30.0;
   double get maxPivot => scrolling ? 526 - cameraOffset : 526.0;
   LaserMazeRun mazeRun = LaserMazeRun(1);
@@ -90,7 +104,27 @@ class BalanceGame {
   bool get spiderLevel => mode == GameMode.classic && level >= 31;
   List<Hole> _classicBoard = ClassicLevels.build(1);
   double controlPosition = 0;
+  bool controlHeld = false;
+  double _controlLift = 0;
   double get controlY => (screenY((left + right) / 2) + 38).clamp(65.0, 532.0);
+  void grabControl() {
+    if (canControl && oneFinger) controlHeld = true;
+  }
+
+  void releaseControl() => controlHeld = false;
+
+  void dragControlVertical(double delta) {
+    if (!canControl || !oneFinger || !controlHeld || !delta.isFinite) return;
+    _controlLift += delta;
+    if (infinite) {
+      _steeringDistance += delta.abs();
+      if (_steeringDistance >= 8) {
+        stallTime = 0;
+        _steeringDistance = 0;
+      }
+    }
+  }
+
   void setControlPosition(double value) {
     if (!canControl || !value.isFinite) return;
     final next = value.clamp(-1.0, 1.0);
@@ -106,11 +140,13 @@ class BalanceGame {
 
   void setControlMode(ControlMode value) {
     clearInput();
+    preferredControlMode = value;
     controlMode = value;
     controlPosition = ((right - left) / 140).clamp(-1.0, 1.0);
   }
 
   static const width = 360.0, height = 560.0, ballRadius = 7.0;
+
   /// Road the automatic climb needs overhead before it lifts again. Larger
   /// than the fatal contact distance, so the gate stops short of a beam.
   static const mazeClearance = ballRadius + 9;
@@ -160,6 +196,69 @@ class BalanceGame {
   double _nextRowY = 250, _corridor = 180;
   double cameraOffset = 0, maxHeight = 0, stallTime = 0, dangerY = 580;
   double _steeringDistance = 0;
+  double _nextCoinY = 380, _nextMazeSpiderY = 320;
+
+  /// Generate in world coordinates once, then prune below the camera. Coins
+  /// remain separate from height so collecting them cannot inflate metres.
+  void ensureEndlessExtras({bool retainForSweep = false}) {
+    if (!infinite && !mazeEndless) return;
+    final ahead = -cameraOffset - 100;
+    if (mazeEndless) {
+      final road = mazeRun.corridor;
+      while (_nextMazeSpiderY >= ahead) {
+        final y = _nextMazeSpiderY;
+        final eligible =
+            road.legs
+                .where(
+                  (leg) =>
+                      leg.primary &&
+                      ((leg.a.y + leg.b.y) / 2 - y).abs() < 150 &&
+                      LaserMazeCorridor.pointDistance(leg.a, leg.b) >= 80,
+                )
+                .toList()
+              ..shuffle(_random);
+        for (final leg in eligible) {
+          final bug = MazeSpider.beside(road, leg, _random);
+          if (bug == null ||
+              spiders.any(
+                (s) =>
+                    math.pow(s.homeX - bug.homeX, 2) +
+                        math.pow(s.homeY - bug.homeY, 2) <
+                    150 * 150,
+              ))
+            continue;
+          spiders.add(bug);
+          break;
+        }
+        _nextMazeSpiderY -= 230 + _random.nextDouble() * 100;
+      }
+      spiders.removeWhere((s) => screenY(s.y) > 660);
+    }
+    while (_nextCoinY >= ahead) {
+      final y = _nextCoinY;
+      for (var attempt = 0; attempt < 100; attempt++) {
+        final x = 38 + _random.nextDouble() * 284;
+        if (mazeEndless &&
+            mazeRun.corridor.firstContact(x, y, x, y, 12) != null)
+          continue;
+        if (board.any(
+          (h) => math.pow(h.x - x, 2) + math.pow(h.y - y, 2) < 30 * 30,
+        ))
+          continue;
+        if (spiders.any(
+          (s) => math.pow(s.homeX - x, 2) + math.pow(s.homeY - y, 2) < 42 * 42,
+        ))
+          continue;
+        coins.add(BrassCoin(x, y));
+        break;
+      }
+      _nextCoinY -=
+          InfiniteTuning.coinSpacing +
+          _random.nextDouble() * InfiniteTuning.coinSpacingJitter;
+    }
+    if (!retainForSweep) coins.removeWhere((c) => screenY(c.y) > 620);
+  }
+
   static const infiniteStart = 440.0;
   static const firstRow = 300.0;
 
@@ -169,7 +268,10 @@ class BalanceGame {
   }
 
   double get difficulty => difficultyAt(maxHeight / 10);
-  double get ascentSpeed => 60 + 120 * difficulty;
+  double get ascentSpeed =>
+      InfiniteTuning.startSpeed +
+      (InfiniteTuning.baseTopSpeed - InfiniteTuning.startSpeed) * difficulty +
+      (infinite ? InfiniteTuning.paceSpeedBonus * (pace - 1) : 0);
   final specialHazards = <SpecialHazard>[];
   double _nextHazardTime = 0;
   int _introducedHazards = 0, _hazardSequence = 0, _hardHazardSequence = 0;
@@ -177,31 +279,21 @@ class BalanceGame {
   String get hazardLabel =>
       specialHazards.isEmpty ? '' : specialHazards.first.label;
 
-  void _updateSpecialHazards(double dt, double oldX, double oldScreenY) {
+  void _updateSpecialHazards(double dt) {
+    specialHazards.removeWhere((h) => h.expired || h.y > 620);
     for (final hazard in specialHazards) {
-      hazard.step(dt, ascentSpeed);
-      if (hazard.hits(oldX, oldScreenY, ballX, screenY(ballY))) {
-        fellThroughGap = hazard.kind == HazardKind.platformGap;
-        _loseClimb(switch (hazard.kind) {
-          HazardKind.laser => 'Laser hit. Move out of the blinking beam.',
-          HazardKind.platformGap => 'The platform broke beneath you.',
-          HazardKind.formingHole => 'The warning hole opened beneath you.',
-          HazardKind.movingHole => 'Caught by a moving hole.',
-        });
-        return;
-      }
+      hazard.step(dt, ascentSpeed, cameraOffset: cameraOffset);
     }
-    specialHazards.removeWhere((h) => h.expired || h.y > 600);
     if (specialHazards.isNotEmpty ||
         elapsed < _nextHazardTime ||
-        score < 180 ||
+        metres < 180 ||
         section == InfiniteSection.breath)
       return;
-    final unlocked = score >= 900
+    final unlocked = metres >= 900
         ? 4
-        : score >= 600
+        : metres >= 600
         ? 3
-        : score >= 350
+        : metres >= 350
         ? 2
         : 1;
     final index = _introducedHazards < unlocked
@@ -210,7 +302,7 @@ class BalanceGame {
               unlocked;
     _hazardSequence = index;
     final hard =
-        score >= 1200 &&
+        metres >= 1200 &&
         section == InfiniteSection.encounter &&
         _introducedHazards >= 4;
     final sweeping = hard && _hardHazardSequence.isEven;
@@ -228,7 +320,10 @@ class BalanceGame {
         sweeping: sweeping,
         zigzag: zigzag,
         warningSeconds: kind == HazardKind.platformGap ? 2.4 : 2.0,
-        liveSeconds: sweeping
+        cameraOffset: cameraOffset,
+        liveSeconds: kind == HazardKind.formingHole
+            ? double.infinity
+            : sweeping
             ? 3.5
             : zigzag
             ? 550 / (ascentSpeed * 1.35 + 35)
@@ -258,13 +353,15 @@ class BalanceGame {
   bool get dangerActive => infinite && stallTime >= 3;
   double get dangerDistance => dangerY - ballY;
 
-  void ensureInfiniteBoard() {
+  void ensureInfiniteBoard({bool retainForSweep = false}) {
     if (!infinite) return;
     while (_nextRowY >= -cameraOffset - 120) {
-      final d = difficultyAt(math.max(0, (infiniteStart - _nextRowY) / 10));
+      final d = InfiniteTuning.densityAt(score);
       final stage = sectionAt(math.max(0, (infiniteStart - _nextRowY) / 10));
       final spacing =
-          (120 - 45 * d + _random.nextDouble() * 20) * stage.spacingFactor;
+          (210 - 130 * d + _random.nextDouble() * 30) *
+          stage.spacingFactor /
+          (1 + (pace - 1) * .035);
       final previous = _corridor;
       final turn = math.min(52.0, spacing * .42);
       _corridor = (_corridor + (_random.nextDouble() * 2 - 1) * turn).clamp(
@@ -273,7 +370,7 @@ class BalanceGame {
       );
       final selected = <Hole>[];
       final recent = _endlessHoles.reversed.take(3).toList().reversed.toList();
-      final density = ((2 + 2 * d) * stage.densityFactor).clamp(1.0, 4.0);
+      final density = ((1 + 3 * d) * stage.densityFactor).clamp(1.0, 4.0);
       final count =
           density.floor() + (_random.nextDouble() < density % 1 ? 1 : 0);
       for (
@@ -306,12 +403,14 @@ class BalanceGame {
       _endlessHoles.addAll(selected);
       _nextRowY -= spacing;
     }
-    _endlessHoles.removeWhere((hole) => screenY(hole.y) > 620);
+    if (!retainForSweep)
+      _endlessHoles.removeWhere((hole) => screenY(hole.y) > 620);
   }
 
   void _updateClimb(double dt) {
     maxHeight = math.max(maxHeight, infiniteStart - ballRadius - ballY);
-    score = (maxHeight / 10).floor();
+    survival.step(dt, maxHeight / 10);
+    score = survival.points.floor();
     if (leftInput != 0 || rightInput != 0) {
       stallTime = 0;
     } else {
@@ -324,27 +423,35 @@ class BalanceGame {
     message = dangerActive
         ? 'KEEP STEERING! The red is rising.'
         : 'Tilt to dodge. The board keeps moving.';
-    ensureInfiniteBoard();
-    if (ballY + ballRadius >= dangerY) {
-      _loseClimb('The red caught you. Keep moving next time.');
-    }
+    ensureInfiniteBoard(retainForSweep: true);
+    ensureEndlessExtras(retainForSweep: true);
+    _ensureInfiniteItems();
+    if (survival.noticeTime > 0) message = survival.notice;
   }
 
   void _loseClimb(String reason, {Hole? hole}) {
+    if (survival.protected) return;
+    survival.breakCombo();
     captureX = hole?.x ?? ballX;
     captureY = hole?.y ?? ballY;
-    lives = 0;
+    lives--;
     misses++;
     lastSuccess = false;
     message = reason;
     event = GameEvent.miss;
     clearInput();
     velocity = leftSpeed = rightSpeed = 0;
+    if (lives > 0) {
+      _recoverInfinite();
+      return;
+    }
     phase = GamePhase.sinking;
     phaseTime = 0;
   }
 
   double left = 526, right = 526, ballX = 180, velocity = 0;
+  final ballTrail = <({double x, double y, double time})>[];
+  double motionSpeed = 0;
   double leftSpeed = 0, rightSpeed = 0;
   double leftInput = 0, rightInput = 0;
   double clock = 0, legTime = 0, elapsed = 0, phaseTime = 0;
@@ -387,13 +494,13 @@ class BalanceGame {
 
   void dragPivot(int side, double delta) {
     if (!canControl || !delta.isFinite || pivotTargets[side] == null) return;
+    delta *= (analog ? analogSensitivity : twoFingerSensitivity).clamp(
+      0.0,
+      1.0,
+    );
     final other = side == 0 ? right : left;
-    final minimum = infinite
-        ? math.max(other - 180, minPivot)
-        : minPivot;
-    final maximum = infinite
-        ? math.min(maxPivot, other + 180)
-        : maxPivot;
+    final minimum = infinite ? math.max(other - 180, minPivot) : minPivot;
+    final maximum = infinite ? math.min(maxPivot, other + 180) : maxPivot;
     final previous = pivotTargets[side]!;
     pivotTargets[side] = (previous + delta).clamp(minimum, maximum);
     if (infinite) {
@@ -419,6 +526,8 @@ class BalanceGame {
   }
 
   void clearInput() {
+    controlHeld = false;
+    _controlLift = 0;
     leftSpeed = rightSpeed = 0;
     pivotTargets.fillRange(0, 2, null);
     _released.fillRange(0, 2, false);
@@ -433,6 +542,8 @@ class BalanceGame {
   }
 
   void resetBall() {
+    ballTrail.clear();
+    motionSpeed = 0;
     if (!infinite) {
       specialHazards.clear();
       _nextFinaleAt = 3;
@@ -462,8 +573,14 @@ class BalanceGame {
   }) {
     runSerial++;
     mode = gameMode;
+    survival = InfiniteProgress(
+      startingPace: infiniteStartingPace,
+      scoreBoost: equipmentMultiplier,
+    );
+    controlMode = preferredControlMode;
     if (merging) mergeRun = MergeRun(seed: _random.nextInt(1 << 30));
-    if (mazeEndless) mazeRun = LaserMazeRun.endless(seed: _random.nextInt(1 << 30));
+    if (mazeEndless)
+      mazeRun = LaserMazeRun.endless(seed: _random.nextInt(1 << 30));
     dailyDate = daily
         ? DailyChallenge.day(challengeDate ?? DateTime.now())
         : null;
@@ -515,10 +632,14 @@ class BalanceGame {
     _introducedHazards = _hazardSequence = _hardHazardSequence = 0;
     fellThroughGap = false;
     _endlessHoles.clear();
+    score = 0;
     if (infinite) ensureInfiniteBoard();
     if (mazeEndless) mazeRun.ensure(LaserMazeRoute.bottomY);
+    _nextCoinY = mazeEndless ? 465 : 380;
+    _nextMazeSpiderY = 320;
+    ensureEndlessExtras();
     target = 1;
-    lives = infinite || merging || maze ? 1 : 3;
+    lives = merging || maze ? 1 : InfiniteTuning.maxLives;
     score = streak = bestStreak = completed = misses = 0;
     elapsed = phaseTime = 0;
     won = paused = false;
@@ -542,13 +663,43 @@ class BalanceGame {
     started = false;
   }
 
+  /// Isolated editor runs are displayed by the editor without saving records.
+  void startCustomMaze(CustomMazeDefinition definition) {
+    final custom = LaserMazeRun.custom(definition);
+    start(gameMode: GameMode.laserMaze);
+    mazeRun = custom;
+  }
+
   void step(double dt) {
     if (!dt.isFinite || dt <= 0) return;
     // Bound individual substeps even if a caller accidentally supplies a long frame.
     var remaining = math.min(dt, .1);
     while (remaining > .000001) {
       final h = math.min(remaining, 1 / 120);
+      final oldX = ballX, oldY = ballY;
       _tick(h);
+      if (!paused) {
+        if (started && phase == GamePhase.playing) {
+          final distance = math.sqrt(
+            math.pow(ballX - oldX, 2) + math.pow(ballY - oldY, 2),
+          );
+          // Visual decay spans the two physics ticks in a 60 Hz display frame.
+          // It never feeds back into movement or the touch targets.
+          motionSpeed = math.max(
+            distance / h,
+            motionSpeed * math.exp(-h / .07),
+          );
+          if (motionSpeed < .5) motionSpeed = 0;
+          ballTrail.removeWhere((p) => clock - p.time > .2);
+          if (distance > .08 && distance < 45) {
+            ballTrail.add((x: oldX, y: oldY, time: clock));
+            if (ballTrail.length > 24) ballTrail.removeAt(0);
+          }
+        } else {
+          ballTrail.clear();
+          motionSpeed = 0;
+        }
+      }
       remaining -= h;
     }
   }
@@ -633,21 +784,23 @@ class BalanceGame {
       }
     }
     if (oneFinger) {
-      // Horizontal control changes tilt; Classic supplies the missing lift axis.
+      // A held handle supplies both axes. Automatic lift resumes on release.
       final halfTilt = controlPosition * 70;
       // The automatic climb only rises while there is road overhead, so a
       // sideways leg holds its height until the ball reaches the next column.
       final climbing =
           !maze ||
           mazeRun.corridor.canClimb(ballX, ballY, mazeClearance) ||
-          (!mazeEndless && ballY <= LaserMazeCorridor.finishY + mazeClearance);
+          (!mazeEndless && ballY <= mazeRun.route!.finishLineY + mazeClearance);
       final lift = climbing ? 14 * dt : 0.0;
       final center =
-          (maze
+          (controlHeld || _controlLift != 0
+                  ? (left + right) / 2 + _controlLift
+                  : maze
                   ? math.max(
                       mazeEndless
                           ? minimum
-                          : LaserMazeCorridor.finishY + ballRadius,
+                          : mazeRun.route!.finishLineY + ballRadius,
                       (left + right) / 2 - lift,
                     )
                   : infinite || merging
@@ -659,6 +812,7 @@ class BalanceGame {
               .clamp(minimum + halfTilt.abs(), maximum - halfTilt.abs());
       left = center - halfTilt;
       right = center + halfTilt;
+      _controlLift = 0;
     }
     if (infinite && (right - left).abs() > 180) {
       if (left < right) {
@@ -715,15 +869,30 @@ class BalanceGame {
       }
       // Height and camera follow the corrected position, so a swipe that ends
       // on a beam cannot bank the height beyond it.
+      if (scrolling) {
+        if (screenY(ballY) < 360) cameraOffset = math.max(0, 360 - ballY);
+        if (screenY(ballY) > 440) cameraOffset = math.max(0, 440 - ballY);
+        if (!mazeEndless) {
+          cameraOffset = math.min(
+            cameraOffset,
+            LaserMazeCorridor.finishY - mazeRun.route!.finishLineY,
+          );
+        }
+      }
       if (mazeEndless) {
         maxHeight = math.max(maxHeight, LaserMazeCorridor.startY - ballY);
         score = (maxHeight / 10).floor();
         if (!mazeRun.ended) {
-          cameraOffset = math.max(cameraOffset, 360 - ballY);
+          // Follow downward returns too, while score retains the highest climb.
           mazeRun.ensure(ballY);
+          ensureEndlessExtras();
         }
       } else {
         score = (mazeRun.progress * 100).floor();
+      }
+      if (mazeEndless && !mazeRun.ended) {
+        if (_updateSpiders(dt, oldX, oldY)) return;
+        _collectCoins(oldX, oldY, ballX, ballY);
       }
       return;
     }
@@ -745,22 +914,18 @@ class BalanceGame {
       }
       return;
     }
-    Hole? hit;
-    for (final spider in spiders) {
-      if (spider.step(dt, oldX, oldY, ballX, ballY)) {
-        lives = 0;
-        misses++;
-        streak = 0;
-        lastSuccess = false;
-        caughtBySpider = true;
-        message = 'Caught by a spider. Stay outside its territory.';
-        event = GameEvent.miss;
-        phase = GamePhase.over;
-        velocity = 0;
-        clearInput();
-        return;
-      }
+    if (infinite) {
+      _updateSpecialHazards(dt);
+      _resolveInfiniteContacts(oldX, oldY, oldScreenY);
+      // Discard only after the entire swept movement has been resolved.
+      _endlessHoles.removeWhere((h) => screenY(h.y) > 620);
+      specialHazards.removeWhere((h) => h.expired || h.y > 620);
+      coins.removeWhere((c) => screenY(c.y) > 620);
+      survival.items.removeWhere((item) => screenY(item.y) > 610);
+      return;
     }
+    Hole? hit;
+    if (_updateSpiders(dt, oldX, oldY)) return;
     var firstContact = double.infinity;
     for (final hole in board) {
       // Swept segment collision prevents fast balls skipping a hole between frames.
@@ -808,9 +973,6 @@ class BalanceGame {
       oldY + (ballY - oldY) * fraction,
     );
     if (hit != null) _capture(hit);
-    if (infinite && phase == GamePhase.playing) {
-      _updateSpecialHazards(dt, oldX, oldScreenY);
-    }
   }
 
   void _collectCoins(double ax, double ay, double bx, double by) {
@@ -827,13 +989,33 @@ class BalanceGame {
           12 * 12) {
         coin.collected = true;
         coinsCollected++;
-        score += 250;
+        if (!scrolling) score += 250;
         lastCoinAge = 0;
         lastCoinX = coin.x;
         lastCoinY = coin.y;
         event = GameEvent.coin;
       }
     }
+  }
+
+  bool _updateSpiders(double dt, double oldX, double oldY) {
+    for (final spider in spiders) {
+      if (!spider.step(dt, oldX, oldY, ballX, ballY)) continue;
+      lives = 0;
+      misses++;
+      streak = 0;
+      lastSuccess = false;
+      caughtBySpider = true;
+      message = mazeEndless
+          ? 'Caught in an active bug zone. Amber warns; red catches.'
+          : 'Caught by a spider. Stay outside its territory.';
+      event = GameEvent.miss;
+      phase = GamePhase.over;
+      velocity = 0;
+      clearInput();
+      return true;
+    }
+    return false;
   }
 
   void _updateFinale(double dt, double oldX, double oldY) {

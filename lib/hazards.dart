@@ -1,9 +1,10 @@
 import 'dart:math' as math;
+import 'infinite_progress.dart';
 
 enum HazardKind { formingHole, movingHole, laser, platformGap }
 
 /// Screen-space hazards keep their full warning visible before activation.
-/// A forming hole starts travelling with the board only after it opens.
+/// Opened forming holes are anchored in world space, including manual camera movement.
 class SpecialHazard {
   SpecialHazard(
     this.kind, {
@@ -13,11 +14,15 @@ class SpecialHazard {
     this.liveSeconds = 3.0,
     this.sweeping = false,
     this.zigzag = false,
-  }) : originX = x;
+    double? cameraOffset,
+  }) : originX = x,
+       _lastCameraOffset = cameraOffset;
   final HazardKind kind;
   final bool sweeping, zigzag;
   final double originX, warningSeconds, liveSeconds;
   double x, y, age = 0;
+  double? _worldY, _lastCameraOffset;
+  double? get worldY => _worldY;
   double _oldX = 0, _oldY = 0, _from = 0, _until = 0;
   bool get warning => age < warningSeconds;
   bool get expired => age >= warningSeconds + liveSeconds;
@@ -38,7 +43,7 @@ class SpecialHazard {
     HazardKind.platformGap => warning ? 'PLATFORM BREAKING' : 'GAP OPEN',
   };
 
-  void step(double dt, double scrollSpeed) {
+  void step(double dt, double scrollSpeed, {double? cameraOffset}) {
     final before = age;
     _oldX = x;
     _oldY = y;
@@ -46,9 +51,23 @@ class SpecialHazard {
     _from = ((warningSeconds - before) / dt).clamp(0.0, 1.0);
     _until = ((warningSeconds + liveSeconds - before) / dt).clamp(0.0, 1.0);
     final liveDt = math.max(0.0, _until - _from) * dt;
-    if (kind == HazardKind.formingHole || kind == HazardKind.movingHole) {
+    if (kind == HazardKind.formingHole && cameraOffset != null) {
+      final previousCamera =
+          _lastCameraOffset ?? cameraOffset - scrollSpeed * dt;
+      final cameraAtStart =
+          previousCamera + (cameraOffset - previousCamera) * _from;
+      final cameraAtEnd =
+          previousCamera + (cameraOffset - previousCamera) * _until;
+      if (liveDt > 0) _worldY ??= y - cameraAtStart;
+      if (_worldY != null) {
+        _oldY = _worldY! + cameraAtStart;
+        y = _worldY! + cameraAtEnd;
+      }
+    } else if (kind == HazardKind.formingHole ||
+        kind == HazardKind.movingHole) {
       y += (zigzag ? scrollSpeed * 1.35 + 35 : scrollSpeed) * liveDt;
     }
+    _lastCameraOffset = cameraOffset;
     if (kind == HazardKind.movingHole && liveDt > 0) {
       final liveAge = (age - warningSeconds).clamp(0.0, liveSeconds);
       x =
@@ -63,29 +82,27 @@ class SpecialHazard {
     }
   }
 
-  bool hits(double oldX, double oldY, double newX, double newY) {
-    if (_until <= _from) return false;
-    // Only the active fraction of a boundary-crossing step can cause damage.
+  bool hits(double oldX, double oldY, double newX, double newY) =>
+      contact(oldX, oldY, newX, newY) != null;
+
+  double? contact(double oldX, double oldY, double newX, double newY) {
+    if (_until <= _from) return null;
     final ax = oldX + (newX - oldX) * _from;
     final ay = oldY + (newY - oldY) * _from;
     final bx = oldX + (newX - oldX) * _until;
     final by = oldY + (newY - oldY) * _until;
+    final double? t;
     if (kind == HazardKind.laser) {
-      return _crossesRect(ax - _oldX, ay, bx - x, by, -10, 10, 33, 537);
+      t = _rectContact(ax - _oldX, ay, bx - x, by, -10, 10, 33, 537);
+    } else if (kind == HazardKind.platformGap) {
+      t = _rectContact(ax, 0, bx, 0, gapLeft + 3, gapRight - 3, -1, 1);
+    } else {
+      t = circleContact(ax - _oldX, ay - _oldY, bx - x, by - y, 0, 0, 8.5);
     }
-    if (kind == HazardKind.platformGap) {
-      return math.max(ax, bx) > gapLeft + 3 && math.min(ax, bx) < gapRight - 3;
-    }
-    final rx = ax - _oldX, ry = ay - _oldY;
-    final dx = (bx - x) - rx, dy = (by - y) - ry;
-    final length = dx * dx + dy * dy;
-    final t = length == 0
-        ? 0.0
-        : (-(rx * dx + ry * dy) / length).clamp(0.0, 1.0);
-    return math.pow(rx + dx * t, 2) + math.pow(ry + dy * t, 2) <= 8.5 * 8.5;
+    return t == null ? null : _from + (_until - _from) * t;
   }
 
-  static bool _crossesRect(
+  static double? _rectContact(
     double ax,
     double ay,
     double bx,
@@ -101,15 +118,15 @@ class SpecialHazard {
       (ay, by - ay, top, bottom),
     ]) {
       if (axis.$2.abs() < .000001) {
-        if (axis.$1 < axis.$3 || axis.$1 > axis.$4) return false;
+        if (axis.$1 < axis.$3 || axis.$1 > axis.$4) return null;
       } else {
         final a = (axis.$3 - axis.$1) / axis.$2,
             b = (axis.$4 - axis.$1) / axis.$2;
         lo = math.max(lo, math.min(a, b));
         hi = math.min(hi, math.max(a, b));
-        if (lo > hi) return false;
+        if (lo > hi) return null;
       }
     }
-    return true;
+    return lo;
   }
 }

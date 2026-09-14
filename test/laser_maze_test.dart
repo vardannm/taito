@@ -14,7 +14,8 @@ import 'package:shared_preferences_platform_interface/shared_preferences_async_p
 void finishMaze(BalanceGame game) {
   final route = game.mazeRun.route!;
   game.ballX = route.finishX;
-  game.left = game.right = 62;
+  game.left = game.right = route.finishLineY + 18;
+  if (route.tall) game.cameraOffset = 360 - game.ballY;
   game.velocity = 0;
   if (game.oneFinger) {
     game.setControlPosition(0);
@@ -78,7 +79,7 @@ void main() {
         InMemorySharedPreferencesAsync.empty(),
   );
 
-  test('ten routes narrow progressively and fit within the board', () {
+  test('twenty routes narrow progressively and fit their map bounds', () {
     final shapes = <String>{};
     var previousWidth = double.infinity;
     for (var i = 1; i <= LaserMazeRoute.count; i++) {
@@ -89,51 +90,27 @@ void main() {
       for (final wall in route.walls) {
         for (final point in [wall.a, wall.b]) {
           expect(point.x, inInclusiveRange(30, 330));
-          expect(point.y, inInclusiveRange(24, 548));
+          expect(point.y, inInclusiveRange(route.routeTop, 548));
         }
       }
       expect(route.contains(180, LaserMazeCorridor.startY), true);
       expect(route.firstContact(180, 519, 180, 519, 7), isNull);
-      expect(route.contains(route.finishX, LaserMazeCorridor.finishY), true);
+      expect(route.contains(route.finishX, route.finishLineY), true);
     }
     expect(shapes.length, LaserMazeRoute.count);
     expect(LaserMazeRoute(0).number, 1);
-    expect(LaserMazeRoute(99).number, 10);
+    expect(LaserMazeRoute(99).number, 20);
   });
 
-  test('every route turns: legs alternate climb and sideways crossing', () {
+  test('every route includes a real downward return and orthogonal legs', () {
     for (var level = 1; level <= LaserMazeRoute.count; level++) {
       final route = LaserMazeRoute(level);
-      final sideways = <double>[], climbs = <double>[];
-      for (var i = 1; i < route.centers.length; i++) {
-        final a = route.centers[i - 1], b = route.centers[i];
-        expect(
-          a.x == b.x || a.y == b.y,
-          true,
-          reason: 'Route $level leg $i is not axis aligned',
-        );
-        if (a.y == b.y && a.x != b.x) {
-          sideways.add(b.y);
-        } else if (a.y != b.y) {
-          climbs.add(a.x);
-        }
-      }
-      // A route is a stack of switchbacks, not one leaning column.
-      expect(sideways.length, route.turns, reason: 'Route $level');
-      expect(climbs.length, route.turns * 2 + 1, reason: 'Route $level');
-      expect(sideways.toSet().length, sideways.length, reason: 'Route $level');
-      final heights = sideways.toList()..sort();
-      for (var i = 1; i < heights.length; i++) {
-        // Sideways legs stay separate instead of merging into one open room.
-        expect(
-          heights[i] - heights[i - 1],
-          greaterThan(2 * route.halfWidth),
-          reason: 'Route $level',
-        );
+      expect(route.legs.where((l) => l.primary && l.b.y > l.a.y), isNotEmpty);
+      for (final leg in route.legs) {
+        expect(leg.a.x == leg.b.x || leg.a.y == leg.b.y, true);
       }
     }
   });
-
   test('a straight climb up the launch column hits a wall on every route', () {
     for (var level = 1; level <= LaserMazeRoute.count; level++) {
       final run = LaserMazeRun(level);
@@ -150,7 +127,7 @@ void main() {
       expect(walk.contacted, false, reason: 'Route $level');
       expect(run.won, true, reason: 'Route $level');
       expect(run.progress, 1);
-      expect(run.contactY, closeTo(LaserMazeCorridor.finishY, .001));
+      expect(run.contactY, closeTo(run.route!.finishLineY, .001));
     }
   });
 
@@ -203,16 +180,19 @@ void main() {
     expect(other.hitLaser, true);
   });
 
-  test('progress tracks the peak and cannot be farmed by going down and up', () {
-    final run = LaserMazeRun(1);
-    run.step(180, 519, 180, 480, 7);
-    final peak = run.progress;
-    expect(peak, greaterThan(0));
-    run.step(180, 480, 180, 510, 7);
-    expect(run.progress, peak);
-    run.step(180, 510, 180, 490, 7);
-    expect(run.progress, peak);
-  });
+  test(
+    'progress tracks the peak and cannot be farmed by going down and up',
+    () {
+      final run = LaserMazeRun(1);
+      run.step(180, 519, 180, 480, 7);
+      final peak = run.progress;
+      expect(peak, greaterThan(0));
+      run.step(180, 480, 180, 510, 7);
+      expect(run.progress, peak);
+      run.step(180, 510, 180, 490, 7);
+      expect(run.progress, peak);
+    },
+  );
 
   for (final control in ControlMode.values) {
     test('maze launch, pause, finish and replay work with $control', () {
@@ -229,7 +209,11 @@ void main() {
       expect(g.lives, 1);
       expect(g.ballY, LaserMazeCorridor.startY);
       g.step(.1);
-      if (control == ControlMode.oneFinger) expect(g.ballY, lessThan(519));
+      expect(g.controlMode, control);
+      expect(
+        g.ballY,
+        closeTo(control == ControlMode.oneFinger ? 517.6 : 519, .001),
+      );
       g.setPaused(true);
       final before = (g.ballX, g.ballY, g.elapsed, g.mazeRun.progress);
       g.step(.1);
@@ -249,33 +233,25 @@ void main() {
     });
   }
 
-  test('the one-finger climb waits under a sideways leg, then resumes', () {
-    final g = BalanceGame()
-      ..setControlMode(ControlMode.oneFinger)
-      ..start(gameMode: GameMode.laserMaze, levelNumber: 1);
-    final route = g.mazeRun.route!;
-    final turn = route.centers[2];
-    for (var i = 0; i < 2400 && !g.finished; i++) g.step(1 / 120);
-    // It stops below the sideways ceiling instead of driving into the beam.
-    expect(g.mazeRun.hitLaser, false);
-    expect(g.ballY, greaterThan(turn.y - route.halfWidth));
-    expect(g.ballY, lessThan(turn.y + route.halfWidth));
-    final held = g.ballY;
-    for (var i = 0; i < 240 && !g.finished; i++) g.step(1 / 120);
-    expect(g.ballY, closeTo(held, .001));
-    // Steering into the next column lets the climb continue.
-    final lane = route.centers[3].x;
-    for (var i = 0; i < 3600 && !g.finished; i++) {
-      g.setControlPosition(
-        ((lane - g.ballX) * .0045 - g.velocity * .0075).clamp(-.3, .3),
-      );
-      g.step(1 / 120);
-      if (g.ballY < held - 30) break;
-    }
-    expect(g.mazeRun.hitLaser, false);
-    expect(g.ballY, lessThan(held - 20));
-  });
-
+  test(
+    'maze respects the selected controls across replay and mode changes',
+    () {
+      for (final control in ControlMode.values) {
+        final g = BalanceGame()..setControlMode(control);
+        for (final mode in [GameMode.laserMaze, GameMode.mazeEndless]) {
+          g.start(gameMode: mode);
+          expect(g.controlMode, control);
+          expect(g.preferredControlMode, control);
+          g.start(gameMode: mode);
+          expect(g.controlMode, control);
+          g.home();
+          expect(g.controlMode, control);
+          g.start(gameMode: GameMode.infinite);
+          expect(g.controlMode, control);
+        }
+      }
+    },
+  );
   test('the endless corridor grows ahead, prunes behind and keeps turning', () {
     for (var seed = 0; seed < 8; seed++) {
       final run = LaserMazeRun.endless(seed: seed);
@@ -288,15 +264,15 @@ void main() {
       expect(run.won, false);
       expect(maze.prunedLegs, greaterThan(0), reason: 'Seed $seed');
       // Pruning keeps the live geometry bounded however far the climb goes.
-      expect(maze.rects.length, lessThan(48), reason: 'Seed $seed');
-      expect(maze.centers.length, maze.rects.length + 1);
+      expect(maze.rects.length, lessThan(180), reason: 'Seed $seed');
+      expect(maze.centers.length, maze.legs.where((l) => l.primary).length + 1);
       var sideways = 0;
       for (var i = 1; i < maze.centers.length; i++) {
         final a = maze.centers[i - 1], b = maze.centers[i];
         expect(a.x == b.x || a.y == b.y, true);
         if (a.y == b.y && a.x != b.x) {
           sideways++;
-          expect((b.x - a.x).abs(), greaterThanOrEqualTo(60));
+          expect((b.x - a.x).abs(), greaterThan(0));
         }
       }
       expect(sideways, greaterThan(0), reason: 'Seed $seed');
@@ -309,9 +285,9 @@ void main() {
   });
 
   test('the endless corridor tightens as the climb goes on', () {
-    expect(EndlessMaze.halfWidthAt(0), 40);
-    expect(EndlessMaze.halfWidthAt(EndlessMaze.ramp), 26);
-    expect(EndlessMaze.halfWidthAt(EndlessMaze.ramp * 4), 26);
+    expect(EndlessMaze.halfWidthAt(0), 26);
+    expect(EndlessMaze.halfWidthAt(EndlessMaze.ramp), 21);
+    expect(EndlessMaze.halfWidthAt(EndlessMaze.ramp * 4), 21);
     expect(
       EndlessMaze.legHeightAt(EndlessMaze.ramp),
       lessThan(EndlessMaze.legHeightAt(0)),
@@ -371,56 +347,61 @@ void main() {
     }
   });
 
-  test('maze records persist per route and control, endless by height', () async {
-    final p = PlayerProfile()
-      ..classicLevel = 31
-      ..mazeLevel = 7;
-    final g = BalanceGame()..start(gameMode: GameMode.laserMaze, levelNumber: 7);
-    g.elapsed = 12;
-    finishMaze(g);
-    expect(p.recordResult(g), true);
-    final first = p.mazeBestTime(7)!;
-    expect(p.recordResult(g), false);
-    expect(p.mazeRuns, 1);
-    g.start(gameMode: GameMode.laserMaze, levelNumber: 7);
-    g.elapsed = 18;
-    finishMaze(g);
-    expect(p.recordResult(g), false);
-    expect(p.mazeBestTime(7), first);
-    g.setControlMode(ControlMode.analog);
-    g.start(gameMode: GameMode.laserMaze, levelNumber: 7);
-    g.elapsed = 8;
-    finishMaze(g);
-    expect(p.recordResult(g), true);
-    expect(p.mazeBestTime(7, ControlMode.analog), lessThan(first));
-    // Endless keeps its own best height and run count.
-    g.start(gameMode: GameMode.mazeEndless);
-    g.maxHeight = 640;
-    g.ballX = 320;
-    g.step(1 / 120);
-    expect(g.finished, true);
-    expect(p.recordResult(g), true);
-    expect(p.mazeEndlessBest, 64);
-    expect(p.mazeEndlessRuns, 1);
-    expect(p.mazeRuns, 3);
-    expect(p.best, 0);
-    expect(p.runs, 0);
-    expect(p.mergeRuns, 0);
-    expect(p.totalStars, 0);
-    await p.save();
-    final restored = PlayerProfile();
-    await restored.load();
-    expect(restored.classicLevel, 31);
-    expect(restored.mazeLevel, 7);
-    expect(restored.mazeRuns, 3);
-    expect(restored.mazeEndlessBest, 64);
-    expect(restored.mazeEndlessRuns, 1);
-    expect(restored.mazeBestTime(7), first);
-    expect(
-      restored.mazeBestTime(7, ControlMode.analog),
-      p.mazeBestTime(7, ControlMode.analog),
-    );
-  });
+  test(
+    'maze records persist per route and control, endless by height',
+    () async {
+      final p = PlayerProfile()
+        ..classicLevel = 31
+        ..mazeLevel = 7;
+      final g = BalanceGame()
+        ..start(gameMode: GameMode.laserMaze, levelNumber: 7);
+      g.elapsed = 12;
+      finishMaze(g);
+      expect(p.recordResult(g), true);
+      final first = p.mazeBestTime(7)!;
+      expect(p.recordResult(g), false);
+      expect(p.mazeRuns, 1);
+      g.start(gameMode: GameMode.laserMaze, levelNumber: 7);
+      g.elapsed = 18;
+      finishMaze(g);
+      expect(p.recordResult(g), false);
+      expect(p.mazeBestTime(7), first);
+      g.setControlMode(ControlMode.analog);
+      g.start(gameMode: GameMode.laserMaze, levelNumber: 7);
+      g.elapsed = 8;
+      finishMaze(g);
+      expect(p.recordResult(g), true);
+      expect(p.mazeBestTime(7, ControlMode.twoFinger), first);
+      expect(p.mazeBestTime(7, ControlMode.analog), lessThan(first));
+      // Endless keeps its own best height and run count.
+      g.start(gameMode: GameMode.mazeEndless);
+      g.maxHeight = 640;
+      g.ballX = 320;
+      g.step(1 / 120);
+      expect(g.finished, true);
+      expect(p.recordResult(g), true);
+      expect(p.mazeEndlessBest, 64);
+      expect(p.mazeEndlessRuns, 1);
+      expect(p.mazeRuns, 3);
+      expect(p.best, 0);
+      expect(p.runs, 0);
+      expect(p.mergeRuns, 0);
+      expect(p.totalStars, 0);
+      await p.save();
+      final restored = PlayerProfile();
+      await restored.load();
+      expect(restored.classicLevel, 31);
+      expect(restored.mazeLevel, 7);
+      expect(restored.mazeRuns, 3);
+      expect(restored.mazeEndlessBest, 64);
+      expect(restored.mazeEndlessRuns, 1);
+      expect(restored.mazeBestTime(7), p.mazeBestTime(7));
+      expect(
+        restored.mazeBestTime(7, ControlMode.analog),
+        p.mazeBestTime(7, ControlMode.analog),
+      );
+    },
+  );
 
   test('lost routes count an attempt without earning a completion time', () {
     final p = PlayerProfile();
@@ -456,17 +437,23 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 400));
         expect(find.byType(LaserMazePicker), findsOneWidget);
-        await tester.ensureVisible(find.byKey(const ValueKey('maze-route-1')));
+        await tester.scrollUntilVisible(
+          find.byKey(const ValueKey('maze-route-1')).hitTestable(),
+          160,
+          scrollable: find.descendant(
+            of: find.byType(LaserMazePicker),
+            matching: find.byType(Scrollable),
+          ),
+        );
         await tester.tap(find.byKey(const ValueKey('maze-route-1')));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 400));
         final g = tester.widget<PivotBoard>(find.byType(PivotBoard)).game;
         expect(g.maze, true);
         expect(find.text('LASER MAZE / ROUTE 1'), findsOneWidget);
-        final joystick = tester.getRect(
-          find.byKey(const ValueKey('analog-left')),
-        );
-        expect(joystick.bottom, lessThanOrEqualTo(layout.$1.height - 24));
+        expect(g.controlMode, ControlMode.analog);
+        expect(p.controlMode, ControlMode.analog);
+        expect(find.byKey(const ValueKey('analog-left')), findsOneWidget);
         finishMaze(g);
         await tester.pump(const Duration(milliseconds: 30));
         expect(find.text('Finish reached.'), findsOneWidget);
@@ -517,7 +504,13 @@ void main() {
     g.ballX = 320;
     await tester.pump(const Duration(milliseconds: 30));
     expect(find.text('The climb ends here.'), findsOneWidget);
-    expect(find.text('ENDLESS CLIMB'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(LaserMazeResult),
+        matching: find.text('ENDLESS CLIMB'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('CLIMB AGAIN'), findsOneWidget);
     expect(p.mazeEndlessBest, 30);
     await tester.tap(find.text('CLIMB AGAIN'));

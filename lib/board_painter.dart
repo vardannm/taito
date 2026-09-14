@@ -1,3 +1,6 @@
+import 'ball_painter.dart';
+import 'platform_painter.dart';
+import 'infinite_painter.dart';
 import 'merge_widgets.dart';
 import 'merge.dart';
 import 'dart:math' as math;
@@ -113,6 +116,7 @@ class BoardPainter extends CustomPainter {
     );
     canvas.save();
     canvas.clipRRect(field);
+    paintInfiniteAtmosphere(canvas, game, reducedMotion);
     // Fine machined surface, concentric engraving, and calibrated side rails.
     final grain = Paint()
       ..color = const Color(0xFF533E20).withAlpha(13)
@@ -164,7 +168,7 @@ class BoardPainter extends CustomPainter {
         game.mazeRun,
         game.clock,
         reducedMotion,
-        cameraOffset: game.mazeEndless ? game.cameraOffset : 0,
+        cameraOffset: game.scrolling ? game.cameraOffset : 0,
       );
     if (game.merging) {
       for (final orb in game.mergeRun.orbs) {
@@ -174,16 +178,44 @@ class BoardPainter extends CustomPainter {
           orb.value,
           MergeRun.fallingRadius,
           match: game.mergeRun.canMerge(orb.value),
+          danger: orb.value > game.mergeRun.head,
         );
+      }
+      for (final gate in game.mergeRun.gates) {
+        final color = game.mergeRun.head > gate.requiredValue ? ink : orange;
+        canvas.drawLine(
+          Offset(20, gate.y),
+          Offset(340, gate.y),
+          Paint()
+            ..color = color.withAlpha(50)
+            ..strokeWidth = 14,
+        );
+        canvas.drawLine(
+          Offset(20, gate.y),
+          Offset(340, gate.y),
+          Paint()
+            ..color = color
+            ..strokeWidth = 3,
+        );
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromCenter(
+              center: Offset(180, gate.y),
+              width: 150,
+              height: 30,
+            ),
+            const Radius.circular(6),
+          ),
+          Paint()..color = color,
+        );
+        text(canvas, '> ${gate.requiredValue}', Offset(180, gate.y), 15, cream);
       }
       if (game.mergeRun.flash > 0) {
         text(canvas, game.mergeRun.notice, const Offset(180, 28), 10, ink);
       }
     }
     paintSpiderBackdrop(canvas, game);
-    final visibleHoles = game.merging
-        ? game.mergeRun.holes.map((hole) => Hole(hole.x, hole.y))
-        : game.board;
+    final visibleHoles = game.board;
     for (final hole in visibleHoles) {
       final p = Offset(hole.x, game.screenY(hole.y));
       final active = !game.infinite && hole.target == game.target.clamp(1, 10);
@@ -316,7 +348,7 @@ class BoardPainter extends CustomPainter {
       }
     }
     for (final coin in game.coins.where((c) => !c.collected)) {
-      final p = Offset(coin.x, coin.y);
+      final p = Offset(coin.x, game.screenY(coin.y));
       final r = reducedMotion
           ? 6.0
           : 6 + math.sin(game.clock * 3 + coin.x) * .5;
@@ -345,17 +377,36 @@ class BoardPainter extends CustomPainter {
     if (game.lastCoinAge < .7) {
       text(
         canvas,
-        '+250',
+        game.scrolling ? '+1 COIN' : '+250',
         Offset(
           game.lastCoinX,
-          game.lastCoinY - 12 - (reducedMotion ? 0 : game.lastCoinAge * 20),
+          game.screenY(game.lastCoinY) -
+              12 -
+              (reducedMotion ? 0 : game.lastCoinAge * 20),
         ),
         11,
         ink,
       );
     }
+    paintInfiniteItems(canvas, game, reducedMotion);
     paintSpecialHazards(canvas, game, reducedMotion);
     paintSpiders(canvas, game, reducedMotion);
+    if (game.infinite || game.mazeEndless) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          const Rect.fromLTWH(258, 20, 80, 21),
+          const Radius.circular(7),
+        ),
+        Paint()..color = ink,
+      );
+      text(
+        canvas,
+        '${game.coinsCollected} COINS',
+        const Offset(300, 30),
+        10,
+        brass,
+      );
+    }
     canvas.save();
     for (final gap in game.specialHazards.where(
       (h) => h.kind == HazardKind.platformGap && h.active,
@@ -367,6 +418,53 @@ class BoardPainter extends CustomPainter {
           Path()..addRect(Rect.fromLTRB(gap.gapLeft, 0, gap.gapRight, 560)),
         ),
       );
+    }
+    paintInfiniteEnergy(canvas, game, reducedMotion);
+    // Short, fading wake behind the ball. This never changes hit geometry.
+    if (game.phase == GamePhase.playing && game.started) {
+      final energy = (game.motionSpeed / 220).clamp(0.0, 1.0);
+      final tint = Color.lerp(
+        const Color(0xFF62E4D3),
+        const Color(0xFFFFD27A),
+        energy,
+      )!;
+      if (!reducedMotion) {
+        for (final sample in game.ballTrail) {
+          final fade = (1 - (game.clock - sample.time) / .2).clamp(0.0, 1.0);
+          canvas.drawCircle(
+            Offset(sample.x, game.screenY(sample.y)),
+            2 + 4 * fade,
+            Paint()..color = tint.withValues(alpha: .24 * fade),
+          );
+        }
+      }
+      if (energy > .025) {
+        final center = Offset(game.ballX, game.screenY(game.ballY));
+        final radius = 15 + energy * 9;
+        canvas.drawCircle(
+          center,
+          radius,
+          Paint()
+            ..shader = RadialGradient(
+              colors: [
+                tint.withValues(alpha: reducedMotion ? .12 : .3),
+                tint.withValues(alpha: 0),
+              ],
+            ).createShader(Rect.fromCircle(center: center, radius: radius)),
+        );
+      }
+    }
+    if (game.infinite && game.survival.flash > 0 && !reducedMotion) {
+      final t = 1 - game.survival.flash / .65;
+      final center = Offset(game.ballX, game.screenY(game.ballY));
+      for (var i = 0; i < 10; i++) {
+        final angle = i * math.pi / 5;
+        canvas.drawCircle(
+          center + Offset(math.cos(angle), math.sin(angle)) * (13 + 24 * t),
+          1.8 * (1 - t),
+          Paint()..color = brass.withValues(alpha: 1 - t),
+        );
+      }
     }
     final a = Offset(20, game.screenY(game.left)),
         b = Offset(340, game.screenY(game.right));
@@ -401,11 +499,24 @@ class BoardPainter extends CustomPainter {
         ..color = const Color(0xFFFFFFE8)
         ..strokeWidth = 1.2,
     );
+    paintPlatformDetail(canvas, a, b, game.platformStyle);
     canvas.restore();
     paintGapWarning(canvas, game, reducedMotion);
     if (game.oneFinger && game.started) {
       final y = game.controlY;
       final x = 180 + game.controlPosition * 110;
+      for (final sign in [-1.0, 1.0]) {
+        canvas.drawPath(
+          Path()
+            ..moveTo(x - 4, y + sign * 20)
+            ..lineTo(x, y + sign * 24)
+            ..lineTo(x + 4, y + sign * 20),
+          Paint()
+            ..color = brass
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5,
+        );
+      }
       canvas.drawLine(
         Offset(70, y),
         Offset(290, y),
@@ -478,16 +589,6 @@ class BoardPainter extends CustomPainter {
         return Offset(x, game.screenY(game.platformY(x) - MergeRun.ballRadius));
       }
 
-      if (run.nearlyFull) {
-        canvas.drawLine(
-          a + const Offset(0, 7),
-          b + const Offset(0, 7),
-          Paint()
-            ..color = orange.withAlpha(run.full ? 210 : 110)
-            ..strokeWidth = 3
-            ..strokeCap = StrokeCap.round,
-        );
-      }
       if (run.segments.length > 1) {
         final leftX = game.visualX - run.leftSpan;
         final rightX = game.visualX + run.rightSpan;
@@ -516,8 +617,7 @@ class BoardPainter extends CustomPainter {
           match: i == run.segments.length - 1,
         );
       }
-      if (!run.hitHole)
-        paintNumberOrb(canvas, segmentCenter(0), run.head, MergeRun.ballRadius);
+      paintNumberOrb(canvas, segmentCenter(0), run.head, MergeRun.ballRadius);
     }
     if (!game.merging && game.ballScale > 0) {
       final p = Offset(game.visualX, game.screenY(game.visualY));
@@ -528,21 +628,18 @@ class BoardPainter extends CustomPainter {
           ..color = Colors.black38
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
       );
-      canvas.drawCircle(
+      paintCosmetic(
+        canvas,
         p,
         7 * game.ballScale,
-        Paint()
-          ..shader =
-              RadialGradient(
-                center: Alignment(-.4, -.5),
-                radius: .85,
-                colors: palette.ball,
-                stops: [0, .2, .5, 1],
-              ).createShader(
-                Rect.fromCircle(center: p, radius: 7 * game.ballScale),
-              ),
+        game.cosmetic,
+        time: game.clock,
+        reducedMotion: reducedMotion,
+        steelPalette: palette.ball,
       );
+      paintInfiniteShield(canvas, game, reducedMotion);
     }
+
     if (game.phase == GamePhase.sinking && !reducedMotion) {
       final t = (game.phaseTime / .7).clamp(0.0, 1.0);
       final p = Offset(game.captureX, game.screenY(game.captureY));

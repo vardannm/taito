@@ -29,24 +29,18 @@ class MergeStatus extends StatelessWidget {
     child: Semantics(
       label:
           'Snake from highest in the middle to smallest outside: ${run.segments.join(', ')}. '
-          '${run.segments.length} of ${MergeRun.maxSegments} balls. '
-          'Collect a matching number with the solid middle ball. Avoid holes.',
+          'Next gate requires more than ${run.upcomingGateValue}. '
+          'Collect equal or smaller numbers with the solid middle ball. Larger numbers are fatal.',
       excludeSemantics: true,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            run.hitHole
-                ? 'FELL INTO A HOLE'
-                : run.overflow
-                ? 'SNAKE TOO LONG'
-                : run.full
-                ? 'PLATFORM FULL'
-                : 'SNAKE  ${run.segments.length} / ${MergeRun.maxSegments}',
+            run.ended ? 'RUN ENDED' : 'GATE > ${run.upcomingGateValue}',
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w800,
-              color: run.nearlyFull
+              color: run.head <= run.upcomingGateValue
                   ? const Color(0xFFCD542F)
                   : const Color(0xFF163D3B),
             ),
@@ -67,8 +61,32 @@ void paintNumberOrb(
   int value,
   double radius, {
   bool match = false,
+  bool danger = false,
   double opacity = 1,
 }) {
+  if (danger) {
+    canvas.drawCircle(
+      center,
+      radius + 4,
+      Paint()
+        ..color = const Color(0xFFCF4036)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5,
+    );
+    final warning = TextPainter(
+      text: const TextSpan(
+        text: '!',
+        style: TextStyle(
+          fontFamily: 'sans-serif',
+          color: Color(0xFFCF4036),
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    warning.paint(canvas, center + Offset(-warning.width / 2, -radius - 19));
+  }
   if (match)
     canvas.drawCircle(
       center,
@@ -138,7 +156,9 @@ class MergeResult extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              run.hitHole ? 'Fell into a hole.' : 'Snake too long.',
+              run.failedGate != null
+                  ? 'Gate not cleared.'
+                  : 'Number too large.',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Color(0xFFF2ECDD),

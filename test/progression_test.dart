@@ -55,7 +55,8 @@ void main() {
     await tester.tap(find.text('Two-Finger Control'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    await tester.tap(find.text('One-Finger Control').last);
+    await tester.ensureVisible(find.byKey(const ValueKey('control-oneFinger')));
+    await tester.tap(find.byKey(const ValueKey('control-oneFinger')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(p.controlMode, ControlMode.oneFinger);
@@ -111,6 +112,7 @@ void main() {
         for (final progress in [0, 400, 900, 1600, 2500]) {
           final g = BalanceGame(seed: seed)..start(gameMode: GameMode.infinite);
           g.cameraOffset = progress * 10.0;
+          g.score = progress * 20;
           g.ensureInfiniteBoard();
           var reachable = [for (var x = 60; x <= 300; x += 4) x.toDouble()];
           for (var screenY = 620; screenY >= -120; screenY -= 8) {
@@ -147,7 +149,7 @@ void main() {
     for (var seed = 0; seed < 20; seed++) {
       final g = BalanceGame(seed: seed)..start(gameMode: GameMode.infinite);
       signatures.add(g.board.map((h) => '${h.x},${h.y}').join('/'));
-      expect(g.board.length, inInclusiveRange(4, 12));
+      expect(g.board.length, inInclusiveRange(1, 6));
       final rows = g.board.map((h) => h.y).toSet().toList()..sort();
       for (var i = 1; i < rows.length; i++) {
         expect(rows[i] - rows[i - 1], greaterThan(12));
@@ -159,10 +161,10 @@ void main() {
     var previous = g.ascentSpeed;
     for (var score = 1; score <= 2000; score++) {
       g.maxHeight = score * 10.0;
-      expect(g.ascentSpeed, inInclusiveRange(previous, previous + .21));
+      expect(g.ascentSpeed, inInclusiveRange(previous, previous + .28));
       previous = g.ascentSpeed;
     }
-    expect(previous, 180);
+    expect(previous, 216);
     final a = BalanceGame(seed: 17)..start(gameMode: GameMode.infinite);
     final b = BalanceGame(seed: 17)..start(gameMode: GameMode.infinite);
     expect(a.board.map((h) => h.x), b.board.map((h) => h.x));

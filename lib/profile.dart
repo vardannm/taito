@@ -1,4 +1,7 @@
 import 'dart:convert';
+import 'dart:async';
+import 'ball_cosmetics.dart';
+import 'platforms.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -9,9 +12,113 @@ import 'rewards.dart';
 import 'laser_maze.dart';
 
 class PlayerProfile {
+  PlayerProfile({
+    this.unlimitedCoins = const bool.fromEnvironment('GILT_UNLIMITED_COINS'),
+  });
+
+  final bool unlimitedCoins;
+  String get _economyKey =>
+      unlimitedCoins ? 'gilt.economy.coinsTest.v1' : 'gilt.economy.v1';
+  bool canAfford(int cost) => unlimitedCoins || wallet >= cost;
+
   late final SharedPreferencesAsync storage = SharedPreferencesAsync();
   int best = 0, runs = 0;
-  int infiniteBest = 0, infiniteRuns = 0;
+  int infiniteBest = 0, infiniteRuns = 0, infiniteBestScore = 0;
+  int wallet = 0;
+  BallCosmetic selectedBall = BallCosmetic.steel;
+  double analogSensitivity = 1, twoFingerSensitivity = 1;
+  PlatformStyle selectedPlatform = PlatformStyle.classic;
+  final ownedPlatforms = <PlatformStyle>{PlatformStyle.classic};
+  double get equipmentMultiplier =>
+      1 + selectedBall.scoreBonus + selectedPlatform.scoreBonus;
+  final ownedBalls = <BallCosmetic>{BallCosmetic.steel};
+  final _bankedCoins = Expando<({int serial, int count})>();
+  Future<void> _economyWrites = Future<void>.value();
+
+  bool bankCoins(BalanceGame game) {
+    if (!game.infinite && !game.mazeEndless) return false;
+    final previous = _bankedCoins[game];
+    final count = previous?.serial == game.runSerial ? previous!.count : 0;
+    final delta = game.coinsCollected - count;
+    if (delta <= 0) return false;
+    _bankedCoins[game] = (serial: game.runSerial, count: game.coinsCollected);
+    wallet += delta;
+    unawaited(saveEconomy());
+    return true;
+  }
+
+  bool selectBall(BallCosmetic ball) {
+    if (!ownedBalls.contains(ball)) {
+      if (!canAfford(ball.cost)) return false;
+      if (!unlimitedCoins) wallet -= ball.cost;
+      ownedBalls.add(ball);
+    }
+    selectedBall = ball;
+    unawaited(saveEconomy());
+    return true;
+  }
+
+  bool selectPlatform(PlatformStyle platform) {
+    if (!ownedPlatforms.contains(platform)) {
+      if (!canAfford(platform.cost)) return false;
+      if (!unlimitedCoins) wallet -= platform.cost;
+      ownedPlatforms.add(platform);
+    }
+    selectedPlatform = platform;
+    unawaited(saveEconomy());
+    return true;
+  }
+
+  Future<void> saveEconomy() {
+    // Snapshot and serialize wallet transactions; an older save cannot undo a purchase.
+    final data = jsonEncode({
+      'wallet': wallet,
+      'owned': ownedBalls.map((b) => b.name).toList(),
+      'selected': selectedBall.name,
+      'bestScore': infiniteBestScore,
+      'platforms': ownedPlatforms.map((p) => p.name).toList(),
+      'platform': selectedPlatform.name,
+    });
+    _economyWrites = _economyWrites.then((_) async {
+      try {
+        await storage.setString(_economyKey, data);
+      } catch (_) {
+        available = false;
+      }
+    });
+    return _economyWrites;
+  }
+
+  void _loadEconomy(String? raw) {
+    if (raw == null) return;
+    try {
+      final data = jsonDecode(raw);
+      if (data is! Map<String, dynamic>) return;
+      if (data['wallet'] is int)
+        wallet = (data['wallet'] as int).clamp(0, 1 << 30);
+      if (data['bestScore'] is int)
+        infiniteBestScore = (data['bestScore'] as int).clamp(0, 1 << 30);
+      final platforms = data['platforms'];
+      if (platforms is List)
+        ownedPlatforms.addAll(
+          PlatformStyle.values.where((p) => platforms.contains(p.name)),
+        );
+      selectedPlatform =
+          ownedPlatforms.where((p) => p.name == data['platform']).firstOrNull ??
+          PlatformStyle.classic;
+      final owned = data['owned'];
+      if (owned is List)
+        ownedBalls.addAll(
+          BallCosmetic.values.where((b) => owned.contains(b.name)),
+        );
+      selectedBall =
+          ownedBalls.where((b) => b.name == data['selected']).firstOrNull ??
+          BallCosmetic.steel;
+    } catch (_) {
+      /* Invalid economy data does not prevent launching the game. */
+    }
+  }
+
   int mergeBest = 0, mergeHighest = 2, mergeRuns = 0;
   bool sound = true, haptics = true;
   bool available = true;
@@ -64,6 +171,7 @@ class PlayerProfile {
   }
 
   bool recordResult(BalanceGame game) {
+    bankCoins(game);
     if (game.mazeEndless) {
       if (!game.finished || _recordedRuns[game] == game.runSerial) return false;
       _recordedRuns[game] = game.runSerial;
@@ -99,8 +207,9 @@ class PlayerProfile {
     _recordedRuns[game] = game.runSerial;
     if (game.infinite) {
       infiniteRuns++;
-      final improved = game.score > infiniteBest;
-      if (improved) infiniteBest = game.score;
+      final improved = game.score > infiniteBestScore;
+      if (improved) infiniteBestScore = game.score;
+      if (game.metres > infiniteBest) infiniteBest = game.metres;
       return improved;
     }
     final records = game.daily ? dailyRecords : levelRecords;
@@ -174,9 +283,12 @@ class PlayerProfile {
       final times = data['times'];
       if (times is! Map<String, dynamic>) return;
       for (final entry in times.entries) {
-        if (!RegExp(
-          r'^(oneFinger|twoFinger|analog):([1-9]|10)$',
-        ).hasMatch(entry.key))
+        final match = RegExp(
+          r'^(oneFinger|twoFinger|analog):([1-9][0-9]*)$',
+        ).firstMatch(entry.key);
+        if (match == null ||
+            (int.tryParse(match.group(2)!) ?? (LaserMazeRoute.count + 1)) >
+                LaserMazeRoute.count)
           continue;
         final value = entry.value;
         if (value is num && value.isFinite && value > 0)
@@ -193,6 +305,14 @@ class PlayerProfile {
       controlMode = await storage.getBool('gilt.oneFinger') == true
           ? ControlMode.oneFinger
           : ControlMode.twoFinger;
+      final analog = await storage.getDouble('gilt.analogSensitivity');
+      final direct = await storage.getDouble('gilt.twoFingerSensitivity');
+      analogSensitivity = analog != null && analog.isFinite
+          ? analog.clamp(0.0, 1.0)
+          : 1;
+      twoFingerSensitivity = direct != null && direct.isFinite
+          ? direct.clamp(0.0, 1.0)
+          : 1;
       final savedMode = await storage.getString('gilt.controlMode');
       controlMode =
           ControlMode.values.where((m) => m.name == savedMode).firstOrNull ??
@@ -212,12 +332,14 @@ class PlayerProfile {
       haptics = await storage.getBool('gilt.haptics') ?? true;
       _loadRecords(await storage.getString('gilt.mastery.v1'));
       _loadMaze(await storage.getString('gilt.maze.v1'));
+      _loadEconomy(await storage.getString(_economyKey));
     } catch (_) {
       available = false;
     }
   }
 
   Future<void> save() async {
+    await saveEconomy();
     try {
       await storage.setString(
         'gilt.maze.v1',
@@ -243,6 +365,11 @@ class PlayerProfile {
         controlMode == ControlMode.oneFinger,
       );
       await storage.setString('gilt.controlMode', controlMode.name);
+      await storage.setDouble('gilt.analogSensitivity', analogSensitivity);
+      await storage.setDouble(
+        'gilt.twoFingerSensitivity',
+        twoFingerSensitivity,
+      );
       await storage.setInt('gilt.classicLevel', classicLevel);
       await storage.setString(
         'gilt.mastery.v1',

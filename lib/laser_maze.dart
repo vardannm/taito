@@ -1,5 +1,9 @@
 import 'dart:math' as math;
 
+part 'maze_routes.dart';
+part 'maze_editor_model.dart';
+part 'custom_maze_levels.dart';
+
 class MazePoint {
   const MazePoint(this.x, this.y);
   final double x, y;
@@ -35,10 +39,13 @@ class LaserMazeCorridor {
   final rects = <MazeRect>[];
   final centers = <MazePoint>[];
   final walls = <MazeWall>[];
+  final legs = <MazeLeg>[];
+  final branches = <MazeBranch>[];
   final _lengths = <double>[0];
   bool openStart = false, openFinish = false;
 
   double get pathLength => _lengths.last;
+
   /// Arc length already covered by the launch area, and the arc length that
   /// counts as a finished route.
   double get startArc => 0;
@@ -52,8 +59,14 @@ class LaserMazeCorridor {
     double halfWidth, {
     bool capA = true,
     bool capB = true,
+    bool primary = true,
+    double? arcStart,
+    double? arcEnd,
+    int chunk = -1,
   }) {
-    if (centers.isEmpty) centers.add(a);
+    if (a.x == b.x && a.y == b.y) return;
+    assert(a.x == b.x || a.y == b.y);
+    if (primary && centers.isEmpty) centers.add(a);
     final horizontal = a.y == b.y;
     final ascending = horizontal ? a.x < b.x : a.y < b.y;
     final lowCap = (ascending ? capA : capB) ? halfWidth : 0.0;
@@ -73,12 +86,107 @@ class LaserMazeCorridor {
               math.max(a.y, b.y) + highCap,
             ),
     );
-    centers.add(b);
-    _lengths.add(
-      _lengths.last +
-          math.sqrt(math.pow(b.x - a.x, 2) + math.pow(b.y - a.y, 2)),
+    final length = (b.x - a.x).abs() + (b.y - a.y).abs();
+    legs.add(
+      MazeLeg(
+        a,
+        b,
+        halfWidth,
+        rects.last,
+        primary: primary,
+        openA: !capA,
+        openB: !capB,
+        arcStart: arcStart ?? _lengths.last,
+        arcEnd: arcEnd ?? _lengths.last + length,
+        chunk: chunk,
+      ),
     );
+    if (primary) {
+      centers.add(b);
+      _lengths.add(_lengths.last + length);
+    }
   }
+
+  void addBranch(
+    List<MazePoint> points,
+    double halfWidth,
+    double fromArc,
+    double toArc, {
+    int chunk = -1,
+  }) {
+    final branch = MazeBranch(points, halfWidth, fromArc, toArc, chunk);
+    branches.add(branch);
+    var covered = 0.0;
+    for (var i = 1; i < points.length; i++) {
+      final length = pointDistance(points[i - 1], points[i]);
+      addLeg(
+        points[i - 1],
+        points[i],
+        halfWidth,
+        primary: false,
+        arcStart: fromArc + (toArc - fromArc) * covered / branch.length,
+        arcEnd:
+            fromArc + (toArc - fromArc) * (covered + length) / branch.length,
+        chunk: chunk,
+      );
+      covered += length;
+    }
+  }
+
+  static double pointDistance(MazePoint a, MazePoint b) =>
+      math.sqrt(math.pow(a.x - b.x, 2) + math.pow(a.y - b.y, 2));
+
+  static double boxDistance(
+    double al,
+    double at,
+    double ar,
+    double ab,
+    double bl,
+    double bt,
+    double br,
+    double bb,
+  ) {
+    final dx = math.max(0.0, math.max(al - br, bl - ar));
+    final dy = math.max(0.0, math.max(at - bb, bt - ab));
+    return math.sqrt(dx * dx + dy * dy);
+  }
+
+  double roadDistanceAlong(MazePoint a, MazePoint b) => rects.fold(
+    double.infinity,
+    (distance, r) => math.min(
+      distance,
+      boxDistance(
+        math.min(a.x, b.x),
+        math.min(a.y, b.y),
+        math.max(a.x, b.x),
+        math.max(a.y, b.y),
+        r.left,
+        r.top,
+        r.right,
+        r.bottom,
+      ),
+    ),
+  );
+
+  double centerlineDistanceAlong(MazePoint a, MazePoint b) => legs.fold(
+    double.infinity,
+    (distance, leg) => math.min(
+      distance,
+      boxDistance(
+        math.min(a.x, b.x),
+        math.min(a.y, b.y),
+        math.max(a.x, b.x),
+        math.max(a.y, b.y),
+        math.min(leg.a.x, leg.b.x),
+        math.min(leg.a.y, leg.b.y),
+        math.max(leg.a.x, leg.b.x),
+        math.max(leg.a.y, leg.b.y),
+      ),
+    ),
+  );
+
+  bool circleOverlapsRoad(double x, double y, double radius) =>
+      roadDistanceAlong(MazePoint(x, y), MazePoint(x, y)) < radius;
 
   /// Recomputes the union outline: every leg edge minus the parts that fall
   /// inside another leg. Exact for axis-aligned legs, and cheap at these sizes.
@@ -86,11 +194,17 @@ class LaserMazeCorridor {
     walls.clear();
     for (var i = 0; i < rects.length; i++) {
       final r = rects[i];
-      final openBottom = openStart && i == 0;
-      final openTop = openFinish && i == rects.length - 1;
+      final leg = legs[i];
       for (var edge = 0; edge < 4; edge++) {
         final vertical = edge < 2;
-        if (!vertical && (edge == 2 ? openTop : openBottom)) continue;
+        bool atEnd(MazePoint p) => switch (edge) {
+          0 => p.x == r.left && leg.a.y == leg.b.y,
+          1 => p.x == r.right && leg.a.y == leg.b.y,
+          2 => p.y == r.top && leg.a.x == leg.b.x,
+          _ => p.y == r.bottom && leg.a.x == leg.b.x,
+        };
+        if ((leg.openA && atEnd(leg.a)) || (leg.openB && atEnd(leg.b)))
+          continue;
         final fixed = switch (edge) {
           0 => r.left,
           1 => r.right,
@@ -111,11 +225,41 @@ class LaserMazeCorridor {
         covered.sort((a, b) => a.first.compareTo(b.first));
         var cursor = from;
         for (final span in covered) {
-          if (span.first > cursor) _addWall(vertical, fixed, cursor, span.first);
+          if (span.first > cursor)
+            _addWall(vertical, fixed, cursor, span.first);
           cursor = math.max(cursor, span.last);
         }
         if (cursor < to) _addWall(vertical, fixed, cursor, to);
       }
+    }
+    final groups = <(bool, double), List<MazeWall>>{};
+    for (final wall in walls) {
+      groups
+          .putIfAbsent((
+            wall.vertical,
+            wall.vertical ? wall.a.x : wall.a.y,
+          ), () => [])
+          .add(wall);
+    }
+    walls.clear();
+    for (final entry in groups.entries) {
+      final vertical = entry.key.$1, fixed = entry.key.$2;
+      final spans =
+          entry.value
+              .map((w) => vertical ? (w.a.y, w.b.y) : (w.a.x, w.b.x))
+              .toList()
+            ..sort((a, b) => a.$1.compareTo(b.$1));
+      var from = spans.first.$1, to = spans.first.$2;
+      for (final span in spans.skip(1)) {
+        if (span.$1 <= to + .001) {
+          to = math.max(to, span.$2);
+        } else {
+          _addWall(vertical, fixed, from, to);
+          from = span.$1;
+          to = span.$2;
+        }
+      }
+      _addWall(vertical, fixed, from, to);
     }
   }
 
@@ -130,31 +274,39 @@ class LaserMazeCorridor {
 
   bool contains(double x, double y) => rects.any((rect) => rect.contains(x, y));
 
-  /// Drops the first [count] legs, keeping the centerline and its arc lengths
-  /// aligned with the remaining road.
-  void dropLeadingLegs(int count) {
-    if (count <= 0) return;
-    rects.removeRange(0, count);
-    centers.removeRange(0, count);
-    _lengths.removeRange(0, count);
+  /// Prune complete modules, retaining their branch geometry as a unit.
+  void dropChunks(Set<int> ids) {
+    final primaryCount = legs
+        .where((l) => l.primary && ids.contains(l.chunk))
+        .length;
+    legs.removeWhere((l) => ids.contains(l.chunk));
+    rects
+      ..clear()
+      ..addAll(legs.map((l) => l.rect));
+    branches.removeWhere((b) => ids.contains(b.chunk));
+    if (primaryCount > 0) {
+      centers.removeRange(0, primaryCount);
+      _lengths.removeRange(0, primaryCount);
+    }
   }
 
-  /// Distance travelled along the centerline, as a fraction of the full route.
+  /// Branches interpolate between their junctions on the main route. A short
+  /// route and its long detour therefore agree when they reconnect.
   double progressAt(double x, double y) {
     if (finishArc <= startArc) return 0;
     var best = double.infinity, arc = 0.0;
-    for (var i = 1; i < centers.length; i++) {
-      final a = centers[i - 1], b = centers[i];
-      final dx = b.x - a.x, dy = b.y - a.y;
+    for (final leg in legs) {
+      final dx = leg.b.x - leg.a.x, dy = leg.b.y - leg.a.y;
       final length2 = dx * dx + dy * dy;
-      final t = length2 == 0
-          ? 0.0
-          : (((x - a.x) * dx + (y - a.y) * dy) / length2).clamp(0.0, 1.0);
-      final px = a.x + dx * t - x, py = a.y + dy * t - y;
+      final t = (((x - leg.a.x) * dx + (y - leg.a.y) * dy) / length2).clamp(
+        0.0,
+        1.0,
+      );
+      final px = leg.a.x + dx * t - x, py = leg.a.y + dy * t - y;
       final distance = px * px + py * py;
       if (distance < best) {
         best = distance;
-        arc = _lengths[i - 1] + math.sqrt(length2) * t;
+        arc = leg.arcStart + (leg.arcEnd - leg.arcStart) * t;
       }
     }
     return ((arc - startArc) / (finishArc - startArc)).clamp(0.0, 1.0);
@@ -240,138 +392,10 @@ class LaserMazeCorridor {
   }
 }
 
-/// One of the ten hand-built routes. Every route climbs, crosses sideways and
-/// climbs again: the turns are real right angles, not a leaning column.
-class LaserMazeRoute extends LaserMazeCorridor {
-  LaserMazeRoute(int number) : number = number.clamp(1, count) {
-    final index = this.number - 1;
-    halfWidth = widths[index];
-    final lanes = patterns[index];
-    final step = (entryY - lastTurnY) / lanes.length;
-    openStart = openFinish = true;
-    var previous = const MazePoint(180, bottomY);
-    addLeg(previous, const MazePoint(180, entryY), halfWidth, capA: false);
-    previous = const MazePoint(180, entryY);
-    for (var i = 0; i < lanes.length; i++) {
-      final turnY = entryY - (i + 1) * step;
-      final corner = MazePoint(previous.x, turnY);
-      addLeg(previous, corner, halfWidth);
-      final lane = MazePoint(180 + lanes[i] * (150 - halfWidth), turnY);
-      addLeg(corner, lane, halfWidth);
-      previous = lane;
-    }
-    addLeg(previous, MazePoint(previous.x, topY), halfWidth, capB: false);
-    rebuildWalls();
-  }
-  static const count = 10;
-  static const bottomY = 548.0, entryY = 476.0, lastTurnY = 104.0;
-  static const topY = 24.0;
-  static const names = [
-    'First light',
-    'Soft turns',
-    'Red river',
-    'Double bend',
-    'Switchback',
-    'Lightning lane',
-    'Narrow passage',
-    'The zigzag',
-    'Needle road',
-    'Final circuit',
-  ];
-  static const widths = <double>[40, 38, 37, 35, 34, 32, 31, 29, 28, 26];
-  // Lane targets per turn, as a fraction of the free half-width. Signs
-  // alternate, so each route is a stack of climb / cross / climb switchbacks.
-  static const patterns = <List<double>>[
-    [.5, -.5],
-    [-.5, .5, 0],
-    [.6, -.5, .55],
-    [-.6, .45, -.55, .6],
-    [.7, -.35, .7, -.6],
-    [-.7, .3, -.6, .55, -.45],
-    [.8, -.25, .7, -.45, .8],
-    [-.8, .2, -.7, .35, -.8, .45],
-    [.85, -.15, .8, -.3, .85, -.5],
-    [-.9, .25, -.85, .3, -.9, .35],
-  ];
-  final int number;
-  late final double halfWidth;
-  String get name => names[number - 1];
-  double get finishX => centers.last.x;
-  int get turns => patterns[number - 1].length;
-  // A run ends at the finish line, a little below the top of the last leg.
-  @override
-  double get finishArc => pathLength - (LaserMazeCorridor.finishY - topY);
-  @override
-  double get startArc => bottomY - LaserMazeCorridor.startY;
-}
-
-/// The endless corridor: the same right-angled legs, generated forever and
-/// tightening as the climb goes on.
-class EndlessMaze extends LaserMazeCorridor {
-  EndlessMaze({int? seed}) : _random = math.Random(seed) {
-    openStart = true;
-    addLeg(
-      const MazePoint(180, 548),
-      const MazePoint(180, firstTurnY),
-      halfWidthAt(0),
-      capA: false,
-    );
-    extendTo(0);
-  }
-  static const firstTurnY = 440.0, ramp = 2400.0;
-  final math.Random _random;
-  double _lane = 180, _topY = firstTurnY;
-  int _direction = 1, prunedLegs = 0;
-  double get lane => _lane;
-  double get topY => _topY;
-  double get climbed => 548 - _topY;
-
-  static double halfWidthAt(double climbed) =>
-      40 - 14 * (climbed / ramp).clamp(0.0, 1.0);
-  static double legHeightAt(double climbed) =>
-      120 - 45 * (climbed / ramp).clamp(0.0, 1.0);
-
-  /// Grows the corridor until it covers [aheadY] and drops the legs left below
-  /// [behindY], so a long climb keeps a constant amount of live geometry.
-  void extendTo(double aheadY, {double? behindY}) {
-    var changed = false;
-    while (_topY > aheadY) {
-      final halfWidth = halfWidthAt(climbed);
-      final legHeight =
-          legHeightAt(climbed) * (.85 + _random.nextDouble() * .3);
-      final turnY = _topY - legHeight;
-      addLeg(MazePoint(_lane, _topY), MazePoint(_lane, turnY), halfWidth);
-      // Switch sides most of the time: switchbacks, not a slow drift.
-      if (_random.nextDouble() < .78) _direction = -_direction;
-      final low = 30 + halfWidth, high = 330 - halfWidth;
-      final travel = 70 + _random.nextDouble() * (110 - halfWidth);
-      var next = (_lane + _direction * travel).clamp(low, high);
-      if ((next - _lane).abs() < 60) {
-        _direction = -_direction;
-        next = (_lane + _direction * travel).clamp(low, high);
-      }
-      addLeg(MazePoint(_lane, turnY), MazePoint(next, turnY), halfWidth);
-      _lane = next;
-      _topY = turnY;
-      changed = true;
-    }
-    if (behindY != null) {
-      final stale = rects.indexWhere((rect) => rect.top <= behindY);
-      if (stale > 0) {
-        prunedLegs += stale;
-        dropLeadingLegs(stale);
-        changed = true;
-      }
-    }
-    if (changed) rebuildWalls();
-  }
-
-  @override
-  double progressAt(double x, double y) => 0;
-}
-
 class LaserMazeRun {
   LaserMazeRun(int level) : corridor = LaserMazeRoute(level);
+  LaserMazeRun.custom(CustomMazeDefinition definition)
+    : corridor = LaserMazeRoute.custom(definition);
   LaserMazeRun.endless({int? seed}) : corridor = EndlessMaze(seed: seed);
   final LaserMazeCorridor corridor;
   bool get endless => corridor is EndlessMaze;
@@ -387,21 +411,23 @@ class LaserMazeRun {
   void ensure(double ballY) {
     final maze = corridor;
     if (maze is EndlessMaze) {
-      maze.extendTo(ballY - 620, behindY: ballY + 360);
+      maze.extendTo(ballY - 620, behindY: ballY + 800);
     }
   }
 
   void step(double ax, double ay, double bx, double by, double radius) {
     if (ended) return;
     final hit = corridor.firstContact(ax, ay, bx, by, radius);
-    const finishY = LaserMazeCorridor.finishY;
+    final finishY = route?.finishLineY ?? LaserMazeCorridor.finishY;
     var finish = !endless && by < ay && ay >= finishY && by <= finishY
         ? (ay - finishY) / (ay - by)
         : null;
     // Only the last leg reaches the finish line: crossing it elsewhere is a
     // wall, not a win.
     if (finish != null &&
-        !corridor.contains(ax + (bx - ax) * finish, finishY)) {
+        (!corridor.contains(ax + (bx - ax) * finish, finishY) ||
+            (ax + (bx - ax) * finish - route!.finishX).abs() >
+                route!.halfWidth)) {
       finish = null;
     }
     var until = 1.0;
