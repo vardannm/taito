@@ -1,3 +1,7 @@
+import 'playtest_recorder.dart';
+export 'pivot_board.dart';
+import 'pivot_board.dart';
+import 'club.dart';
 import 'control_options.dart';
 import 'infinite_painter.dart';
 import 'ball_cosmetics.dart';
@@ -74,6 +78,7 @@ class _GameScreenState extends State<GameScreen>
   final game = BalanceGame();
   final frame = ValueNotifier<int>(0);
   final feedback = GameFeedback();
+  final playtest = PlaytestRecorder();
   final touch = [0.0, 0.0];
   final keyboard = [0.0, 0.0];
   late final Ticker ticker;
@@ -116,6 +121,11 @@ class _GameScreenState extends State<GameScreen>
     }
     profile.bankCoins(game);
     if (game.event != null) {
+      playtest.record(game.event!.name, {
+        "mode": game.mode.name,
+        "target": game.completed,
+        "misses": game.misses,
+      });
       unawaited(feedback.play(game.event!, profile));
       if (game.event != GameEvent.coin && game.event != GameEvent.merge) {
         touch.fillRange(0, 2, 0);
@@ -125,6 +135,12 @@ class _GameScreenState extends State<GameScreen>
     }
     if (game.finished && !recorded) {
       recorded = true;
+      playtest.record("run_finished", {
+        "mode": game.mode.name,
+        "won": game.won,
+        "score": game.score,
+        "activeSeconds": game.elapsed,
+      });
       if (!game.practice) {
         final locked = CabinetStyle.values
             .where((c) => !profile.isUnlocked(c))
@@ -186,6 +202,21 @@ class _GameScreenState extends State<GameScreen>
   }
 
   void start(GameMode mode, {DateTime? challengeDate}) => setState(() {
+    playtest.record("run_started", {
+      "mode": mode.name,
+      "control": profile.controlMode.name,
+      "level": mode == GameMode.laserMaze
+          ? profile.mazeLevel
+          : profile.classicLevel,
+      "retry":
+          game.finished &&
+          game.mode == mode &&
+          (mode != GameMode.classic || profile.classicLevel == game.level) &&
+          (mode != GameMode.laserMaze || profile.mazeLevel == game.level) &&
+          (mode != GameMode.daily ||
+              DailyChallenge.key(challengeDate ?? DateTime.now()) ==
+                  game.dailyKey),
+    });
     clearControls();
     recorded = newBest = false;
     game.setControlMode(profile.controlMode);
@@ -432,6 +463,21 @@ class _GameScreenState extends State<GameScreen>
   Widget build(BuildContext context) {
     if (tutorialOpen) {
       return FirstPlayTutorial(
+        control: profile.controlMode,
+        onLessonComplete: (step) => playtest.record("tutorial_step", {
+          "step": step,
+          "control": profile.controlMode.name,
+        }),
+        onExit: (completed) => playtest.record(
+          completed ? "tutorial_completed" : "tutorial_skipped",
+        ),
+        analogSensitivity: profile.analogSensitivity,
+        twoFingerSensitivity: profile.twoFingerSensitivity,
+        onControlChanged: (mode) {
+          playtest.record("tutorial_control_changed", {"control": mode.name});
+          profile.controlMode = mode;
+          unawaited(profile.save());
+        },
         onDone: () {
           unawaited(profile.completeTutorial());
           setState(() => tutorialOpen = false);
@@ -540,50 +586,56 @@ class _GameScreenState extends State<GameScreen>
                             ),
                           ],
                           const SizedBox(height: 14),
-                          Expanded(
-                            child: Center(
-                              child: AspectRatio(
-                                aspectRatio: 360 / 560,
-                                child: Stack(
-                                  fit: StackFit.expand,
-                                  children: [
-                                    DecoratedBox(
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(22),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: ink.withAlpha(30),
-                                            blurRadius: 18,
-                                            offset: const Offset(0, 9),
+                          if (viewport.maxHeight >= 700)
+                            Expanded(
+                              child: Center(
+                                child: AspectRatio(
+                                  aspectRatio: 360 / 560,
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(
+                                            22,
                                           ),
-                                        ],
-                                      ),
-                                      child: RepaintBoundary(
-                                        child: CustomPaint(
-                                          painter: BoardPainter(
-                                            game,
-                                            repaint: frame,
-                                            reducedMotion: MediaQuery.of(
-                                              context,
-                                            ).disableAnimations,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: ink.withAlpha(30),
+                                              blurRadius: 18,
+                                              offset: const Offset(0, 9),
+                                            ),
+                                          ],
+                                        ),
+                                        child: RepaintBoundary(
+                                          child: CustomPaint(
+                                            painter: BoardPainter(
+                                              game,
+                                              repaint: frame,
+                                              reducedMotion: MediaQuery.of(
+                                                context,
+                                              ).disableAnimations,
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    ),
-                                    if (game.paused || game.finished)
-                                      boardOverlay(),
-                                  ],
+                                      if (game.paused || game.finished)
+                                        boardOverlay(),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
+                          if (viewport.maxHeight < 700) const Spacer(),
                           const SizedBox(height: 12),
                           ...[
-                            Text(
-                              'Guide the steel ball. Chase the glow.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: ink.withAlpha(170),
+                            TextButton.icon(
+                              onPressed: showClub,
+                              icon: const Icon(Icons.flag_outlined, size: 18),
+                              label: Text(
+                                'NEXT: ${NextGoal.forProfile(profile).title}',
+                                maxLines: 2,
+                                textAlign: TextAlign.center,
                               ),
                             ),
                             const SizedBox(height: 14),
@@ -1256,6 +1308,9 @@ class _GameScreenState extends State<GameScreen>
               TextButton(
                 onPressed: () {
                   Navigator.pop(context);
+                  playtest.record("tutorial_started", {
+                    "control": profile.controlMode.name,
+                  });
                   setState(() => tutorialOpen = true);
                 },
                 child: const Text('REPLAY QUICK TUTORIAL'),
@@ -1320,6 +1375,23 @@ class _GameScreenState extends State<GameScreen>
         ticker.start();
       }
     }
+  }
+
+  Future<void> showClub() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ClubScreen(
+          profile: profile,
+          recorder: playtest,
+          onPlay: (mode, level, date) {
+            if (mode == GameMode.classic) profile.classicLevel = level;
+            unawaited(profile.save());
+            start(mode, challengeDate: date);
+          },
+        ),
+      ),
+    );
+    if (mounted) setState(() {});
   }
 
   Future<void> showSettings() => showModalBottomSheet<void>(
@@ -1429,6 +1501,14 @@ class _GameScreenState extends State<GameScreen>
                   label: const Text('Cabinet styles'),
                 ),
                 TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    showClub();
+                  },
+                  icon: const Icon(Icons.emoji_events_outlined),
+                  label: const Text('Goals, friends & backup'),
+                ),
+                TextButton.icon(
                   key: const ValueKey('open-command'),
                   onPressed: () {
                     Navigator.pop(context);
@@ -1443,113 +1523,5 @@ class _GameScreenState extends State<GameScreen>
         ),
       ),
     ),
-  );
-}
-
-/// Pointer ownership stays with the grabbed pivot through crossing and release.
-class PivotBoard extends StatefulWidget {
-  const PivotBoard({super.key, required this.game, required this.frame});
-  final BalanceGame game;
-  final Listenable frame;
-  @override
-  State<PivotBoard> createState() => _PivotBoardState();
-}
-
-class _PivotBoardState extends State<PivotBoard> {
-  final pointers = <int, int>{};
-  final lastY = <int, double>{};
-  int epoch = -1;
-  @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, bounds) {
-      final game = widget.game;
-      if (epoch != game.inputEpoch) {
-        pointers.clear();
-        lastY.clear();
-        epoch = game.inputEpoch;
-      }
-      final viewport = BoardViewport(bounds.biggest);
-      void release(PointerEvent event) {
-        final side = pointers.remove(event.pointer);
-        lastY.remove(event.pointer);
-        if (side != null && side < 2) game.releasePivot(side);
-        if (side == 2) game.releaseControl();
-      }
-
-      return Listener(
-        behavior: HitTestBehavior.opaque,
-        onPointerDown: (event) {
-          if (!game.canControl || game.analog) return;
-          if (!viewport.rect.contains(event.localPosition)) return;
-          if (epoch != game.inputEpoch) {
-            pointers.clear();
-            lastY.clear();
-            epoch = game.inputEpoch;
-          }
-          if (game.oneFinger) {
-            final point =
-                (event.localPosition - viewport.offset) / viewport.scale;
-            if (pointers.isNotEmpty ||
-                (point.dy - game.controlY).abs() > 30 ||
-                (point.dx - (180 + game.controlPosition * 110)).abs() > 32)
-              return;
-            pointers[event.pointer] = 2;
-            lastY[event.pointer] = point.dx - game.controlPosition * 110;
-            game.grabControl();
-            return;
-          }
-          final side = event.localPosition.dx < viewport.rect.center.dx ? 0 : 1;
-          final pivot = viewport.project(
-            Offset(
-              side == 0 ? 20 : 340,
-              game.screenY(side == 0 ? game.left : game.right),
-            ),
-          );
-          final x = pivot.dx, y = pivot.dy;
-          if ((event.localPosition.dx - x).abs() > 44 ||
-              (event.localPosition.dy - y).abs() > 48 ||
-              pointers.containsValue(side))
-            return;
-          pointers[event.pointer] = side;
-          lastY[event.pointer] = event.localPosition.dy;
-          game.grabPivot(side);
-        },
-        onPointerMove: (event) {
-          final side = pointers[event.pointer];
-          if (side == null || !game.canControl || epoch != game.inputEpoch)
-            return;
-          if (side == 2) {
-            final x =
-                (event.localPosition.dx - viewport.offset.dx) / viewport.scale;
-            game.setControlPosition((x - lastY[event.pointer]!) / 110);
-            game.dragControlVertical(event.localDelta.dy / viewport.scale);
-            return;
-          }
-          final delta =
-              (event.localPosition.dy - lastY[event.pointer]!) / viewport.scale;
-          lastY[event.pointer] = event.localPosition.dy;
-          game.dragPivot(side, delta);
-        },
-        onPointerUp: release,
-        onPointerCancel: release,
-        child: Semantics(
-          label: game.analog
-              ? 'Use the bottom left and right vertical joysticks to move the platform ends'
-              : game.oneFinger
-              ? 'Drag the lower handle left or right to tilt, up to lift, down to lower'
-              : 'Drag the left and right ends of the platform up or down',
-          child: RepaintBoundary(
-            child: CustomPaint(
-              painter: BoardPainter(
-                game,
-                repaint: widget.frame,
-                reducedMotion: MediaQuery.of(context).disableAnimations,
-              ),
-              child: const SizedBox.expand(),
-            ),
-          ),
-        ),
-      );
-    },
   );
 }

@@ -1,5 +1,18 @@
 # Validation record
 
+## Interactive onboarding, goals, friend codes and backups — 2026-09-16
+
+- Replaced the illustrated tutorial with three real touch exercises using the shared PivotBoard and AnalogControls: lift/release, tilt, and target capture. Each control mode is selectable. The simulation is isolated from profile rewards. Compact screens scroll outside the active controls; control gestures do not scroll the lesson.
+- Added the arcade club via the home NEXT goal and Settings. Goals select incomplete Classic levels for the chosen control mode, then clean/time objectives and Daily play. Cabinet progress remains based on earned stars.
+- Added bounded local Daily friend-code import/share. Codes pin date, control mode and rules version; they are explicitly friend-reported personal scores. Added versioned manual progress export/restore with size/type/range checks, a replacement preview, and isolated test-economy validation.
+- Added an opt-in, local playtest event recorder, a five-participant session protocol, store-copy draft, Android signing template/configuration, and a read-only release preflight. Human sessions and physical-device tests remain NOT RUN.
+- Removed the temporary unconditional wallet=99999 override after the regression suite exposed five persistence failures. Normal wallets persist again; the existing GILT_UNLIMITED_COINS test flag still permits free test purchases in a separate economy.
+- Full automated suite: **211 tests passed**. Final static analysis: **No issues found**. Touch tests complete all three lessons in all control modes on 320×568; 390×844 gestures also passed earlier. The club is covered at 320×568 with 1.6× text. Ten actual Flutter phone renders were generated, with representative compact/home/tutorial/club renders inspected.
+- Web release build succeeded. Android playtest APK built and package metadata verified as version 0.11.0, build 15; development signing remains active because no upload key is configured. No Android device was attached during the final device inventory. Native iOS build/signing and battery/frame-time measurements require external hardware and remain unverified.
+- Online leaderboards and automatic cloud synchronization are **not implemented or deployed**; backend selection/account setup is pending. Local friend codes and manual backups are functional and described accurately in the UI. See release/ONLINE_SCOPE.md for outstanding service requirements.
+- Logs: artifacts/growth-tests-final.log, growth-analysis-final.log, growth-renders-final.log, growth-android-final.log. Screenshots: artifacts/growth-*.png. No store upload, player recruitment, or fabricated retention data.
+
+
 ## Right-angled Laser Maze routes and endless climb - 2026-09-10
 
 - Replaced the single-valued `centerAt(y)` corridor with `LaserMazeCorridor`: a list of axis-aligned legs whose union is the road, and whose lasers are the exact boundary of that union (each leg edge minus the spans covered by another leg). Sideways legs are ordinary legs in this model, so every route now climbs a column, crosses sideways and climbs again through real right angles. All ten routes were rebuilt from a per-level half-width (40 down to 26) and a lane fraction per crossing (two crossings on route 1, six on routes 8-10). Progress follows the whole centerline by arc length instead of height.

@@ -784,7 +784,7 @@ class BalanceGame {
       }
     }
     if (oneFinger) {
-      // A held handle supplies both axes. Automatic lift resumes on release.
+      // A held handle supplies both axes. Only mazes auto-lift on release.
       final halfTilt = controlPosition * 70;
       // The automatic climb only rises while there is road overhead, so a
       // sideways leg holds its height until the ball reaches the next column.
@@ -803,12 +803,7 @@ class BalanceGame {
                           : mazeRun.route!.finishLineY + ballRadius,
                       (left + right) / 2 - lift,
                     )
-                  : infinite || merging
-                  ? (left + right) / 2
-                  : math.max(
-                      activeHole.y + ballRadius,
-                      (left + right) / 2 - 20 * dt,
-                    ))
+                  : (left + right) / 2)
               .clamp(minimum + halfTilt.abs(), maximum - halfTilt.abs());
       left = center - halfTilt;
       right = center + halfTilt;
@@ -823,7 +818,7 @@ class BalanceGame {
     }
     // A rolling sphere: 5/7 of gravity projected onto the bar, then onto x.
     final slope = (right - left) / 320;
-    velocity += (5 / 7) * 710 * slope / (1 + slope * slope) * dt;
+    velocity += (5 / 7) * 959 * slope / (1 + slope * slope) * dt;
     velocity *= math.exp(-.48 * dt);
     velocity = velocity.clamp(-265.0, 265.0);
     ballX += velocity * dt;

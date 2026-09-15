@@ -161,90 +161,389 @@ void paintInfiniteItems(Canvas c, BalanceGame game, bool reducedMotion) {
   }
 }
 
-void paintInfiniteEnergy(Canvas c, BalanceGame game, bool reducedMotion) {
+void paintInfiniteEnergy(
+  Canvas c,
+  BalanceGame game,
+  bool reducedMotion,
+) {
   if (!game.infinite || game.survival.combo < 5) return;
-  final a = Offset(20, game.screenY(game.left)),
-      b = Offset(340, game.screenY(game.right));
-  final span = (b - a).distance;
+
+  final a = Offset(20, game.screenY(game.left));
+  final b = Offset(340, game.screenY(game.right));
+
+  final combo = game.survival.combo;
+
+  // 0 at x5, reaches maximum intensity around x20.
+  final intensity = ((combo - 5) / 15.0).clamp(0.0, 1.0);
+
+  final direction = b - a;
+  final span = direction.distance;
+
+  if (span <= 0) return;
+
+  final angle = math.atan2(direction.dy, direction.dx);
+
+  final time = game.clock;
+
+  // The whole effect becomes faster / more unstable as combo rises.
+  final pulse =
+      reducedMotion
+          ? 1.0
+          : 0.82 +
+              math.sin(time * (5.0 + intensity * 5.0)) *
+                  (0.10 + intensity * 0.08);
+
+  // Changes from warm gold -> orange/red -> almost white-hot.
+  final energyColor = Color.lerp(
+    const Color(0xFFFFC247),
+    const Color(0xFFFF365D),
+    intensity,
+  )!;
+
+  final secondaryColor = Color.lerp(
+    const Color(0xFFFF8A32),
+    const Color(0xFFD43CFF),
+    intensity,
+  )!;
+
   c.save();
+
   c.translate(a.dx, a.dy);
-  c.rotate(math.atan2(b.dy - a.dy, b.dx - a.dx));
-  c.drawRect(
-    Rect.fromLTWH(0, -13, span, 15),
+  c.rotate(angle);
+
+  // ============================================================
+  // 1. HUGE ENERGY AURA
+  // ============================================================
+
+  c.drawLine(
+    const Offset(0, 0),
+    Offset(span, 0),
     Paint()
-      ..shader = const LinearGradient(
+      ..color = energyColor.withValues(
+        alpha: (0.10 + intensity * 0.10) * pulse,
+      )
+      ..strokeWidth = 30 + intensity * 12
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = MaskFilter.blur(
+        BlurStyle.normal,
+        16 + intensity * 10,
+      ),
+  );
+
+  // ============================================================
+  // 2. LOWER HOT GLOW
+  // Gives the platform a heated / charged feeling.
+  // ============================================================
+
+  c.drawRect(
+    Rect.fromLTWH(
+      0,
+      -4,
+      span,
+      12 + intensity * 5,
+    ),
+    Paint()
+      ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [Color(0x00FF773F), Color(0xBBFFB550)],
-      ).createShader(Rect.fromLTWH(0, -13, span, 15)),
+        colors: [
+          energyColor.withValues(alpha: 0.65),
+          secondaryColor.withValues(alpha: 0.25),
+          secondaryColor.withValues(alpha: 0.0),
+        ],
+      ).createShader(
+        Rect.fromLTWH(
+          0,
+          -4,
+          span,
+          20,
+        ),
+      )
+      ..maskFilter = const MaskFilter.blur(
+        BlurStyle.normal,
+        7,
+      ),
   );
+
+  // ============================================================
+  // 3. ELECTRIC ENERGY ARCS
+  // ============================================================
+
   if (!reducedMotion) {
-    // Broad, curling outer flames with independent warm cores and rising embers.
-    // All particles are derived from time; nothing accumulates between frames.
-    for (var i = 0; i < 20; i++) {
-      final phase = game.clock * 5.2 + i * 2.37;
-      final x = 8 + i * (span - 16) / 19;
-      final h = 13 + 8 * math.sin(phase) + 6 * math.sin(phase * .71 + i);
-      final curl = 5 * math.sin(phase * .8);
-      for (var layer = 0; layer < 2; layer++) {
-        final height = layer == 0 ? h : h * .6, width = layer == 0 ? 9.0 : 4.5;
-        final flame = Path()
-          ..moveTo(x - width, 1)
-          ..cubicTo(
-            x - width - 3,
-            -height * .38,
-            x + curl - width,
-            -height * .8,
-            x + curl,
-            -height - 5,
-          )
-          ..cubicTo(
-            x + curl + 2,
-            -height * .55,
-            x + width + 3,
-            -height * .35,
-            x + width,
-            1,
-          )
-          ..close();
-        c.drawPath(
-          flame,
-          Paint()
-            ..shader =
-                LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: layer == 0
-                      ? [const Color(0xAAED593A), const Color(0xEEFFA538)]
-                      : [const Color(0xCCFFE8A8), const Color(0xFFFFF5CC)],
-                ).createShader(
-                  Rect.fromLTWH(x - width, -height - 5, width * 2, height + 6),
-                ),
-        );
+    final arcCount = 3 + (intensity * 5).round();
+
+    for (var arc = 0; arc < arcCount; arc++) {
+      final path = Path();
+
+      final segments = 12;
+
+      for (var i = 0; i <= segments; i++) {
+        final progress = i / segments;
+        final x = progress * span;
+
+        // Arcs become larger and more unstable with combo.
+        final wave =
+            math.sin(
+              progress * math.pi * (3 + arc % 3) +
+                  time * (5.5 + intensity * 4) +
+                  arc * 2.1,
+            );
+
+        final noise =
+            math.sin(
+              i * 8.73 +
+                  time * (9 + arc * 0.8) +
+                  arc * 13.7,
+            );
+
+        final envelope = math.sin(progress * math.pi);
+
+        final height =
+            envelope *
+            (
+              wave * (4 + intensity * 8) +
+              noise * (2 + intensity * 5)
+            );
+
+        final y = -6 - arc * 1.5 - height;
+
+        if (i == 0) {
+          path.moveTo(x, 0);
+        } else {
+          path.lineTo(x, y);
+        }
       }
-      if (i.isEven) {
-        final life = (game.clock * .8 + i * .173) % 1;
-        c.drawCircle(
-          Offset(x + math.sin(i + life * 3) * 7, -7 - life * 37),
-          1.3 * (1 - life),
-          Paint()
-            ..color = const Color(
-              0xFFFFE5A2,
-            ).withValues(alpha: (1 - life) * .9),
-        );
-      }
+
+      path.lineTo(span, 0);
+
+      // Arc glow.
+      c.drawPath(
+        path,
+        Paint()
+          ..color = secondaryColor.withValues(
+            alpha: 0.17 + intensity * 0.15,
+          )
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 5
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..maskFilter = const MaskFilter.blur(
+            BlurStyle.normal,
+            7,
+          ),
+      );
+
+      // Sharp electrical center.
+      c.drawPath(
+        path,
+        Paint()
+          ..color = Color.lerp(
+            energyColor,
+            Colors.white,
+            0.55,
+          )!.withValues(
+            alpha: 0.45 + intensity * 0.4,
+          )
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.0 + intensity
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round,
+      );
     }
   }
+
+  // ============================================================
+  // 4. TRAVELLING ENERGY SURGES
+  // Bright pulses race along the platform.
+  // ============================================================
+
+  if (!reducedMotion) {
+    final surgeCount = 2 + (intensity * 2).round();
+
+    for (var i = 0; i < surgeCount; i++) {
+      final progress =
+          (
+            time * (0.65 + intensity * 0.9) +
+            i / surgeCount
+          ) %
+          1.0;
+
+      final x = progress * span;
+
+      final radius = 7 + intensity * 7;
+
+      c.drawCircle(
+        Offset(x, 0),
+        radius * 2.2,
+        Paint()
+          ..color = energyColor.withValues(
+            alpha: 0.18,
+          )
+          ..maskFilter = const MaskFilter.blur(
+            BlurStyle.normal,
+            14,
+          ),
+      );
+
+      c.drawCircle(
+        Offset(x, 0),
+        radius,
+        Paint()
+          ..shader = RadialGradient(
+            colors: [
+              Colors.white.withValues(alpha: 0.95),
+              energyColor.withValues(alpha: 0.7),
+              energyColor.withValues(alpha: 0),
+            ],
+          ).createShader(
+            Rect.fromCircle(
+              center: Offset(x, 0),
+              radius: radius,
+            ),
+          ),
+      );
+    }
+  }
+
+  // ============================================================
+  // 5. RISING SPARKS / ENERGY DEBRIS
+  // ============================================================
+
+  if (!reducedMotion) {
+    final particleCount = 10 + (intensity * 16).round();
+
+    for (var i = 0; i < particleCount; i++) {
+      final life =
+          (
+            time * (0.65 + intensity * 0.8) +
+            i * 0.117
+          ) %
+          1.0;
+
+      final baseX =
+          ((i * 71.0) % math.max(span - 10, 1)) + 5;
+
+      final sideways =
+          math.sin(
+            i * 2.71 +
+                time * (4 + intensity * 4),
+          ) *
+          (3 + intensity * 6);
+
+      final y =
+          -5 -
+          life * (20 + intensity * 34);
+
+      final x = baseX + sideways * life;
+
+      final alpha =
+          (1 - life) *
+          (0.35 + intensity * 0.55);
+
+      final radius =
+          (1.1 + intensity * 1.3) *
+          (1 - life * 0.55);
+
+      c.drawCircle(
+        Offset(x, y),
+        radius * 3,
+        Paint()
+          ..color = secondaryColor.withValues(
+            alpha: alpha * 0.25,
+          )
+          ..maskFilter = const MaskFilter.blur(
+            BlurStyle.normal,
+            5,
+          ),
+      );
+
+      c.drawCircle(
+        Offset(x, y),
+        radius,
+        Paint()
+          ..color = Color.lerp(
+            energyColor,
+            Colors.white,
+            0.65,
+          )!.withValues(
+            alpha: alpha,
+          ),
+      );
+    }
+  }
+
+  // ============================================================
+  // 6. WHITE-HOT PLATFORM CORE
+  // ============================================================
+
   c.drawLine(
-    const Offset(0, -2),
-    Offset(span, -2),
+    const Offset(0, 0),
+    Offset(span, 0),
     Paint()
-      ..color = const Color(0xFFFFE8A2)
-      ..strokeWidth = 2.5,
+      ..color = energyColor.withValues(
+        alpha: 0.8 * pulse,
+      )
+      ..strokeWidth = 7 + intensity * 2
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(
+        BlurStyle.normal,
+        5,
+      ),
   );
+
+  c.drawLine(
+    const Offset(0, 0),
+    Offset(span, 0),
+    Paint()
+      ..color = Color.lerp(
+        const Color(0xFFFFF0B5),
+        Colors.white,
+        intensity,
+      )!
+      ..strokeWidth = 2.2 + intensity
+      ..strokeCap = StrokeCap.round,
+  );
+
+  // ============================================================
+  // 7. ENDPOINT ENERGY BURSTS
+  // ============================================================
+
+  if (!reducedMotion) {
+    for (final x in [0.0, span]) {
+      final endpointPulse =
+          0.7 +
+          math.sin(
+                time * (7 + intensity * 5) +
+                x,
+              ) *
+              0.3;
+
+      c.drawCircle(
+        Offset(x, 0),
+        (10 + intensity * 7) * endpointPulse,
+        Paint()
+          ..color = secondaryColor.withValues(
+            alpha: 0.22 + intensity * 0.15,
+          )
+          ..maskFilter = const MaskFilter.blur(
+            BlurStyle.normal,
+            10,
+          ),
+      );
+
+      c.drawCircle(
+        Offset(x, 0),
+        2.2 + intensity * 1.5,
+        Paint()
+          ..color = Colors.white.withValues(
+            alpha: 0.9,
+          ),
+      );
+    }
+  }
+
   c.restore();
 }
-
 void paintInfiniteShield(Canvas c, BalanceGame game, bool reducedMotion) {
   if (!game.infinite || !game.survival.protected || game.ballScale <= 0) return;
   final p = Offset(game.visualX, game.screenY(game.visualY));

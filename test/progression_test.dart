@@ -91,16 +91,23 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  test('one-finger lift waits at the target height rather than passing it', () {
+  test('one-finger levels hold height before and after manual lifting', () {
     final g = BalanceGame()
       ..setControlMode(ControlMode.oneFinger)
       ..start();
     g.ballX = g.activeHole.x < 180 ? 300 : 60;
     g.board.removeWhere((h) => h.target != 1);
+    final initialHeight = (g.left + g.right) / 2;
     advance(g, 8);
+    expect((g.left + g.right) / 2, closeTo(initialHeight, .001));
+    g.grabControl();
+    g.dragControlVertical(-30);
+    g.step(1 / 120);
+    g.releaseControl();
+    advance(g, 2);
     expect(
       (g.left + g.right) / 2,
-      closeTo(g.activeHole.y + BalanceGame.ballRadius, .001),
+      closeTo(initialHeight - 30, .001),
     );
     expect(g.canControl, isTrue);
   });

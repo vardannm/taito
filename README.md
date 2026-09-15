@@ -173,3 +173,20 @@ Gear tables are in `lib/ball_cosmetics.dart` and `lib/platforms.dart`; animated 
 ### Unlimited-coin testing APK
 
 Build with `--dart-define=GILT_UNLIMITED_COINS=true` to enable unlimited Gear Shop purchases. The shop displays an infinity balance and a TEST BUILD label. The default build keeps the normal economy. Test purchases use `gilt.economy.coinsTest.v1`, separate from the normal wallet and gear ownership; other settings and progression remain shared.
+
+
+## Interactive onboarding and arcade club (0.11.0)
+
+The first-run tutorial now uses a real isolated practice game. Pick Two-finger, One-finger or Vertical Analog, lift and release, tilt the ball, and catch the glowing target. NEXT unlocks after doing the action; reset, back and skip remain available. Replay it from How to Play. Tutorial progress does not award coins or game records.
+
+Tap the home screen’s NEXT goal or Settings → Goals, friends & backup. Goals follow the selected control scheme: finish the campaign, then earn clean and time stars. The club shows cabinet unlock progress and opens the suggested level directly.
+
+Daily friend challenges use a copied `GILT1` code containing a display name, date, controls and personal best score. Paste a friend's code to play that exact Daily board. Scores are friend-reported and stored locally, not server-verified rankings. Friend challenges are capped at 30 on-device entries.
+
+Manual progress backups include records, wallet, owned/selected gear and settings. COPY BACKUP puts a versioned JSON snapshot on the clipboard; save it outside the app. RESTORE validates the snapshot and previews its progress before replacing local data. Test-economy snapshots cannot restore into normal builds. Maze editor drafts, friend codes and playtest logs are separate and are not part of a progress backup. No automatic cloud sync or online account is connected.
+
+The optional local playtest recorder is in the same club screen. Start a session, replay the tutorial and observe the player, then stop and copy the report before closing the app. It captures up to 1,000 events without names or uploads. Starting another session replaces the in-memory report. See `playtest/NEXT_SESSION.md`; human sessions are still pending.
+
+Normal builds now respect saved wallets instead of resetting them to 99,999. For free test purchases use the existing `--dart-define=GILT_UNLIMITED_COINS=true` build flag; its economy remains separate.
+
+Release preparation: `python scripts/release_check.py`, `release/DEVICE_QA.md`, and `release/STORE_COPY.md`. Android release signing reads ignored `android/key.properties` when configured; without it the APK remains development-signed. iOS compilation, signing and physical-device tests require the release Mac/iPhone. Review screenshots can be regenerated with `flutter test tool/render_growth.dart`.
