@@ -502,61 +502,6 @@ class BoardPainter extends CustomPainter {
     paintPlatformDetail(canvas, a, b, game.platformStyle);
     canvas.restore();
     paintGapWarning(canvas, game, reducedMotion);
-    if (game.oneFinger && game.started) {
-      final y = game.controlY;
-      final x = 180 + game.controlPosition * 110;
-      for (final sign in [-1.0, 1.0]) {
-        canvas.drawPath(
-          Path()
-            ..moveTo(x - 4, y + sign * 20)
-            ..lineTo(x, y + sign * 24)
-            ..lineTo(x + 4, y + sign * 20),
-          Paint()
-            ..color = brass
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.5,
-        );
-      }
-      canvas.drawLine(
-        Offset(70, y),
-        Offset(290, y),
-        Paint()
-          ..color = ink.withAlpha(100)
-          ..strokeWidth = 2,
-      );
-      canvas.drawLine(
-        Offset(180, game.screenY((game.left + game.right) / 2)),
-        Offset(x, y),
-        Paint()
-          ..color = ink.withAlpha(130)
-          ..strokeWidth = 2,
-      );
-      for (final end in [70.0, 180.0, 290.0]) {
-        canvas.drawLine(
-          Offset(end, y - 4),
-          Offset(end, y + 4),
-          Paint()
-            ..color = ink
-            ..strokeWidth = 2,
-        );
-      }
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(center: Offset(x, y), width: 18, height: 30),
-          const Radius.circular(5),
-        ),
-        Paint()..color = ink,
-      );
-      for (final dy in [-5.0, 0.0, 5.0]) {
-        canvas.drawLine(
-          Offset(x - 4, y + dy),
-          Offset(x + 4, y + dy),
-          Paint()
-            ..color = brass
-            ..strokeWidth = 1.5,
-        );
-      }
-    }
     for (final p in [a, b]) {
       canvas.drawRRect(
         RRect.fromRectAndRadius(

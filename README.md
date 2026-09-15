@@ -190,3 +190,8 @@ The optional local playtest recorder is in the same club screen. Start a session
 Normal builds now respect saved wallets instead of resetting them to 99,999. For free test purchases use the existing `--dart-define=GILT_UNLIMITED_COINS=true` build flag; its economy remains separate.
 
 Release preparation: `python scripts/release_check.py`, `release/DEVICE_QA.md`, and `release/STORE_COPY.md`. Android release signing reads ignored `android/key.properties` when configured; without it the APK remains development-signed. iOS compilation, signing and physical-device tests require the release Mac/iPhone. Review screenshots can be regenerated with `flutter test tool/render_growth.dart`.
+
+
+## One-finger thumb area (0.11.1)
+
+One-finger controls now sit in a 96-pixel area below the board, keeping the ball above your finger. Touch anywhere in the area and drag sideways to tilt, up/down to move vertically. Release and re-grab wherever comfortable; touching a new point does not jump the platform. Movement stops at the area's edges, so lift and re-touch to continue a long climb. A second pointer is ignored and pause/cancel clears the active touch. This shared control appears in gameplay, the tutorial and maze-editor playtests. Two-finger and Vertical Analog controls are unchanged.

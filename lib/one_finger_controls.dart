@@ -1,0 +1,201 @@
+import 'package:flutter/material.dart';
+import 'board_painter.dart';
+import 'game.dart';
+
+/// Relative touch control below the playfield. Re-grabbing never repositions it.
+class OneFingerControls extends StatefulWidget {
+  const OneFingerControls({
+    super.key,
+    required this.game,
+    required this.frame,
+    required this.boardScale,
+  });
+  static const height = 96.0;
+  final BalanceGame game;
+  final Listenable frame;
+  final double boardScale;
+  @override
+  State<OneFingerControls> createState() => _OneFingerControlsState();
+}
+
+class _OneFingerControlsState extends State<OneFingerControls> {
+  int? pointer;
+  int epoch = -1;
+  Offset origin = Offset.zero, previous = Offset.zero;
+  Offset? contact;
+  double initialTilt = 0;
+
+  void synchronize() {
+    if (epoch != widget.game.inputEpoch) {
+      pointer = null;
+      contact = null;
+      epoch = widget.game.inputEpoch;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant OneFingerControls oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.game != widget.game ||
+        oldWidget.boardScale != widget.boardScale) {
+      oldWidget.game.releaseControl();
+      pointer = null;
+      contact = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.game.releaseControl();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: widget.frame,
+    builder: (context, _) {
+      synchronize();
+      return LayoutBuilder(
+        builder: (context, bounds) {
+          final game = widget.game;
+          final scale = widget.boardScale.clamp(.1, 10.0);
+          Offset limited(Offset p) => Offset(
+            p.dx.clamp(0.0, bounds.maxWidth),
+            p.dy.clamp(0.0, bounds.maxHeight),
+          );
+          return Semantics(
+            label:
+                'One-finger thumb area below the board. Drag anywhere here sideways to tilt, up to lift, down to lower. Release and touch again to continue.',
+            child: GestureDetector(
+              onPanUpdate:
+                  (_) {}, // Keep tutorial page scrolling out of control drags.
+              child: Listener(
+                behavior: HitTestBehavior.opaque,
+                onPointerDown: (event) {
+                  synchronize();
+                  if (!game.canControl || !game.oneFinger || pointer != null)
+                    return;
+                  pointer = event.pointer;
+                  origin = previous = limited(event.localPosition);
+                  initialTilt = game.controlPosition;
+                  game.grabControl();
+                  setState(() => contact = origin);
+                },
+                onPointerMove: (event) {
+                  synchronize();
+                  if (pointer != event.pointer ||
+                      !game.canControl ||
+                      !game.oneFinger)
+                    return;
+                  final point = limited(event.localPosition);
+                  game.setControlPosition(
+                    initialTilt + (point.dx - origin.dx) / (110 * scale),
+                  );
+                  game.dragControlVertical((point.dy - previous.dy) / scale);
+                  previous = point;
+                  setState(() => contact = point);
+                },
+                onPointerUp: (event) {
+                  synchronize();
+                  if (pointer != event.pointer) return;
+                  game.releaseControl();
+                  setState(() {
+                    pointer = null;
+                    contact = null;
+                  });
+                },
+                onPointerCancel: (event) {
+                  synchronize();
+                  if (pointer != event.pointer) return;
+                  game.clearInput();
+                  setState(() {
+                    pointer = null;
+                    contact = null;
+                  });
+                },
+                child: CustomPaint(
+                  painter: _ThumbPadPainter(game, contact),
+                  child: const SizedBox.expand(),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
+class _ThumbPadPainter extends CustomPainter {
+  _ThumbPadPainter(this.game, this.contact);
+  final BalanceGame game;
+  final Offset? contact;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final enabled = game.canControl;
+    final area = RRect.fromRectAndRadius(
+      Rect.fromLTWH(12, 8, size.width - 24, size.height - 14),
+      const Radius.circular(22),
+    );
+    canvas.drawRRect(area, Paint()..color = cream);
+    canvas.drawRRect(
+      area,
+      Paint()
+        ..color = ink.withAlpha(enabled ? 65 : 25)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+    final center = Offset(size.width / 2, size.height / 2 + 7);
+    canvas.drawLine(
+      Offset(40, center.dy),
+      Offset(size.width - 40, center.dy),
+      Paint()
+        ..color = ink.withAlpha(45)
+        ..strokeWidth = 2,
+    );
+    final knob = contact == null
+        ? center + Offset(game.controlPosition * (size.width / 2 - 48), 0)
+        : Offset(
+            contact!.dx.clamp(36.0, size.width - 36),
+            contact!.dy.clamp(40.0, size.height - 26),
+          );
+    canvas.drawCircle(
+      knob,
+      22,
+      Paint()..color = ink.withAlpha(enabled ? 255 : 90),
+    );
+    canvas.drawCircle(
+      knob,
+      19,
+      Paint()
+        ..color = brass
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2,
+    );
+    for (final dy in [-5.0, 0.0, 5.0]) {
+      canvas.drawLine(
+        knob + Offset(-7, dy),
+        knob + Offset(7, dy),
+        Paint()
+          ..color = brass
+          ..strokeWidth = 2,
+      );
+    }
+    final text = TextPainter(
+      text: TextSpan(
+        text: 'TILT LEFT/RIGHT  ·  LIFT UP/DOWN',
+        style: TextStyle(
+          color: ink.withAlpha(enabled ? 210 : 100),
+          fontSize: 10,
+          fontFamily: 'sans-serif',
+          letterSpacing: .7,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: size.width - 40);
+    text.paint(canvas, Offset((size.width - text.width) / 2, 16));
+  }
+
+  @override
+  bool shouldRepaint(covariant _ThumbPadPainter oldDelegate) => true;
+}

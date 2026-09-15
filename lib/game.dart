@@ -106,7 +106,6 @@ class BalanceGame {
   double controlPosition = 0;
   bool controlHeld = false;
   double _controlLift = 0;
-  double get controlY => (screenY((left + right) / 2) + 38).clamp(65.0, 532.0);
   void grabControl() {
     if (canControl && oneFinger) controlHeld = true;
   }

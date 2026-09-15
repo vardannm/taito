@@ -1,3 +1,4 @@
+import 'package:balance_arcade/one_finger_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -45,15 +46,12 @@ Future<void> moveControls(
     await left.up();
     await right?.up();
   } else if (game.oneFinger) {
-    final pointer = await tester.startGesture(
-      origin +
-          viewport.project(
-            Offset(180 + game.controlPosition * 110, game.controlY),
-          ),
-    );
-    await pointer.moveBy(
-      tilt ? Offset(75 * viewport.scale, 0) : Offset(0, dy * viewport.scale),
-    );
+    final pad = find.byType(OneFingerControls);
+    await tester.ensureVisible(pad);
+    await tester.pump();
+    final scale = tester.widget<OneFingerControls>(pad).boardScale;
+    final pointer = await tester.startGesture(tester.getCenter(pad));
+    await pointer.moveBy(tilt ? Offset(75 * scale, 0) : Offset(0, dy * scale));
     await frames(tester, 2);
     await pointer.up();
   } else {

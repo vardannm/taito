@@ -1,10 +1,10 @@
+import 'package:balance_arcade/one_finger_controls.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/levels.dart';
 import 'package:balance_arcade/main.dart';
-import 'package:balance_arcade/board_painter.dart';
 import 'package:balance_arcade/profile.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -105,10 +105,7 @@ void main() {
     g.step(1 / 120);
     g.releaseControl();
     advance(g, 2);
-    expect(
-      (g.left + g.right) / 2,
-      closeTo(initialHeight - 30, .001),
-    );
+    expect((g.left + g.right) / 2, closeTo(initialHeight - 30, .001));
     expect(g.canControl, isTrue);
   });
   test(
@@ -301,14 +298,14 @@ void main() {
           ),
         ),
       );
-      final rect = tester.getRect(find.byType(PivotBoard));
-      final view = BoardViewport(rect.size);
-      final start = rect.topLeft + view.project(Offset(180, g.controlY));
+      final pad = find.byType(OneFingerControls);
+      final scale = tester.widget<OneFingerControls>(pad).boardScale;
+      final start = tester.getCenter(pad);
       final finger = await tester.startGesture(start);
-      await finger.moveBy(Offset(200 * view.scale, 0));
+      await finger.moveBy(Offset(200 * scale, 0));
       g.step(1 / 120);
       expect(g.right - g.left, closeTo(140, .001));
-      await finger.moveBy(Offset(-400 * view.scale, 0));
+      await finger.moveBy(Offset(-400 * scale, 0));
       g.step(1 / 120);
       expect(g.right - g.left, closeTo(-140, .001));
       g.setPaused(true);

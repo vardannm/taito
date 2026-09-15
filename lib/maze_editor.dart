@@ -804,7 +804,7 @@ class _MazeEditorPlaytestState extends State<MazeEditorPlaytest>
                       : game.analog
                       ? 'Use the vertical controls. Test scores stay private.'
                       : game.oneFinger
-                      ? 'Move the lower handle in both axes. Test scores stay private.'
+                      ? 'Drag in the thumb area below the board to tilt and lift. Test scores stay private.'
                       : 'Drag both grips. Test runs do not save scores.',
                   textAlign: TextAlign.center,
                 ),

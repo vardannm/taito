@@ -113,13 +113,13 @@ class _FirstPlayTutorialState extends State<FirstPlayTutorial>
   String get instruction => switch (lesson) {
     0 =>
       game.oneFinger
-          ? 'Drag the lower handle up, then let go. The platform holds its height.'
+          ? 'Drag up in the thumb area below the board, then let go. The platform holds its height.'
           : game.analog
           ? 'Drag both bottom joysticks up, then let go. The platform holds its height.'
           : 'Drag both end grips up, then let go. The platform holds its height.',
     1 =>
       game.oneFinger
-          ? 'Drag the lower handle sideways. Tilt until the ball rolls to either side.'
+          ? 'Drag sideways in the thumb area below the board. Tilt until the ball rolls to either side.'
           : game.analog
           ? 'Move one bottom joystick up or down. Tilt until the ball rolls to either side.'
           : 'Move one end grip up or down. Tilt until the ball rolls to either side.',

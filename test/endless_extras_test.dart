@@ -1,3 +1,4 @@
+import 'package:balance_arcade/one_finger_controls.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -137,30 +138,26 @@ void main() {
           ),
         ),
       );
-      final origin = tester.getTopLeft(find.byType(PivotBoard));
-      final finger = await tester.startGesture(
-        origin + Offset(180, g.controlY),
-        pointer: 1,
-      );
-      final extra = await tester.startGesture(
-        origin + Offset(180, g.controlY),
-        pointer: 2,
-      );
+      final pad = find.byType(OneFingerControls);
+      final origin = tester.getCenter(pad);
+      final scale = tester.widget<OneFingerControls>(pad).boardScale;
+      final finger = await tester.startGesture(origin, pointer: 1);
+      final extra = await tester.startGesture(origin, pointer: 2);
       await extra.moveBy(const Offset(0, -100));
       expect(g.controlPosition, 0);
-      await finger.moveBy(const Offset(22, -60));
+      await finger.moveBy(Offset(22 * scale, -30 * scale));
       g.step(1 / 120);
       expect(g.controlPosition, closeTo(.2, .001));
-      expect((g.left + g.right) / 2, 440);
+      expect((g.left + g.right) / 2, closeTo(470, .001));
       expect(g.right - g.left, closeTo(28, .001));
-      await finger.moveBy(const Offset(0, 30));
+      await finger.moveBy(Offset(0, 15 * scale));
       g.step(1 / 120);
-      expect((g.left + g.right) / 2, 470);
+      expect((g.left + g.right) / 2, closeTo(485, .001));
       g.setPaused(true);
       await finger.moveBy(const Offset(0, -100));
       g.setPaused(false);
       g.step(1 / 120);
-      expect((g.left + g.right) / 2, 470);
+      expect((g.left + g.right) / 2, closeTo(485, .001));
       await finger.cancel();
       await extra.up();
       expect(g.controlHeld, false);

@@ -110,7 +110,7 @@ class _ControlOptionsState extends State<ControlOptions>
                             ControlMode.twoFinger =>
                               'Drag each platform end. Lift together, or tilt independently.',
                             ControlMode.oneFinger =>
-                              'One handle controls tilt and height. Drag sideways, up or down.',
+                              'Use the thumb area below the board. Drag sideways to tilt, up or down to move.',
                             ControlMode.analog =>
                               'Slide the two bottom controls vertically. Release to hold position.',
                           }, style: const TextStyle(fontSize: 12, height: 1.4)),
