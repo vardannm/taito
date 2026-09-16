@@ -163,7 +163,10 @@ void main() {
         ..sound = false
         ..haptics = false;
       await tester.pumpWidget(ArcadeApp(profile: profile));
-      await tester.tap(find.text('INFINITE'));
+      expect(
+        tester.widget<PivotBoard>(find.byType(PivotBoard)).game.waitingForInput,
+        isTrue,
+      );
       await tester.pump();
       expect(find.text('INFINITE / POINTS'), findsOneWidget);
       expect(find.text('THE RUSH'), findsOneWidget);

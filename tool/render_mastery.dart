@@ -1,3 +1,4 @@
+import '../test/support/mode_navigation.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -57,7 +58,7 @@ void main() {
       ..tutorialSeen = true
       ..sound = false
       ..haptics = false;
-    for (var level = 1; level <= 12; level++) {
+    for (var level = 1; level <= 45; level++) {
       profile.levelRecords['twoFinger:$level'] = LevelRecord(
         starMask: level % 3 == 0 ? 7 : 3,
         bestScore: 8500 + level * 190,
@@ -80,7 +81,7 @@ void main() {
     }
 
     await capture('mastery-home');
-    await tester.tap(find.text('CLASSIC'));
+    await openClassicLevels(tester);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await capture('mastery-level-grid');
@@ -101,6 +102,9 @@ void main() {
     await tester.ensureVisible(find.text('BACK TO CLUB'));
     await tester.tap(find.text('BACK TO CLUB'));
     await tester.pump();
+    await tester.tap(find.byTooltip('Modes'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.text('DAILY'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
@@ -114,7 +118,11 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('BACK TO CLUB'));
     await tester.pump();
-    await tester.tap(find.text('CABINET'));
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.ensureVisible(find.text('Cabinet styles'));
+    await tester.tap(find.text('Cabinet styles'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const ValueKey('cabinet-jade')));
@@ -124,7 +132,7 @@ void main() {
     tester.state<NavigatorState>(find.byType(Navigator).first).pop();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    await tester.tap(find.text('CLASSIC'));
+    await openClassicLevels(tester);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await tester.scrollUntilVisible(

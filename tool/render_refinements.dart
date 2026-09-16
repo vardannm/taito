@@ -83,6 +83,9 @@ void main() {
       Navigator.of(tester.element(find.text('Make yourself at home.'))).pop();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
+      await tester.tap(find.byTooltip('Modes'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.ensureVisible(find.text('GEAR SHOP'));
       await tester.tap(find.text('GEAR SHOP'));
       await tester.pump();
@@ -95,8 +98,8 @@ void main() {
       Navigator.of(tester.element(find.text('Platforms'))).pop();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
-      await tester.ensureVisible(find.text('INFINITE'));
-      await tester.tap(find.text('INFINITE'));
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.keyW);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.keyW);
       await tester.pump();
       final g = tester.widget<PivotBoard>(find.byType(PivotBoard)).game;
       await tester.pump(const Duration(milliseconds: 16));

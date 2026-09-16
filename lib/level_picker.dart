@@ -10,9 +10,10 @@ class LevelPicker extends StatelessWidget {
     required this.selected,
     required this.onSelected,
     this.records = const {},
+    this.totalStars = 0,
     this.controlLabel = 'Two-finger',
   });
-  final int selected;
+  final int selected, totalStars;
   final Map<int, LevelRecord> records;
   final String controlLabel;
   final ValueChanged<int> onSelected;
@@ -59,13 +60,18 @@ class LevelPicker extends StatelessWidget {
           ),
           delegate: SliverChildBuilderDelegate((context, index) {
             final number = first + index,
-                active = number == selected,
+                active =
+                    number == selected &&
+                    ClassicLevels.isUnlocked(number, totalStars),
                 spider = number >= 31;
+            final unlocked = ClassicLevels.isUnlocked(number, totalStars);
+            final required = ClassicLevels.requiredStars(number);
             final record = records[number] ?? const LevelRecord();
             return Semantics(
               button: true,
+              enabled: unlocked,
               label:
-                  'Level $number: ${ClassicLevels.names[number - 1]}${spider ? ", spider territory" : ""}',
+                  'Level $number: ${ClassicLevels.names[number - 1]}${spider ? ", spider territory" : ""}${unlocked ? "" : ", locked, needs $required stars; you have $totalStars"}',
               child: Material(
                 color: active
                     ? ink
@@ -82,7 +88,7 @@ class LevelPicker extends StatelessWidget {
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
                   key: ValueKey('level-$number'),
-                  onTap: () => onSelected(number),
+                  onTap: unlocked ? () => onSelected(number) : null,
                   child: Padding(
                     padding: const EdgeInsets.all(7),
                     child: Column(
@@ -116,12 +122,17 @@ class LevelPicker extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 6),
-                        StarRow(record.starMask, size: 16, dark: active),
+                        if (unlocked)
+                          StarRow(record.starMask, size: 16, dark: active)
+                        else
+                          const Icon(Icons.lock_outline, size: 18, color: ink),
                         const SizedBox(height: 3),
                         FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Text(
-                            record.bestScore > 0
+                            !unlocked
+                                ? '$totalStars / $required STARS'
+                                : record.bestScore > 0
                                 ? 'PB ${record.bestScore}'
                                 : (number % 10 == 0 ? 'FINALE' : 'UNPLAYED'),
                             style: TextStyle(
@@ -131,7 +142,7 @@ class LevelPicker extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (record.bestTime != null)
+                        if (unlocked && record.bestTime != null)
                           Text(
                             formatRunTime(record.bestTime!),
                             style: TextStyle(
@@ -152,7 +163,7 @@ class LevelPicker extends StatelessWidget {
         slivers: [
           heading(
             'Choose your challenge.',
-            '50 boards · $controlLabel records. Stars: finish, no misses, beat the time. Every tenth board is a finale.',
+            '$totalStars Classic stars · 2 more stars unlock each level. Stars are shared across controls and are not spent. $controlLabel records.',
           ),
           grid(1, 30),
           heading(

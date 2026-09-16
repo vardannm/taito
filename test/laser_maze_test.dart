@@ -1,3 +1,4 @@
+import 'support/mode_navigation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/game.dart';
@@ -432,8 +433,8 @@ void main() {
           ..haptics = false
           ..controlMode = ControlMode.analog;
         await tester.pumpWidget(ArcadeApp(profile: p));
-        await tester.ensureVisible(find.text('LASER MAZE'));
-        await tester.tap(find.text('LASER MAZE'));
+
+        await openMazeRoutes(tester);
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 400));
         expect(find.byType(LaserMazePicker), findsOneWidget);
@@ -489,8 +490,8 @@ void main() {
       ..sound = false
       ..haptics = false;
     await tester.pumpWidget(ArcadeApp(profile: p));
-    await tester.ensureVisible(find.text('LASER MAZE'));
-    await tester.tap(find.text('LASER MAZE'));
+
+    await openMazeRoutes(tester);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await tester.ensureVisible(find.byKey(const ValueKey('maze-endless')));

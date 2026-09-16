@@ -1,3 +1,4 @@
+import '../test/support/mode_navigation.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -74,8 +75,8 @@ void main() {
     }
 
     await capture('maze-home');
-    await tester.ensureVisible(find.text('LASER MAZE'));
-    await tester.tap(find.text('LASER MAZE'));
+
+    await openMazeRoutes(tester);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await capture('maze-picker');

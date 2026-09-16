@@ -1,3 +1,4 @@
+import 'support/mode_navigation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/game.dart';
@@ -399,13 +400,13 @@ void main() {
         ..haptics = false
         ..controlMode = ControlMode.analog;
       await tester.pumpWidget(ArcadeApp(profile: p));
-      await tester.ensureVisible(find.text('2048  /  MERGE'));
-      await tester.tap(find.text('2048  /  MERGE'));
+
+      await selectWorld(tester, 4);
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      await tester.tap(find.text('PLAY 2048'));
+      await tester.pump(const Duration(milliseconds: 600));
+      await startWorld(tester);
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump(const Duration(milliseconds: 600));
       expect(find.byType(MergeStatus), findsOneWidget);
       final g = tester.widget<PivotBoard>(find.byType(PivotBoard)).game;
       expect(

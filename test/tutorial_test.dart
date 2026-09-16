@@ -140,10 +140,11 @@ void main() {
       ..sound = false
       ..haptics = false;
     await tester.pumpWidget(ArcadeApp(profile: profile));
-    await tester.tap(find.text('SKIP'));
-    await tester.pump();
-    expect(profile.tutorialSeen, true);
+    expect(find.byType(FirstPlayTutorial), findsNothing);
     expect(profile.runs, 0);
+    await tester.tap(find.byTooltip('Modes'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.ensureVisible(find.text('HOW TO PLAY'));
     await tester.pump();
     await tester.tap(find.text('HOW TO PLAY'));
@@ -153,6 +154,13 @@ void main() {
     await tester.tap(find.text('REPLAY QUICK TUTORIAL'));
     await frames(tester, 25);
     expect(find.byType(FirstPlayTutorial), findsOneWidget);
+    await tester.tap(find.text('SKIP'));
+    await tester.pump();
+    expect(profile.tutorialSeen, true);
+    expect(
+      tester.widget<PivotBoard>(find.byType(PivotBoard)).game.waitingForInput,
+      isTrue,
+    );
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

@@ -31,7 +31,7 @@ void main() {
         InMemorySharedPreferencesAsync.empty(),
   );
   test(
-    'three hits cost one heart each, clear inputs, recover safely and finally end the run',
+    'three hits grant protection without dropping control; the final hit ends the run',
     () {
       final g = run();
       final serial = g.runSerial;
@@ -46,23 +46,14 @@ void main() {
         expect(g.runSerial, serial);
         expect(g.survival.combo, 1);
         expect(g.survival.visualCombo, 0);
-        expect(g.pivotTargets.every((target) => target == null), true);
         if (remaining > 0) {
           expect(g.phase, GamePhase.playing);
-          expect(g.left, g.right);
-          expect(g.screenY(g.left), inInclusiveRange(67, 497));
+          expect(g.pivotTargets.every((target) => target != null), true);
           expect(g.survival.recovery, 2.5);
-          expect(
-            g.board.every(
-              (h) =>
-                  math.pow(h.x - g.ballX, 2) + math.pow(h.y - g.ballY, 2) >=
-                  30 * 30,
-            ),
-            true,
-          );
           hit(g);
           expect(g.lives, remaining);
         } else {
+          expect(g.pivotTargets, [null, null]);
           expect(g.phase, GamePhase.sinking);
           for (var i = 0; i < 90; i++) {
             g.step(1 / 120);
@@ -174,7 +165,9 @@ void main() {
         g.dragPivot(1, -200);
         g.step(1 / 120);
         expect(g.lives, shieldFirst ? 3 : 2);
-        expect(g.survival.shield > 0, shieldFirst);
+        // Continuing through the hit can collect a later shield, but it
+        // cannot retroactively prevent the heart loss earlier in the sweep.
+        expect(g.survival.shield > 0, true);
       },
     );
   }
@@ -388,4 +381,107 @@ void main() {
       await p.saveEconomy();
     },
   );
+  for (final mode in ControlMode.values) {
+    test(
+      '$mode heart loss preserves position, momentum and both input axes',
+      () {
+        BalanceGame prepared() {
+          final g = BalanceGame(seed: 31)
+            ..setControlMode(mode)
+            ..start(gameMode: GameMode.infinite);
+          g.board.clear();
+          g.survival.items.clear();
+          g.coins.clear();
+          g.left = 390;
+          g.right = 420;
+          g.ballX = 154;
+          g.velocity = 34;
+          g.survival.combo = 5;
+          g.leftInput = -.3;
+          g.rightInput = .2;
+          if (g.oneFinger) {
+            g.setControlPosition((g.right - g.left) / 140);
+            g.grabControl();
+            g.dragControlVertical(-6);
+          } else {
+            g.grabPivot(0);
+            g.grabPivot(1);
+            g.dragPivot(0, -6);
+            g.dragPivot(1, -4);
+            if (g.analog) {
+              g.setAnalogInput(0, -.4);
+              g.setAnalogInput(1, -.3);
+            }
+          }
+          return g;
+        }
+
+        final hitRun = prepared(), uninterrupted = prepared();
+        final epoch = hitRun.inputEpoch;
+        hitRun.board.add(Hole(hitRun.ballX, hitRun.ballY));
+        hitRun.step(1 / 120);
+        uninterrupted.step(1 / 120);
+        expect(hitRun.lives, 2);
+        expect(hitRun.survival.combo, 1);
+        expect(hitRun.survival.recovery, InfiniteTuning.recoverySeconds);
+        expect(hitRun.canControl, isTrue);
+        expect(hitRun.inputEpoch, epoch);
+        expect(hitRun.left, uninterrupted.left);
+        expect(hitRun.right, uninterrupted.right);
+        expect(hitRun.ballX, uninterrupted.ballX);
+        expect(hitRun.ballY, uninterrupted.ballY);
+        expect(hitRun.velocity, uninterrupted.velocity);
+        expect(hitRun.leftSpeed, uninterrupted.leftSpeed);
+        expect(hitRun.rightSpeed, uninterrupted.rightSpeed);
+        expect(hitRun.pivotTargets, uninterrupted.pivotTargets);
+        expect(hitRun.analogInputs, uninterrupted.analogInputs);
+        expect(hitRun.controlHeld, uninterrupted.controlHeld);
+        expect(hitRun.controlPosition, uninterrupted.controlPosition);
+        expect(hitRun.leftInput, uninterrupted.leftInput);
+        expect(hitRun.rightInput, uninterrupted.rightInput);
+        expect(hitRun.cameraOffset, uninterrupted.cameraOffset);
+        expect(hitRun.dangerY, uninterrupted.dangerY);
+        // Use the held controller again, with no grab or pointer restart.
+        for (final g in [hitRun, uninterrupted]) {
+          if (g.oneFinger) {
+            g.dragControlVertical(5);
+            g.setControlPosition(.1);
+          } else {
+            g.dragPivot(0, 5);
+            g.dragPivot(1, 3);
+          }
+          g.step(1 / 120);
+        }
+        expect(hitRun.left, uninterrupted.left);
+        expect(hitRun.right, uninterrupted.right);
+        expect(hitRun.ballX, uninterrupted.ballX);
+      },
+    );
+  }
+
+  test('hit protection blinks for 2.5 active seconds and pause freezes it', () {
+    final g = run();
+    hit(g);
+    expect(g.survival.recoveryOpacity, 1);
+    g.survival.step(.25, 0);
+    expect(g.survival.recoveryOpacity, closeTo(.35, 1e-9));
+    g.setPaused(true);
+    for (var i = 0; i < 30; i++) {
+      g.step(.1);
+    }
+    expect(g.survival.recovery, 2.25);
+    expect(g.survival.recoveryOpacity, closeTo(.35, 1e-9));
+    g.setPaused(false);
+    for (var i = 0; i < 271; i++) {
+      g.board.clear();
+      g.specialHazards.clear();
+      g.survival.items.clear();
+      g.stallTime = 0;
+      g.step(1 / 120);
+    }
+    expect(g.survival.protected, isFalse);
+    expect(g.survival.recoveryOpacity, 1);
+    hit(g);
+    expect(g.lives, 1);
+  });
 }

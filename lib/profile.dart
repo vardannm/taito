@@ -154,6 +154,15 @@ class PlayerProfile {
     return total;
   }
 
+  bool isClassicLevelUnlocked(int level) =>
+      ClassicLevels.isUnlocked(level, totalStars);
+
+  bool selectClassicLevel(int level) {
+    if (!isClassicLevelUnlocked(level)) return false;
+    classicLevel = level;
+    return true;
+  }
+
   bool isUnlocked(CabinetStyle style) => totalStars >= style.requiredStars;
   bool selectCabinet(CabinetStyle style) {
     if (!isUnlocked(style)) return false;

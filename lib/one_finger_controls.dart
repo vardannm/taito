@@ -21,7 +21,7 @@ class OneFingerControls extends StatefulWidget {
 class _OneFingerControlsState extends State<OneFingerControls> {
   int? pointer;
   int epoch = -1;
-  Offset origin = Offset.zero, previous = Offset.zero;
+  Offset origin = Offset.zero, previous = Offset.zero, position = Offset.zero;
   Offset? contact;
   double initialTilt = 0;
 
@@ -36,11 +36,15 @@ class _OneFingerControlsState extends State<OneFingerControls> {
   @override
   void didUpdateWidget(covariant OneFingerControls oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.game != widget.game ||
-        oldWidget.boardScale != widget.boardScale) {
+    if (oldWidget.game != widget.game) {
       oldWidget.game.releaseControl();
       pointer = null;
       contact = null;
+    } else if (oldWidget.boardScale != widget.boardScale) {
+      // A layout change is not a release. Rebase tilt at the held contact so
+      // resizing never drops pointer ownership or jumps to a new tilt.
+      origin = previous;
+      initialTilt = widget.game.controlPosition;
     }
   }
 
@@ -61,11 +65,11 @@ class _OneFingerControlsState extends State<OneFingerControls> {
           final scale = widget.boardScale.clamp(.1, 10.0);
           Offset limited(Offset p) => Offset(
             p.dx.clamp(0.0, bounds.maxWidth),
-            p.dy.clamp(0.0, bounds.maxHeight),
+            p.dy, // Vertical input follows the finger beyond the visible pad.
           );
           return Semantics(
             label:
-                'One-finger thumb area below the board. Drag anywhere here sideways to tilt, up to lift, down to lower. Release and touch again to continue.',
+                'One-finger thumb area below the board. Drag sideways to tilt, up to lift, down to lower. Keep dragging beyond the area to move further.',
             child: GestureDetector(
               onPanUpdate:
                   (_) {}, // Keep tutorial page scrolling out of control drags.
@@ -76,7 +80,8 @@ class _OneFingerControlsState extends State<OneFingerControls> {
                   if (!game.canControl || !game.oneFinger || pointer != null)
                     return;
                   pointer = event.pointer;
-                  origin = previous = limited(event.localPosition);
+                  position = event.localPosition;
+                  origin = previous = limited(position);
                   initialTilt = game.controlPosition;
                   game.grabControl();
                   setState(() => contact = origin);
@@ -87,7 +92,10 @@ class _OneFingerControlsState extends State<OneFingerControls> {
                       !game.canControl ||
                       !game.oneFinger)
                     return;
-                  final point = limited(event.localPosition);
+                  // Deltas retain the held contact when the pad moves in the
+                  // layout; a changed local origin must not become movement.
+                  position += event.delta;
+                  final point = limited(position);
                   game.setControlPosition(
                     initialTilt + (point.dx - origin.dx) / (110 * scale),
                   );

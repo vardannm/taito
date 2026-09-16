@@ -141,7 +141,7 @@ extension InfiniteGameplay on BalanceGame {
         );
         fellThroughGap = contact.reason == 'The platform broke beneath you.';
         _loseClimb(contact.reason!, hole: contact.hole);
-        return;
+        if (phase != GamePhase.playing) return;
       }
     }
     _collectCoins(oldX, oldY, ballX, ballY);
@@ -149,44 +149,9 @@ extension InfiniteGameplay on BalanceGame {
 
   void _recoverInfinite() {
     survival.recovery = InfiniteTuning.recoverySeconds;
-    // Preserve the camera, generated holes, active hazards and generation cursor.
-    // Find the nearest safe landing at the current elevation instead of erasing
-    // hazards or sending the platform back to its launch height.
-    final originX = ballX, originY = ballY;
-    var best = double.infinity, landingX = originX, landingY = originY;
-    for (var sy = 60.0; sy <= 490; sy += 10) {
-      final wy = sy - cameraOffset;
-      for (var x = 36.0; x <= 324; x += 8) {
-        if (_endlessHoles.any(
-          (h) => math.pow(h.x - x, 2) + math.pow(h.y - wy, 2) < 30 * 30,
-        ))
-          continue;
-        if (specialHazards.any((h) {
-          if (h.expired) return false;
-          if (h.kind == HazardKind.laser) return (x - h.x).abs() < 24;
-          if (h.kind == HazardKind.platformGap)
-            return x > h.gapLeft - 10 && x < h.gapRight + 10;
-          return math.pow(h.x - x, 2) + math.pow(h.y - sy, 2) < 34 * 34;
-        }))
-          continue;
-        final distance =
-            math.pow(x - originX, 2) + 3 * math.pow(wy - originY, 2);
-        if (distance < best) {
-          best = distance.toDouble();
-          landingX = x;
-          landingY = wy;
-        }
-      }
-    }
-    ballX = landingX;
-    left = right = landingY + BalanceGame.ballRadius;
-    controlPosition = 0;
-    _nextHazardTime = math.max(_nextHazardTime, elapsed + 3);
-    dangerY = 580 - cameraOffset;
-    stallTime = _steeringDistance = 0;
+    // A nonfatal hit only grants protection. Position, momentum, the course
+    // and active controller ownership keep advancing through the same run.
     fellThroughGap = false;
-    ballTrail.clear();
-    motionSpeed = 0;
     survival.announce('LIFE LOST · Combo reset · $lives hearts left');
     message = survival.notice;
   }

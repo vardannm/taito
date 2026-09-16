@@ -47,6 +47,14 @@ class InfiniteProgress {
   double nextHeartY = InfiniteTuning.firstHeartY;
   final items = <InfiniteItem>[];
   bool get protected => shield > 0 || recovery > 0;
+
+  /// Two gentle blinks per second during hit protection; never drives physics.
+  double get recoveryOpacity {
+    if (recovery <= 0) return 1;
+    final age = InfiniteTuning.recoverySeconds - recovery;
+    return .35 + .65 * (1 + math.cos(age * math.pi * 4)) / 2;
+  }
+
   double paceAt(double metres) =>
       (startingPace + metres / InfiniteTuning.metresPerPace).clamp(
         1.0,

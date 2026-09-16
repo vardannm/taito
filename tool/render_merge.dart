@@ -1,3 +1,4 @@
+import '../test/support/mode_navigation.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -72,12 +73,12 @@ void main() {
     }
 
     await capture('merge-home');
-    await tester.ensureVisible(find.text('2048  /  MERGE'));
-    await tester.tap(find.text('2048  /  MERGE'));
+
+    await selectWorld(tester, 4);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await capture('merge-guide');
-    await tester.tap(find.text('PLAY 2048'));
+    await startWorld(tester);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     final game = tester.widget<PivotBoard>(find.byType(PivotBoard)).game;

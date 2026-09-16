@@ -21,39 +21,51 @@ const brass = Color(0xFFD9AE65);
 
 /// One transform shared by rendering and pointer hit testing.
 class BoardViewport {
-  BoardViewport(Size size)
-    : scale = math.min(
-        size.width / BalanceGame.width,
-        size.height / BalanceGame.height,
-      ),
-      offset = Offset(
-        (size.width -
-                BalanceGame.width *
-                    math.min(
-                      size.width / BalanceGame.width,
-                      size.height / BalanceGame.height,
-                    )) /
-            2,
-        (size.height -
-                BalanceGame.height *
-                    math.min(
-                      size.width / BalanceGame.width,
-                      size.height / BalanceGame.height,
-                    )) /
-            2,
-      );
-  final double scale;
-  final Offset offset;
+  BoardViewport(Size size, {double fillWidth = 0, double focusY = 440}) {
+    final fit = math.min(
+      size.width / BalanceGame.width,
+      size.height / BalanceGame.height,
+    );
+    scale =
+        fit +
+        (size.width / BalanceGame.width - fit) * fillWidth.clamp(0.0, 1.0);
+    final height = BalanceGame.height * scale;
+    offset = Offset(
+      (size.width - BalanceGame.width * scale) / 2,
+      height <= size.height
+          ? (size.height - height) / 2
+          : (size.height * .72 - focusY * scale).clamp(
+              size.height - height,
+              0.0,
+            ),
+    );
+  }
+  factory BoardViewport.forGame(
+    Size size,
+    BalanceGame game, {
+    double fillWidth = 0,
+  }) => BoardViewport(
+    size,
+    fillWidth: fillWidth,
+    focusY: game.screenY((game.left + game.right) / 2),
+  );
+  late final double scale;
+  late final Offset offset;
   Offset project(Offset point) => offset + point * scale;
   Rect get rect =>
       offset & Size(BalanceGame.width * scale, BalanceGame.height * scale);
 }
 
 class BoardPainter extends CustomPainter {
-  BoardPainter(this.game, {this.reducedMotion = false, Listenable? repaint})
-    : super(repaint: repaint);
+  BoardPainter(
+    this.game, {
+    this.reducedMotion = false,
+    this.fillWidth = 0,
+    Listenable? repaint,
+  }) : super(repaint: repaint);
   final BalanceGame game;
   final bool reducedMotion;
+  final double fillWidth;
 
   void text(
     Canvas c,
@@ -86,7 +98,8 @@ class BoardPainter extends CustomPainter {
     final palette = CabinetPalette.of(game.cabinet);
     final ink = palette.frame, brass = palette.trim;
     canvas.save();
-    final viewport = BoardViewport(size);
+    canvas.clipRect(Offset.zero & size);
+    final viewport = BoardViewport.forGame(size, game, fillWidth: fillWidth);
     canvas.translate(viewport.offset.dx, viewport.offset.dy);
     canvas.scale(viewport.scale);
     final outer = RRect.fromRectAndRadius(
@@ -407,6 +420,16 @@ class BoardPainter extends CustomPainter {
         brass,
       );
     }
+    final recoveryOpacity = game.infinite && !reducedMotion
+        ? game.survival.recoveryOpacity
+        : 1.0;
+    final blink = recoveryOpacity < 1;
+    if (blink) {
+      canvas.saveLayer(
+        const Rect.fromLTWH(0, 0, 360, 560),
+        Paint()..color = Colors.white.withValues(alpha: recoveryOpacity),
+      );
+    }
     canvas.save();
     for (final gap in game.specialHazards.where(
       (h) => h.kind == HazardKind.platformGap && h.active,
@@ -585,6 +608,8 @@ class BoardPainter extends CustomPainter {
       paintInfiniteShield(canvas, game, reducedMotion);
     }
 
+    if (blink) canvas.restore();
+
     if (game.phase == GamePhase.sinking && !reducedMotion) {
       final t = (game.phaseTime / .7).clamp(0.0, 1.0);
       final p = Offset(game.captureX, game.screenY(game.captureY));
@@ -628,5 +653,7 @@ class BoardPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant BoardPainter oldDelegate) =>
-      oldDelegate.game != game || reducedMotion != oldDelegate.reducedMotion;
+      oldDelegate.game != game ||
+      reducedMotion != oldDelegate.reducedMotion ||
+      fillWidth != oldDelegate.fillWidth;
 }

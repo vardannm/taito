@@ -69,7 +69,7 @@ void main() {
   );
 
   testWidgets(
-    'leaving the thumb area stops vertical movement; cancel discards pending movement',
+    'vertical drags continue outside the thumb area and reverse immediately; cancel stops input',
     (tester) async {
       tester.view.physicalSize = const Size(400, 800);
       tester.view.devicePixelRatio = 1;
@@ -94,17 +94,74 @@ void main() {
       final finger = await tester.startGesture(tester.getCenter(pad));
       await finger.moveBy(const Offset(0, -300));
       game.step(1 / 120);
-      expect(game.left, 452);
+      expect(game.left, 200);
       await finger.moveBy(const Offset(0, -50));
       game.step(1 / 120);
-      expect(game.left, 452);
+      expect(game.left, 150);
+      // Reverse while the finger is still far above the pad.
+      await finger.moveBy(const Offset(0, 100));
+      game.step(1 / 120);
+      expect(game.left, 250);
       await finger.up();
       final next = await tester.startGesture(tester.getCenter(pad));
+      await next.moveBy(const Offset(0, 150));
+      game.step(1 / 120);
+      expect(game.left, 400); // Downward drag also continues below the pad.
+      await next.moveBy(const Offset(0, -20));
+      game.step(1 / 120);
+      expect(game.left, 380); // Reverse immediately while below the pad.
       await next.moveBy(const Offset(0, 15));
       await next.cancel();
       game.step(1 / 120);
-      expect(game.left, 452);
+      expect(game.left, 380);
       expect(game.controlHeld, false);
+      await tester.pumpWidget(const SizedBox());
+      frame.dispose();
+    },
+  );
+  testWidgets(
+    'resizing a held thumb pad preserves ownership and relative drag',
+    (tester) async {
+      final game = BalanceGame()
+        ..setControlMode(ControlMode.oneFinger)
+        ..start(gameMode: GameMode.practice);
+      game.board.clear();
+      final frame = ValueNotifier(0);
+      Future<void> show(double height) => tester.pumpWidget(
+        MaterialApp(
+          home: Center(
+            child: SizedBox(
+              width: 360,
+              height: height,
+              child: PivotBoard(game: game, frame: frame),
+            ),
+          ),
+        ),
+      );
+      await show(600);
+      final pad = find.byType(OneFingerControls);
+      final state = tester.state(pad);
+      final finger = await tester.startGesture(
+        tester.getCenter(pad),
+        pointer: 51,
+      );
+      await finger.moveBy(const Offset(12, -8));
+      game.step(1 / 120);
+      final tilt = game.controlPosition;
+      final height = (game.left + game.right) / 2;
+      final epoch = game.inputEpoch;
+      await show(560);
+      expect(tester.state(pad), same(state));
+      expect(game.controlHeld, isTrue);
+      expect(game.inputEpoch, epoch);
+      expect(game.controlPosition, tilt);
+      final scale = tester.widget<OneFingerControls>(pad).boardScale;
+      await finger.moveBy(const Offset(-3, -4));
+      game.step(1 / 120);
+      expect(game.controlPosition, closeTo(tilt - 3 / (110 * scale), .00001));
+      expect((game.left + game.right) / 2, closeTo(height - 4 / scale, .00001));
+      await finger.up();
+      expect(game.controlHeld, isFalse);
       await tester.pumpWidget(const SizedBox());
       frame.dispose();
     },

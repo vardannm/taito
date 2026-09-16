@@ -42,8 +42,11 @@ extension ControlModeLabel on ControlMode {
 
 /// Fixed-step simulation. No Flutter imports: physics can be tested in isolation.
 class BalanceGame {
-  BalanceGame({int? seed}) : _random = math.Random(seed);
-  final math.Random _random;
+  BalanceGame({int? seed}) : _runRandom = math.Random(seed);
+  final math.Random _runRandom;
+  // Match the baked Infinite carousel image without consuming run randomness.
+  math.Random? _previewRandom;
+  math.Random get _random => _previewRandom ?? _runRandom;
   InfiniteProgress survival = InfiniteProgress();
   int infiniteStartingPace = 1;
   BallCosmetic cosmetic = BallCosmetic.steel;
@@ -80,9 +83,15 @@ class BalanceGame {
       infinite || mazeEndless || (maze && mazeRun.route!.tall);
   double get minPivot => scrolling ? 40 - cameraOffset : 30.0;
   double get maxPivot => scrolling ? 526 - cameraOffset : 526.0;
-  LaserMazeRun mazeRun = LaserMazeRun(1);
+  LaserMazeRun? _mazeRun;
+  LaserMazeRun get mazeRun => _mazeRun ??= LaserMazeRun(1);
+  set mazeRun(LaserMazeRun value) => _mazeRun = value;
   bool get merging => mode == GameMode.merge2048;
-  MergeRun mergeRun = MergeRun();
+  MergeRun? _mergeRun;
+  MergeRun get mergeRun => _mergeRun ??= MergeRun();
+  set mergeRun(MergeRun value) => _mergeRun = value;
+  bool get hasMazeResources => _mazeRun != null;
+  bool get hasMergeResources => _mergeRun != null;
   bool get daily => mode == GameMode.daily;
   String get dailyKey =>
       dailyDate == null ? '' : DailyChallenge.key(dailyDate!);
@@ -102,12 +111,15 @@ class BalanceGame {
   final spiders = <BoardSpider>[];
   bool caughtBySpider = false;
   bool get spiderLevel => mode == GameMode.classic && level >= 31;
-  List<Hole> _classicBoard = ClassicLevels.build(1);
+  List<Hole> _classicBoard = [];
   double controlPosition = 0;
   bool controlHeld = false;
   double _controlLift = 0;
   void grabControl() {
-    if (canControl && oneFinger) controlHeld = true;
+    if (canControl && oneFinger) {
+      beginInput();
+      controlHeld = true;
+    }
   }
 
   void releaseControl() => controlHeld = false;
@@ -438,12 +450,12 @@ class BalanceGame {
     lastSuccess = false;
     message = reason;
     event = GameEvent.miss;
-    clearInput();
-    velocity = leftSpeed = rightSpeed = 0;
     if (lives > 0) {
       _recoverInfinite();
       return;
     }
+    clearInput();
+    velocity = leftSpeed = rightSpeed = 0;
     phase = GamePhase.sinking;
     phaseTime = 0;
   }
@@ -458,12 +470,39 @@ class BalanceGame {
   int target = 1, lives = 3, score = 0, streak = 0, bestStreak = 0;
   int lastAward = 0, completed = 0, misses = 0, inputEpoch = 0;
   bool started = false, paused = false, won = false;
+  bool waitingForInput = false;
+  // Selection gestures block new control contacts synchronously, including a
+  // second finger arriving before Flutter has rebuilt its IgnorePointer layer.
+  bool inputLocked = false;
+  void Function()? onInputStarted;
   bool lastSuccess = false;
   GamePhase phase = GamePhase.playing;
   GameEvent? event;
   String message = 'Ten holes. Two thumbs. Steady nerves.';
   bool get finished => phase == GamePhase.over;
-  bool get canControl => started && !paused && phase == GamePhase.playing;
+  bool get canControl =>
+      started && !paused && !inputLocked && phase == GamePhase.playing;
+
+  /// Activate the prepared board without resetting input or rebuilding a run.
+  /// The caller continues handling this same key/pointer event as movement.
+  void beginInput() {
+    if (!canControl || !waitingForInput) return;
+    if (infinite) {
+      _previewRandom = null;
+      // Replace only the course. Keep pointer ownership, platform and input
+      // epoch intact so this very same event also controls the new run.
+      _endlessHoles.clear();
+      coins.clear();
+      _nextRowY = 300 + _random.nextDouble() * 20;
+      _corridor = 150 + _random.nextDouble() * 60;
+      _nextCoinY = 380;
+      ensureInfiniteBoard();
+      ensureEndlessExtras();
+    }
+    waitingForInput = false;
+    onInputStarted?.call();
+  }
+
   Hole get activeHole =>
       board.firstWhere((h) => h.target == target.clamp(1, 10));
   double get ballY =>
@@ -487,6 +526,7 @@ class BalanceGame {
 
   void grabPivot(int side) {
     if (!canControl) return;
+    beginInput();
     _released[side] = false;
     pivotTargets[side] = side == 0 ? left : right;
   }
@@ -569,9 +609,15 @@ class BalanceGame {
     GameMode gameMode = GameMode.classic,
     int levelNumber = 1,
     DateTime? challengeDate,
+    bool waitForInput = false,
   }) {
     runSerial++;
     mode = gameMode;
+    _previewRandom = infinite && waitForInput ? math.Random(711) : null;
+    // A mode switch releases the previous mode's generated world. These
+    // objects own no tickers; the screen drives only this active simulation.
+    if (!maze) _mazeRun = null;
+    if (!merging) _mergeRun = null;
     survival = InfiniteProgress(
       startingPace: infiniteStartingPace,
       scoreBoost: equipmentMultiplier,
@@ -590,7 +636,9 @@ class BalanceGame {
             maze ? LaserMazeRoute.count : ClassicLevels.count,
           );
     if (mode == GameMode.laserMaze) mazeRun = LaserMazeRun(level);
-    _classicBoard = practice
+    _classicBoard = infinite || merging || maze
+        ? []
+        : practice
         ? List<Hole>.of(holes)
         : ClassicLevels.build(
             level,
@@ -643,6 +691,8 @@ class BalanceGame {
     elapsed = phaseTime = 0;
     won = paused = false;
     started = true;
+    waitingForInput = waitForInput;
+    inputLocked = false;
     phase = GamePhase.playing;
     event = null;
     message = mazeEndless
@@ -670,7 +720,7 @@ class BalanceGame {
   }
 
   void step(double dt) {
-    if (!dt.isFinite || dt <= 0) return;
+    if (!dt.isFinite || dt <= 0 || waitingForInput) return;
     // Bound individual substeps even if a caller accidentally supplies a long frame.
     var remaining = math.min(dt, .1);
     while (remaining > .000001) {

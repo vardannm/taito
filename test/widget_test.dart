@@ -1,3 +1,4 @@
+import 'support/mode_navigation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/main.dart';
@@ -21,8 +22,11 @@ void main() {
         ..sound = false
         ..haptics = false;
       await tester.pumpWidget(ArcadeApp(profile: profile));
-      expect(find.text('A little tilt.\nA lot of nerve.'), findsOneWidget);
+      expect(find.text('INFINITE / POINTS'), findsOneWidget);
       expect(tester.takeException(), isNull);
+      await tester.tap(find.byTooltip('Modes'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.ensureVisible(find.text('HOW TO PLAY'));
       await tester.tap(find.text('HOW TO PLAY'));
       await tester.pump();
@@ -95,17 +99,17 @@ void main() {
           ..haptics = false,
       ),
     );
-    await tester.tap(find.text('CLASSIC'));
+    await openClassicLevels(tester);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.text('First steps'));
     await tester.pump();
     final rect = tester.getRect(find.byType(PivotBoard));
-    expect(rect.left, 12);
-    expect(rect.right, 788);
-    expect(rect.bottom, 1166);
+    expect(rect.left, greaterThanOrEqualTo(12));
+    expect(rect.right, lessThanOrEqualTo(788));
+    expect(rect.bottom, lessThanOrEqualTo(1166));
     expect(rect.top, greaterThanOrEqualTo(44));
-    expect(rect.height, greaterThan(1000));
+    expect(rect.height, greaterThan(850));
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

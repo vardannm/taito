@@ -18,6 +18,10 @@ void main() {
   );
   test('next goals follow completion, clean and time stars per control', () {
     final p = PlayerProfile()..classicLevel = 5;
+    // Stars earned with another control unlock the recommended boards.
+    for (var level = 1; level <= 4; level++) {
+      p.levelRecords['analog:$level'] = const LevelRecord(starMask: 7);
+    }
     expect(NextGoal.forProfile(p).level, 5);
     p.levelRecords['twoFinger:5'] = const LevelRecord(starMask: 1);
     expect(NextGoal.forProfile(p).level, 6);

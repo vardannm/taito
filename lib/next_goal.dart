@@ -10,10 +10,11 @@ class NextGoal {
   final int level;
   final DateTime? date;
   static NextGoal forProfile(PlayerProfile p) {
-    // Finish the campaign before asking for harder clean/time stars.
+    // Recommend only reachable boards; improve stars to unlock more of them.
     for (final bit in [1, 2, 4]) {
       for (var offset = 0; offset < ClassicLevels.count; offset++) {
         final level = (p.classicLevel - 1 + offset) % ClassicLevels.count + 1;
+        if (!p.isClassicLevelUnlocked(level)) continue;
         if (p.levelRecord(level).starMask & bit != 0) continue;
         final title = bit == 1
             ? 'Clear level $level'

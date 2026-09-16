@@ -6,6 +6,9 @@ import 'rewards.dart';
 /// Reproducible scattered boards; target order is independent of height.
 class ClassicLevels {
   static const count = 50;
+  static int requiredStars(int level) => (level.clamp(1, count) - 1) * 2;
+  static bool isUnlocked(int level, int stars) =>
+      level >= 1 && level <= count && stars >= requiredStars(level);
   static const names = [
     'First steps',
     'Gentle bend',

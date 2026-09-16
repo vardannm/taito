@@ -28,6 +28,11 @@ import 'merge.dart';
 import 'laser_maze.dart';
 import 'laser_maze_widgets.dart';
 import 'maze_editor.dart';
+import 'mode_carousel.dart';
+import 'mode_previews.dart';
+import 'heart_loss_effect.dart';
+import 'control_hint.dart';
+import 'one_finger_controls.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -74,9 +79,11 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   final game = BalanceGame();
   final frame = ValueNotifier<int>(0);
+  final hud = ValueNotifier<Object?>(null);
+  final backdrop = ValueNotifier<int>(0);
   final feedback = GameFeedback();
   final playtest = PlaytestRecorder();
   final touch = [0.0, 0.0];
@@ -87,37 +94,118 @@ class _GameScreenState extends State<GameScreen>
   bool recorded = false, newBest = false, briefing = false;
   List<CabinetStyle> newUnlocks = [];
   late bool tutorialOpen;
-  bool commandOpen = false;
+  bool commandOpen = false, readyRetry = false;
+  final carouselKey = GlobalKey<ModeCarouselState>();
+  final boardKey = GlobalKey();
+  final analogKey = GlobalKey();
+  late final AnimationController entrance;
+  bool returning = false;
+  final heartEffects = <HeartLossEffect>[];
+  final effectsKey = GlobalKey();
+  int observedLives = 3;
+  double get expansion =>
+      Curves.easeInOutCubic.transform((entrance.value / .78).clamp(0.0, 1.0));
+  double get chromeOpacity => entrance.isCompleted
+      ? 0
+      : 1 - ((entrance.value - .78) / .22).clamp(0.0, 1.0);
+  int selectedMode = 0;
+  bool carouselMoving = false;
   PlayerProfile get profile => widget.profile;
 
   @override
   void initState() {
     super.initState();
-    tutorialOpen = !profile.tutorialSeen;
-    game.cabinet = profile.cabinet;
-    game.cosmetic = profile.selectedBall;
-    game.platformStyle = profile.selectedPlatform;
-    game.analogSensitivity = profile.analogSensitivity;
-    game.twoFingerSensitivity = profile.twoFingerSensitivity;
-    game.infiniteStartingPace = InfiniteTuning.startingPace(
-      profile.infiniteBest,
-    );
+    entrance =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 560),
+        )..addListener(() {
+          if (mounted) setState(() {});
+        });
+    ticker = createTicker(tick);
+    tutorialOpen = false;
+    prepareInfinite();
+    game.onInputStarted = () {
+      if (game.mode == GameMode.classic) profile.classicLevel = game.level;
+      if (game.mode == GameMode.laserMaze) profile.mazeLevel = game.level;
+      unawaited(profile.save());
+      playtest.record("run_started", {
+        "mode": game.mode.name,
+        "control": game.controlMode.name,
+        "retry": readyRetry,
+      });
+      // Do not reset controls or replace the board on the starting touch.
+      enterWorld();
+      setState(() {});
+    };
     WidgetsBinding.instance.addObserver(this);
     HardwareKeyboard.instance.addHandler(onKey);
-    ticker = createTicker(tick)..start();
+  }
+
+  void runTicker() {
+    previous = null;
+    accumulator = 0;
+    if (!ticker.isActive) ticker.start();
+  }
+
+  void enterWorld() {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      entrance.value = 1;
+    } else {
+      entrance.forward();
+    }
+    if (!game.paused) runTicker();
+  }
+
+  void spawnHeartLoss() {
+    final board = boardKey.currentContext?.findRenderObject() as RenderBox?;
+    final layer = effectsKey.currentContext?.findRenderObject() as RenderBox?;
+    if (board == null || layer == null || !board.hasSize || !layer.hasSize)
+      return;
+    final viewport = BoardViewport.forGame(
+      Size(
+        board.size.width,
+        math.max(
+          1,
+          board.size.height - (game.oneFinger ? OneFingerControls.height : 0),
+        ),
+      ),
+      game,
+      fillWidth: expansion,
+    );
+    final point = viewport.project(
+      Offset(game.ballX, game.screenY(game.platformY(game.ballX))),
+    );
+    final origin =
+        layer.globalToLocal(board.localToGlobal(point)) - const Offset(0, 20);
+    if (heartEffects.length == 3) heartEffects.removeAt(0);
+    heartEffects.add(HeartLossEffect(origin));
   }
 
   void tick(Duration now) {
     final delta = previous == null
-        ? 0.0
+        ? 1 / 120
         : (now - previous!).inMicroseconds / 1000000;
     previous = now;
+    for (final effect in heartEffects) {
+      effect.age += delta;
+    }
+    heartEffects.removeWhere((effect) => effect.finished);
     accumulator += math.min(delta, .05);
+    final inputEpoch = game.inputEpoch;
     final before =
         '${game.phase}/${game.target}/${game.lives}/${game.inputEpoch}/$recorded';
     while (accumulator >= 1 / 120) {
       game.step(1 / 120);
       accumulator -= 1 / 120;
+    }
+    if (game.lives < observedLives) spawnHeartLoss();
+    observedLives = game.lives;
+    // Feedback (including a lost heart) must not invalidate held input.
+    // Only simulation transitions that actually clear input release keys.
+    if (game.inputEpoch != inputEpoch) {
+      touch.fillRange(0, 2, 0);
+      keyboard.fillRange(0, 2, 0);
     }
     profile.bankCoins(game);
     if (game.event != null) {
@@ -127,10 +215,7 @@ class _GameScreenState extends State<GameScreen>
         "misses": game.misses,
       });
       unawaited(feedback.play(game.event!, profile));
-      if (game.event != GameEvent.coin && game.event != GameEvent.merge) {
-        touch.fillRange(0, 2, 0);
-        keyboard.fillRange(0, 2, 0);
-      }
+
       game.event = null;
     }
     if (game.finished && !recorded) {
@@ -150,7 +235,28 @@ class _GameScreenState extends State<GameScreen>
         unawaited(profile.save());
       }
     }
+    // Rebuild HUD text only when its displayed values change, not every frame.
+    hud.value = (
+      game.score,
+      game.metres,
+      game.lives,
+      game.target,
+      game.elapsed.ceil(),
+      game.hazardLabel,
+      game.dangerActive,
+      game.section,
+      game.survival.combo,
+      game.paceLevel,
+      game.survival.noticeTime > 0 ? game.survival.notice : '',
+      game.survival.shield.ceil(),
+      game.survival.recovery.ceil(),
+      game.coinsCollected,
+      game.coins.length,
+      game.merging ? game.mergeRun.highest : 0,
+    );
+    backdrop.value = (game.survival.visualCombo * 64).round();
     frame.value++;
+    if (game.finished && heartEffects.isEmpty) ticker.stop();
     if (before !=
         '${game.phase}/${game.target}/${game.lives}/${game.inputEpoch}/$recorded')
       setState(() {});
@@ -174,7 +280,12 @@ class _GameScreenState extends State<GameScreen>
   }
 
   bool onKey(KeyEvent event) {
-    if (commandOpen) return false;
+    if (commandOpen ||
+        tutorialOpen ||
+        returning ||
+        carouselMoving ||
+        ModalRoute.of(context)?.isCurrent != true)
+      return false;
     final key = event.logicalKey;
     const controlKeys = [
       LogicalKeyboardKey.keyW,
@@ -185,11 +296,13 @@ class _GameScreenState extends State<GameScreen>
     if (key == LogicalKeyboardKey.escape &&
         event is KeyDownEvent &&
         game.started &&
+        !game.waitingForInput &&
         !game.finished) {
       pause();
       return true;
     }
     if (!controlKeys.contains(key)) return false;
+    if (event is KeyDownEvent) game.beginInput();
     final held = HardwareKeyboard.instance.logicalKeysPressed;
     keyboard[0] =
         (held.contains(LogicalKeyboardKey.keyS) ? 1.0 : 0) -
@@ -202,6 +315,22 @@ class _GameScreenState extends State<GameScreen>
   }
 
   void start(GameMode mode, {DateTime? challengeDate}) => setState(() {
+    if (mode == GameMode.infinite) {
+      prepareInfinite(retry: game.infinite && game.finished);
+      entrance.reverse();
+      return;
+    }
+    if (mode == GameMode.classic &&
+        !profile.isClassicLevelUnlocked(profile.classicLevel)) {
+      unawaited(selectLevel());
+      return;
+    }
+    final index = arcadeModes.indexOf(mode);
+    if (index >= 0) {
+      carouselKey.currentState?.jumpTo(index);
+      selectedMode = index;
+      carouselMoving = false;
+    }
     playtest.record("run_started", {
       "mode": mode.name,
       "control": profile.controlMode.name,
@@ -240,6 +369,9 @@ class _GameScreenState extends State<GameScreen>
     );
     briefing = game.finale;
     if (briefing) game.setPaused(true);
+    observedLives = game.lives;
+    heartEffects.clear();
+    enterWorld();
   });
   Future<void> selectLevel() => showModalBottomSheet<void>(
     context: context,
@@ -251,13 +383,14 @@ class _GameScreenState extends State<GameScreen>
       child: SafeArea(
         child: LevelPicker(
           selected: profile.classicLevel,
+          totalStars: profile.totalStars,
           records: {
             for (var i = 1; i <= ClassicLevels.count; i++)
               i: profile.levelRecord(i),
           },
           controlLabel: profile.controlMode.label,
           onSelected: (number) {
-            profile.classicLevel = number;
+            if (!profile.selectClassicLevel(number)) return;
             unawaited(profile.save());
             Navigator.pop(context);
             start(GameMode.classic);
@@ -417,6 +550,7 @@ class _GameScreenState extends State<GameScreen>
       setState(() {
         game.cosmetic = profile.selectedBall;
         game.platformStyle = profile.selectedPlatform;
+        if (game.waitingForInput) prepareWorld(selectedMode);
       });
   }
 
@@ -424,30 +558,129 @@ class _GameScreenState extends State<GameScreen>
     briefing = false;
     clearControls();
     game.setPaused(!game.paused);
+    if (game.paused) {
+      ticker.stop();
+    } else {
+      runTicker();
+    }
   });
-  void home() => setState(() {
+  void prepareInfinite({bool retry = false}) {
+    prepareWorld(0, retry: retry);
+  }
+
+  int get classicContinueLevel {
+    var level = profile.classicLevel.clamp(1, ClassicLevels.count);
+    while (level > 1 && !profile.isClassicLevelUnlocked(level)) {
+      level--;
+    }
+    return level;
+  }
+
+  int worldLevel(int index) => switch (arcadeModes[index]) {
+    GameMode.classic => classicContinueLevel,
+    GameMode.laserMaze => profile.mazeLevel.clamp(1, LaserMazeRoute.count),
+    _ => 1,
+  };
+
+  void prepareWorld(int index, {bool retry = false}) {
+    ticker.stop();
+    previous = null;
+    accumulator = 0;
+    heartEffects.clear();
+    carouselKey.currentState?.jumpTo(index);
+    carouselMoving = false;
+    selectedMode = index;
+    readyRetry = retry;
     clearControls();
+    recorded = newBest = briefing = false;
+    newUnlocks = [];
+    game.setControlMode(profile.controlMode);
+    game.cabinet = profile.cabinet;
+    game.cosmetic = profile.selectedBall;
+    game.platformStyle = profile.selectedPlatform;
+    game.analogSensitivity = profile.analogSensitivity;
+    game.twoFingerSensitivity = profile.twoFingerSensitivity;
+    game.infiniteStartingPace = InfiniteTuning.startingPace(
+      profile.infiniteBest,
+    );
+    game.start(
+      gameMode: arcadeModes[index],
+      levelNumber: worldLevel(index),
+      waitForInput: true,
+    );
+    observedLives = game.lives;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      for (final neighbor in [index - 1, index + 1]) {
+        if (neighbor >= 0 && neighbor < arcadeModes.length) {
+          unawaited(
+            precacheImage(
+              AssetImage(
+                modePreviewAsset(arcadeModes[neighbor], worldLevel(neighbor)),
+              ),
+              context,
+            ),
+          );
+        }
+      }
+    });
+    frame.value++;
+  }
+
+  Future<void> home() async {
+    if (returning) return;
     profile.bankCoins(game);
-    game.home();
-  });
+    final index = arcadeModes.indexOf(game.mode);
+    setState(() {
+      returning = true;
+      clearControls();
+      game.setPaused(true);
+      ticker.stop();
+      heartEffects.clear();
+    });
+    if (MediaQuery.disableAnimationsOf(context)) {
+      entrance.value = 0;
+    } else {
+      try {
+        await entrance.reverse().orCancel;
+      } on TickerCanceled {
+        return;
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      prepareWorld(index < 0 ? 0 : index);
+      returning = false;
+    });
+  }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed && game.started && !game.finished) {
+      if (game.waitingForInput) {
+        clearControls();
+        return;
+      }
       setState(() {
         clearControls();
         game.setPaused(true);
+        ticker.stop();
       });
     }
   }
 
   @override
   void dispose() {
+    game.onInputStarted = null;
     profile.bankCoins(game);
     WidgetsBinding.instance.removeObserver(this);
     HardwareKeyboard.instance.removeHandler(onKey);
     ticker.dispose();
+    entrance.dispose();
+    heartEffects.clear();
     frame.dispose();
+    hud.dispose();
+    backdrop.dispose();
     feedback.dispose();
     super.dispose();
   }
@@ -480,323 +713,58 @@ class _GameScreenState extends State<GameScreen>
         },
         onDone: () {
           unawaited(profile.completeTutorial());
-          setState(() => tutorialOpen = false);
+          setState(() {
+            tutorialOpen = false;
+            prepareInfinite();
+          });
         },
       );
     }
-    if (game.started) return playScreen(context);
-    return Scaffold(
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, viewport) {
-            // Preserve usable controls in landscape and with larger accessibility text.
-            final minHeight = MediaQuery.textScalerOf(context).scale(1) > 1.3
-                ? 800.0
-                : 580.0;
-            final height = math.max(viewport.maxHeight, minHeight);
-            return SingleChildScrollView(
-              physics: viewport.maxHeight < minHeight
-                  ? null
-                  : const NeverScrollableScrollPhysics(),
-              child: SizedBox(
-                height: height,
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 450),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 22),
-                      child: Column(
-                        children: [
-                          SizedBox(height: height > 760 ? 16 : 8),
-                          header(),
-                          SizedBox(height: height > 760 ? 22 : 12),
-                          ...[
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                const Expanded(
-                                  child: FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    alignment: Alignment.centerLeft,
-                                    child: Text(
-                                      'A little tilt.\nA lot of nerve.',
-                                      style: TextStyle(
-                                        fontSize: 35,
-                                        fontWeight: FontWeight.w800,
-                                        height: 1.05,
-                                        letterSpacing: -1.5,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 4),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Icon(
-                                        Icons.stars_rounded,
-                                        color: orange.withAlpha(230),
-                                        size: 24,
-                                      ),
-                                      const SizedBox(height: 5),
-                                      Text(
-                                        'CLASSIC BEST',
-                                        style: label(ink.withAlpha(135))
-                                            .copyWith(
-                                              fontSize: 8,
-                                              letterSpacing: 1,
-                                            ),
-                                      ),
-                                      Text(
-                                        profile.best.toString().padLeft(5, '0'),
-                                        style: const TextStyle(
-                                          fontSize: 18,
-                                          fontFamily: 'monospace',
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Container(
-                                  width: 5,
-                                  height: 5,
-                                  decoration: const BoxDecoration(
-                                    color: orange,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 7),
-                                Expanded(
-                                  child: Text(
-                                    profile.totalStars == 0
-                                        ? 'TEN HOLES. NO LIMITS.'
-                                        : '${profile.totalStars} / 150 CLASSIC STARS',
-                                    style: label(ink.withAlpha(160)),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                          const SizedBox(height: 14),
-                          if (viewport.maxHeight >= 700)
-                            Expanded(
-                              child: Center(
-                                child: AspectRatio(
-                                  aspectRatio: 360 / 560,
-                                  child: Stack(
-                                    fit: StackFit.expand,
-                                    children: [
-                                      DecoratedBox(
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(
-                                            22,
-                                          ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: ink.withAlpha(30),
-                                              blurRadius: 18,
-                                              offset: const Offset(0, 9),
-                                            ),
-                                          ],
-                                        ),
-                                        child: RepaintBoundary(
-                                          child: CustomPaint(
-                                            painter: BoardPainter(
-                                              game,
-                                              repaint: frame,
-                                              reducedMotion: MediaQuery.of(
-                                                context,
-                                              ).disableAnimations,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      if (game.paused || game.finished)
-                                        boardOverlay(),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          if (viewport.maxHeight < 700) const Spacer(),
-                          const SizedBox(height: 12),
-                          ...[
-                            TextButton.icon(
-                              onPressed: showClub,
-                              icon: const Icon(Icons.flag_outlined, size: 18),
-                              label: Text(
-                                'NEXT: ${NextGoal.forProfile(profile).title}',
-                                maxLines: 2,
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: primary(
-                                    'CLASSIC',
-                                    selectLevel,
-                                    trailing: '${ClassicLevels.count}',
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: primary(
-                                    'INFINITE',
-                                    () => start(GameMode.infinite),
-                                    trailing: '∞',
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton.icon(
-                                onPressed: showMerge,
-                                icon: const Icon(Icons.auto_awesome, size: 17),
-                                label: const Text(
-                                  '2048  /  MERGE',
-                                  style: TextStyle(fontWeight: FontWeight.w800),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton.icon(
-                                onPressed: selectMaze,
-                                icon: const Icon(Icons.route_rounded, size: 17),
-                                label: const Text(
-                                  'LASER MAZE',
-                                  style: TextStyle(fontWeight: FontWeight.w800),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: showDaily,
-                                    icon: const Icon(
-                                      Icons.today_outlined,
-                                      size: 17,
-                                    ),
-                                    label: const Text(
-                                      'DAILY',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: showBallShop,
-                                    icon: const Icon(
-                                      Icons.palette_outlined,
-                                      size: 17,
-                                    ),
-                                    label: const Text(
-                                      'GEAR SHOP',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                TextButton(
-                                  onPressed: () => start(GameMode.practice),
-                                  style: TextButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 4,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    'PRACTICE',
-                                    style: label().copyWith(fontSize: 9),
-                                  ),
-                                ),
-                                TextButton(
-                                  onPressed: showGuide,
-                                  child: Text(
-                                    'HOW TO PLAY',
-                                    style: label().copyWith(
-                                      fontSize: 9,
-                                      letterSpacing: 1,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
+    return playScreen(context);
   }
 
-  Widget header() => Row(
-    children: [
-      const Icon(Icons.adjust, size: 26, color: orange),
-      const SizedBox(width: 8),
-      const Text(
-        'GILT',
-        style: TextStyle(
-          fontSize: 26,
-          letterSpacing: 5,
-          fontWeight: FontWeight.w900,
+  Future<void> showModes() => showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: cream,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (sheetContext) {
+      Widget choice(String title, IconData icon, VoidCallback action) =>
+          ListTile(
+            leading: Icon(icon),
+            title: Text(title),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.pop(sheetContext);
+              action();
+            },
+          );
+      return SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const ListTile(title: Text('Your arcade')),
+              choice('Classic levels', Icons.adjust, selectLevel),
+              choice('Maze routes', Icons.route_rounded, selectMaze),
+              choice('DAILY', Icons.today_outlined, showDaily),
+              choice(
+                'PRACTICE',
+                Icons.touch_app,
+                () => start(GameMode.practice),
+              ),
+              choice('GEAR SHOP', Icons.palette_outlined, showBallShop),
+              choice(
+                'Goals, friends & backup',
+                Icons.emoji_events_outlined,
+                showClub,
+              ),
+              choice('HOW TO PLAY', Icons.help_outline, showGuide),
+            ],
+          ),
         ),
-      ),
-      const SizedBox(width: 12),
-      Expanded(
-        child: Text(
-          'MECHANICAL\nARCADE CLUB',
-          style: label(
-            ink.withAlpha(130),
-          ).copyWith(fontSize: 8, height: 1.5, letterSpacing: 1.5),
-        ),
-      ),
-      IconButton(
-        tooltip: game.started && !game.finished
-            ? (game.paused ? 'Resume' : 'Pause')
-            : 'Settings',
-        onPressed: game.started && !game.finished ? pause : showSettings,
-        style: IconButton.styleFrom(side: BorderSide(color: ink.withAlpha(45))),
-        icon: Icon(
-          game.started && !game.finished
-              ? (game.paused ? Icons.play_arrow_rounded : Icons.pause_rounded)
-              : Icons.tune_rounded,
-          size: 20,
-        ),
-      ),
-    ],
+      );
+    },
   );
 
   Widget scoreboard() => Column(
@@ -901,13 +869,18 @@ class _GameScreenState extends State<GameScreen>
             style: const TextStyle(fontSize: 10, color: ink),
           ),
         ),
-        if (game.survival.protected)
-          Text(
-            game.survival.shield > 0
-                ? 'SHIELD ${game.survival.shield.ceil()}s'
-                : 'RECOVERY ${game.survival.recovery.ceil()}s',
-            style: label(ink),
-          ),
+        // Reserve this line so shield/recovery effects never resize controls.
+        Text(
+          game.survival.shield > 0
+              ? 'SHIELD ${game.survival.shield.ceil()}s'
+              : game.survival.recovery > 0
+              ? 'RECOVERY ${game.survival.recovery.ceil()}s'
+              : ' ',
+          key: const ValueKey('protection-status'),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: label(ink),
+        ),
       ],
       if (!game.infinite && !game.practice && !game.merging && !game.maze)
         Text(
@@ -928,78 +901,504 @@ class _GameScreenState extends State<GameScreen>
     ],
   );
 
-  Widget playScreen(BuildContext context) => Scaffold(
-    body: Stack(
-      fit: StackFit.expand,
+  static const worldColors = [
+    Color(0xFFE9E9DC),
+    Color(0xFFF1E4C8),
+    Color(0xFFD5E8E5),
+    Color(0xFFE4E3F1),
+    Color(0xFFF3DFD0),
+  ];
+
+  String worldTitle(int index) => switch (index) {
+    0 => 'Infinite',
+    1 => 'Classic',
+    2 => 'Maze Infinite',
+    3 => 'Maze',
+    _ => '2048 Merge',
+  };
+
+  String worldSubtitle(int index) => switch (index) {
+    0 => 'NO FINISH LINE. FIND YOUR FLOW.',
+    1 => 'Classic • Level ${worldLevel(index)}',
+    2 => 'ONE ROAD. ENDLESS POSSIBILITIES.',
+    3 => 'Maze • Level ${worldLevel(index)}',
+    _ => 'SMALL NUMBERS. BIG POSSIBILITIES.',
+  };
+
+  String get startInstruction => switch (game.controlMode) {
+    ControlMode.analog => 'Touch a joystick to play',
+    ControlMode.oneFinger => 'Drag the thumb area to play',
+    ControlMode.twoFinger => 'Move a platform end to play',
+  };
+
+  bool acceptsWorldSwipe(Offset global) {
+    if (!game.waitingForInput ||
+        returning ||
+        !entrance.isDismissed ||
+        carouselMoving ||
+        ModalRoute.of(context)?.isCurrent != true)
+      return false;
+    final analog = analogKey.currentContext?.findRenderObject() as RenderBox?;
+    if (game.analog && analog != null) {
+      final point = analog.globalToLocal(global);
+      if ((Offset.zero & analog.size).contains(point) &&
+          (point.dx <= 106 || point.dx >= analog.size.width - 106))
+        return false;
+    }
+    final board = boardKey.currentContext?.findRenderObject() as RenderBox?;
+    if (board == null) return true;
+    final point = board.globalToLocal(global);
+    if (!(Offset.zero & board.size).contains(point)) return true;
+    if (game.oneFinger)
+      return point.dy < board.size.height - OneFingerControls.height;
+    if (game.analog) return true;
+    final viewport = BoardViewport(board.size);
+    for (final side in [0, 1]) {
+      final pivot = viewport.project(
+        Offset(
+          side == 0 ? 20 : 340,
+          game.screenY(side == 0 ? game.left : game.right),
+        ),
+      );
+      if ((point.dx - pivot.dx).abs() <= 44 &&
+          (point.dy - pivot.dy).abs() <= 48)
+        return false;
+    }
+    return true;
+  }
+
+  Widget world(BuildContext context, int index) {
+    final active = index == selectedMode;
+    return AnimatedContainer(
+      duration: Duration(
+        milliseconds: MediaQuery.disableAnimationsOf(context) ? 0 : 220,
+      ),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            worldColors[index].withAlpha(0),
+            game.waitingForInput
+                ? worldColors[index]
+                : worldColors[index].withAlpha(0),
+          ],
+        ),
+      ),
+      child: active
+          ? Stack(
+              fit: StackFit.expand,
+              children: [
+                IgnorePointer(
+                  ignoring: carouselMoving,
+                  child: PivotBoard(
+                    key: boardKey,
+                    game: game,
+                    frame: frame,
+                    fillWidth: expansion,
+                    showHint:
+                        game.waitingForInput &&
+                        !carouselMoving &&
+                        !returning &&
+                        entrance.isDismissed,
+                  ),
+                ),
+              ],
+            )
+          : Opacity(
+              opacity: 1 - expansion,
+              child: IgnorePointer(
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: RepaintBoundary(
+                        child: Image.asset(
+                          modePreviewAsset(
+                            arcadeModes[index],
+                            worldLevel(index),
+                          ),
+                          key: ValueKey('mode-preview-$index'),
+                          fit: BoxFit.contain,
+                          width: double.infinity,
+                          height: double.infinity,
+                          cacheWidth: 180,
+                          excludeFromSemantics: true,
+                        ),
+                      ),
+                    ),
+                    if (game.oneFinger)
+                      const SizedBox(height: OneFingerControls.height),
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+
+  Widget selectionHeader(double page) {
+    final index = page.round().clamp(0, arcadeModes.length - 1);
+    final distance = page - index;
+    final reduced = MediaQuery.disableAnimationsOf(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (game.infinite)
-          RepaintBoundary(
-            child: CustomPaint(
-              painter: InfiniteBackdropPainter(
-                game,
-                reducedMotion: MediaQuery.disableAnimationsOf(context),
-                repaint: frame,
+        Row(
+          children: [
+            Text(
+              'GILT',
+              style: label().copyWith(letterSpacing: 5, fontSize: 13),
+            ),
+            const Spacer(),
+            IconButton(
+              tooltip: 'Modes',
+              onPressed: carouselMoving ? null : showModes,
+              icon: const Icon(Icons.apps_rounded, size: 21),
+            ),
+            IconButton(
+              tooltip: 'Settings',
+              onPressed: carouselMoving ? null : showSettings,
+              icon: const Icon(Icons.tune_rounded, size: 21),
+            ),
+          ],
+        ),
+        Expanded(
+          child: Transform.translate(
+            offset: Offset(reduced ? 0 : distance * -28, 0),
+            child: Opacity(
+              opacity: reduced ? 1 : 1 - distance.abs() * .8,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    worldTitle(index),
+                    key: const ValueKey('selected-mode-title'),
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: MediaQuery.sizeOf(context).height < 650
+                          ? 28
+                          : 34,
+                      height: 1.05,
+                      letterSpacing: -1.4,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    worldSubtitle(index),
+                    key: const ValueKey('selected-mode-subtitle'),
+                    maxLines: 1,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      letterSpacing: 1.25,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-        SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: AnimatedBuilder(
-                        animation: frame,
-                        builder: (context, _) => scoreboard(),
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: game.paused ? 'Resume' : 'Pause',
-                      onPressed: pause,
-                      icon: Icon(
-                        game.paused
-                            ? Icons.play_arrow_rounded
-                            : Icons.pause_rounded,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (game.merging)
-                AnimatedBuilder(
-                  animation: frame,
-                  builder: (context, _) => MergeStatus(run: game.mergeRun),
-                ),
-              Expanded(
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    PivotBoard(
-                      key: ValueKey(game.inputEpoch),
-                      game: game,
-                      frame: frame,
-                    ),
-                    if (game.paused || game.finished) boardOverlay(),
-                  ],
-                ),
-              ),
-              if (game.analog)
-                SizedBox(
-                  height: (MediaQuery.sizeOf(context).height * .19).clamp(
-                    104.0,
-                    140.0,
-                  ),
-                  child: AnalogControls(game: game, frame: frame),
-                ),
-            ],
-          ),
         ),
       ],
-    ),
+    );
+  }
+
+  Widget carouselFooter(double page) => Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      IconButton(
+        tooltip: 'Previous mode',
+        visualDensity: VisualDensity.compact,
+        onPressed: selectedMode > 0 && !carouselMoving
+            ? () => carouselKey.currentState?.select(selectedMode - 1)
+            : null,
+        icon: const Icon(Icons.chevron_left_rounded, size: 18),
+      ),
+      for (var index = 0; index < arcadeModes.length; index++)
+        Semantics(
+          label: '${worldTitle(index)}, ${index + 1} of 5',
+          selected: selectedMode == index,
+          button: true,
+          child: GestureDetector(
+            key: ValueKey('mode-$index'),
+            behavior: HitTestBehavior.opaque,
+            onTap: carouselMoving
+                ? null
+                : () => carouselKey.currentState?.select(index),
+            child: SizedBox(
+              width: 24,
+              height: 30,
+              child: Center(
+                child: Container(
+                  width: 6 + 12 * (1 - (page - index).abs().clamp(0.0, 1.0)),
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: Color.lerp(
+                      ink.withAlpha(50),
+                      ink,
+                      1 - (page - index).abs().clamp(0.0, 1.0),
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      IconButton(
+        tooltip: 'Next mode',
+        visualDensity: VisualDensity.compact,
+        onPressed: selectedMode < 4 && !carouselMoving
+            ? () => carouselKey.currentState?.select(selectedMode + 1)
+            : null,
+        icon: const Icon(Icons.chevron_right_rounded, size: 18),
+      ),
+    ],
   );
 
+  Widget playScreen(BuildContext context) => Scaffold(
+    body: ModeCarousel(
+      key: carouselKey,
+      selected: selectedMode,
+      locked: !game.waitingForInput || returning || !entrance.isDismissed,
+      expansion: expansion,
+      controlInset: game.oneFinger ? OneFingerControls.height : 0,
+      acceptSwipe: acceptsWorldSwipe,
+      onMoving: (moving) => setState(() {
+        carouselMoving = moving;
+        game.inputLocked = moving;
+      }),
+      onSelected: (index) => setState(() {
+        if (index != selectedMode) prepareWorld(index);
+      }),
+      worldBuilder: world,
+      builder: (context, worlds, page) {
+        final low = page.floor().clamp(0, 4), high = page.ceil().clamp(0, 4);
+        final background = Color.lerp(
+          worldColors[low],
+          worldColors[high],
+          page - page.floor(),
+        )!;
+        final ready =
+            game.waitingForInput && !returning && entrance.isDismissed;
+        final menuHeaderHeight =
+            MediaQuery.sizeOf(context).height < 650 &&
+                MediaQuery.textScalerOf(context).scale(10) <= 10
+            ? 104.0
+            : 144.0;
+        final headerHeight =
+            menuHeaderHeight +
+            ((game.infinite ? 104.0 : 80.0) - menuHeaderHeight) * expansion;
+        return ColoredBox(
+          color: background,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (game.infinite)
+                Opacity(
+                  opacity: 1 - chromeOpacity,
+
+                  child: RepaintBoundary(
+                    child: CustomPaint(
+                      painter: InfiniteBackdropPainter(
+                        game,
+                        reducedMotion: MediaQuery.disableAnimationsOf(context),
+                        repaint: backdrop,
+                      ),
+                    ),
+                  ),
+                ),
+              SafeArea(
+                key: const ValueKey('arcade-stage'),
+                child: Column(
+                  children: [
+                    SizedBox(
+                      height: headerHeight,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 4,
+                        ),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            IgnorePointer(
+                              ignoring: !ready,
+                              child: ExcludeSemantics(
+                                excluding: !ready,
+                                child: Opacity(
+                                  opacity: chromeOpacity,
+
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.topLeft,
+                                    child: SizedBox(
+                                      width:
+                                          MediaQuery.sizeOf(context).width - 40,
+                                      height: menuHeaderHeight - 8,
+                                      child: selectionHeader(page),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            IgnorePointer(
+                              ignoring: ready,
+                              child: ExcludeSemantics(
+                                excluding: ready,
+                                child: Opacity(
+                                  opacity: 1 - chromeOpacity,
+
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: AnimatedBuilder(
+                                          animation: hud,
+                                          builder: (context, _) => FittedBox(
+                                            fit: BoxFit.scaleDown,
+                                            alignment: Alignment.centerLeft,
+                                            child: SizedBox(
+                                              width:
+                                                  MediaQuery.sizeOf(
+                                                    context,
+                                                  ).width -
+                                                  100,
+                                              child: scoreboard(),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      IconButton(
+                                        tooltip: game.paused
+                                            ? 'Resume'
+                                            : 'Pause',
+                                        onPressed: pause,
+                                        icon: Icon(
+                                          game.paused
+                                              ? Icons.play_arrow_rounded
+                                              : Icons.pause_rounded,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // This slot stays the same size after the starting touch.
+                    SizedBox(
+                      height: 26,
+                      child: chromeOpacity > 0
+                          ? Opacity(
+                              opacity: chromeOpacity,
+                              child: Center(
+                                child: Text(
+                                  '$startInstruction · ${profile.controlMode.label}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : game.merging
+                          ? AnimatedBuilder(
+                              animation: frame,
+                              builder: (context, _) =>
+                                  MergeStatus(run: game.mergeRun),
+                            )
+                          : status(),
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          vertical: 12 * (1 - expansion),
+                        ),
+                        child: worlds,
+                      ),
+                    ),
+                    SizedBox(
+                      height: 34 * (1 - expansion),
+                      child: OverflowBox(
+                        minHeight: 34,
+                        maxHeight: 34,
+                        alignment: Alignment.bottomCenter,
+                        child: IgnorePointer(
+                          ignoring: !ready,
+                          child: ExcludeSemantics(
+                            excluding: !ready,
+                            child: Opacity(
+                              opacity: chromeOpacity,
+
+                              child: carouselFooter(page),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (game.analog)
+                      SizedBox(
+                        key: analogKey,
+                        height: (MediaQuery.sizeOf(context).height * .19).clamp(
+                          104.0,
+                          140.0,
+                        ),
+                        child: IgnorePointer(
+                          ignoring: carouselMoving,
+                          child: LayoutBuilder(
+                            builder: (context, bounds) => Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                AnalogControls(game: game, frame: frame),
+                                if (ready && !carouselMoving)
+                                  ControlHint(
+                                    anchors: [
+                                      Offset(62, bounds.maxHeight / 2),
+                                      Offset(
+                                        bounds.maxWidth - 62,
+                                        bounds.maxHeight / 2,
+                                      ),
+                                    ],
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (!returning && (game.paused || game.finished))
+                SafeArea(
+                  key: const ValueKey('run-overlay'),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: boardOverlay(),
+                  ),
+                ),
+              IgnorePointer(
+                child: RepaintBoundary(
+                  key: effectsKey,
+                  child: CustomPaint(
+                    painter: HeartLossPainter(
+                      heartEffects,
+                      reducedMotion: MediaQuery.disableAnimationsOf(context),
+                      repaint: frame,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
   Widget status() => SizedBox(
     height: 20,
     child: Center(
@@ -1187,7 +1586,12 @@ class _GameScreenState extends State<GameScreen>
                                 if (game.won &&
                                     game.mode == GameMode.classic &&
                                     game.level < ClassicLevels.count) {
-                                  profile.classicLevel = game.level + 1;
+                                  if (!profile.selectClassicLevel(
+                                    game.level + 1,
+                                  )) {
+                                    unawaited(selectLevel());
+                                    return;
+                                  }
                                   unawaited(profile.save());
                                 }
                                 start(game.mode, challengeDate: game.dailyDate);
@@ -1198,12 +1602,26 @@ class _GameScreenState extends State<GameScreen>
                               : game.won &&
                                     game.mode == GameMode.classic &&
                                     game.level < ClassicLevels.count
-                              ? 'NEXT LEVEL'
+                              ? profile.isClassicLevelUnlocked(game.level + 1)
+                                    ? 'NEXT LEVEL'
+                                    : 'EARN MORE STARS'
                               : 'ONE MORE RUN',
                           style: label(),
                         ),
                       ),
                     ),
+                    if (game.won &&
+                        game.mode == GameMode.classic &&
+                        game.level < ClassicLevels.count &&
+                        !profile.isClassicLevelUnlocked(game.level + 1))
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: Text(
+                          'Level ${game.level + 1} needs ${ClassicLevels.requiredStars(game.level + 1)} stars · You have ${profile.totalStars}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: cream, fontSize: 12),
+                        ),
+                      ),
                     if (game.won && !game.practice)
                       TextButton(
                         onPressed: () =>
@@ -1264,7 +1682,7 @@ class _GameScreenState extends State<GameScreen>
               guideRow(
                 '04',
                 'Go beyond ten.',
-                'Infinite begins with three hearts. A hit costs a heart and resets your combo; a nearby safe landing gives 2.5 seconds of protection while preserving the course. Gold crystals build combos up to x5. Blue shields protect for 10 seconds. Rare hearts restore a life. Keep steering to escape the rising red floor.',
+                'Infinite begins with three hearts. A hit costs a heart and resets your combo; the ball and platform blink for 2.5 seconds of protection while you keep steering from the same position. Gold crystals build combos up to x5. Blue shields protect for 10 seconds. Rare hearts restore a life. Keep steering to escape the rising red floor.',
               ),
               const Text(
                 'Desktop: W / S = left end. ↑ / ↓ = right end. Esc = pause.',
@@ -1372,7 +1790,8 @@ class _GameScreenState extends State<GameScreen>
         commandOpen = false;
         previous = null;
         accumulator = 0;
-        ticker.start();
+        if (!game.waitingForInput && !game.paused && !game.finished)
+          runTicker();
       }
     }
   }
@@ -1420,7 +1839,9 @@ class _GameScreenState extends State<GameScreen>
                   value: profile.controlMode,
                   onChanged: (mode) {
                     update(() => profile.controlMode = mode);
-                    game.setControlMode(mode);
+                    setState(() {
+                      game.setControlMode(mode);
+                    });
                     unawaited(profile.save());
                   },
                 ),

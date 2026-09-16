@@ -1,3 +1,4 @@
+import 'support/mode_navigation.dart';
 import 'package:balance_arcade/one_finger_controls.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/levels.dart';
 import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/profile.dart';
+import 'package:balance_arcade/rewards.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'game_test.dart' show advance, placeAt;
@@ -48,6 +50,9 @@ void main() {
       ..tutorialSeen = true
       ..sound = false
       ..haptics = false;
+    for (var level = 1; level <= 33; level++) {
+      p.levelRecords['twoFinger:$level'] = const LevelRecord(starMask: 7);
+    }
     await tester.pumpWidget(ArcadeApp(profile: p));
     await tester.tap(find.byTooltip('Settings'));
     await tester.pump();
@@ -64,7 +69,7 @@ void main() {
     Navigator.of(tester.element(find.text('Make yourself at home.'))).pop();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    await tester.tap(find.text('CLASSIC'));
+    await openClassicLevels(tester);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await tester.scrollUntilVisible(
