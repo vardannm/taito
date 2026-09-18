@@ -67,10 +67,10 @@ class MergeRun {
   int get upcomingGateValue =>
       gates.isNotEmpty ? gates.first.requiredValue : gateValueAt(nextGateScore);
 
-  /// 400 score -> 64, 800 -> 128, 1200 -> 256, 16400 -> 4096.
+  /// 400 score -> 128, 800 -> 256, 1200 -> 512, 16400 -> 8192.
   /// Scale with earned score, rather than doubling every 400 indefinitely.
   static int gateValueAt(int milestone) =>
-      math.pow(2, math.max(1, (milestone ~/ 4).bitLength - 1)).toInt();
+      math.pow(2, math.max(1, (milestone ~/ 2).bitLength - 1)).toInt();
 
   // Fill each ring on both sides, reversing the first side on the next ring:
   // 0, -1, +1, +2, -2, -3, +3 ... gives [2, 16, 32, 8, 4].
@@ -97,8 +97,10 @@ class MergeRun {
     return slots * spacing;
   }
 
-  double get minHeadX => platformLeft + ballRadius + leftSpan;
-  double get maxHeadX => platformRight - ballRadius - rightSpan;
+  // Only the solid middle ball is steered, and it reaches either edge of the
+  // platform. Collected segments trail past the ends instead of blocking it.
+  double get minHeadX => platformLeft + ballRadius;
+  double get maxHeadX => platformRight - ballRadius;
   double segmentX(double headX, int index) =>
       headX + segmentSlot(index) * spacing;
 

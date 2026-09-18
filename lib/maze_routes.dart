@@ -472,8 +472,10 @@ class EndlessMaze extends LaserMazeCorridor {
   double get lane => _lane;
   double get topY => _topY;
   double get climbed => 548 - _topY;
+  /// The opening is roomy and squeezes down to the veteran width over the
+  /// ramp, so the first climb is not the hardest part of a run.
   static double halfWidthAt(double climbed) =>
-      26 - 5 * (climbed / ramp).clamp(0.0, 1.0);
+      34 - 13 * (climbed / ramp).clamp(0.0, 1.0);
   static double legHeightAt(double climbed) =>
       108 - 20 * (climbed / ramp).clamp(0.0, 1.0);
 

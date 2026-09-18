@@ -21,11 +21,56 @@ void clearStream(BalanceGame game) {
 List<int> fullSnake() =>
     List.generate(MergeRun.maxSegments, (i) => 1 << (MergeRun.maxSegments - i));
 
+/// The generated geometry a carousel preview shows for [mode].
+List<double> layoutOf(BalanceGame game, GameMode mode) => switch (mode) {
+  GameMode.merge2048 => [
+    for (final orb in game.mergeRun.orbs) ...[orb.x, orb.y, orb.value + .0],
+  ],
+  GameMode.mazeEndless => [
+    for (final leg in game.mazeRun.corridor.legs) ...[
+      leg.a.x,
+      leg.a.y,
+      leg.b.x,
+      leg.b.y,
+    ],
+  ],
+  _ => [
+    for (final hole in game.board) ...[hole.x, hole.y],
+  ],
+};
+
 void main() {
   setUp(
     () => SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty(),
   );
+
+  test('every waiting carousel board matches the baked layout, then varies', () {
+    for (final mode in [
+      GameMode.merge2048,
+      GameMode.mazeEndless,
+      GameMode.infinite,
+    ]) {
+      // The bake tool renders seed 711; a live engine has consumed unknown
+      // randomness by the time the player swipes back to the mode.
+      final baked = BalanceGame(seed: 711)
+        ..start(gameMode: mode, waitForInput: true);
+      final used = BalanceGame(seed: 4242)
+        ..start(gameMode: GameMode.infinite, waitForInput: true)
+        ..start(gameMode: GameMode.classic, levelNumber: 7)
+        ..start(gameMode: mode, waitForInput: true);
+      expect(layoutOf(used, mode), layoutOf(baked, mode), reason: '$mode');
+      // The run itself is not the preview: the first touch draws a new course.
+      final varied = <List<double>>{};
+      for (final seed in [1, 2, 3, 4]) {
+        final game = BalanceGame(seed: seed)
+          ..start(gameMode: mode, waitForInput: true)
+          ..beginInput();
+        varied.add(layoutOf(game, mode));
+      }
+      expect(varied.length, greaterThan(1), reason: '$mode');
+    }
+  });
 
   test(
     'requested centered 2 16 32 8 4 layout cascades to 64 with another 2',
@@ -260,7 +305,7 @@ void main() {
       expect(run.gates.single.scoreAt, 400);
       expect(run.gates.single.y, lessThan(0));
       expect(run.pendingGates, 2);
-      run.segments[0] = 512;
+      run.segments[0] = 1024;
       for (final scoreAt in [400, 800, 1200]) {
         expect(run.gates.single.scoreAt, scoreAt);
         run.gates.single.y = 500;
@@ -270,8 +315,9 @@ void main() {
       expect(run.gatesPassed, 3);
       expect(run.gates, isEmpty);
       expect(run.nextGateScore, 1600);
-      expect(MergeRun.gateValueAt(16400), 4096);
-      expect(MergeRun.gateValueAt(4398046511104), 1099511627776);
+      expect(MergeRun.gateValueAt(400), 128);
+      expect(MergeRun.gateValueAt(16400), 8192);
+      expect(MergeRun.gateValueAt(4398046511104), 2199023255552);
     },
   );
   test(
@@ -344,21 +390,24 @@ void main() {
         g.ballY,
         closeTo(g.platformY(g.ballX) - MergeRun.ballRadius, .001),
       );
+      // Collected segments never shorten the head's reach: it still travels to
+      // either edge of the platform while they trail past the ends.
+      expect(g.mergeRun.minHeadX, MergeRun.platformLeft + MergeRun.ballRadius);
+      expect(g.mergeRun.maxHeadX, MergeRun.platformRight - MergeRun.ballRadius);
       for (final direction in [-1, 1]) {
         g.ballX = direction < 0 ? g.mergeRun.minHeadX : g.mergeRun.maxHeadX;
         g.velocity = direction * 265;
         g.step(.1);
-        for (var i = 0; i < g.mergeRun.segments.length; i++) {
-          final x = g.mergeRun.segmentX(g.ballX, i);
-          expect(
-            x - MergeRun.ballRadius,
-            greaterThanOrEqualTo(MergeRun.platformLeft),
-          );
-          expect(
-            x + MergeRun.ballRadius,
-            lessThanOrEqualTo(MergeRun.platformRight),
-          );
-        }
+        final head = g.mergeRun.segmentX(g.ballX, 0);
+        expect(head, g.ballX);
+        expect(
+          head - MergeRun.ballRadius,
+          greaterThanOrEqualTo(MergeRun.platformLeft),
+        );
+        expect(
+          head + MergeRun.ballRadius,
+          lessThanOrEqualTo(MergeRun.platformRight),
+        );
       }
     });
     test('food and gates pause, resume and reset together with $control', () {

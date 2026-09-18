@@ -767,139 +767,126 @@ class _GameScreenState extends State<GameScreen>
     },
   );
 
-  Widget scoreboard() => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  game.mazeEndless
-                      ? 'LASER MAZE / ENDLESS'
-                      : game.maze
-                      ? 'LASER MAZE / ROUTE ${game.level}'
-                      : game.merging
-                      ? '2048 / SCORE'
-                      : game.infinite
-                      ? 'INFINITE / POINTS'
-                      : 'SCORE',
-                  style: label(),
-                ),
-                Text(
-                  game.mazeEndless
-                      ? '${game.score}m'
-                      : game.maze
-                      ? '${game.score}%'
-                      : game.score.toString().padLeft(5, '0'),
-                  style: const TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    fontFamily: 'monospace',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            game.maze
-                ? formatRunTime(game.elapsed)
-                : game.merging
-                ? 'TOP ${formatMergeNumber(game.mergeRun.highest)}'
-                : game.infinite
-                ? '${game.metres}m'
-                : game.practice
-                ? 'PRACTICE'
-                : '${game.lives} BALLS',
-            style: label(),
-          ),
-        ],
-      ),
-      Text(
-        game.maze
-            ? game.mazeRun.name.toUpperCase()
-            : game.merging
-            ? 'MERGE SMALL · DODGE BIG'
-            : game.infinite
-            ? (game.dangerActive
-                  ? 'RED RISING'
-                  : game.hazardLabel.isNotEmpty
-                  ? game.hazardLabel
-                  : game.section.label)
-            : '${game.daily ? 'DAILY' : 'L${game.level.toString().padLeft(2, '0')}'}  •  HOLE ${game.target.clamp(1, 10).toString().padLeft(2, '0')} / 10',
-        style: label(
-          game.dangerActive || game.hazardLabel.isNotEmpty ? orange : ink,
-        ),
-      ),
-      if (game.infinite) ...[
-        Wrap(
-          spacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
+  /// Three tight lines. Everything the run needs, and no more, so the board
+  /// keeps the height instead of the chrome.
+  Widget scoreboard() {
+    final infinite = game.infinite;
+    final detail = infinite
+        ? 'PACE x${game.paceLevel} · COMBO x${game.survival.combo}'
+              '${game.survival.scoreBoost > 1 ? ' · GEAR x${formatBoost(game.survival.scoreBoost)}' : ''}'
+        : game.finale
+        ? (game.hazardLabel.isEmpty
+              ? 'FINALE · ${game.finaleTitle}'
+              : game.hazardLabel)
+        : game.practice || game.merging || game.maze
+        ? ''
+        : '${formatRunTime(game.elapsed)} / ${formatRunTime(game.targetTime)} · ${game.coinsCollected}/${game.coins.length} COINS';
+    final caption = infinite
+        ? (game.survival.shield > 0
+              ? 'SHIELD ${game.survival.shield.ceil()}s'
+              : game.survival.recovery > 0
+              ? 'RECOVERY ${game.survival.recovery.ceil()}s'
+              : game.survival.noticeTime > 0
+              ? game.survival.notice
+              : game.dangerActive
+              ? 'RED RISING'
+              : game.hazardLabel.isNotEmpty
+              ? game.hazardLabel
+              : game.section.label)
+        : game.maze
+        ? game.mazeRun.name.toUpperCase()
+        : game.merging
+        ? 'MERGE SMALL · DODGE BIG'
+        : '${game.daily ? 'DAILY' : 'L${game.level.toString().padLeft(2, '0')}'}  •  HOLE ${game.target.clamp(1, 10).toString().padLeft(2, '0')} / 10';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
           children: [
-            Semantics(
-              label: '${game.lives} of 3 hearts',
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (var i = 0; i < 3; i++)
-                    Icon(
-                      i < game.lives ? Icons.favorite : Icons.favorite_border,
-                      color: orange,
-                      size: 16,
-                    ),
-                ],
+            Expanded(
+              child: Text(
+                game.mazeEndless
+                    ? 'LASER MAZE / ENDLESS'
+                    : game.maze
+                    ? 'LASER MAZE / ROUTE ${game.level}'
+                    : game.merging
+                    ? '2048 / SCORE'
+                    : infinite
+                    ? 'INFINITE / POINTS'
+                    : 'SCORE',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: label(),
               ),
             ),
+            if (detail.isNotEmpty)
+              Flexible(
+                child: Text(
+                  detail,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10,
+                    letterSpacing: .8,
+                    fontWeight: FontWeight.w600,
+                    color: ink.withAlpha(185),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
             Text(
-              'PACE x${game.paceLevel} · COMBO x${game.survival.combo}',
+              game.mazeEndless
+                  ? '${game.score}m'
+                  : game.maze
+                  ? '${game.score}%'
+                  : game.score.toString().padLeft(5, '0'),
+              style: const TextStyle(
+                fontSize: 26,
+                height: 1.1,
+                fontWeight: FontWeight.w800,
+                fontFamily: 'monospace',
+              ),
+            ),
+            const Spacer(),
+            Text(
+              game.maze
+                  ? formatRunTime(game.elapsed)
+                  : game.merging
+                  ? 'TOP ${formatMergeNumber(game.mergeRun.highest)}'
+                  : infinite
+                  ? '${game.metres}m'
+                  : game.practice
+                  ? 'PRACTICE'
+                  : '${game.lives} BALLS',
               style: label(),
             ),
           ],
         ),
+        // Reserved line: notices and timers must never resize the header.
         SizedBox(
-          height: 14,
+          height: 15,
           child: Text(
-            game.survival.noticeTime > 0
-                ? game.survival.notice
-                : 'GEAR x${formatBoost(game.survival.scoreBoost)} · Gold: combo · Blue: shield · Red: heart',
+            caption,
+            key: const ValueKey('protection-status'),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 10, color: ink),
+            style: label(
+              game.dangerActive ||
+                      game.hazardLabel.isNotEmpty ||
+                      game.survival.shield > 0
+                  ? orange
+                  : ink,
+            ),
           ),
-        ),
-        // Reserve this line so shield/recovery effects never resize controls.
-        Text(
-          game.survival.shield > 0
-              ? 'SHIELD ${game.survival.shield.ceil()}s'
-              : game.survival.recovery > 0
-              ? 'RECOVERY ${game.survival.recovery.ceil()}s'
-              : ' ',
-          key: const ValueKey('protection-status'),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: label(ink),
         ),
       ],
-      if (!game.infinite && !game.practice && !game.merging && !game.maze)
-        Text(
-          '${formatRunTime(game.elapsed)} / ${formatRunTime(game.targetTime)}  ·  ${game.coinsCollected}/${game.coins.length} COINS',
-          style: TextStyle(fontSize: 10, color: ink.withAlpha(175)),
-        ),
-      if (game.finale)
-        Text(
-          game.hazardLabel.isEmpty
-              ? 'FINALE · ${game.finaleTitle}'
-              : game.hazardLabel,
-          style: const TextStyle(
-            fontSize: 10,
-            color: orange,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-    ],
-  );
+    );
+  }
 
   static const worldColors = [
     Color(0xFFE9E9DC),
@@ -1003,6 +990,40 @@ class _GameScreenState extends State<GameScreen>
                         entrance.isDismissed,
                   ),
                 ),
+                // Rides the cabinet's top-right corner while the board waits.
+                if (game.waitingForInput && !returning)
+                  LayoutBuilder(
+                    builder: (context, bounds) {
+                      final corner = BoardViewport.forGame(
+                        Size(
+                          bounds.maxWidth,
+                          math.max(
+                            1,
+                            bounds.maxHeight -
+                                (game.oneFinger
+                                    ? OneFingerControls.height
+                                    : 0),
+                          ),
+                        ),
+                        game,
+                        fillWidth: expansion,
+                      ).rect.topRight;
+                      return Stack(
+                        children: [
+                          Positioned(
+                            // Straddle the corner outward so the coin badge
+                            // beneath it stays readable.
+                            right: (bounds.maxWidth - corner.dx - 29).clamp(
+                              2.0,
+                              bounds.maxWidth,
+                            ),
+                            top: (corner.dy - 29).clamp(2.0, bounds.maxHeight),
+                            child: shopButton(),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
               ],
             )
           : Opacity(
@@ -1034,6 +1055,35 @@ class _GameScreenState extends State<GameScreen>
             ),
     );
   }
+
+  /// Corner shortcut into the gear shop, offered only while a board waits.
+  Widget shopButton() => Semantics(
+    button: true,
+    label: 'Gear shop',
+    child: Tooltip(
+      message: 'Gear shop',
+      child: Material(
+        color: cream,
+        shape: CircleBorder(side: BorderSide(color: ink.withAlpha(40))),
+        elevation: 3,
+        shadowColor: ink.withAlpha(90),
+        child: InkWell(
+          key: const ValueKey('board-shop'),
+          customBorder: const CircleBorder(),
+          onTap: carouselMoving ? null : showBallShop,
+          child: const SizedBox(
+            width: 42,
+            height: 42,
+            child: Icon(
+              Icons.storefront_rounded,
+              size: 22,
+              color: ink,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 
   Widget selectionHeader(double page) {
     final index = page.round().clamp(0, arcadeModes.length - 1);
@@ -1188,7 +1238,7 @@ class _GameScreenState extends State<GameScreen>
             : 144.0;
         final headerHeight =
             menuHeaderHeight +
-            ((game.infinite ? 104.0 : 80.0) - menuHeaderHeight) * expansion;
+            ((game.infinite ? 72.0 : 66.0) - menuHeaderHeight) * expansion;
         return ColoredBox(
           color: background,
           child: Stack(
@@ -1268,11 +1318,19 @@ class _GameScreenState extends State<GameScreen>
                                           ),
                                         ),
                                       ),
-                                      IconButton(
+                                      IconButton.filledTonal(
                                         tooltip: game.paused
                                             ? 'Resume'
                                             : 'Pause',
                                         onPressed: pause,
+                                        iconSize: 30,
+                                        constraints: const BoxConstraints
+                                            .tightFor(width: 52, height: 52),
+                                        style: IconButton.styleFrom(
+                                          padding: EdgeInsets.zero,
+                                          backgroundColor: ink.withAlpha(22),
+                                          foregroundColor: ink,
+                                        ),
                                         icon: Icon(
                                           game.paused
                                               ? Icons.play_arrow_rounded
@@ -1627,6 +1685,13 @@ class _GameScreenState extends State<GameScreen>
                         onPressed: () =>
                             start(game.mode, challengeDate: game.dailyDate),
                         child: Text('RETRY THIS BOARD', style: label(brass)),
+                      ),
+                    // A paused run can be dropped for a fresh one in any mode.
+                    if (game.paused)
+                      TextButton(
+                        onPressed: () =>
+                            start(game.mode, challengeDate: game.dailyDate),
+                        child: Text('RESTART RUN', style: label(brass)),
                       ),
                     TextButton(
                       onPressed: home,

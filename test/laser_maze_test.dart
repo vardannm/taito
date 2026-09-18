@@ -286,7 +286,8 @@ void main() {
   });
 
   test('the endless corridor tightens as the climb goes on', () {
-    expect(EndlessMaze.halfWidthAt(0), 26);
+    expect(EndlessMaze.halfWidthAt(0), 34);
+    expect(EndlessMaze.halfWidthAt(EndlessMaze.ramp / 2), 27.5);
     expect(EndlessMaze.halfWidthAt(EndlessMaze.ramp), 21);
     expect(EndlessMaze.halfWidthAt(EndlessMaze.ramp * 4), 21);
     expect(

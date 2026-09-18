@@ -487,16 +487,26 @@ class BalanceGame {
   /// The caller continues handling this same key/pointer event as movement.
   void beginInput() {
     if (!canControl || !waitingForInput) return;
-    if (infinite) {
+    if (_previewRandom != null) {
       _previewRandom = null;
       // Replace only the course. Keep pointer ownership, platform and input
       // epoch intact so this very same event also controls the new run.
-      _endlessHoles.clear();
-      coins.clear();
-      _nextRowY = 300 + _random.nextDouble() * 20;
-      _corridor = 150 + _random.nextDouble() * 60;
-      _nextCoinY = 380;
-      ensureInfiniteBoard();
+      if (infinite) {
+        _endlessHoles.clear();
+        coins.clear();
+        _nextRowY = 300 + _random.nextDouble() * 20;
+        _corridor = 150 + _random.nextDouble() * 60;
+        _nextCoinY = 380;
+        ensureInfiniteBoard();
+      }
+      if (merging) mergeRun = MergeRun(seed: _random.nextInt(1 << 30));
+      if (mazeEndless) {
+        coins.clear();
+        mazeRun = LaserMazeRun.endless(seed: _random.nextInt(1 << 30));
+        mazeRun.ensure(LaserMazeRoute.bottomY);
+        _nextCoinY = 465;
+        _nextMazeSpiderY = 320;
+      }
       ensureEndlessExtras();
     }
     waitingForInput = false;
@@ -613,7 +623,11 @@ class BalanceGame {
   }) {
     runSerial++;
     mode = gameMode;
-    _previewRandom = infinite && waitForInput ? math.Random(711) : null;
+    // Every generated mode holds the baked carousel layout while it waits, so
+    // swiping back shows the same starting position instead of a new draw.
+    _previewRandom = waitForInput && (infinite || merging || mazeEndless)
+        ? math.Random(711)
+        : null;
     // A mode switch releases the previous mode's generated world. These
     // objects own no tickers; the screen drives only this active simulation.
     if (!maze) _mazeRun = null;

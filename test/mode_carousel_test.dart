@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/main.dart';
+import 'package:balance_arcade/ball_shop.dart';
 import 'package:balance_arcade/mode_carousel.dart';
 import 'package:balance_arcade/profile.dart';
 import 'package:balance_arcade/rewards.dart';
@@ -235,6 +236,51 @@ void main() {
       },
     );
   }
+
+  for (var index = 0; index < 5; index++) {
+    testWidgets('a paused run restarts in world $index', (tester) async {
+      final game = await launch(tester, ControlMode.oneFinger);
+      await selectWorld(tester, index);
+      await startWorld(tester);
+      expect(game.waitingForInput, isFalse);
+      final serial = game.runSerial;
+      await tester.tap(find.byTooltip('Pause'));
+      await tester.pump();
+      expect(game.paused, isTrue);
+      await tester.tap(find.text('RESTART RUN'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 700));
+      expect(game.mode, arcadeModes[index]);
+      expect(game.runSerial, greaterThan(serial));
+      expect(game.paused, isFalse);
+      expect(game.score, 0);
+      // A restarted run is a fresh one, not a resumed clock.
+      expect(game.elapsed, lessThan(1));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
+
+  testWidgets('the waiting board opens the gear shop, a run hides it', (
+    tester,
+  ) async {
+    final game = await launch(tester, ControlMode.oneFinger);
+    const shop = ValueKey('board-shop');
+    expect(find.byKey(shop), findsOneWidget);
+    await tester.tap(find.byKey(shop));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(BallShop), findsOneWidget);
+    await tester.tapAt(const Offset(8, 8));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(BallShop), findsNothing);
+    await startWorld(tester);
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(game.waitingForInput, isFalse);
+    expect(find.byKey(shop), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
 
   testWidgets(
     'large text and reduced motion retain accessible mode navigation',

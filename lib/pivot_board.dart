@@ -121,11 +121,14 @@ class _PivotBoardState extends State<PivotBoard> {
       onPointerUp: release,
       onPointerCancel: release,
       child: Semantics(
-        label: game.analog
+        // Lives are painted on the board itself, so they are announced here.
+        label:
+            (game.infinite ? '${game.lives} of 3 hearts. ' : '') +
+            (game.analog
             ? 'Use the bottom left and right vertical joysticks to move the platform ends'
             : game.oneFinger
             ? 'Use the thumb area below the board to tilt and lift'
-            : 'Drag the left and right ends of the platform up or down',
+            : 'Drag the left and right ends of the platform up or down'),
         child: Stack(
           fit: StackFit.expand,
           children: [

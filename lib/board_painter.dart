@@ -13,6 +13,7 @@ import 'hazard_painter.dart';
 import 'spider_painter.dart';
 import 'cabinet.dart';
 import 'laser_maze_painter.dart';
+import 'heart_loss_effect.dart';
 
 const cream = Color(0xFFF2ECDD);
 const ink = Color(0xFF163D3B);
@@ -32,8 +33,11 @@ class BoardViewport {
     final height = BalanceGame.height * scale;
     offset = Offset(
       (size.width - BalanceGame.width * scale) / 2,
+      // Slack sits above the board during a run so it rests near the control
+      // area instead of leaving a gap between the two.
       height <= size.height
-          ? (size.height - height) / 2
+          ? (size.height - height) *
+                (.5 + .42 * fillWidth.clamp(0.0, 1.0))
           : (size.height * .72 - focusY * scale).clamp(
               size.height - height,
               0.0,
@@ -404,6 +408,26 @@ class BoardPainter extends CustomPainter {
     paintInfiniteItems(canvas, game, reducedMotion);
     paintSpecialHazards(canvas, game, reducedMotion);
     paintSpiders(canvas, game, reducedMotion);
+    if (game.infinite) {
+      // Lives ride in the board's own top-left corner, just clear of the rail.
+      canvas.save();
+      canvas.translate(38, 31);
+      for (var i = 0; i < 3; i++) {
+        final held = i < game.lives;
+        canvas.save();
+        canvas.scale(.74);
+        canvas.drawPath(
+          HeartLossPainter.heart,
+          Paint()
+            ..color = orange.withValues(alpha: held ? .9 : .3)
+            ..style = held ? PaintingStyle.fill : PaintingStyle.stroke
+            ..strokeWidth = 2.5,
+        );
+        canvas.restore();
+        canvas.translate(22, 0);
+      }
+      canvas.restore();
+    }
     if (game.infinite || game.mazeEndless) {
       canvas.drawRRect(
         RRect.fromRectAndRadius(
