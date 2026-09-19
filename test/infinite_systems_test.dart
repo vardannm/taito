@@ -69,13 +69,13 @@ void main() {
     },
   );
   test(
-    'combo crystals award increasing points once, cap at five and survive missed items',
+    'combo crystals award increasing points once, cap at seven and survive missed items',
     () {
       final g = run();
       var total = 0;
       for (var i = 0; i < 6; i++) {
         pickup(g, InfiniteItemKind.combo);
-        final combo = math.min(5, i + 2);
+        final combo = math.min(7, i + 2);
         total += 50 * combo;
         expect(g.survival.combo, combo);
         expect(g.score, total);
@@ -85,7 +85,7 @@ void main() {
       expect(g.score, score);
       g.survival.items.add(InfiniteItem(InfiniteItemKind.combo, 40, 650));
       g.step(1 / 120);
-      expect(g.survival.combo, 5);
+      expect(g.survival.combo, 7);
       expect(g.survival.items.any((i) => i.y == 650), false);
     },
   );
@@ -300,7 +300,7 @@ void main() {
       p.selectBall(BallCosmetic.steel);
       p.selectBall(BallCosmetic.neon);
       expect(p.wallet, 5);
-      g.start(gameMode: GameMode.mazeEndless);
+      g.start(gameMode: GameMode.infinite);
       g.coinsCollected = 3;
       p.bankCoins(g);
       await p.saveEconomy();

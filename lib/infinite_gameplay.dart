@@ -58,6 +58,60 @@ extension InfiniteGameplay on BalanceGame {
     }
   }
 
+  /// Starts, runs and ends a laser maze section. Gates are spaced by distance
+  /// so their rhythm holds at any ascent speed, and the section is measured in
+  /// points so it lasts the same stretch of the run however fast it is climbed.
+  void _updateMazeSection(double dt) {
+    for (final gate in mazeGates) {
+      gate.step(dt, ascentSpeed);
+    }
+    mazeGates.removeWhere((gate) => gate.y > 600);
+    _lastGateY += ascentSpeed * dt;
+    final climbed = maxHeight / 10;
+    if (!mazeSection) {
+      if (!mazeSectionsEnabled || climbed < _nextMazeMetres) return;
+      _mazeEndMetres = climbed + InfiniteTuning.mazeSectionMetres;
+      _mazeSectionTime = 0;
+      _lastGateY = 90;
+      survival.announce('LASER MAZE · steer through the gaps');
+      return;
+    }
+    _mazeSectionTime += dt;
+    // Carry the hole generator's frontier along with the camera. The maze
+    // stretch stays empty, and no backlog of rows bursts out when it ends.
+    _nextRowY = math.min(_nextRowY, -cameraOffset - 121);
+    if (climbed >= _mazeEndMetres ||
+        _mazeSectionTime >= InfiniteTuning.mazeSectionSeconds) {
+      _mazeEndMetres = 0;
+      _nextMazeMetres =
+          climbed +
+          InfiniteTuning.mazeRestMetres +
+          _random.nextDouble() * 260;
+      // A beat of clear board before ordinary hazards resume.
+      _nextHazardTime = math.max(_nextHazardTime, elapsed + 3);
+      survival.announce('MAZE CLEARED');
+      return;
+    }
+    if (_lastGateY < InfiniteTuning.mazeGateSpacing) return;
+    _lastGateY = 0;
+    // Wide by design: the opening only tightens a little as the pace rises.
+    final width = (132 - 7.0 * (paceLevel - 1)).clamp(104.0, 132.0);
+    final low = MazeGate.edge + width / 2 + 6;
+    final high = MazeGate.edge + MazeGate.span - width / 2 - 6;
+    // Each gap sits within reach of the last one, so no gate asks for a dash
+    // the ball could not make in the time it has.
+    final previous = mazeGates.isEmpty ? ballX : mazeGates.last.gapCenter;
+    final from = math.max(low, previous - InfiniteTuning.mazeGapShift);
+    final to = math.min(high, previous + InfiniteTuning.mazeGapShift);
+    mazeGates.add(
+      MazeGate(
+        y: -30,
+        gapCenter: from + _random.nextDouble() * math.max(0, to - from),
+        gapWidth: width,
+      ),
+    );
+  }
+
   void _takeInfiniteItem(InfiniteItem item) {
     survival.items.remove(item);
     final bonus = InfiniteTuning.comboPoints * paceLevel * survival.scoreBoost;
@@ -112,6 +166,22 @@ extension InfiniteGameplay on BalanceGame {
             HazardKind.formingHole => 'The warning hole opened beneath you.',
             HazardKind.movingHole => 'Caught by a moving hole.',
           },
+        ));
+    }
+    for (final gate in mazeGates) {
+      final t = gate.contact(
+        oldX,
+        oldScreenY,
+        ballX,
+        screenY(ballY),
+        BalanceGame.ballRadius,
+      );
+      if (t != null)
+        events.add((
+          t: t,
+          item: null,
+          hole: null,
+          reason: 'Laser wall. Steer through the gap.',
         ));
     }
     if (ballY + BalanceGame.ballRadius >= dangerY) {

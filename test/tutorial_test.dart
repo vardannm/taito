@@ -51,8 +51,10 @@ Future<void> moveControls(
     await tester.pump();
     final scale = tester.widget<OneFingerControls>(pad).boardScale;
     final pointer = await tester.startGesture(tester.getCenter(pad));
-    await pointer.moveBy(tilt ? Offset(75 * scale, 0) : Offset(0, dy * scale));
-    await frames(tester, 2);
+    // Lifting is a held stick outside Infinite: push it in screen space,
+    // hold it there, then let go.
+    await pointer.moveBy(tilt ? Offset(75 * scale, 0) : Offset(0, dy.sign * 50));
+    await frames(tester, tilt ? 2 : 24);
     await pointer.up();
   } else {
     final left = await tester.startGesture(

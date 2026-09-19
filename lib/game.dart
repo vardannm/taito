@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'hazards.dart';
+import 'maze_gates.dart';
 import 'levels.dart';
 import 'spiders.dart';
 import 'rewards.dart';
@@ -27,7 +28,6 @@ enum GameMode {
   daily,
   merge2048,
   laserMaze,
-  mazeEndless,
 }
 
 enum ControlMode { twoFinger, oneFinger, analog }
@@ -75,12 +75,11 @@ class BalanceGame {
   int level = 1, runSerial = 0;
   CabinetStyle cabinet = CabinetStyle.brass;
   DateTime? dailyDate;
-  bool get maze => mode == GameMode.laserMaze || mazeEndless;
-  bool get mazeEndless => mode == GameMode.mazeEndless;
+  bool get maze => mode == GameMode.laserMaze;
 
   /// Modes whose camera follows the climb instead of holding the whole board.
   bool get scrolling =>
-      infinite || mazeEndless || (maze && mazeRun.route!.tall);
+      infinite || (maze && mazeRun.route!.tall);
   double get minPivot => scrolling ? 40 - cameraOffset : 30.0;
   double get maxPivot => scrolling ? 526 - cameraOffset : 526.0;
   LaserMazeRun? _mazeRun;
@@ -122,7 +121,23 @@ class BalanceGame {
     }
   }
 
-  void releaseControl() => controlHeld = false;
+  void releaseControl() {
+    controlHeld = false;
+    _liftInput = 0;
+  }
+
+  /// Levels and mazes read the one-finger pad as a stick, so a held deflection
+  /// keeps climbing. Infinite and 2048 keep their one-to-one finger drag.
+  bool get stickLift => oneFinger && !infinite && !merging;
+
+  /// Held deflection of that stick, -1 (full up) to 1 (full down).
+  double _liftInput = 0;
+  /// Board units a second at full deflection: a whole rail in about 3.5s.
+  static const liftMotor = 140.0;
+  void setLiftInput(double value) {
+    if (!canControl || !oneFinger || !value.isFinite) return;
+    _liftInput = value.clamp(-1.0, 1.0);
+  }
 
   void dragControlVertical(double delta) {
     if (!canControl || !oneFinger || !controlHeld || !delta.isFinite) return;
@@ -207,51 +222,17 @@ class BalanceGame {
   double _nextRowY = 250, _corridor = 180;
   double cameraOffset = 0, maxHeight = 0, stallTime = 0, dangerY = 580;
   double _steeringDistance = 0;
-  double _nextCoinY = 380, _nextMazeSpiderY = 320;
+  double _nextCoinY = 380;
 
   /// Generate in world coordinates once, then prune below the camera. Coins
   /// remain separate from height so collecting them cannot inflate metres.
   void ensureEndlessExtras({bool retainForSweep = false}) {
-    if (!infinite && !mazeEndless) return;
+    if (!infinite) return;
     final ahead = -cameraOffset - 100;
-    if (mazeEndless) {
-      final road = mazeRun.corridor;
-      while (_nextMazeSpiderY >= ahead) {
-        final y = _nextMazeSpiderY;
-        final eligible =
-            road.legs
-                .where(
-                  (leg) =>
-                      leg.primary &&
-                      ((leg.a.y + leg.b.y) / 2 - y).abs() < 150 &&
-                      LaserMazeCorridor.pointDistance(leg.a, leg.b) >= 80,
-                )
-                .toList()
-              ..shuffle(_random);
-        for (final leg in eligible) {
-          final bug = MazeSpider.beside(road, leg, _random);
-          if (bug == null ||
-              spiders.any(
-                (s) =>
-                    math.pow(s.homeX - bug.homeX, 2) +
-                        math.pow(s.homeY - bug.homeY, 2) <
-                    150 * 150,
-              ))
-            continue;
-          spiders.add(bug);
-          break;
-        }
-        _nextMazeSpiderY -= 230 + _random.nextDouble() * 100;
-      }
-      spiders.removeWhere((s) => screenY(s.y) > 660);
-    }
     while (_nextCoinY >= ahead) {
       final y = _nextCoinY;
       for (var attempt = 0; attempt < 100; attempt++) {
         final x = 38 + _random.nextDouble() * 284;
-        if (mazeEndless &&
-            mazeRun.corridor.firstContact(x, y, x, y, 12) != null)
-          continue;
         if (board.any(
           (h) => math.pow(h.x - x, 2) + math.pow(h.y - y, 2) < 30 * 30,
         ))
@@ -284,11 +265,25 @@ class BalanceGame {
       (InfiniteTuning.baseTopSpeed - InfiniteTuning.startSpeed) * difficulty +
       (infinite ? InfiniteTuning.paceSpeedBonus * (pace - 1) : 0);
   final specialHazards = <SpecialHazard>[];
+  /// Infinite's laser maze interludes: a stretch where the hole stream stops
+  /// and wide laser gates come down instead.
+  final mazeGates = <MazeGate>[];
+
+  /// Turns the interludes off for callers that want the plain hole climb,
+  /// including tests that isolate the ordinary hazard scheduler.
+  bool mazeSectionsEnabled = true;
+  double _nextMazeMetres = 0, _mazeEndMetres = 0, _lastGateY = 0;
+  double _mazeSectionTime = 0;
+  bool get mazeSection =>
+      infinite && mazeSectionsEnabled && _mazeEndMetres > 0;
   double _nextHazardTime = 0;
   int _introducedHazards = 0, _hazardSequence = 0, _hardHazardSequence = 0;
   bool fellThroughGap = false;
-  String get hazardLabel =>
-      specialHazards.isEmpty ? '' : specialHazards.first.label;
+  String get hazardLabel => mazeSection
+      ? 'LASER MAZE'
+      : specialHazards.isEmpty
+      ? ''
+      : specialHazards.first.label;
 
   void _updateSpecialHazards(double dt) {
     specialHazards.removeWhere((h) => h.expired || h.y > 620);
@@ -296,6 +291,7 @@ class BalanceGame {
       hazard.step(dt, ascentSpeed, cameraOffset: cameraOffset);
     }
     if (specialHazards.isNotEmpty ||
+        mazeSection ||
         elapsed < _nextHazardTime ||
         metres < 180 ||
         section == InfiniteSection.breath)
@@ -434,7 +430,9 @@ class BalanceGame {
     message = dangerActive
         ? 'KEEP STEERING! The red is rising.'
         : 'Tilt to dodge. The board keeps moving.';
-    ensureInfiniteBoard(retainForSweep: true);
+    _updateMazeSection(dt);
+    // The maze replaces the course while it lasts: no new holes fall into it.
+    if (!mazeSection) ensureInfiniteBoard(retainForSweep: true);
     ensureEndlessExtras(retainForSweep: true);
     _ensureInfiniteItems();
     if (survival.noticeTime > 0) message = survival.notice;
@@ -496,17 +494,16 @@ class BalanceGame {
         coins.clear();
         _nextRowY = 300 + _random.nextDouble() * 20;
         _corridor = 150 + _random.nextDouble() * 60;
+        // Drawn in the same order as a fresh start, so waiting first and
+        // playing straight away consume identical run randomness.
+        _nextMazeMetres =
+            InfiniteTuning.mazeFirstMetres + _random.nextDouble() * 120;
+        mazeGates.clear();
+        _mazeEndMetres = _lastGateY = _mazeSectionTime = 0;
         _nextCoinY = 380;
         ensureInfiniteBoard();
       }
       if (merging) mergeRun = MergeRun(seed: _random.nextInt(1 << 30));
-      if (mazeEndless) {
-        coins.clear();
-        mazeRun = LaserMazeRun.endless(seed: _random.nextInt(1 << 30));
-        mazeRun.ensure(LaserMazeRoute.bottomY);
-        _nextCoinY = 465;
-        _nextMazeSpiderY = 320;
-      }
       ensureEndlessExtras();
     }
     waitingForInput = false;
@@ -577,6 +574,7 @@ class BalanceGame {
   void clearInput() {
     controlHeld = false;
     _controlLift = 0;
+    _liftInput = 0;
     leftSpeed = rightSpeed = 0;
     pivotTargets.fillRange(0, 2, null);
     _released.fillRange(0, 2, false);
@@ -625,7 +623,7 @@ class BalanceGame {
     mode = gameMode;
     // Every generated mode holds the baked carousel layout while it waits, so
     // swiping back shows the same starting position instead of a new draw.
-    _previewRandom = waitForInput && (infinite || merging || mazeEndless)
+    _previewRandom = waitForInput && (infinite || merging)
         ? math.Random(711)
         : null;
     // A mode switch releases the previous mode's generated world. These
@@ -638,8 +636,6 @@ class BalanceGame {
     );
     controlMode = preferredControlMode;
     if (merging) mergeRun = MergeRun(seed: _random.nextInt(1 << 30));
-    if (mazeEndless)
-      mazeRun = LaserMazeRun.endless(seed: _random.nextInt(1 << 30));
     dailyDate = daily
         ? DailyChallenge.day(challengeDate ?? DateTime.now())
         : null;
@@ -689,15 +685,17 @@ class BalanceGame {
     _nextRowY = 300 + _random.nextDouble() * 20;
     _corridor = 150 + _random.nextDouble() * 60;
     specialHazards.clear();
+    mazeGates.clear();
+    _nextMazeMetres =
+        InfiniteTuning.mazeFirstMetres + _random.nextDouble() * 120;
+    _mazeEndMetres = _lastGateY = _mazeSectionTime = 0;
     _nextHazardTime = 0;
     _introducedHazards = _hazardSequence = _hardHazardSequence = 0;
     fellThroughGap = false;
     _endlessHoles.clear();
     score = 0;
     if (infinite) ensureInfiniteBoard();
-    if (mazeEndless) mazeRun.ensure(LaserMazeRoute.bottomY);
-    _nextCoinY = mazeEndless ? 465 : 380;
-    _nextMazeSpiderY = 320;
+    _nextCoinY = 380;
     ensureEndlessExtras();
     target = 1;
     lives = merging || maze ? 1 : InfiniteTuning.maxLives;
@@ -709,9 +707,7 @@ class BalanceGame {
     inputLocked = false;
     phase = GamePhase.playing;
     event = null;
-    message = mazeEndless
-        ? 'Climb as far as you can. Every wall is fatal.'
-        : maze
+    message = maze
         ? 'Stay between the red lasers. Reach the checkered finish.'
         : merging
         ? mergeRun.notice
@@ -854,16 +850,19 @@ class BalanceGame {
       final climbing =
           !maze ||
           mazeRun.corridor.canClimb(ballX, ballY, mazeClearance) ||
-          (!mazeEndless && ballY <= mazeRun.route!.finishLineY + mazeClearance);
+          ballY <= mazeRun.route!.finishLineY + mazeClearance;
       final lift = climbing ? 14 * dt : 0.0;
+      // Two lift models. Infinite reads the finger one-to-one. Levels and
+      // mazes read the pad as a stick, so a held deflection keeps climbing
+      // until the platform reaches the rail. Both keep the headroom the tilt
+      // needs, so the bar never hangs off the board.
+      final push = stickLift ? _liftInput * liftMotor * dt : 0.0;
       final center =
           (controlHeld || _controlLift != 0
-                  ? (left + right) / 2 + _controlLift
+                  ? (left + right) / 2 + _controlLift + push
                   : maze
                   ? math.max(
-                      mazeEndless
-                          ? minimum
-                          : mazeRun.route!.finishLineY + ballRadius,
+                      mazeRun.route!.finishLineY + ballRadius,
                       (left + right) / 2 - lift,
                     )
                   : (left + right) / 2)
@@ -930,28 +929,12 @@ class BalanceGame {
       if (scrolling) {
         if (screenY(ballY) < 360) cameraOffset = math.max(0, 360 - ballY);
         if (screenY(ballY) > 440) cameraOffset = math.max(0, 440 - ballY);
-        if (!mazeEndless) {
-          cameraOffset = math.min(
-            cameraOffset,
-            LaserMazeCorridor.finishY - mazeRun.route!.finishLineY,
-          );
-        }
+        cameraOffset = math.min(
+          cameraOffset,
+          LaserMazeCorridor.finishY - mazeRun.route!.finishLineY,
+        );
       }
-      if (mazeEndless) {
-        maxHeight = math.max(maxHeight, LaserMazeCorridor.startY - ballY);
-        score = (maxHeight / 10).floor();
-        if (!mazeRun.ended) {
-          // Follow downward returns too, while score retains the highest climb.
-          mazeRun.ensure(ballY);
-          ensureEndlessExtras();
-        }
-      } else {
-        score = (mazeRun.progress * 100).floor();
-      }
-      if (mazeEndless && !mazeRun.ended) {
-        if (_updateSpiders(dt, oldX, oldY)) return;
-        _collectCoins(oldX, oldY, ballX, ballY);
-      }
+      score = (mazeRun.progress * 100).floor();
       return;
     }
     if (merging) {
@@ -1064,9 +1047,7 @@ class BalanceGame {
       streak = 0;
       lastSuccess = false;
       caughtBySpider = true;
-      message = mazeEndless
-          ? 'Caught in an active bug zone. Amber warns; red catches.'
-          : 'Caught by a spider. Stay outside its territory.';
+      message = 'Caught by a spider. Stay outside its territory.';
       event = GameEvent.miss;
       phase = GamePhase.over;
       velocity = 0;

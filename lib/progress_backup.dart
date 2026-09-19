@@ -25,8 +25,10 @@ class ProgressBackup {
       p.mergeHighest,
       p.mergeRuns,
       p.mazeRuns,
-      p.mazeEndlessBest,
-      p.mazeEndlessRuns,
+      // Two retired Maze Infinite counters. The slots stay so codes written
+      // before the mode was removed still decode by position.
+      0,
+      0,
       p.wallet,
     ],
     'control': p.controlMode.name,
@@ -93,8 +95,7 @@ class ProgressBackup {
       ..mergeHighest = n[6]
       ..mergeRuns = n[7]
       ..mazeRuns = n[8]
-      ..mazeEndlessBest = n[9]
-      ..mazeEndlessRuns = n[10]
+      // n[9] and n[10] are the retired Maze Infinite counters.
       ..wallet = n[11]
       ..controlMode = choice(d['control'], ControlMode.values)
       ..classicLevel = integer(d['level'], ClassicLevels.count)
@@ -189,8 +190,6 @@ class ProgressBackup {
       ..mergeHighest = source.mergeHighest
       ..mergeRuns = source.mergeRuns
       ..mazeRuns = source.mazeRuns
-      ..mazeEndlessBest = source.mazeEndlessBest
-      ..mazeEndlessRuns = source.mazeEndlessRuns
       ..wallet = source.wallet
       ..controlMode = source.controlMode
       ..classicLevel = source.classicLevel

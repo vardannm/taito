@@ -36,7 +36,7 @@ class PlayerProfile {
   Future<void> _economyWrites = Future<void>.value();
 
   bool bankCoins(BalanceGame game) {
-    if (!game.infinite && !game.mazeEndless) return false;
+    if (!game.infinite) return false;
     final previous = _bankedCoins[game];
     final count = previous?.serial == game.runSerial ? previous!.count : 0;
     final delta = game.coinsCollected - count;
@@ -126,7 +126,6 @@ class PlayerProfile {
   ControlMode controlMode = ControlMode.twoFinger;
   int classicLevel = 1;
   int mazeLevel = 1, mazeRuns = 0;
-  int mazeEndlessBest = 0, mazeEndlessRuns = 0;
   final mazeBestTimes = <String, double>{};
   double? mazeBestTime(int route, [ControlMode? control]) =>
       mazeBestTimes[recordKey(route, control ?? controlMode)];
@@ -181,14 +180,6 @@ class PlayerProfile {
 
   bool recordResult(BalanceGame game) {
     bankCoins(game);
-    if (game.mazeEndless) {
-      if (!game.finished || _recordedRuns[game] == game.runSerial) return false;
-      _recordedRuns[game] = game.runSerial;
-      mazeEndlessRuns++;
-      final improved = game.score > mazeEndlessBest;
-      if (improved) mazeEndlessBest = game.score;
-      return improved;
-    }
     if (game.maze) {
       if (!game.finished || _recordedRuns[game] == game.runSerial) return false;
       _recordedRuns[game] = game.runSerial;
@@ -285,10 +276,6 @@ class PlayerProfile {
         mazeLevel = (data['selected'] as int).clamp(1, LaserMazeRoute.count);
       if (data['runs'] is int)
         mazeRuns = (data['runs'] as int).clamp(0, 1 << 30);
-      if (data['endlessBest'] is int)
-        mazeEndlessBest = (data['endlessBest'] as int).clamp(0, 1 << 30);
-      if (data['endlessRuns'] is int)
-        mazeEndlessRuns = (data['endlessRuns'] as int).clamp(0, 1 << 30);
       final times = data['times'];
       if (times is! Map<String, dynamic>) return;
       for (final entry in times.entries) {
@@ -355,8 +342,6 @@ class PlayerProfile {
         jsonEncode({
           'selected': mazeLevel,
           'runs': mazeRuns,
-          'endlessBest': mazeEndlessBest,
-          'endlessRuns': mazeEndlessRuns,
           'times': mazeBestTimes,
         }),
       );
@@ -396,6 +381,24 @@ class PlayerProfile {
 
 class GameFeedback {
   AudioPlayer? _player;
+  static bool _sharedContext = false;
+
+  /// Effects and music are two players in one app. Left at the plugin's
+  /// default, every effect requests full audio focus, and Android answers by
+  /// revoking it from the music, which then stops for good. Mixing instead of
+  /// grabbing focus lets the coin land over the loop.
+  Future<void> _shareAudioFocus() async {
+    if (_sharedContext) return;
+    _sharedContext = true;
+    try {
+      await AudioPlayer.global.setAudioContext(
+        AudioContextConfig(focus: AudioContextConfigFocus.mixWithOthers)
+            .build(),
+      );
+    } catch (_) {
+      /* An unavailable audio platform must never interrupt a run. */
+    }
+  }
   Future<void> play(GameEvent event, PlayerProfile profile) async {
     if (profile.haptics) {
       if (event == GameEvent.miss) {
@@ -406,6 +409,7 @@ class GameFeedback {
     }
     if (!profile.sound) return;
     try {
+      await _shareAudioFocus();
       await (_player ??= AudioPlayer()).play(
         AssetSource(
           'audio/${event == GameEvent.merge
@@ -421,7 +425,49 @@ class GameFeedback {
     }
   }
 
+  AudioPlayer? _music;
+  String? _track;
+  bool _musicPlaying = false;
+
+  /// Background music for the modes that want one. Passing a null track stops
+  /// it; [playing] false holds it where it is, so pausing a run and resuming
+  /// picks the loop up again rather than restarting it.
+  Future<void> updateMusic({
+    required String? track,
+    required bool playing,
+    double volume = .32,
+  }) async {
+    if (track == _track && (track == null || playing == _musicPlaying)) return;
+    try {
+      if (track == null) {
+        _track = null;
+        _musicPlaying = false;
+        await _music?.stop();
+        return;
+      }
+      await _shareAudioFocus();
+      final music = _music ??= AudioPlayer()
+        ..setReleaseMode(ReleaseMode.loop);
+      if (track != _track) {
+        _track = track;
+        _musicPlaying = true;
+        await music.setVolume(volume);
+        await music.play(AssetSource(track), volume: volume);
+        if (!playing) {
+          _musicPlaying = false;
+          await music.pause();
+        }
+        return;
+      }
+      _musicPlaying = playing;
+      await (playing ? music.resume() : music.pause());
+    } catch (_) {
+      /* Audio restrictions must never interrupt a run. */
+    }
+  }
+
   void dispose() {
     _player?.dispose();
+    _music?.dispose();
   }
 }

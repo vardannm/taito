@@ -30,7 +30,6 @@ void main() {
     for (final mode in [
       GameMode.infinite,
       GameMode.classic,
-      GameMode.mazeEndless,
       GameMode.laserMaze,
       GameMode.merge2048,
     ]) {

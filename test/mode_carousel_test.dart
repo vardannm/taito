@@ -36,7 +36,7 @@ void main() {
         InMemorySharedPreferencesAsync.empty(),
   );
 
-  testWidgets('five worlds swipe in order, snap, and never simulate previews', (
+  testWidgets('every world swipes in order, snaps, and never simulates previews', (
     tester,
   ) async {
     final game = await launch(tester, ControlMode.twoFinger);
@@ -45,9 +45,9 @@ void main() {
           .widget<PageView>(find.byType(PageView))
           .childrenDelegate
           .estimatedChildCount,
-      5,
+      arcadeModes.length,
     );
-    for (var index = 0; index < 5; index++) {
+    for (var index = 0; index < arcadeModes.length; index++) {
       if (index > 0) await swipe(tester);
       expect(carousel(tester).page, closeTo(index.toDouble(), .001));
       expect(game.mode, arcadeModes[index]);
@@ -59,8 +59,8 @@ void main() {
       expect(tester.takeException(), isNull);
     }
     await swipe(tester); // End stays on 2048.
-    expect(carousel(tester).page, 4);
-    for (var index = 3; index >= 0; index--) {
+    expect(carousel(tester).page, arcadeModes.length - 1);
+    for (var index = arcadeModes.length - 2; index >= 0; index--) {
       await swipe(tester, forward: false);
       expect(game.mode, arcadeModes[index]);
       expect(carousel(tester).page, index);
@@ -71,7 +71,7 @@ void main() {
   });
 
   for (final control in ControlMode.values) {
-    for (var index = 0; index < 5; index++) {
+    for (var index = 0; index < arcadeModes.length; index++) {
       testWidgets(
         '$control starts world $index with the same pointer and locks swipes',
         (tester) async {
@@ -84,7 +84,9 @@ void main() {
           final left = game.left;
           final finger = await tester.startGesture(
             contact(tester, game),
-            pointer: 20,
+            // Well clear of the pointer ids flutter_test assigns to the
+            // swipes below, which are separate gestures of their own.
+            pointer: 520,
           );
           await finger.moveBy(const Offset(5, -5));
           expect(game.waitingForInput, isFalse);
@@ -117,8 +119,9 @@ void main() {
           await tester.pump();
           expect(game.mode, arcadeModes[index]);
           expect(game.waitingForInput, isTrue);
-          await swipe(tester, forward: index < 4);
-          expect(carousel(tester).page, index < 4 ? index + 1 : index - 1);
+          final last = arcadeModes.length - 1;
+          await swipe(tester, forward: index < last);
+          expect(carousel(tester).page, index < last ? index + 1 : index - 1);
           expect(tester.takeException(), isNull);
           await tester.pumpWidget(const SizedBox());
         },
@@ -157,7 +160,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pump();
-    await selectWorld(tester, 3);
+    await selectWorld(tester, 2);
     expect(find.text('Maze • Level 12'), findsOneWidget);
     await startWorld(tester);
     expect(game.level, 12);
@@ -237,7 +240,7 @@ void main() {
     );
   }
 
-  for (var index = 0; index < 5; index++) {
+  for (var index = 0; index < arcadeModes.length; index++) {
     testWidgets('a paused run restarts in world $index', (tester) async {
       final game = await launch(tester, ControlMode.oneFinger);
       await selectWorld(tester, index);
@@ -293,7 +296,7 @@ void main() {
         tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
       );
       final game = await launch(tester, ControlMode.analog);
-      for (var index = 1; index < 5; index++) {
+      for (var index = 1; index < arcadeModes.length; index++) {
         await tester.tap(find.byTooltip('Next mode'));
         await tester.pump();
         expect(game.mode, arcadeModes[index]);

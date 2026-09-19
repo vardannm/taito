@@ -11,16 +11,12 @@ class LaserMazePicker extends StatelessWidget {
     required this.selected,
     required this.onSelected,
     required this.control,
-    required this.onEndless,
     this.bestTimes = const {},
-    this.endlessBest = 0,
   });
   final int selected;
   final ControlMode control;
   final Map<int, double> bestTimes;
-  final int endlessBest;
   final ValueChanged<int> onSelected;
-  final VoidCallback onEndless;
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, bounds) {
@@ -61,85 +57,6 @@ class LaserMazePicker extends StatelessWidget {
                     ),
                   ),
                 ],
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
-              child: Semantics(
-                button: true,
-                label: 'Endless laser maze',
-                child: Material(
-                  color: ink,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    side: const BorderSide(color: orange),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: InkWell(
-                    key: const ValueKey('maze-endless'),
-                    onTap: onEndless,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            width: 44,
-                            height: 68,
-                            child: CustomPaint(
-                              painter: EndlessMazePreview(7),
-                              child: const SizedBox.expand(),
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Text(
-                                  'ENDLESS',
-                                  style: TextStyle(
-                                    fontSize: 19,
-                                    fontWeight: FontWeight.w900,
-                                    color: cream,
-                                    letterSpacing: 1,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  'Random branches, loops and downward returns. Bugs stay outside: amber warns, red zones catch. Collect coins along the road.',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    height: 1.35,
-                                    color: Color(0xFFCAD5CD),
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  endlessBest > 0
-                                      ? 'BEST $endlessBest M'
-                                      : 'CLIMB AS FAR AS YOU CAN',
-                                  style: const TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w800,
-                                    color: brass,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Icon(
-                            Icons.arrow_forward_rounded,
-                            size: 20,
-                            color: brass,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
               ),
             ),
           ),
@@ -272,11 +189,7 @@ class LaserMazeResult extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              game.won
-                  ? 'Finish reached.'
-                  : game.mazeEndless
-                  ? 'The climb ends here.'
-                  : 'Laser contact.',
+              game.won ? 'Finish reached.' : 'Laser contact.',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 27,
@@ -286,32 +199,19 @@ class LaserMazeResult extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              game.mazeEndless
-                  ? 'ENDLESS CLIMB'
-                  : 'ROUTE ${game.level} · ${game.mazeRun.name}',
+              'ROUTE ${game.level} · ${game.mazeRun.name}',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 12, color: brass),
             ),
             const SizedBox(height: 8),
             Text(
-              game.mazeEndless
-                  ? '${newBest ? 'NEW BEST · ' : ''}${game.score} m climbed'
-                  : game.won
+              game.won
                   ? '${newBest ? 'NEW BEST · ' : ''}${formatRunTime(game.elapsed)}'
                   : '${game.score}% reached. Stay between the red walls.',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 12, color: Color(0xFFCAD5CD)),
             ),
             const SizedBox(height: 18),
-            if (game.mazeEndless)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(
-                  '${game.coinsCollected} coins · ${game.caughtBySpider ? 'Caught by a spider' : 'Laser contact'}',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 12, color: brass),
-                ),
-              ),
             SizedBox(
               width: double.infinity,
               child: FilledButton(
@@ -321,9 +221,7 @@ class LaserMazeResult extends StatelessWidget {
                 ),
                 onPressed: game.won ? onNext ?? onLevels : onRetry,
                 child: Text(
-                  game.mazeEndless
-                      ? 'CLIMB AGAIN'
-                      : game.won
+                  game.won
                       ? (onNext != null ? 'NEXT ROUTE' : 'CHOOSE A ROUTE')
                       : 'RETRY ROUTE',
                 ),
@@ -332,7 +230,7 @@ class LaserMazeResult extends StatelessWidget {
             Wrap(
               alignment: WrapAlignment.center,
               children: [
-                if (game.won && !game.mazeEndless)
+                if (game.won)
                   TextButton(
                     onPressed: onRetry,
                     child: const Text(

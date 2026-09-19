@@ -26,14 +26,6 @@ List<double> layoutOf(BalanceGame game, GameMode mode) => switch (mode) {
   GameMode.merge2048 => [
     for (final orb in game.mergeRun.orbs) ...[orb.x, orb.y, orb.value + .0],
   ],
-  GameMode.mazeEndless => [
-    for (final leg in game.mazeRun.corridor.legs) ...[
-      leg.a.x,
-      leg.a.y,
-      leg.b.x,
-      leg.b.y,
-    ],
-  ],
   _ => [
     for (final hole in game.board) ...[hole.x, hole.y],
   ],
@@ -46,11 +38,7 @@ void main() {
   );
 
   test('every waiting carousel board matches the baked layout, then varies', () {
-    for (final mode in [
-      GameMode.merge2048,
-      GameMode.mazeEndless,
-      GameMode.infinite,
-    ]) {
+    for (final mode in [GameMode.merge2048, GameMode.infinite]) {
       // The bake tool renders seed 711; a live engine has consumed unknown
       // randomness by the time the player swipes back to the mode.
       final baked = BalanceGame(seed: 711)
@@ -450,7 +438,7 @@ void main() {
         ..controlMode = ControlMode.analog;
       await tester.pumpWidget(ArcadeApp(profile: p));
 
-      await selectWorld(tester, 4);
+      await selectWorld(tester, 3);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 600));
       await startWorld(tester);

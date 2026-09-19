@@ -292,7 +292,7 @@ void main() {
       final g = BalanceGame()
         ..setControlMode(ControlMode.oneFinger)
         ..start(gameMode: mode);
-      if (g.infinite) g.board.clear();
+      g.board.clear(); // Platform travel only; no holes to sink into.
       final frame = ValueNotifier(0);
       await tester.pumpWidget(
         MaterialApp(
@@ -307,12 +307,37 @@ void main() {
       final scale = tester.widget<OneFingerControls>(pad).boardScale;
       final start = tester.getCenter(pad);
       final finger = await tester.startGesture(start);
+      // Tilt fully from mid-board, where every mode has room for the whole bar.
+      await finger.moveBy(Offset(0, -160 * scale));
+      g.step(1 / 120);
       await finger.moveBy(Offset(200 * scale, 0));
       g.step(1 / 120);
       expect(g.right - g.left, closeTo(140, .001));
       await finger.moveBy(Offset(-400 * scale, 0));
       g.step(1 / 120);
       expect(g.right - g.left, closeTo(-140, .001));
+      if (g.infinite) {
+        // Infinite steers one-to-one: the platform tracks the finger exactly,
+        // and a held position adds nothing of its own.
+        final before = (g.left + g.right) / 2;
+        await finger.moveBy(Offset(0, -40 * scale));
+        g.step(1 / 120);
+        expect((g.left + g.right) / 2, lessThan(before - 39));
+      } else {
+        // Levels and mazes hold a stick: pushed up and held, the platform
+        // climbs on its own until it reaches the top of its travel.
+        await finger.moveBy(const Offset(0, -60));
+        for (var i = 0; i < 360; i++) {
+          g.step(1 / 120);
+        }
+        expect(math.min(g.left, g.right), closeTo(g.minPivot, .001));
+        // Pushed the other way it runs all the way back down.
+        await finger.moveBy(const Offset(0, 400));
+        for (var i = 0; i < 720; i++) {
+          g.step(1 / 120);
+        }
+        expect(math.max(g.left, g.right), closeTo(g.maxPivot, .001));
+      }
       g.setPaused(true);
       final left = g.left;
       await finger.moveBy(Offset(50, 0));

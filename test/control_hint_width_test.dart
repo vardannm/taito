@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/board_painter.dart';
+import 'package:balance_arcade/mode_carousel.dart';
 import 'package:balance_arcade/control_hint.dart';
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/main.dart';
@@ -52,7 +53,7 @@ void main() {
         '$control painted gameplay actually fills the width at $size',
         (tester) async {
           final game = await launch(tester, control, size: size);
-          for (var mode = 0; mode < 5; mode++) {
+          for (var mode = 0; mode < arcadeModes.length; mode++) {
             await selectWorld(tester, mode);
             await startWorld(tester);
             await tester.pump(const Duration(milliseconds: 600));

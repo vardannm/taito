@@ -11,12 +11,22 @@ abstract final class InfiniteTuning {
   static const startSpeed = 68.0, baseTopSpeed = 180.0, paceSpeedBonus = 9.0;
   static const coinSpacing = 85.0, coinSpacingJitter = 65.0;
   static const visualIntensity = 1.0, maxParticles = 24;
-  static const maxLives = 3, maxPace = 5, maxCombo = 5;
+  static const maxLives = 3, maxPace = 5, maxCombo = 7;
   static const shieldSeconds = 10.0, recoverySeconds = 2.5;
   static const metresPerPace = 150.0, comboPoints = 50;
   static const firstComboY = 190.0, firstShieldY = -950.0;
   static const firstHeartY = -1650.0;
   static const comboSpacing = 280.0, shieldSpacing = 2400.0;
+  /// Laser maze sections, measured in metres climbed: the first arrives here,
+  /// each covers this stretch, and the next follows after this much clear air.
+  /// Distance, not score, so a lucky crystal cannot cut a maze short.
+  static const mazeFirstMetres = 220.0, mazeSectionMetres = 170.0;
+  static const mazeRestMetres = 380.0, mazeGateSpacing = 290.0;
+  /// How far a gap may move between gates, so the run is always steerable.
+  static const mazeGapShift = 150.0;
+  /// A section also ends on the clock, so a stalled climb cannot sit inside a
+  /// maze that its own distance would never finish.
+  static const mazeSectionSeconds = 38.0;
   static const heartSpacing = 3600.0, maxItems = 12;
   static int startingPace(int bestMetres) => bestMetres >= 450
       ? 3
@@ -66,7 +76,9 @@ class InfiniteProgress {
     recovery = math.max(0, recovery - dt);
     flash = math.max(0, flash - dt);
     noticeTime = math.max(0, noticeTime - dt);
-    visualCombo += ((combo - 1) / 4 - visualCombo) * (1 - math.exp(-5 * dt));
+    visualCombo +=
+        ((combo - 1) / (InfiniteTuning.maxCombo - 1) - visualCombo) *
+        (1 - math.exp(-5 * dt));
     if (metres > scoredMetres) {
       points +=
           (metres - scoredMetres) *

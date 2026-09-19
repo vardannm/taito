@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'game.dart';
-import 'spiders.dart';
 
 void paintSpiderBackdrop(Canvas c, BalanceGame game) {
   if (game.spiders.isEmpty) return;
@@ -44,59 +43,11 @@ void paintSpiderBackdrop(Canvas c, BalanceGame game) {
     c.restore();
   }
   for (final s in game.spiders) {
-    final bug = s is MazeSpider ? s : null;
-    final radius = bug?.catchingRadius ?? s.zoneRadius;
+    final radius = s.zoneRadius;
     final center = Offset(s.zoneX, game.screenY(s.zoneY)),
-        color = bug != null
-            ? bug.active
-                  ? const Color(0xFFF25454)
-                  : bug.warning
-                  ? const Color(0xFFFFC568)
-                  : const Color(0xFF728E83)
-            : s.chasing
+        color = s.chasing
             ? const Color(0xFFEF6654)
             : const Color(0xFF725138);
-    if (bug != null && (bug.warning || bug.active)) {
-      final road = Path();
-      for (final r in game.mazeRun.corridor.rects) {
-        road.addRect(
-          Rect.fromLTRB(
-            r.left,
-            game.screenY(r.top),
-            r.right,
-            game.screenY(r.bottom),
-          ),
-        );
-      }
-      c.save();
-      c.clipPath(road);
-      c.drawCircle(
-        center,
-        radius,
-        Paint()..color = color.withAlpha(bug.active ? 105 : 40),
-      );
-      c.restore();
-      if (bug.warning) {
-        c.drawCircle(
-          center,
-          bug.maxZone,
-          Paint()
-            ..color = color.withAlpha(70)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1,
-        );
-        c.drawArc(
-          Rect.fromCircle(center: center, radius: bug.maxZone + 2),
-          -math.pi / 2,
-          math.pi * 2 * bug.warningProgress,
-          false,
-          Paint()
-            ..color = color
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 2,
-        );
-      }
-    }
     c.drawCircle(
       center,
       radius,
@@ -134,14 +85,7 @@ void paintSpiders(Canvas c, BalanceGame game, bool reducedMotion) {
     c.translate(spider.x, game.screenY(spider.y));
     c.rotate(spider.heading);
     c.scale(spider.bodyRadius / 6);
-    final bug = spider is MazeSpider ? spider : null;
-    final color = bug != null
-        ? bug.active
-              ? const Color(0xFF9E262C)
-              : bug.warning
-              ? const Color(0xFF92601F)
-              : const Color(0xFF253C34)
-        : spider.chasing
+    final color = spider.chasing
         ? const Color(0xFF80251F)
         : const Color(0xFF253C34);
     final legs = Paint()

@@ -45,7 +45,11 @@ void main() {
   );
   test('hard variants alternate only in late encounter sections', () {
     for (final height in [9000.0, 12600.0, 13500.0, 12000.0]) {
-      final g = BalanceGame(seed: 42)..start(gameMode: GameMode.infinite);
+      final g = BalanceGame(seed: 42)
+        ..start(gameMode: GameMode.infinite)
+        // Laser maze sections have their own tests; this one is about the
+        // ordinary hazard scheduler.
+        ..mazeSectionsEnabled = false;
       final variants = <bool>[];
       for (var i = 0; i < 10; i++) {
         g.maxHeight = height;
@@ -140,7 +144,11 @@ void main() {
   test(
     'all four milestones introduce their hazards in order without stacking',
     () {
-      final game = BalanceGame()..start(gameMode: GameMode.infinite);
+      final game = BalanceGame()
+        ..start(gameMode: GameMode.infinite)
+        // Laser maze sections have their own tests; this one is about the
+        // ordinary hazard scheduler.
+        ..mazeSectionsEnabled = false;
       game.maxHeight = 290;
       game.step(1 / 120);
       expect(game.specialHazards, isEmpty);

@@ -225,36 +225,4 @@ class MazeRoutePreview extends CustomPainter {
       number != oldDelegate.number;
 }
 
-/// Preview of the endless corridor for the mode card.
-class EndlessMazePreview extends CustomPainter {
-  EndlessMazePreview(this.seed);
-  final int seed;
-  @override
-  void paint(Canvas canvas, Size size) {
-    final maze = EndlessMaze(seed: seed);
-    canvas.save();
-    // The generated road runs past the top of the card.
-    canvas.clipRect(Offset.zero & size);
-    canvas.scale(size.width / 360, size.height / 560);
-    final beams = Path();
-    for (final wall in maze.walls) {
-      beams
-        ..moveTo(wall.a.x, wall.a.y)
-        ..lineTo(wall.b.x, wall.b.y);
-    }
-    canvas.drawPath(
-      beams,
-      Paint()
-        ..color = const Color(0xFFEF515A)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 8
-        ..strokeJoin = StrokeJoin.round
-        ..strokeCap = StrokeCap.round,
-    );
-    canvas.restore();
-  }
 
-  @override
-  bool shouldRepaint(EndlessMazePreview oldDelegate) =>
-      seed != oldDelegate.seed;
-}

@@ -14,6 +14,7 @@ import 'spider_painter.dart';
 import 'cabinet.dart';
 import 'laser_maze_painter.dart';
 import 'heart_loss_effect.dart';
+import 'pickup_painter.dart';
 
 const cream = Color(0xFFF2ECDD);
 const ink = Color(0xFF163D3B);
@@ -366,29 +367,12 @@ class BoardPainter extends CustomPainter {
     }
     for (final coin in game.coins.where((c) => !c.collected)) {
       final p = Offset(coin.x, game.screenY(coin.y));
-      final r = reducedMotion
-          ? 6.0
-          : 6 + math.sin(game.clock * 3 + coin.x) * .5;
-      canvas.drawCircle(
-        p + const Offset(0, 1),
-        r + 1,
-        Paint()..color = const Color(0xFF604622),
-      );
-      canvas.drawCircle(p, r, Paint()..color = const Color(0xFFFFDA7B));
-      canvas.drawCircle(
+      // Each coin turns from its own angle, so a row never flips in unison.
+      paintBrassCoin(
+        canvas,
         p,
-        r - 1.5,
-        Paint()
-          ..color = const Color(0xFF957034)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = .8,
-      );
-      canvas.drawLine(
-        p - const Offset(0, 2.5),
-        p + const Offset(0, 2.5),
-        Paint()
-          ..color = const Color(0xFF604622)
-          ..strokeWidth = 1.5,
+        6.6,
+        reducedMotion ? 1 : math.cos(game.clock * 1.9 + coin.x * .12),
       );
     }
     if (game.lastCoinAge < .7) {
@@ -406,6 +390,7 @@ class BoardPainter extends CustomPainter {
       );
     }
     paintInfiniteItems(canvas, game, reducedMotion);
+    paintMazeGates(canvas, game, reducedMotion);
     paintSpecialHazards(canvas, game, reducedMotion);
     paintSpiders(canvas, game, reducedMotion);
     if (game.infinite) {
@@ -428,7 +413,7 @@ class BoardPainter extends CustomPainter {
       }
       canvas.restore();
     }
-    if (game.infinite || game.mazeEndless) {
+    if (game.infinite) {
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           const Rect.fromLTWH(258, 20, 80, 21),
@@ -549,20 +534,23 @@ class BoardPainter extends CustomPainter {
     paintPlatformDetail(canvas, a, b, game.platformStyle);
     canvas.restore();
     paintGapWarning(canvas, game, reducedMotion);
+    // Only two-finger play grabs the ends, so only it wears grab handles. The
+    // other controls keep slim caps that never read as something to drag.
+    final grips = game.started && !game.oneFinger && !game.analog;
     for (final p in [a, b]) {
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           Rect.fromCenter(
             center: p,
-            width: game.started ? 27 : 12,
-            height: game.started ? 32 : 19,
+            width: grips ? 27 : 12,
+            height: grips ? 32 : 19,
           ),
           const Radius.circular(3),
         ),
         Paint()..color = ink,
       );
       canvas.drawCircle(p, 2, Paint()..color = brass);
-      if (game.started) {
+      if (grips) {
         for (final dy in [-7.0, 7.0]) {
           canvas.drawLine(
             p + Offset(-6, dy),

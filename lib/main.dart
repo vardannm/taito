@@ -200,6 +200,7 @@ class _GameScreenState extends State<GameScreen>
       accumulator -= 1 / 120;
     }
     if (game.lives < observedLives) spawnHeartLoss();
+    syncMusic();
     observedLives = game.lives;
     // Feedback (including a lost heart) must not invalidate held input.
     // Only simulation transitions that actually clear input release keys.
@@ -362,8 +363,6 @@ class _GameScreenState extends State<GameScreen>
       gameMode: mode,
       levelNumber: mode == GameMode.laserMaze
           ? profile.mazeLevel
-          : mode == GameMode.mazeEndless
-          ? 1
           : profile.classicLevel,
       challengeDate: challengeDate,
     );
@@ -372,6 +371,7 @@ class _GameScreenState extends State<GameScreen>
     observedLives = game.lives;
     heartEffects.clear();
     enterWorld();
+    syncMusic();
   });
   Future<void> selectLevel() => showModalBottomSheet<void>(
     context: context,
@@ -411,7 +411,6 @@ class _GameScreenState extends State<GameScreen>
         child: LaserMazePicker(
           selected: profile.mazeLevel,
           control: profile.controlMode,
-          endlessBest: profile.mazeEndlessBest,
           bestTimes: {
             for (var i = 1; i <= LaserMazeRoute.count; i++)
               if (profile.mazeBestTime(i, profile.controlMode) case final time?)
@@ -422,10 +421,6 @@ class _GameScreenState extends State<GameScreen>
             unawaited(profile.save());
             Navigator.pop(context);
             start(GameMode.laserMaze);
-          },
-          onEndless: () {
-            Navigator.pop(context);
-            start(GameMode.mazeEndless);
           },
         ),
       ),
@@ -554,10 +549,29 @@ class _GameScreenState extends State<GameScreen>
       });
   }
 
+  /// Infinite and 2048 run to a loop; every other screen is quiet. Pausing
+  /// holds the track rather than restarting it.
+  static const themeTrack = 'audio/theme.m4a';
+  void syncMusic() {
+    final wants =
+        (game.infinite || game.merging) &&
+        profile.sound &&
+        game.started &&
+        !game.finished &&
+        !tutorialOpen;
+    unawaited(
+      feedback.updateMusic(
+        track: wants ? themeTrack : null,
+        playing: !game.paused && !game.waitingForInput && !returning,
+      ),
+    );
+  }
+
   void pause() => setState(() {
     briefing = false;
     clearControls();
     game.setPaused(!game.paused);
+    syncMusic();
     if (game.paused) {
       ticker.stop();
     } else {
@@ -609,6 +623,7 @@ class _GameScreenState extends State<GameScreen>
       waitForInput: true,
     );
     observedLives = game.lives;
+    syncMusic();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       for (final neighbor in [index - 1, index + 1]) {
@@ -667,6 +682,7 @@ class _GameScreenState extends State<GameScreen>
         ticker.stop();
       });
     }
+    syncMusic();
   }
 
   @override
@@ -675,6 +691,7 @@ class _GameScreenState extends State<GameScreen>
     profile.bankCoins(game);
     WidgetsBinding.instance.removeObserver(this);
     HardwareKeyboard.instance.removeHandler(onKey);
+    unawaited(feedback.updateMusic(track: null, playing: false));
     ticker.dispose();
     entrance.dispose();
     heartEffects.clear();
@@ -684,6 +701,12 @@ class _GameScreenState extends State<GameScreen>
     feedback.dispose();
     super.dispose();
   }
+
+  /// The HUD sits on the Infinite backdrop, which turns dark at x6 and x7.
+  /// Its text follows so a high combo never costs the player their score.
+  Color get chromeInk => game.infinite
+      ? Color.lerp(ink, cream, comboDarkness(game.survival.visualCombo))!
+      : ink;
 
   TextStyle label([Color color = ink]) => TextStyle(
     fontSize: 10,
@@ -806,9 +829,7 @@ class _GameScreenState extends State<GameScreen>
           children: [
             Expanded(
               child: Text(
-                game.mazeEndless
-                    ? 'LASER MAZE / ENDLESS'
-                    : game.maze
+                game.maze
                     ? 'LASER MAZE / ROUTE ${game.level}'
                     : game.merging
                     ? '2048 / SCORE'
@@ -817,7 +838,7 @@ class _GameScreenState extends State<GameScreen>
                     : 'SCORE',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: label(),
+                style: label(chromeInk),
               ),
             ),
             if (detail.isNotEmpty)
@@ -830,7 +851,7 @@ class _GameScreenState extends State<GameScreen>
                     fontSize: 10,
                     letterSpacing: .8,
                     fontWeight: FontWeight.w600,
-                    color: ink.withAlpha(185),
+                    color: chromeInk.withAlpha(185),
                   ),
                 ),
               ),
@@ -840,16 +861,15 @@ class _GameScreenState extends State<GameScreen>
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(
-              game.mazeEndless
-                  ? '${game.score}m'
-                  : game.maze
+              game.maze
                   ? '${game.score}%'
                   : game.score.toString().padLeft(5, '0'),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 26,
                 height: 1.1,
                 fontWeight: FontWeight.w800,
                 fontFamily: 'monospace',
+                color: chromeInk,
               ),
             ),
             const Spacer(),
@@ -863,7 +883,7 @@ class _GameScreenState extends State<GameScreen>
                   : game.practice
                   ? 'PRACTICE'
                   : '${game.lives} BALLS',
-              style: label(),
+              style: label(chromeInk),
             ),
           ],
         ),
@@ -880,7 +900,7 @@ class _GameScreenState extends State<GameScreen>
                       game.hazardLabel.isNotEmpty ||
                       game.survival.shield > 0
                   ? orange
-                  : ink,
+                  : chromeInk,
             ),
           ),
         ),
@@ -899,16 +919,14 @@ class _GameScreenState extends State<GameScreen>
   String worldTitle(int index) => switch (index) {
     0 => 'Infinite',
     1 => 'Classic',
-    2 => 'Maze Infinite',
-    3 => 'Maze',
+    2 => 'Maze',
     _ => '2048 Merge',
   };
 
   String worldSubtitle(int index) => switch (index) {
     0 => 'NO FINISH LINE. FIND YOUR FLOW.',
     1 => 'Classic • Level ${worldLevel(index)}',
-    2 => 'ONE ROAD. ENDLESS POSSIBILITIES.',
-    3 => 'Maze • Level ${worldLevel(index)}',
+    2 => 'Maze • Level ${worldLevel(index)}',
     _ => 'SMALL NUMBERS. BIG POSSIBILITIES.',
   };
 
@@ -1166,7 +1184,8 @@ class _GameScreenState extends State<GameScreen>
       ),
       for (var index = 0; index < arcadeModes.length; index++)
         Semantics(
-          label: '${worldTitle(index)}, ${index + 1} of 5',
+          label:
+              '${worldTitle(index)}, ${index + 1} of ${arcadeModes.length}',
           selected: selectedMode == index,
           button: true,
           child: GestureDetector(
@@ -1198,7 +1217,7 @@ class _GameScreenState extends State<GameScreen>
       IconButton(
         tooltip: 'Next mode',
         visualDensity: VisualDensity.compact,
-        onPressed: selectedMode < 4 && !carouselMoving
+        onPressed: selectedMode < arcadeModes.length - 1 && !carouselMoving
             ? () => carouselKey.currentState?.select(selectedMode + 1)
             : null,
         icon: const Icon(Icons.chevron_right_rounded, size: 18),
@@ -1328,8 +1347,10 @@ class _GameScreenState extends State<GameScreen>
                                             .tightFor(width: 52, height: 52),
                                         style: IconButton.styleFrom(
                                           padding: EdgeInsets.zero,
-                                          backgroundColor: ink.withAlpha(22),
-                                          foregroundColor: ink,
+                                          backgroundColor: chromeInk.withAlpha(
+                                            22,
+                                          ),
+                                          foregroundColor: chromeInk,
                                         ),
                                         icon: Icon(
                                           game.paused
@@ -1469,7 +1490,7 @@ class _GameScreenState extends State<GameScreen>
           fontWeight: FontWeight.w600,
           color: game.phase == GamePhase.sinking && !game.lastSuccess
               ? orange
-              : ink.withAlpha(190),
+              : chromeInk.withAlpha(190),
         ),
       ),
     ),
@@ -1513,7 +1534,7 @@ class _GameScreenState extends State<GameScreen>
           game: game,
           newBest: newBest,
           onRetry: () => start(game.mode),
-          onNext: !game.mazeEndless && game.level < LaserMazeRoute.count
+          onNext: game.level < LaserMazeRoute.count
               ? () {
                   profile.mazeLevel = game.level + 1;
                   unawaited(profile.save());
@@ -1747,7 +1768,7 @@ class _GameScreenState extends State<GameScreen>
               guideRow(
                 '04',
                 'Go beyond ten.',
-                'Infinite begins with three hearts. A hit costs a heart and resets your combo; the ball and platform blink for 2.5 seconds of protection while you keep steering from the same position. Gold crystals build combos up to x5. Blue shields protect for 10 seconds. Rare hearts restore a life. Keep steering to escape the rising red floor.',
+                'Infinite begins with three hearts. Laser maze sections arrive from time to time: the traps stop and wide laser walls come down instead, so steer through their openings. A hit costs a heart and resets your combo; the ball and platform blink for 2.5 seconds of protection while you keep steering from the same position. Gold crystals build combos up to x7; the board turns violet at x6 and darker at x7. Blue shields protect for 10 seconds. Rare hearts restore a life. Keep steering to escape the rising red floor.',
               ),
               const Text(
                 'Desktop: W / S = left end. ↑ / ↓ = right end. Esc = pause.',
@@ -1772,7 +1793,7 @@ class _GameScreenState extends State<GameScreen>
               guideRow(
                 '08',
                 'Take the detour.',
-                'Classic and Daily brass coins are worth 250 points. Infinite and Laser Endless coins save to your local wallet immediately. Open the Gear Shop for balls and platforms that add Infinite point multipliers; handling stays the same. Each coin can be collected once. Classic stars unlock cabinet styles with identical handling.',
+                'Classic and Daily brass coins are worth 250 points. Infinite coins save to your local wallet immediately. Open the Gear Shop for balls and platforms that add Infinite point multipliers; handling stays the same. Each coin can be collected once. Classic stars unlock cabinet styles with identical handling.',
               ),
               guideRow(
                 '09',
@@ -1943,6 +1964,8 @@ class _GameScreenState extends State<GameScreen>
                   value: profile.sound,
                   onChanged: (v) {
                     update(() => profile.sound = v);
+                    // The music follows the same switch, mid-run included.
+                    syncMusic();
                     unawaited(profile.save());
                   },
                 ),

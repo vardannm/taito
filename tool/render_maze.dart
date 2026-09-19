@@ -8,8 +8,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/profile.dart';
 import 'package:balance_arcade/game.dart';
-import 'package:balance_arcade/laser_maze.dart';
-import 'package:balance_arcade/spiders.dart';
 import 'package:balance_arcade/laser_maze_widgets.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -153,26 +151,6 @@ void main() {
       await tester.pump(const Duration(milliseconds: 20));
       await capture('maze-expert-$number-summit');
     }
-    game.start(gameMode: GameMode.mazeEndless);
-    await tester.pump(const Duration(milliseconds: 20));
-    await capture('maze-endless-start');
-    expect(game.controlMode, ControlMode.twoFinger);
-    for (final bug in game.spiders.cast<MazeSpider>())
-      bug.time = 4.1 - bug.phase;
-    await tester.pump(const Duration(milliseconds: 20));
-    await capture('maze-bug-warning');
-    for (final bug in game.spiders.cast<MazeSpider>())
-      bug.time = 5.2 - bug.phase;
-    await tester.pump(const Duration(milliseconds: 20));
-    await capture('maze-bug-active');
-    // Lift along the generated centerline so the scrolled corridor is visible.
-    final maze = game.mazeRun.corridor as EndlessMaze;
-    final high = maze.centers.firstWhere((p) => p.y < 240);
-    game.ballX = high.x;
-    game.left = game.right = high.y + BalanceGame.ballRadius;
-    game.maxHeight = LaserMazeCorridor.startY - high.y;
-    await tester.pump(const Duration(milliseconds: 20));
-    await capture('maze-endless-climb');
     game.start(gameMode: GameMode.infinite);
     await tester.pump(const Duration(milliseconds: 20));
     await capture('infinite-random-coins');

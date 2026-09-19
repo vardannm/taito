@@ -59,7 +59,7 @@ void main() {
       await selectWorld(tester, 2);
       expect(game.hasMazeResources, isTrue);
       expect(game.hasMergeResources, isFalse);
-      await selectWorld(tester, 4);
+      await selectWorld(tester, 3);
       expect(game.hasMazeResources, isFalse);
       expect(game.hasMergeResources, isTrue);
       await selectWorld(tester, 0);
