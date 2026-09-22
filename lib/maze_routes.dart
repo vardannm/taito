@@ -218,10 +218,6 @@ void _buildPlan(
 
 class LaserMazeRoute extends LaserMazeCorridor {
   LaserMazeRoute(int number) : number = number.clamp(1, count) {
-    if (this.number > 20) {
-      _buildCustom(customMazeLevels[this.number - 21]);
-      return;
-    }
     final random = math.Random(72031 + this.number * 997);
     if (this.number > 10) {
       _buildExpert(random);
@@ -311,70 +307,9 @@ class LaserMazeRoute extends LaserMazeCorridor {
     rebuildWalls();
   }
 
-  LaserMazeRoute.custom(CustomMazeDefinition definition) : number = 0 {
-    _buildCustom(definition);
-  }
-  CustomMazeDefinition? _custom;
-  Map<MazeNode, int> _customDistances = {};
-  void _buildCustom(CustomMazeDefinition definition) {
-    final check = definition.analyze();
-    if (!check.valid) throw ArgumentError(check.errors.join('\n'));
-    _custom = definition;
-    _customDistances = check.distances;
-    halfWidth = check.path.last.halfWidth;
-    structure = MazeStructure.windingLoop;
-    routeTop = definition.finish.y - 40;
-    openStart = openFinish = true;
-    addLeg(
-      const MazePoint(180, bottomY),
-      CustomMazeDefinition.launch,
-      20,
-      capA: false,
-    );
-    for (final road in check.path) addLeg(road.from, road.to, road.halfWidth);
-    addLeg(
-      definition.finish,
-      MazePoint(definition.finish.x, routeTop),
-      halfWidth,
-      capB: false,
-    );
-    for (final road in definition.roads) {
-      addLeg(road.from, road.to, road.halfWidth, primary: false);
-    }
-    rebuildWalls();
-  }
-
-  @override
-  double progressAt(double x, double y) {
-    if (_custom == null) return super.progressAt(x, y);
-    var nearest = double.infinity, remaining = 0.0;
-    final gx = (x / 10).round() * 10, gy = (y / 10).round() * 10;
-    // Only nearby road nodes can be closest while the ball is on the road.
-    // This bounds authored-map progress work even for an eight-screen maze.
-    for (var dx = -50; dx <= 50; dx += 10) {
-      for (var dy = -50; dy <= 50; dy += 10) {
-        final nx = gx + dx, ny = gy + dy;
-        final value = _customDistances[(nx, ny)];
-        if (value == null) continue;
-        final distance = math.sqrt(math.pow(x - nx, 2) + math.pow(y - ny, 2));
-        if (distance < nearest) {
-          nearest = distance;
-          remaining = value + distance;
-        }
-      }
-    }
-    if (!nearest.isFinite) return 0;
-    final total = _customDistances[(180, 480)]! + 39;
-    return (1 - remaining / total).clamp(0.0, 1.0);
-  }
-
-  static int get count => 20 + customMazeLevels.length;
+  static const count = 20;
   static const bottomY = 548.0, entryY = 480.0, topY = 24.0;
-  static List<String> get names => [
-    ..._builtInNames,
-    ...customMazeLevels.map((l) => l.name),
-  ];
-  static const _builtInNames = [
+  static const names = [
     'Return bend',
     'Long crossing',
     'Split decision',
@@ -410,13 +345,12 @@ class LaserMazeRoute extends LaserMazeCorridor {
   ];
   final int number;
   double routeTop = topY;
-  bool get tall =>
-      _custom != null ? finishLineY < LaserMazeCorridor.finishY : number > 10;
-  double get finishLineY => _custom?.finish.y ?? routeTop + 20;
+  bool get tall => number > 10;
+  double get finishLineY => routeTop + 20;
   double get mapHeight => bottomY - routeTop + 24;
   late final double halfWidth;
   late final MazeStructure structure;
-  String get name => _custom?.name ?? names[number - 1];
+  String get name => names[number - 1];
   double get finishX => centers.last.x;
   int get turns => legs.where((l) => l.primary && l.a.y == l.b.y).length;
   @override

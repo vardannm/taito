@@ -1,71 +1,26 @@
 import 'dart:math' as math;
 import 'game.dart';
+import 'classic_levels.dart';
 import 'spiders.dart';
 import 'rewards.dart';
 
-/// Reproducible scattered boards; target order is independent of height.
+/// Fixed Classic layouts and seeded Daily boards with shared gameplay rules.
 class ClassicLevels {
   static const count = 50;
   static int requiredStars(int level) => (level.clamp(1, count) - 1) * 2;
   static bool isUnlocked(int level, int stars) =>
       level >= 1 && level <= count && stars >= requiredStars(level);
-  static const names = [
-    'First steps',
-    'Gentle bend',
-    'Wide valley',
-    'Little wave',
-    'Open crossing',
-    'Left bank',
-    'Right bank',
-    'Switchback',
-    'Twin bays',
-    'Long sweep',
-    'Slalom',
-    'Crescent',
-    'Hourglass',
-    'Stairway',
-    'Crosswind',
-    'Narrow river',
-    'Double switch',
-    'Broken rhythm',
-    'Inside line',
-    'Outward bound',
-    'Needlework',
-    'Tidal turn',
-    'Chicane',
-    'Off balance',
-    'Brass passage',
-    'Razor bend',
-    'Three turns',
-    'Pendulum',
-    'Final ascent',
-    'Masterwork',
-    'Silken threshold',
-    'Quiet legs',
-    'The watchful corner',
-    'Thread crossing',
-    'First bite',
-    'Two keepers',
-    'Dust and silk',
-    'Hidden courtyard',
-    'Tangled brass',
-    'Patient hunters',
-    'The long web',
-    'Narrow escape',
-    'Three sentinels',
-    'Silk labyrinth',
-    'Midnight patrol',
-    'Crossed territories',
-    'The gathering',
-    'Last safe passage',
-    'Widow gallery',
-    'Heart of the web',
-  ];
+  static final names = List<String>.unmodifiable(
+    classicLevelDefinitions.map((level) => level.name),
+  );
+
   static List<Hole> build(int number, {int? dailySeed}) {
     final level = number.clamp(1, count);
-    final random = dailySeed == null
-        ? math.Random(1907 + level * 811)
-        : DailyRandom(dailySeed);
+    if (dailySeed == null) {
+      // Gameplay owns a mutable list; the source definition stays immutable.
+      return List<Hole>.of(classicLevelDefinitions[level - 1].holes);
+    }
+    final random = DailyRandom(dailySeed);
     final slots = level <= 5
         ? [9, 7, 8, 5, 6, 3, 4, 1, 2, 0]
         : ([for (var i = 0; i < 9; i++) i]..shuffle(random));
@@ -103,47 +58,8 @@ class ClassicLevels {
     return result;
   }
 
-  static List<BoardSpider> spidersFor(int level, List<Hole> board) {
-    if (level < 31) return [];
-    final random = math.Random(8917 + level * 97);
-    final result = <BoardSpider>[];
-    final wanted = level < 36
-        ? 1
-        : level < 43
-        ? 2
-        : 3;
-    for (var attempt = 0; attempt < 1200 && result.length < wanted; attempt++) {
-      final keeper = (level == 40 || level == 50) && result.isEmpty;
-      final radius = 38.0 + (level - 31) * .4 + (keeper ? 10 : 0);
-      final x = 52 + random.nextDouble() * 256,
-          y = 82 + random.nextDouble() * 336;
-      if (board
-          .where((h) => h.target > 0)
-          .any(
-            (h) =>
-                math.pow(h.x - x, 2) + math.pow(h.y - y, 2) <
-                math.pow(radius + 24, 2),
-          ))
-        continue;
-      if (result.any(
-        (s) =>
-            math.pow(s.homeX - x, 2) + math.pow(s.homeY - y, 2) <
-            math.pow(radius + s.zoneRadius + 30, 2),
-      ))
-        continue;
-      final candidate = BoardSpider(
-        x,
-        y,
-        radius,
-        phase: random.nextDouble() * math.pi * 2,
-        chaseSpeed: 65 + (level - 31),
-        bodyRadius: keeper ? 11 : 6,
-      );
-      if (!hasSafeRoutes(board, [...result, candidate])) continue;
-      result.add(candidate);
-    }
-    return result;
-  }
+  static ClassicLevelDefinition definition(int level) =>
+      classicLevelDefinitions[level.clamp(1, count) - 1];
 
   static List<BrassCoin> coinsFor(List<Hole> board, List<BoardSpider> spiders) {
     final result = <BrassCoin>[];
@@ -176,23 +92,8 @@ class ClassicLevels {
     return result;
   }
 
-  static String finaleTitle(int level) => switch (level) {
-    10 => 'The light gate',
-    20 => 'The wandering eye',
-    30 => 'Clockwork trial',
-    40 => 'The silk keeper',
-    50 => 'Heart of the web',
-    _ => '',
-  };
-  static String finaleRule(int level) => switch (level) {
-    10 => 'A red lane warns before the laser fires. Cross while it is dark.',
-    20 => 'A marked hole wakes and sweeps sideways. Watch its path.',
-    30 => 'Laser lanes and roaming holes take turns. Read each warning.',
-    40 =>
-      'A larger spider guards an expanded territory. Stay beyond the dashed circle.',
-    50 => 'The keeper and its spiders guard the web while laser lanes charge.',
-    _ => '',
-  };
+  static String finaleTitle(int level) => definition(level).finaleTitle;
+  static String finaleRule(int level) => definition(level).finaleRule;
 
   /// Check connected space around all targets before accepting a territory.
   static bool hasSafeRoutes(List<Hole> board, List<BoardSpider> spiders) {

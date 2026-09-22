@@ -1,8 +1,6 @@
 import 'dart:math' as math;
 
 part 'maze_routes.dart';
-part 'maze_editor_model.dart';
-part 'custom_maze_levels.dart';
 
 class MazePoint {
   const MazePoint(this.x, this.y);
@@ -374,12 +372,10 @@ class LaserMazeCorridor {
 
 class LaserMazeRun {
   LaserMazeRun(int level) : corridor = LaserMazeRoute(level);
-  LaserMazeRun.custom(CustomMazeDefinition definition)
-    : corridor = LaserMazeRoute.custom(definition);
   final LaserMazeCorridor corridor;
   LaserMazeRoute? get route =>
       corridor is LaserMazeRoute ? corridor as LaserMazeRoute : null;
-  String get name => route?.name ?? 'Custom route';
+  String get name => route!.name;
   bool hitLaser = false, won = false;
   double progress = 0, contactX = 180, contactY = LaserMazeCorridor.startY;
   double contactFraction = 1;

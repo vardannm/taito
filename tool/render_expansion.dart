@@ -12,7 +12,7 @@ import 'package:shared_preferences_platform_interface/in_memory_shared_preferenc
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 void main() {
-  testWidgets('render the Infinite expansion, shop and editor on phones', (
+  testWidgets('render the Infinite expansion and shop on phones', (
     tester,
   ) async {
     for (final family in [
@@ -98,45 +98,6 @@ void main() {
       ]);
       await tester.pump(const Duration(milliseconds: 16));
       await capture('infinite-combo-${width.toInt()}');
-      await tester.pumpWidget(const SizedBox());
-      await tester.pumpWidget(
-        RepaintBoundary(
-          key: key,
-          child: ArcadeApp(profile: p),
-        ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-      await tester.pump();
-      await tester.tap(find.byIcon(Icons.tune_rounded));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      await tester.ensureVisible(find.byKey(const ValueKey('open-command')));
-      await tester.tap(find.byKey(const ValueKey('open-command')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      await tester.enterText(
-        find.byKey(const ValueKey('command-input')),
-        '/editor',
-      );
-      await tester.tap(find.text('Run'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      await tester.pump();
-      await capture('maze-editor-${width.toInt()}');
-      await tester.tap(find.text('Export Dart'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      await capture('maze-editor-export-${width.toInt()}');
-      Navigator.of(
-        tester.element(find.byKey(const ValueKey('editor-code'))),
-      ).pop();
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      await tester.tap(find.text('Playtest'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      await capture('maze-editor-playtest-${width.toInt()}');
       await tester.pumpWidget(const SizedBox());
     }
   });

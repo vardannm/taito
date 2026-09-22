@@ -1,0 +1,29 @@
+part of '../classic_levels.dart';
+
+// Classic level 3. Coordinates use the 360 x 560 board.
+const classicLevel03 = ClassicLevelDefinition(
+  name: "Wide valley",
+  holes: [
+    Hole(207.10349349961882, 453.95709885132106, target: 1),
+    Hole(300.40681014384194, 369.7528572233469, target: 2),
+    Hole(115.78175051161433, 397.1623842568065, target: 3),
+    Hole(262.09318523915215, 270.615666100957, target: 4),
+    Hole(55.148539546266356, 319.850734736668, target: 5),
+    Hole(148.22911040234823, 192.38830814227052, target: 6),
+    Hole(49.342217079544376, 231.67084004379117, target: 7),
+    Hole(261.9721393740592, 90.63420584094975, target: 8),
+    Hole(104.97059263119354, 148.44003519440605, target: 9),
+    Hole(309.9557376096097, 58.296364224259236, target: 10),
+    Hole(232.60359897404967, 392.22108587848874),
+    Hole(102.20921134586808, 100.47095176736858),
+    Hole(117.67675280002155, 230.73859906633544),
+    Hole(219.3049849175149, 283.6098031592985),
+    Hole(265.6231824706813, 470.4452297375585),
+    Hole(137.05358366607567, 322.23692667691734),
+    Hole(202.52444065481052, 159.12099587770666),
+  ],
+  // Spider patrol centers and movement settings.
+  spiders: [],
+  // Spawn positions for each numbered target; waves repeat in order.
+  hazards: [],
+);

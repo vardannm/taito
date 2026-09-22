@@ -43,10 +43,9 @@ void main() {
     () {
       for (var level = 31; level <= 50; level++) {
         final board = ClassicLevels.build(level),
-            spiders = ClassicLevels.spidersFor(
+            spiders = ClassicLevels.definition(
               level,
-              ClassicLevels.build(level),
-            );
+            ).spiders.map((s) => s.create()).toList();
         expect(
           spiders.length,
           level < 36
@@ -68,7 +67,7 @@ void main() {
           }
         }
       }
-      expect(ClassicLevels.spidersFor(30, ClassicLevels.build(30)), isEmpty);
+      expect(ClassicLevels.definition(30).spiders, isEmpty);
     },
   );
   test(

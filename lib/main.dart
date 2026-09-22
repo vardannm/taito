@@ -1,4 +1,5 @@
 import 'playtest_recorder.dart';
+import 'app_analytics.dart';
 export 'pivot_board.dart';
 import 'pivot_board.dart';
 import 'club.dart';
@@ -27,7 +28,6 @@ import 'merge_widgets.dart';
 import 'merge.dart';
 import 'laser_maze.dart';
 import 'laser_maze_widgets.dart';
-import 'maze_editor.dart';
 import 'mode_carousel.dart';
 import 'mode_previews.dart';
 import 'heart_loss_effect.dart';
@@ -47,12 +47,14 @@ Future<void> main() async {
   );
   final profile = PlayerProfile();
   await profile.load();
-  runApp(ArcadeApp(profile: profile));
+  final analytics = await AppAnalytics.initialize();
+  runApp(ArcadeApp(profile: profile, analytics: analytics));
 }
 
 class ArcadeApp extends StatelessWidget {
-  const ArcadeApp({super.key, required this.profile});
+  const ArcadeApp({super.key, required this.profile, this.analytics});
   final PlayerProfile profile;
+  final AppAnalytics? analytics;
   @override
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
@@ -67,13 +69,14 @@ class ArcadeApp extends StatelessWidget {
         displayColor: ink,
       ),
     ),
-    home: GameScreen(profile: profile),
+    home: GameScreen(profile: profile, analytics: analytics),
   );
 }
 
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key, required this.profile});
+  const GameScreen({super.key, required this.profile, this.analytics});
   final PlayerProfile profile;
+  final AppAnalytics? analytics;
   @override
   State<GameScreen> createState() => _GameScreenState();
 }
@@ -86,6 +89,7 @@ class _GameScreenState extends State<GameScreen>
   final backdrop = ValueNotifier<int>(0);
   final feedback = GameFeedback();
   final playtest = PlaytestRecorder();
+  late final analytics = widget.analytics ?? AppAnalytics();
   final touch = [0.0, 0.0];
   final keyboard = [0.0, 0.0];
   late final Ticker ticker;
@@ -94,7 +98,7 @@ class _GameScreenState extends State<GameScreen>
   bool recorded = false, newBest = false, briefing = false;
   List<CabinetStyle> newUnlocks = [];
   late bool tutorialOpen;
-  bool commandOpen = false, readyRetry = false;
+  bool readyRetry = false;
   final carouselKey = GlobalKey<ModeCarouselState>();
   final boardKey = GlobalKey();
   final analogKey = GlobalKey();
@@ -126,6 +130,7 @@ class _GameScreenState extends State<GameScreen>
     tutorialOpen = false;
     prepareInfinite();
     game.onInputStarted = () {
+      analytics.startRun(game);
       if (game.mode == GameMode.classic) profile.classicLevel = game.level;
       if (game.mode == GameMode.laserMaze) profile.mazeLevel = game.level;
       unawaited(profile.save());
@@ -221,6 +226,7 @@ class _GameScreenState extends State<GameScreen>
     }
     if (game.finished && !recorded) {
       recorded = true;
+      analytics.finishRun(game);
       playtest.record("run_finished", {
         "mode": game.mode.name,
         "won": game.won,
@@ -281,8 +287,7 @@ class _GameScreenState extends State<GameScreen>
   }
 
   bool onKey(KeyEvent event) {
-    if (commandOpen ||
-        tutorialOpen ||
+    if (tutorialOpen ||
         returning ||
         carouselMoving ||
         ModalRoute.of(context)?.isCurrent != true)
@@ -367,6 +372,8 @@ class _GameScreenState extends State<GameScreen>
       challengeDate: challengeDate,
     );
     briefing = game.finale;
+    analytics.selectMode(game.mode);
+    analytics.startRun(game);
     if (briefing) game.setPaused(true);
     observedLives = game.lives;
     heartEffects.clear();
@@ -531,6 +538,7 @@ class _GameScreenState extends State<GameScreen>
   );
 
   Future<void> showBallShop() async {
+    analytics.openShop(game.mode);
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -597,6 +605,7 @@ class _GameScreenState extends State<GameScreen>
   };
 
   void prepareWorld(int index, {bool retry = false}) {
+    analytics.selectMode(arcadeModes[index]);
     ticker.stop();
     previous = null;
     accumulator = 0;
@@ -991,58 +1000,19 @@ class _GameScreenState extends State<GameScreen>
         ),
       ),
       child: active
-          ? Stack(
-              fit: StackFit.expand,
-              children: [
-                IgnorePointer(
-                  ignoring: carouselMoving,
-                  child: PivotBoard(
-                    key: boardKey,
-                    game: game,
-                    frame: frame,
-                    fillWidth: expansion,
-                    showHint:
-                        game.waitingForInput &&
-                        !carouselMoving &&
-                        !returning &&
-                        entrance.isDismissed,
-                  ),
-                ),
-                // Rides the cabinet's top-right corner while the board waits.
-                if (game.waitingForInput && !returning)
-                  LayoutBuilder(
-                    builder: (context, bounds) {
-                      final corner = BoardViewport.forGame(
-                        Size(
-                          bounds.maxWidth,
-                          math.max(
-                            1,
-                            bounds.maxHeight -
-                                (game.oneFinger
-                                    ? OneFingerControls.height
-                                    : 0),
-                          ),
-                        ),
-                        game,
-                        fillWidth: expansion,
-                      ).rect.topRight;
-                      return Stack(
-                        children: [
-                          Positioned(
-                            // Straddle the corner outward so the coin badge
-                            // beneath it stays readable.
-                            right: (bounds.maxWidth - corner.dx - 29).clamp(
-                              2.0,
-                              bounds.maxWidth,
-                            ),
-                            top: (corner.dy - 29).clamp(2.0, bounds.maxHeight),
-                            child: shopButton(),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-              ],
+          ? IgnorePointer(
+              ignoring: carouselMoving,
+              child: PivotBoard(
+                key: boardKey,
+                game: game,
+                frame: frame,
+                fillWidth: expansion,
+                showHint:
+                    game.waitingForInput &&
+                    !carouselMoving &&
+                    !returning &&
+                    entrance.isDismissed,
+              ),
             )
           : Opacity(
               opacity: 1 - expansion,
@@ -1074,7 +1044,7 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  /// Corner shortcut into the gear shop, offered only while a board waits.
+  /// Fixed header shortcut into the gear shop while selecting a mode.
   Widget shopButton() => Semantics(
     button: true,
     label: 'Gear shop',
@@ -1092,11 +1062,7 @@ class _GameScreenState extends State<GameScreen>
           child: const SizedBox(
             width: 42,
             height: 42,
-            child: Icon(
-              Icons.storefront_rounded,
-              size: 22,
-              color: ink,
-            ),
+            child: Icon(Icons.storefront_rounded, size: 22, color: ink),
           ),
         ),
       ),
@@ -1117,6 +1083,10 @@ class _GameScreenState extends State<GameScreen>
               style: label().copyWith(letterSpacing: 5, fontSize: 13),
             ),
             const Spacer(),
+            if (game.waitingForInput && !returning) ...[
+              shopButton(),
+              const SizedBox(width: 8),
+            ],
             IconButton(
               tooltip: 'Modes',
               onPressed: carouselMoving ? null : showModes,
@@ -1860,28 +1830,6 @@ class _GameScreenState extends State<GameScreen>
     ),
   );
 
-  Future<void> openCommandPanel() async {
-    commandOpen = true;
-    clearControls();
-    ticker.stop();
-    try {
-      await showMazeEditorCommand(
-        context,
-        control: profile.controlMode,
-        analogSensitivity: profile.analogSensitivity,
-        twoFingerSensitivity: profile.twoFingerSensitivity,
-      );
-    } finally {
-      if (mounted) {
-        commandOpen = false;
-        previous = null;
-        accumulator = 0;
-        if (!game.waitingForInput && !game.paused && !game.finished)
-          runTicker();
-      }
-    }
-  }
-
   Future<void> showClub() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -2016,15 +1964,6 @@ class _GameScreenState extends State<GameScreen>
                   },
                   icon: const Icon(Icons.emoji_events_outlined),
                   label: const Text('Goals, friends & backup'),
-                ),
-                TextButton.icon(
-                  key: const ValueKey('open-command'),
-                  onPressed: () {
-                    Navigator.pop(context);
-                    unawaited(openCommandPanel());
-                  },
-                  icon: const Icon(Icons.terminal, size: 18),
-                  label: const Text('Command'),
                 ),
               ],
             ),

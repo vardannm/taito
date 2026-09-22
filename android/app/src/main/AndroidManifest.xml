@@ -3,6 +3,7 @@
         android:label="GILT"
         android:name="${applicationName}"
         android:icon="@drawable/gilt_icon">
+        <meta-data android:name="firebase_analytics_collection_enabled" android:value="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

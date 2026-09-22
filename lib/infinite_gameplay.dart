@@ -5,6 +5,53 @@ extension InfiniteGameplay on BalanceGame {
   int get paceLevel => survival.levelAt(maxHeight / 10);
   double get pace => survival.paceAt(maxHeight / 10);
 
+  void _pruneInfiniteSpiders() {
+    spiders.removeWhere(
+      (s) => screenY(s.zoneY) - s.zoneRadius > 620 && screenY(s.y) > 620,
+    );
+  }
+
+  void _spawnInfiniteSpider(
+    double y,
+    double routeFrom,
+    double routeTo,
+    InfiniteSection stage,
+  ) {
+    if (y > _nextSpiderY) return;
+    // Distance-based encounters, with clear stretches between territories.
+    // Consume skipped slots too, so maze/breath sections never build a backlog.
+    _nextSpiderY = y - (1050 - 90 * paceLevel) - _random.nextDouble() * 400;
+    final radius = 38.0 + 2 * (paceLevel - 1);
+    if (mazeSection ||
+        stage == InfiniteSection.breath ||
+        screenY(y) + radius >= 0 ||
+        spiders.length >= 3)
+      return;
+    for (var attempt = 0; attempt < 24; attempt++) {
+      final x = 52 + _random.nextDouble() * 256;
+      // Protect both ends of the winding route through this row.
+      if (x >= math.min(routeFrom, routeTo) - radius - 46 &&
+          x <= math.max(routeFrom, routeTo) + radius + 46)
+        continue;
+      if (board.any(
+        (h) =>
+            math.pow(h.x - x, 2) + math.pow(h.y - y, 2) <
+            math.pow(radius + 20, 2),
+      ))
+        continue;
+      spiders.add(
+        BoardSpider(
+          x,
+          y,
+          radius,
+          phase: _random.nextDouble() * math.pi * 2,
+          chaseSpeed: 65 + 4.0 * (paceLevel - 1),
+        ),
+      );
+      return;
+    }
+  }
+
   void _ensureInfiniteItems() {
     final ahead = -cameraOffset - 100;
     void spawn(InfiniteItemKind kind, double y) {
@@ -22,6 +69,11 @@ extension InfiniteGameplay on BalanceGame {
         }
         if (x < 45 ||
             x > 315 ||
+            spiders.any(
+              (s) =>
+                  math.pow(s.zoneX - x, 2) + math.pow(s.zoneY - atY, 2) <
+                  math.pow(s.zoneRadius + 16, 2),
+            ) ||
             board.any(
               (h) => math.pow(h.x - x, 2) + math.pow(h.y - atY, 2) < 32 * 32,
             ) ||
@@ -84,9 +136,7 @@ extension InfiniteGameplay on BalanceGame {
         _mazeSectionTime >= InfiniteTuning.mazeSectionSeconds) {
       _mazeEndMetres = 0;
       _nextMazeMetres =
-          climbed +
-          InfiniteTuning.mazeRestMetres +
-          _random.nextDouble() * 260;
+          climbed + InfiniteTuning.mazeRestMetres + _random.nextDouble() * 260;
       // A beat of clear board before ordinary hazards resume.
       _nextHazardTime = math.max(_nextHazardTime, elapsed + 3);
       survival.announce('MAZE CLEARED');
@@ -141,9 +191,34 @@ extension InfiniteGameplay on BalanceGame {
     event = GameEvent.coin;
   }
 
-  void _resolveInfiniteContacts(double oldX, double oldY, double oldScreenY) {
+  void _resolveInfiniteContacts(
+    double oldX,
+    double oldY,
+    double oldScreenY,
+    double dt,
+  ) {
     final events =
         <({double t, InfiniteItem? item, Hole? hole, String? reason})>[];
+    for (final spider in spiders) {
+      final sx = spider.x, sy = spider.y;
+      spider.step(dt, oldX, oldY, ballX, ballY);
+      final t = circleContact(
+        oldX - sx,
+        oldY - sy,
+        ballX - spider.x,
+        ballY - spider.y,
+        0,
+        0,
+        BalanceGame.ballRadius + spider.bodyRadius,
+      );
+      if (t != null)
+        events.add((
+          t: t,
+          item: null,
+          hole: null,
+          reason: 'Caught by a spider. Stay outside its territory.',
+        ));
+    }
     for (final item in survival.items) {
       final t = circleContact(oldX, oldY, ballX, ballY, item.x, item.y, 13);
       if (t != null) events.add((t: t, item: item, hole: null, reason: null));

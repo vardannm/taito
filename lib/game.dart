@@ -21,14 +21,7 @@ enum GamePhase { playing, sinking, returning, over }
 
 enum GameEvent { target, miss, complete, coin, merge }
 
-enum GameMode {
-  classic,
-  infinite,
-  practice,
-  daily,
-  merge2048,
-  laserMaze,
-}
+enum GameMode { classic, infinite, practice, daily, merge2048, laserMaze }
 
 enum ControlMode { twoFinger, oneFinger, analog }
 
@@ -78,8 +71,7 @@ class BalanceGame {
   bool get maze => mode == GameMode.laserMaze;
 
   /// Modes whose camera follows the climb instead of holding the whole board.
-  bool get scrolling =>
-      infinite || (maze && mazeRun.route!.tall);
+  bool get scrolling => infinite || (maze && mazeRun.route!.tall);
   double get minPivot => scrolling ? 40 - cameraOffset : 30.0;
   double get maxPivot => scrolling ? 526 - cameraOffset : 526.0;
   LaserMazeRun? _mazeRun;
@@ -94,7 +86,9 @@ class BalanceGame {
   bool get daily => mode == GameMode.daily;
   String get dailyKey =>
       dailyDate == null ? '' : DailyChallenge.key(dailyDate!);
-  bool get finale => mode == GameMode.classic && level % 10 == 0;
+  bool get finale => mode == GameMode.classic &&
+      (ClassicLevels.definition(level).finaleTitle.isNotEmpty ||
+          ClassicLevels.definition(level).hazards.isNotEmpty);
   String get finaleTitle => finale ? ClassicLevels.finaleTitle(level) : '';
   final coins = <BrassCoin>[];
   int coinsCollected = 0;
@@ -109,7 +103,8 @@ class BalanceGame {
 
   final spiders = <BoardSpider>[];
   bool caughtBySpider = false;
-  bool get spiderLevel => mode == GameMode.classic && level >= 31;
+  bool get spiderLevel => mode == GameMode.classic &&
+      ClassicLevels.definition(level).spiders.isNotEmpty;
   List<Hole> _classicBoard = [];
   double controlPosition = 0;
   bool controlHeld = false;
@@ -132,6 +127,7 @@ class BalanceGame {
 
   /// Held deflection of that stick, -1 (full up) to 1 (full down).
   double _liftInput = 0;
+
   /// Board units a second at full deflection: a whole rail in about 3.5s.
   static const liftMotor = 140.0;
   void setLiftInput(double value) {
@@ -220,6 +216,7 @@ class BalanceGame {
   GameMode mode = GameMode.classic;
   final List<Hole> _endlessHoles = [];
   double _nextRowY = 250, _corridor = 180;
+  double _nextSpiderY = -400;
   double cameraOffset = 0, maxHeight = 0, stallTime = 0, dangerY = 580;
   double _steeringDistance = 0;
   double _nextCoinY = 380;
@@ -238,7 +235,9 @@ class BalanceGame {
         ))
           continue;
         if (spiders.any(
-          (s) => math.pow(s.homeX - x, 2) + math.pow(s.homeY - y, 2) < 42 * 42,
+          (s) =>
+              math.pow(s.homeX - x, 2) + math.pow(s.homeY - y, 2) <
+              math.pow(s.zoneRadius + 12, 2),
         ))
           continue;
         coins.add(BrassCoin(x, y));
@@ -265,6 +264,7 @@ class BalanceGame {
       (InfiniteTuning.baseTopSpeed - InfiniteTuning.startSpeed) * difficulty +
       (infinite ? InfiniteTuning.paceSpeedBonus * (pace - 1) : 0);
   final specialHazards = <SpecialHazard>[];
+
   /// Infinite's laser maze interludes: a stretch where the hole stream stops
   /// and wide laser gates come down instead.
   final mazeGates = <MazeGate>[];
@@ -274,8 +274,7 @@ class BalanceGame {
   bool mazeSectionsEnabled = true;
   double _nextMazeMetres = 0, _mazeEndMetres = 0, _lastGateY = 0;
   double _mazeSectionTime = 0;
-  bool get mazeSection =>
-      infinite && mazeSectionsEnabled && _mazeEndMetres > 0;
+  bool get mazeSection => infinite && mazeSectionsEnabled && _mazeEndMetres > 0;
   double _nextHazardTime = 0;
   int _introducedHazards = 0, _hazardSequence = 0, _hardHazardSequence = 0;
   bool fellThroughGap = false;
@@ -375,6 +374,7 @@ class BalanceGame {
         70.0,
         290.0,
       );
+      _spawnInfiniteSpider(_nextRowY, previous, _corridor, stage);
       final selected = <Hole>[];
       final recent = _endlessHoles.reversed.take(3).toList().reversed.toList();
       final density = ((1 + 3 * d) * stage.densityFactor).clamp(1.0, 4.0);
@@ -400,6 +400,11 @@ class BalanceGame {
             (h.y - y).abs() > 12 &&
             (h.x - x) * (h.x - x) + (h.y - y) * (h.y - y) > 36 * 36;
         if ((x - safeX).abs() > 46 - 12 * d &&
+            spiders.every(
+              (s) =>
+                  math.pow(s.zoneX - x, 2) + math.pow(s.zoneY - y, 2) >
+                  math.pow(s.zoneRadius + 20, 2),
+            ) &&
             selected.every(separated) &&
             _endlessHoles.where((h) => (h.y - y).abs() < 36).every(separated)) {
           selected.add(Hole(x, y));
@@ -412,6 +417,7 @@ class BalanceGame {
     }
     if (!retainForSweep)
       _endlessHoles.removeWhere((hole) => screenY(hole.y) > 620);
+    if (!retainForSweep) _pruneInfiniteSpiders();
   }
 
   void _updateClimb(double dt) {
@@ -593,7 +599,9 @@ class BalanceGame {
     motionSpeed = 0;
     if (!infinite) {
       specialHazards.clear();
-      _nextFinaleAt = 3;
+      _nextFinaleAt = mode == GameMode.classic
+          ? ClassicLevels.definition(level).firstHazardAfter
+          : 3;
       _finaleSequence = 0;
     }
     for (final spider in spiders) {
@@ -656,7 +664,7 @@ class BalanceGame {
           );
     spiders.clear();
     if (spiderLevel)
-      spiders.addAll(ClassicLevels.spidersFor(level, _classicBoard));
+      spiders.addAll(ClassicLevels.definition(level).spiders.map((s) => s.create()));
     caughtBySpider = false;
     coins.clear();
     if (!infinite && !practice && !merging && !maze)
@@ -684,6 +692,7 @@ class BalanceGame {
     dangerY = 580;
     _nextRowY = 300 + _random.nextDouble() * 20;
     _corridor = 150 + _random.nextDouble() * 60;
+    _nextSpiderY = -400;
     specialHazards.clear();
     mazeGates.clear();
     _nextMazeMetres =
@@ -720,13 +729,6 @@ class BalanceGame {
   void home() {
     start();
     started = false;
-  }
-
-  /// Isolated editor runs are displayed by the editor without saving records.
-  void startCustomMaze(CustomMazeDefinition definition) {
-    final custom = LaserMazeRun.custom(definition);
-    start(gameMode: GameMode.laserMaze);
-    mazeRun = custom;
   }
 
   void step(double dt) {
@@ -957,12 +959,13 @@ class BalanceGame {
     }
     if (infinite) {
       _updateSpecialHazards(dt);
-      _resolveInfiniteContacts(oldX, oldY, oldScreenY);
+      _resolveInfiniteContacts(oldX, oldY, oldScreenY, dt);
       // Discard only after the entire swept movement has been resolved.
       _endlessHoles.removeWhere((h) => screenY(h.y) > 620);
       specialHazards.removeWhere((h) => h.expired || h.y > 620);
       coins.removeWhere((c) => screenY(c.y) > 620);
       survival.items.removeWhere((item) => screenY(item.y) > 610);
+      _pruneInfiniteSpiders();
       return;
     }
     Hole? hit;
@@ -1058,7 +1061,8 @@ class BalanceGame {
   }
 
   void _updateFinale(double dt, double oldX, double oldY) {
-    if (level == 40) return;
+    final definition = ClassicLevels.definition(level);
+    if (definition.hazards.isEmpty) return;
     for (final h in specialHazards) {
       h.step(dt, 0);
       if (h.hits(oldX, oldY, ballX, ballY)) {
@@ -1081,24 +1085,25 @@ class BalanceGame {
     }
     specialHazards.removeWhere((h) => h.expired);
     if (specialHazards.isNotEmpty || legTime < _nextFinaleAt) return;
-    final moving = level == 20 || (level == 30 && _finaleSequence.isOdd);
-    final lanes = [
-      90.0,
-      180.0,
-      270.0,
-    ].where((x) => (x - activeHole.x).abs() > (moving ? 72 : 32)).toList();
-    final x = lanes[_finaleSequence % lanes.length];
+    final wave = definition.hazards[_finaleSequence % definition.hazards.length];
+    final positions = wave.positions.where((p) => p.target == target).toList();
+    if (positions.isEmpty) {
+      _finaleSequence++;
+      _nextFinaleAt = legTime + definition.hazardInterval;
+      return;
+    }
+    final position = positions[_finaleSequence % positions.length];
     specialHazards.add(
       SpecialHazard(
-        moving ? HazardKind.movingHole : HazardKind.laser,
-        x: x,
-        y: (activeHole.y - 55).clamp(65.0, 440.0),
-        warningSeconds: 2.4,
-        liveSeconds: moving ? 3 : 1.2,
+        wave.kind,
+        x: position.x,
+        y: position.y,
+        warningSeconds: wave.warningSeconds,
+        liveSeconds: wave.liveSeconds,
       ),
     );
     _finaleSequence++;
-    _nextFinaleAt = legTime + (level == 50 ? 7 : 9);
+    _nextFinaleAt = legTime + definition.hazardInterval;
   }
 
   void _capture(Hole hole) {

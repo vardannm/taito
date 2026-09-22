@@ -14,7 +14,7 @@ Alternatively:
 
 Controls: drag the left or right grip on the platform up and down. Both fingers work independently; release to hold that pivot. In Infinite, release and grab again for another upward swipe. Carousel previews fit the complete board. Gameplay scales uniformly to fill the available safe-area width. On shorter screens, the visible region follows the platform vertically instead of shrinking the board or stretching its artwork; holes and the ball stay circular. Painting, pointer hit testing and heart feedback use the same viewport transform. On desktop use **W/S** for the left end, **Up/Down** for the right, and **Esc** to pause.
 
-Settings offers illustrated, animated cards for **Two-Finger Control** (default), **One-Finger Control**, and **Vertical Analog Control**. Vertical Analog and Two-Finger each have a saved sensitivity slider from 0 to 1: 0 disables touch movement and 1 preserves full response. Scaling is immediate and independent; keyboard movement is unchanged. Editor playtests inherit these settings. Vertical analog places two independent joysticks at the bottom inside the safe area. Drag up to raise that platform end, down to lower it; the platform follows directly with about 19% less sensitivity. There is no dead zone. Horizontal movement is ignored. Release centers the knob and holds the final platform position; grab again to continue moving. One finger drags the lower handle left/right to set tilt and up/down to raise or lower both ends. Once held, vertical dragging continues beyond the thumb area and reverses immediately, without a pad-edge movement cap. The visible pad and knob keep the same design; the knob stays drawn within the pad. Holding the handle pauses the control mode’s automatic lift in Classic; release resumes it. Infinite’s continuous board ascent remains active. Classic automatically lifts at 20 world units/second and waits at the current target height, so a target cannot be left behind. All three modes share ball physics. All touch targets are consumed on the next 120 Hz physics tick without smoothing or an added delay. Keyboard motor easing remains. Ball acceleration and its speed cap increased by about 8%.
+Settings offers illustrated, animated cards for **Two-Finger Control** (default), **One-Finger Control**, and **Vertical Analog Control**. Vertical Analog and Two-Finger each have a saved sensitivity slider from 0 to 1: 0 disables touch movement and 1 preserves full response. Scaling is immediate and independent; keyboard movement is unchanged. Vertical analog places two independent joysticks at the bottom inside the safe area. Drag up to raise that platform end, down to lower it; the platform follows directly with about 19% less sensitivity. There is no dead zone. Horizontal movement is ignored. Release centers the knob and holds the final platform position; grab again to continue moving. One finger drags the lower handle left/right to set tilt and up/down to raise or lower both ends. Once held, vertical dragging continues beyond the thumb area and reverses immediately, without a pad-edge movement cap. The visible pad and knob keep the same design; the knob stays drawn within the pad. Holding the handle pauses the control mode’s automatic lift in Classic; release resumes it. Infinite’s continuous board ascent remains active. Classic automatically lifts at 20 world units/second and waits at the current target height, so a target cannot be left behind. All three modes share ball physics. All touch targets are consumed on the next 120 Hz physics tick without smoothing or an added delay. Keyboard motor easing remains. Ball acceleration and its speed cap increased by about 8%.
 
 Swipe to Classic to continue the saved level directly. The small arcade icon → Classic levels opens a responsive grid of 50 named levels. Each board retains ten targets, three lives and the existing scoring. Level 1 is open initially; level N requires `2 × (N − 1)` total Classic stars (level 2: 2, level 10: 18, level 50: 98). Stars are permanent, not spent, and each distinct objective counts once across control methods. Daily stars do not unlock Classic boards. Locked cards show the earned/required count. Winning offers **NEXT LEVEL** when its requirement is met, or **EARN MORE STARS** and replay options otherwise; the selected level is remembered. Deterministic scattered layouts vary target positions, heights, and numbering so targets no longer follow a single route. Trap density increases through the original 30 boards. Practice retains its original board and unlimited attempts.
 
@@ -156,18 +156,6 @@ Automated tests validate connectivity, ball clearance, protected routes, require
 
 Moving balls now leave a short teal-to-gold wake and a soft glow that responds to speed. The effect is visual only, pauses with gameplay, fades while stationary and clears on restart. Reduced-motion mode omits the wake.
 
-## Draw and export your own Laser Maze
-
-Open **Settings → Command**, enter **`/editor`**, and press **Run**.
-
-- **Road**: drag one horizontal or vertical segment, snapped to a 10-unit grid. Connect from START; intersect roads to create branches and loops. Choose widths from 22 to 56 units.
-- **Erase** removes the touched road segment. **Finish** places the finish on an endpoint. **Pan/zoom** explores the canvas, which supports 1, 2, 4, 6 or 8 screens of height.
-- Undo/redo restores edits. The menu offers **Save draft**, **Validate route**, **Fit whole map**, **Return to START**, and **Clear roads**. Draft saving is explicit and local.
-- **Playtest** opens an isolated test run using your saved control choice, including Vertical Analog. Retry and return to editing freely; test scores never enter the profile.
-- **Export Dart → Copy Dart** copies a validated `CustomMazeDefinition`. Paste it inside `customMazeLevels` in `lib/custom_maze_levels.dart`, then rebuild. It appears after the 20 built-in routes. Keep existing entries in order to preserve their record identities.
-
-Validation checks grid alignment, road bounds and widths, connectivity, a finish at the upper terminal end of a vertical road, and swept ball clearance. Roads are unioned before generating laser walls; intersections do not leave internal walls. The source format lives in `lib/maze_editor_model.dart`.
-
 Gear tables are in `lib/ball_cosmetics.dart` and `lib/platforms.dart`; animated control cards and sensitivity sliders are in `lib/control_options.dart`. Regenerate phone renders with `tool/render_refinements.dart`.
 
 ### Unlimited-coin testing APK
@@ -183,7 +171,7 @@ Open the arcade icon or Settings → Goals, friends & backup. Goals follow the s
 
 Daily friend challenges use a copied `GILT1` code containing a display name, date, controls and personal best score. Paste a friend's code to play that exact Daily board. Scores are friend-reported and stored locally, not server-verified rankings. Friend challenges are capped at 30 on-device entries.
 
-Manual progress backups include records, wallet, owned/selected gear and settings. COPY BACKUP puts a versioned JSON snapshot on the clipboard; save it outside the app. RESTORE validates the snapshot and previews its progress before replacing local data. Test-economy snapshots cannot restore into normal builds. Maze editor drafts, friend codes and playtest logs are separate and are not part of a progress backup. No automatic cloud sync or online account is connected.
+Manual progress backups include records, wallet, owned/selected gear and settings. COPY BACKUP puts a versioned JSON snapshot on the clipboard; save it outside the app. RESTORE validates the snapshot and previews its progress before replacing local data. Test-economy snapshots cannot restore into normal builds. Friend codes and playtest logs are separate and are not part of a progress backup. No automatic cloud sync or online account is connected.
 
 The optional local playtest recorder is in the same club screen. Start a session, replay the tutorial and observe the player, then stop and copy the report before closing the app. It captures up to 1,000 events without names or uploads. Starting another session replaces the in-memory report. See `playtest/NEXT_SESSION.md`; human sessions are still pending.
 
@@ -194,13 +182,13 @@ Release preparation: `python scripts/release_check.py`, `release/DEVICE_QA.md`, 
 
 ## One-finger thumb area (0.11.1)
 
-One-finger controls now sit in a 96-pixel area below the board, keeping the ball above your finger. Touch anywhere in the area and drag sideways to tilt, up/down to move vertically. Release and re-grab wherever comfortable; touching a new point does not jump the platform. Movement stops at the area's edges, so lift and re-touch to continue a long climb. A second pointer is ignored and pause/cancel clears the active touch. This shared control appears in gameplay, the tutorial and maze-editor playtests. Two-finger and Vertical Analog controls are unchanged.
+One-finger controls now sit in a 96-pixel area below the board, keeping the ball above your finger. Touch anywhere in the area and drag sideways to tilt, up/down to move vertically. Release and re-grab wherever comfortable; touching a new point does not jump the platform. Movement stops at the area's edges, so lift and re-touch to continue a long climb. A second pointer is ignored and pause/cancel clears the active touch. This shared control appears in gameplay and the tutorial. Two-finger and Vertical Analog controls are unchanged.
 
 ### Lightweight carousel previews
 
 Only the snapped page owns a live `BalanceGame` environment. Inactive pages are pre-baked, softened 180×280 screenshots, including all 50 Classic and 20 built-in Maze levels (73 images total, about 3.7 MB). Swiping partway shows the image without preparing that mode. The live world changes only after the snap finishes; there is one simulation ticker, stopped during selection, pause and return. Maze and Merge resources are created only when needed and released when leaving their mode. No runtime blur, screenshot generation or hidden simulation is used for neighboring pages.
 
-Regenerate preview assets after changing board artwork, built-in routes, or adding custom Maze routes:
+Regenerate preview assets after changing board artwork or built-in routes:
 
 ```powershell
 .\scripts\flutter.ps1 test --no-pub tool/bake_mode_previews.dart
@@ -208,3 +196,11 @@ Regenerate preview assets after changing board artwork, built-in routes, or addi
 
 Use `tool/render_mode_transitions.dart` for expansion, full-game, floating-heart and reverse-animation frames. Reduced motion switches layouts immediately and uses a stationary heart fade. The analog control artwork is unchanged.
 While a mode waits for its first input, a touch-transparent finger icon demonstrates the selected controls: two vertical drags over the platform grips or analog sticks, or a diagonal tilt/lift drag over the one-finger pad. The hint stops immediately on input, hides during a carousel swipe or return transition, and reappears when selection is ready again. Reduced motion shows a stationary finger. This uses a separate, disposable visual animation; the waiting game simulation remains stopped and analog artwork is unchanged.
+## Editing individual Classic levels
+
+The 50 Classic layouts live in `lib/classic_levels/level_01.dart` through
+`lib/classic_levels/level_50.dart`. Each file contains the level name, hole coordinates, spider patrol centers,
+and laser/moving-hole spawn positions and timing. `lib/classic_levels.dart` registers them in saved-progress order;
+`lib/levels.dart` loads them and retains the shared gameplay rules and Daily generator.
+See `lib/classic_levels/README.md` for editing instructions. The split preserves
+all previous Classic names and hole coordinates exactly.

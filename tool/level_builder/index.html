@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GILT · Level Builder</title><link rel="stylesheet" href="/builder.css"></head>
+<body>
+<header><div class="brand">GILT<span>LEVEL BUILDER</span></div><span class="tag">LOCAL DEVELOPER TOOL</span><div class="actions">
+<button id="new">New level</button><button id="load">Open existing</button><button id="import">Import draft</button><button id="save">Save draft</button><button id="export" class="primary">Export Dart ↗</button></div></header>
+<main>
+<aside class="left"><div class="eyebrow">YOUR WORKSPACE</div><h1>Build the next<br>challenge.</h1><p class="muted">Place objects. Shape the route.<br>Export a level ready for your code.</p>
+<label>Level number<input id="number" type="number" min="1" step="1"></label>
+<label>Level name<input id="name" maxlength="120"></label>
+<div class="section-title">TOOLS <span>Click to place · drag to move</span></div><div id="tools" class="tools"></div>
+<label class="check"><input id="snap" type="checkbox" checked> Snap to 10-unit grid</label>
+<div class="section-title">HAZARD WAVES <button id="add-wave" title="Add a hazard wave">+</button></div>
+<select id="wave" aria-label="Active hazard wave"></select><div class="small-row"><button id="wave-up">Move wave up</button><button id="delete-wave">Delete wave</button></div>
+<p class="hint">Lasers span the board vertically. Each position belongs to a target and a repeating wave.</p>
+<label>Show hazards for target<select id="filter"><option value="0">All targets</option></select></label>
+<details><summary>Briefing & timing</summary><label>Briefing title<input id="finaleTitle"></label><label>Briefing instructions<textarea id="finaleRule" rows="3"></textarea></label><label>First hazard after (seconds)<input id="firstHazardAfter" type="number" min="0" step="0.1"></label><label>Repeat interval (seconds)<input id="hazardInterval" type="number" min="0.1" step="0.1"></label></details>
+</aside>
+<section class="stage"><div class="stage-bar"><div><strong id="file-name">level_51.dart</strong><span id="autosave">Draft saved locally</span></div><div><button id="undo" title="Undo (Ctrl+Z)">↶ Undo</button><button id="redo" title="Redo (Ctrl+Shift+Z)">↷ Redo</button></div></div>
+<div class="canvas-wrap"><canvas id="board" width="720" height="1120" aria-label="Level layout. Click to place an object and drag selected objects to move them."></canvas></div>
+<div class="stage-footer"><span id="cursor">360 × 560 board</span><span id="counts"></span></div>
+</section>
+<aside class="right"><div class="eyebrow">OBJECT INSPECTOR</div><h2 id="selection-title">Nothing selected</h2><p id="selection-hint" class="muted">Choose a tool and click the board, or select an existing object.</p><div id="inspector"></div><button id="delete" class="danger" hidden>Delete selected object</button>
+<div class="section-title">LEVEL CHECK</div><div id="validation"></div><p class="hint">Checks cover targets, bounds and spacing. Playtest the exported level to judge difficulty.</p>
+<details><summary>Objects <span id="object-count"></span></summary><div id="objects"></div></details>
+<div class="help-card"><strong>Only for you.</strong><p>This builder runs separately from the game. Export creates source text; it never overwrites a game file.</p></div>
+</aside>
+</main>
+<dialog id="open-dialog"><div class="dialog-heading"><h2>Start from an existing level</h2><button data-close="open-dialog">Close</button></div><p class="muted">Opens a copy as the next new level. Existing source files remain untouched.</p><div id="level-list"></div></dialog>
+<dialog id="export-dialog"><div class="dialog-heading"><h2 id="export-title">Export level</h2><button data-close="export-dialog">Close</button></div><p id="export-status"></p><textarea id="code" spellcheck="false" readonly aria-label="Exported Dart source"></textarea><div class="small-row"><button id="download" class="primary">Download .dart</button><button id="copy">Copy code</button></div><ol><li>Save this file in <code>lib/classic_levels/</code>.</li><li>Run <code>.\scripts\register_levels.ps1</code> to register it and bake previews.</li><li>Rebuild the game and playtest the new level.</li></ol></dialog>
+<input id="import-file" type="file" accept=".json,application/json" hidden><div id="toast" role="status"></div>
+<script src="/model.js"></script><script src="/builder.js"></script>
+</body></html>
