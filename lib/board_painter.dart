@@ -416,6 +416,7 @@ class BoardPainter extends CustomPainter {
     paintMazeGates(canvas, game, reducedMotion);
     paintSpecialHazards(canvas, game, reducedMotion);
     paintSpiders(canvas, game, reducedMotion);
+    paintSpiderWebShots(canvas, game, reducedMotion);
     if (game.infinite && showHud) {
       // Lives ride in the board's own top-left corner, just clear of the rail.
       canvas.save();

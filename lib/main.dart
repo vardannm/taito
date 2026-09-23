@@ -1742,12 +1742,12 @@ class _GameScreenState extends State<GameScreen>
               guideRow(
                 '05',
                 'Watch the warnings.',
-                'Infinite starts with open spaces and builds difficulty with height. Warning holes unlock at 180m, moving holes at 350m, lasers at 600m and platform gaps at 900m. Move away from red warnings before they activate.',
+                'Infinite starts with open spaces and builds difficulty with height. Warning holes unlock at 180m, moving holes at 350m, lasers at 600m and platform gaps at 900m. Move away from red warnings before they activate. In late Infinite encounters, orbiting holes follow a marked circle.',
               ),
               guideRow(
                 '06',
                 'Stay out of the web.',
-                'Classic levels 31–50 have slow patrolling spiders. Enter a marked territory and its spider chases you. Contact ends the run immediately. Each successful target resets the spiders.',
+                'Classic levels 31–50 have slow patrolling spiders. Enter a marked territory and its spider chases you. Contact ends the run immediately. Each successful target resets the spiders. In Infinite, spiders move slowly and fire aimed webs: move away from the marked line before the slow shot arrives. Web hits cost a heart; shields block them.',
               ),
               const SizedBox(height: 20),
               guideRow(

@@ -3,6 +3,7 @@ import 'hazards.dart';
 import 'maze_gates.dart';
 import 'levels.dart';
 import 'spiders.dart';
+import 'spider_web.dart';
 import 'rewards.dart';
 import 'merge.dart';
 import 'laser_maze.dart';
@@ -219,6 +220,8 @@ class BalanceGame {
   final List<Hole> _endlessHoles = [];
   double _nextRowY = 250, _corridor = 180;
   double _nextSpiderY = -1800;
+  final webShots = <SpiderWebShot>[];
+  double _nextWebTime = 0;
   double cameraOffset = 0, maxHeight = 0, stallTime = 0, dangerY = 580;
   double _steeringDistance = 0;
   double _nextCoinY = 380;
@@ -319,8 +322,9 @@ class BalanceGame {
                 InfiniteDifficulty.hardHazards &&
         section == InfiniteSection.encounter &&
         _introducedHazards >= 4;
-    final sweeping = hard && _hardHazardSequence.isEven;
-    final zigzag = hard && !sweeping;
+    final sweeping = hard && _hardHazardSequence % 3 == 0;
+    final zigzag = hard && _hardHazardSequence % 3 == 1;
+    final orbiting = hard && _hardHazardSequence % 3 == 2;
     if (hard) _hardHazardSequence++;
     final kind = hard
         ? (sweeping ? HazardKind.laser : HazardKind.movingHole)
@@ -329,13 +333,27 @@ class BalanceGame {
     specialHazards.add(
       SpecialHazard(
         kind,
-        x: zigzag ? 180 : lane,
-        y: zigzag ? 55 : (screenY(ballY) - 150).clamp(75.0, 300.0),
+        x: zigzag
+            ? 180
+            : orbiting
+            ? lane.clamp(110.0, 250.0)
+            : lane,
+        y: zigzag
+            ? 55
+            : orbiting
+            ? (screenY(ballY) - 45).clamp(visibleTop + 105, 405.0)
+            : (screenY(ballY) - 150).clamp(75.0, 300.0),
+        motion: orbiting ? HazardMotion.circle : HazardMotion.legacy,
+        radiusX: InfiniteTuning.orbitRadius,
+        period: InfiniteTuning.orbitPeriod,
+        phase: orbiting ? -math.pi / 2 : 0,
         sweeping: sweeping,
         zigzag: zigzag,
         warningSeconds: kind == HazardKind.platformGap ? 2.4 : 2.0,
         cameraOffset: cameraOffset,
-        liveSeconds: kind == HazardKind.formingHole
+        liveSeconds: orbiting
+            ? InfiniteTuning.orbitLifeSeconds
+            : kind == HazardKind.formingHole
             ? double.infinity
             : sweeping
             ? 3.5
@@ -675,6 +693,8 @@ class BalanceGame {
             dailySeed: daily ? DailyChallenge.seed(dailyDate!) : null,
           );
     spiders.clear();
+    webShots.clear();
+    _nextWebTime = 0;
     if (spiderLevel)
       spiders.addAll(
         ClassicLevels.definition(level).spiders.map((s) => s.create()),
@@ -980,6 +1000,14 @@ class BalanceGame {
       coins.removeWhere((c) => screenY(c.y) > 620);
       survival.items.removeWhere((item) => screenY(item.y) > 610);
       _pruneInfiniteSpiders();
+      webShots.removeWhere(
+        (shot) =>
+            shot.expired ||
+            shot.x < 0 ||
+            shot.x > 360 ||
+            shot.y < visibleTop - 30 ||
+            shot.y > 610,
+      );
       return;
     }
     Hole? hit;

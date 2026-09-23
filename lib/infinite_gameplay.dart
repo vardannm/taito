@@ -56,10 +56,47 @@ extension InfiniteGameplay on BalanceGame {
           radius,
           phase: _random.nextDouble() * math.pi * 2,
           chaseSpeed:
-              65 + 4.0 * (paceLevel - 1) * InfiniteDifficulty.spiderGrowth,
+              InfiniteTuning.spiderChaseSpeed +
+              InfiniteTuning.spiderChaseBonus *
+                  (paceLevel - 1) *
+                  InfiniteDifficulty.spiderGrowth,
         ),
       );
       return;
+    }
+  }
+
+  void _updateSpiderWebs(double dt) {
+    // Maze and breathing sections provide a clean break from ranged attacks.
+    if (mazeSection || section == InfiniteSection.breath) {
+      webShots.clear();
+      _nextWebTime = math.max(_nextWebTime, elapsed + 1);
+      return;
+    }
+    webShots.removeWhere((shot) => shot.expired);
+    for (final shot in webShots) {
+      shot.step(dt);
+    }
+    if (elapsed < _nextWebTime ||
+        webShots.length >= InfiniteTuning.maxWebShots ||
+        specialHazards.isNotEmpty)
+      return;
+    for (final spider in spiders) {
+      final sy = screenY(spider.y);
+      final dx = ballX - spider.x, dy = screenY(ballY) - sy;
+      final distance = math.sqrt(dx * dx + dy * dy);
+      if (sy < visibleTop + 35 || sy > 490 || distance < 100 || distance > 300)
+        continue;
+      webShots.add(
+        SpiderWebShot(
+          x: spider.x,
+          y: sy,
+          targetX: ballX,
+          targetY: screenY(ballY),
+        ),
+      );
+      _nextWebTime = elapsed + InfiniteTuning.webInterval;
+      break;
     }
   }
 
@@ -223,6 +260,7 @@ extension InfiniteGameplay on BalanceGame {
             InfiniteItem? item,
             BrassCoin? coin,
             Hole? hole,
+            SpiderWebShot? web,
             String? reason,
           })
         >[];
@@ -244,7 +282,21 @@ extension InfiniteGameplay on BalanceGame {
           item: null,
           coin: null,
           hole: null,
+          web: null,
           reason: 'Caught by a spider. Stay outside its territory.',
+        ));
+    }
+    _updateSpiderWebs(dt);
+    for (final web in webShots) {
+      final t = web.contact(oldX, oldScreenY, ballX, screenY(ballY));
+      if (t != null)
+        events.add((
+          t: t,
+          item: null,
+          coin: null,
+          hole: null,
+          web: web,
+          reason: 'Hit by a web. Dodge the aimed shot.',
         ));
     }
     // Rebuild only future rewards when a magnet is picked up mid-sweep.
@@ -269,6 +321,7 @@ extension InfiniteGameplay on BalanceGame {
             item: item,
             coin: null,
             hole: null,
+            web: null,
             reason: null,
           ));
       }
@@ -288,6 +341,7 @@ extension InfiniteGameplay on BalanceGame {
             item: null,
             coin: coin,
             hole: null,
+            web: null,
             reason: null,
           ));
       }
@@ -302,6 +356,7 @@ extension InfiniteGameplay on BalanceGame {
           item: null,
           coin: null,
           hole: hole,
+          web: null,
           reason: 'Into a trap.',
         ));
     }
@@ -319,6 +374,7 @@ extension InfiniteGameplay on BalanceGame {
           item: null,
           coin: null,
           hole: null,
+          web: null,
           reason: switch (hazard.kind) {
             HazardKind.laser => 'Laser hit. Move out of the blinking beam.',
             HazardKind.platformGap => 'The platform broke beneath you.',
@@ -341,6 +397,7 @@ extension InfiniteGameplay on BalanceGame {
           item: null,
           coin: null,
           hole: null,
+          web: null,
           reason: 'Laser wall. Steer through the gap.',
         ));
     }
@@ -350,6 +407,7 @@ extension InfiniteGameplay on BalanceGame {
         item: null,
         coin: null,
         hole: null,
+        web: null,
         reason: 'The red caught you. Keep steering.',
       ));
     }
@@ -371,7 +429,9 @@ extension InfiniteGameplay on BalanceGame {
         }
       } else if (contact.coin != null) {
         _takeCoin(contact.coin!);
-      } else if (!survival.protected) {
+      } else {
+        if (contact.web != null) contact.web!.consumed = true;
+        if (survival.protected) continue;
         fellThroughGap = contact.reason == 'The platform broke beneath you.';
         _loseClimb(contact.reason!, hole: contact.hole);
         if (phase != GamePhase.playing) return;

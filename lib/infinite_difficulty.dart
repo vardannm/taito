@@ -21,7 +21,7 @@ abstract final class InfiniteDifficulty {
   // Shortens special-hazard intervals as distance increases.
   static const hazardFrequency = 1.0;
 
-  // Probability of hard variants after 2,400m, subject to encounter rules.
+  // Chance of sweeping lasers, zigzag/orbiting holes after 2,400m in encounters.
   static const hardHazards = 1.0;
 
   // Growth of encounter sections at the expense of breathing sections.

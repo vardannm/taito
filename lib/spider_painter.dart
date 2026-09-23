@@ -136,3 +136,63 @@ void paintSpiders(Canvas c, BalanceGame game, bool reducedMotion) {
     c.restore();
   }
 }
+
+/// A fixed aiming line precedes each slow, non-homing web projectile.
+void paintSpiderWebShots(Canvas c, BalanceGame game, bool reducedMotion) {
+  if (!game.infinite) return;
+  for (final web in game.webShots) {
+    if (web.expired) continue;
+    final center = Offset(web.x, web.y);
+    final tint = infiniteBoardInk(game, center);
+    final paint = Paint()
+      ..color = tint
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.3;
+    if (web.warning) {
+      final target = Offset(web.targetX, web.targetY);
+      final delta = target - center;
+      for (var i = 0; i < 12; i++) {
+        c.drawLine(
+          center + delta * (i / 12),
+          center + delta * ((i + .5) / 12),
+          Paint()
+            ..color = tint.withAlpha(120)
+            ..strokeWidth = 1,
+        );
+      }
+      c.drawCircle(
+        target,
+        10,
+        Paint()
+          ..color = tint.withAlpha(130)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1,
+      );
+      c.drawArc(
+        Rect.fromCircle(center: center, radius: 14),
+        -math.pi / 2,
+        math.pi * 2 * web.age / web.warningSeconds,
+        false,
+        paint,
+      );
+    }
+    final radius = web.warning ? 7.0 : 9.0;
+    c.drawCircle(
+      center,
+      radius + 2,
+      Paint()
+        ..color = (tint == Colors.white ? Colors.black : Colors.white)
+            .withAlpha(160),
+    );
+    c.drawCircle(center, radius, paint);
+    c.drawCircle(center, radius * .45, paint);
+    for (var i = 0; i < 6; i++) {
+      final a = i * math.pi / 3 + (reducedMotion ? 0 : web.age * .7);
+      c.drawLine(
+        center,
+        center + Offset(math.cos(a), math.sin(a)) * radius,
+        paint,
+      );
+    }
+  }
+}

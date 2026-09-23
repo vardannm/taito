@@ -50,7 +50,9 @@ class SpecialHazard {
   String get label => switch (kind) {
     HazardKind.formingHole => warning ? 'HOLE OPENING' : 'HOLE OPEN',
     HazardKind.movingHole =>
-      zigzag
+      motion == HazardMotion.circle
+          ? (warning ? 'ORBITING HOLE INCOMING' : 'ORBITING HOLE')
+          : zigzag
           ? (warning ? 'ZIGZAG INCOMING' : 'ZIGZAG HOLE')
           : (warning ? 'MOVING HOLE INCOMING' : 'MOVING HOLE'),
     HazardKind.laser =>

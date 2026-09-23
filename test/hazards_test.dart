@@ -43,35 +43,47 @@ void main() {
       expect(h.y, greaterThan(140));
     },
   );
-  test('hard variants alternate only in late encounter sections', () {
-    for (final height in [9000.0, 24000.0, 43200.0, 42900.0]) {
-      final g = BalanceGame(seed: 42)
-        ..start(gameMode: GameMode.infinite)
-        // Laser maze sections have their own tests; this one is about the
-        // ordinary hazard scheduler.
-        ..mazeSectionsEnabled = false;
-      final variants = <bool>[];
-      for (var i = 0; i < 10; i++) {
-        g.maxHeight = height;
-        g.elapsed += 20;
-        g.specialHazards.clear();
-        g.board.clear();
-        g.stallTime = 0;
-        g.step(1 / 120);
-        for (final h in g.specialHazards) {
-          if (h.sweeping || h.zigzag) variants.add(h.sweeping);
+  test(
+    'hard variants cycle through sweep, zigzag and orbit only in late encounters',
+    () {
+      for (final height in [9000.0, 24000.0, 43200.0, 42900.0]) {
+        final g = BalanceGame(seed: 42)
+          ..start(gameMode: GameMode.infinite)
+          // Laser maze sections have their own tests; this one is about the
+          // ordinary hazard scheduler.
+          ..mazeSectionsEnabled = false;
+        final variants = <int>[];
+        for (var i = 0; i < 10; i++) {
+          g.maxHeight = height;
+          g.elapsed += 20;
+          g.specialHazards.clear();
+          g.board.clear();
+          g.stallTime = 0;
+          g.step(1 / 120);
+          for (final h in g.specialHazards) {
+            if (h.sweeping || h.zigzag || h.motion == HazardMotion.circle) {
+              variants.add(
+                h.sweeping
+                    ? 0
+                    : h.zigzag
+                    ? 1
+                    : 2,
+              );
+            }
+          }
+        }
+        if (height == 42900) {
+          expect(variants.length, greaterThan(2));
+          expect(variants, contains(2));
+          for (var i = 1; i < variants.length; i++) {
+            expect(variants[i], (variants[i - 1] + 1) % 3);
+          }
+        } else {
+          expect(variants, isEmpty);
         }
       }
-      if (height == 42900) {
-        expect(variants.length, greaterThan(2));
-        for (var i = 1; i < variants.length; i++) {
-          expect(variants[i], !variants[i - 1]);
-        }
-      } else {
-        expect(variants, isEmpty);
-      }
-    }
-  });
+    },
+  );
   for (final kind in HazardKind.values) {
     test(
       '$kind is harmless throughout warning and lethal after activation',
@@ -156,8 +168,10 @@ void main() {
       for (final height in [4500.0, 10800.0, 15000.0, 22500.0]) {
         game.maxHeight = height;
         for (var i = 0; i < 25 * 120; i++) {
-          // Isolate scheduling from ordinary traps and the separate idle penalty.
+          // Isolate scheduling from traps, ranged spiders and the idle penalty.
           game.board.clear();
+          game.spiders.clear();
+          game.webShots.clear();
           game.stallTime = 0;
           game.ballX = 332;
           game.velocity = 0;

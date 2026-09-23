@@ -30,7 +30,7 @@ void paintSpecialHazards(Canvas c, BalanceGame game, bool reducedMotion) {
           ..strokeWidth = 2,
       );
     }
-    if (h.warning &&
+    if ((h.warning || (h.active && h.motion == HazardMotion.circle)) &&
         h.motion != HazardMotion.legacy &&
         h.motion != HazardMotion.stationary) {
       final path = Paint()
@@ -148,7 +148,15 @@ void paintSpecialHazards(Canvas c, BalanceGame game, bool reducedMotion) {
           ..strokeWidth = 2,
       );
     }
-    if (h.kind == HazardKind.movingHole) {
+    if (h.kind == HazardKind.movingHole && h.motion == HazardMotion.circle) {
+      // Tangent arrow communicates the circular direction, not a sideways sweep.
+      final angle = math.atan2(h.y - h.originY, h.x - h.originX);
+      final direction = Offset(-math.sin(angle), math.cos(angle));
+      final normal = Offset(-direction.dy, direction.dx);
+      final tip = p + direction * 23;
+      c.drawLine(tip, tip - direction * 6 + normal * 4, warning);
+      c.drawLine(tip, tip - direction * 6 - normal * 4, warning);
+    } else if (h.kind == HazardKind.movingHole) {
       for (final d in [-1.0, 1.0]) {
         final tip = p + Offset(d * 29, 0);
         c.drawLine(tip, tip + Offset(-d * 5, -5), warning);

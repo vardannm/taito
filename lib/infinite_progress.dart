@@ -28,6 +28,12 @@ abstract final class InfiniteTuning {
   static const shieldSeconds = 10.0, recoverySeconds = 2.5;
   static const magnetSeconds = 12.0, magnetRadius = 220.0;
   static const firstMagnetY = -450.0, magnetSpacing = 2800.0;
+  // Infinite spiders and their aimed shots: fixed gentle speeds at every pace.
+  static const spiderChaseSpeed = 44.0, spiderChaseBonus = 3.0;
+  static const webSpeed = 90.0, webRadius = 5.0;
+  static const webWarningSeconds = 1.0, webLifeSeconds = 4.0;
+  static const webInterval = 3.5, maxWebShots = 2;
+  static const orbitRadius = 62.0, orbitPeriod = 5.5, orbitLifeSeconds = 6.0;
   static const metresPerPace = 600.0, comboPoints = 50;
   static const firstComboY = 190.0, firstShieldY = -950.0;
   static const firstHeartY = -1650.0;
