@@ -53,7 +53,7 @@ void main() {
     final game = BalanceGame()..start(gameMode: GameMode.infinite);
     expect(game.ascentSpeed, 68);
     game.maxHeight = 4500;
-    expect(game.ascentSpeed, 151);
+    expect(game.ascentSpeed, closeTo(85.0859375, .001));
     game.maxHeight = 100000;
     expect(game.ascentSpeed, 216);
   });

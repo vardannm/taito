@@ -66,10 +66,12 @@ class BrassCoin {
 enum InfiniteSection { rush, breath, encounter }
 
 InfiniteSection sectionAt(double meters) {
-  final phase = meters % 180;
-  return phase < 90
+  final phase = meters % 360;
+  // Lengthen recovery stretches early; encounters grow to the original share.
+  final growth = ((meters - 600) / 1800).clamp(0.0, 1.0);
+  return phase < 180
       ? InfiniteSection.rush
-      : phase < 120
+      : phase < 360 - 120 * growth
       ? InfiniteSection.breath
       : InfiniteSection.encounter;
 }

@@ -86,7 +86,8 @@ class BalanceGame {
   bool get daily => mode == GameMode.daily;
   String get dailyKey =>
       dailyDate == null ? '' : DailyChallenge.key(dailyDate!);
-  bool get finale => mode == GameMode.classic &&
+  bool get finale =>
+      mode == GameMode.classic &&
       (ClassicLevels.definition(level).finaleTitle.isNotEmpty ||
           ClassicLevels.definition(level).hazards.isNotEmpty);
   String get finaleTitle => finale ? ClassicLevels.finaleTitle(level) : '';
@@ -103,7 +104,8 @@ class BalanceGame {
 
   final spiders = <BoardSpider>[];
   bool caughtBySpider = false;
-  bool get spiderLevel => mode == GameMode.classic &&
+  bool get spiderLevel =>
+      mode == GameMode.classic &&
       ClassicLevels.definition(level).spiders.isNotEmpty;
   List<Hole> _classicBoard = [];
   double controlPosition = 0;
@@ -216,7 +218,7 @@ class BalanceGame {
   GameMode mode = GameMode.classic;
   final List<Hole> _endlessHoles = [];
   double _nextRowY = 250, _corridor = 180;
-  double _nextSpiderY = -400;
+  double _nextSpiderY = -1800;
   double cameraOffset = 0, maxHeight = 0, stallTime = 0, dangerY = 580;
   double _steeringDistance = 0;
   double _nextCoinY = 380;
@@ -251,11 +253,12 @@ class BalanceGame {
   }
 
   static const infiniteStart = 440.0;
+  // Logical top of the expanded portrait viewport, in board coordinates.
+  double visibleTop = 0;
   static const firstRow = 300.0;
 
   static double difficultyAt(double progress) {
-    final t = (progress / 900).clamp(0.0, 1.0);
-    return t * t * (3 - 2 * t);
+    return InfiniteTuning.difficultyAt(progress);
   }
 
   double get difficulty => difficultyAt(maxHeight / 10);
@@ -292,23 +295,19 @@ class BalanceGame {
     if (specialHazards.isNotEmpty ||
         mazeSection ||
         elapsed < _nextHazardTime ||
-        metres < 180 ||
+        metres < InfiniteTuning.hazardMilestones.first ||
         section == InfiniteSection.breath)
       return;
-    final unlocked = metres >= 900
-        ? 4
-        : metres >= 600
-        ? 3
-        : metres >= 350
-        ? 2
-        : 1;
+    final unlocked = InfiniteTuning.hazardMilestones
+        .where((m) => metres >= m)
+        .length;
     final index = _introducedHazards < unlocked
         ? _introducedHazards++
         : (_hazardSequence + 1 + _random.nextInt(math.max(1, unlocked - 1))) %
               unlocked;
     _hazardSequence = index;
     final hard =
-        metres >= 1200 &&
+        _random.nextDouble() < InfiniteTuning.complexityAt(metres.toDouble()) &&
         section == InfiniteSection.encounter &&
         _introducedHazards >= 4;
     final sweeping = hard && _hardHazardSequence.isEven;
@@ -343,8 +342,8 @@ class BalanceGame {
     // One special hazard at a time, with recovery time before the next warning.
     _nextHazardTime =
         elapsed +
-        (section == InfiniteSection.encounter ? 9 : 12) -
-        5.5 * difficulty;
+        (section == InfiniteSection.encounter ? 16 : 20) -
+        (section == InfiniteSection.encounter ? 12.5 : 13.5) * difficulty;
   }
 
   bool get infinite => mode == GameMode.infinite;
@@ -361,8 +360,8 @@ class BalanceGame {
 
   void ensureInfiniteBoard({bool retainForSweep = false}) {
     if (!infinite) return;
-    while (_nextRowY >= -cameraOffset - 120) {
-      final d = InfiniteTuning.densityAt(score);
+    while (_nextRowY >= -cameraOffset + visibleTop - 120) {
+      final d = InfiniteTuning.runDensity(score, maxHeight / 10);
       final stage = sectionAt(math.max(0, (infiniteStart - _nextRowY) / 10));
       final spacing =
           (210 - 130 * d + _random.nextDouble() * 30) *
@@ -664,7 +663,9 @@ class BalanceGame {
           );
     spiders.clear();
     if (spiderLevel)
-      spiders.addAll(ClassicLevels.definition(level).spiders.map((s) => s.create()));
+      spiders.addAll(
+        ClassicLevels.definition(level).spiders.map((s) => s.create()),
+      );
     caughtBySpider = false;
     coins.clear();
     if (!infinite && !practice && !merging && !maze)
@@ -692,7 +693,7 @@ class BalanceGame {
     dangerY = 580;
     _nextRowY = 300 + _random.nextDouble() * 20;
     _corridor = 150 + _random.nextDouble() * 60;
-    _nextSpiderY = -400;
+    _nextSpiderY = -1800;
     specialHazards.clear();
     mazeGates.clear();
     _nextMazeMetres =
@@ -1065,7 +1066,7 @@ class BalanceGame {
     if (definition.hazards.isEmpty) return;
     for (final h in specialHazards) {
       h.step(dt, 0);
-      if (h.hits(oldX, oldY, ballX, ballY)) {
+      if (h.hits(oldX, oldY, ballX, ballY, boardTop: visibleTop)) {
         captureX = ballX;
         captureY = ballY;
         lives--;
@@ -1085,7 +1086,8 @@ class BalanceGame {
     }
     specialHazards.removeWhere((h) => h.expired);
     if (specialHazards.isNotEmpty || legTime < _nextFinaleAt) return;
-    final wave = definition.hazards[_finaleSequence % definition.hazards.length];
+    final wave =
+        definition.hazards[_finaleSequence % definition.hazards.length];
     final positions = wave.positions.where((p) => p.target == target).toList();
     if (positions.isEmpty) {
       _finaleSequence++;
@@ -1100,6 +1102,12 @@ class BalanceGame {
         y: position.y,
         warningSeconds: wave.warningSeconds,
         liveSeconds: wave.liveSeconds,
+        motion: wave.motion,
+        orientation: wave.orientation,
+        radiusX: wave.radiusX,
+        radiusY: wave.radiusY,
+        period: wave.period,
+        phase: wave.phase,
       ),
     );
     _finaleSequence++;

@@ -336,10 +336,10 @@ void main() {
     },
   );
   test('Infinite rhythm changes pressure without reducing ascent speed', () {
-    expect(sectionAt(89), InfiniteSection.rush);
-    expect(sectionAt(90), InfiniteSection.breath);
-    expect(sectionAt(120), InfiniteSection.encounter);
-    expect(sectionAt(180), InfiniteSection.rush);
+    expect(sectionAt(179), InfiniteSection.rush);
+    expect(sectionAt(180), InfiniteSection.breath);
+    expect(sectionAt(2490), InfiniteSection.encounter);
+    expect(sectionAt(2520), InfiniteSection.rush);
     expect(
       InfiniteSection.breath.densityFactor,
       lessThan(InfiniteSection.rush.densityFactor),

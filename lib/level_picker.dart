@@ -171,6 +171,13 @@ class LevelPicker extends StatelessWidget {
             'Spiders patrol the marked territories. Cross a boundary and they chase. Contact ends your run.',
           ),
           grid(31, 20),
+          if (ClassicLevels.count > 50) ...[
+            heading(
+              'More challenges · 51–${ClassicLevels.count}',
+              'New boards, new routes. Keep climbing.',
+            ),
+            grid(51, ClassicLevels.count - 50),
+          ],
         ],
       );
     },

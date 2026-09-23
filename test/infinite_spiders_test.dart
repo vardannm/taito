@@ -12,8 +12,9 @@ void main() {
         final g = BalanceGame(seed: seed)..start(gameMode: GameMode.infinite);
         expect(g.spiders, isEmpty);
         final seen = <BoardSpider>{};
-        for (var offset = 100.0; offset < 20000; offset += 100) {
+        for (var offset = 100.0; offset < 45000; offset += 100) {
           g.cameraOffset = offset;
+          g.maxHeight = offset;
           g.ensureInfiniteBoard();
           expect(g.spiders.length, lessThanOrEqualTo(3));
           for (final s in g.spiders) {

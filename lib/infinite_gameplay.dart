@@ -20,7 +20,7 @@ extension InfiniteGameplay on BalanceGame {
     if (y > _nextSpiderY) return;
     // Distance-based encounters, with clear stretches between territories.
     // Consume skipped slots too, so maze/breath sections never build a backlog.
-    _nextSpiderY = y - (1050 - 90 * paceLevel) - _random.nextDouble() * 400;
+    _nextSpiderY = y - (1800 - 1200 * difficulty) - _random.nextDouble() * 400;
     final radius = 38.0 + 2 * (paceLevel - 1);
     if (mazeSection ||
         stage == InfiniteSection.breath ||
@@ -53,7 +53,7 @@ extension InfiniteGameplay on BalanceGame {
   }
 
   void _ensureInfiniteItems() {
-    final ahead = -cameraOffset - 100;
+    final ahead = -cameraOffset + visibleTop - 100;
     void spawn(InfiniteItemKind kind, double y) {
       if (survival.items.length >= InfiniteTuning.maxItems) return;
       // Gold combo crystals sometimes sit near a hole, with a safe approach.
@@ -229,7 +229,13 @@ extension InfiniteGameplay on BalanceGame {
         events.add((t: t, item: null, hole: hole, reason: 'Into a trap.'));
     }
     for (final hazard in specialHazards) {
-      final t = hazard.contact(oldX, oldScreenY, ballX, screenY(ballY));
+      final t = hazard.contact(
+        oldX,
+        oldScreenY,
+        ballX,
+        screenY(ballY),
+        boardTop: visibleTop,
+      );
       if (t != null)
         events.add((
           t: t,

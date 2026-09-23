@@ -19,7 +19,7 @@ void main() {
 
   test('all star thresholds are reachable and exact, with level 1 free', () {
     expect(ClassicLevels.isUnlocked(1, 0), isTrue);
-    for (var level = 2; level <= 50; level++) {
+    for (var level = 2; level <= ClassicLevels.count; level++) {
       final stars = ClassicLevels.requiredStars(level);
       expect(stars, (level - 1) * 2);
       expect(stars, lessThanOrEqualTo((level - 1) * 3));
@@ -27,7 +27,7 @@ void main() {
       expect(ClassicLevels.isUnlocked(level, stars), isTrue);
     }
     expect(ClassicLevels.isUnlocked(0, 150), isFalse);
-    expect(ClassicLevels.isUnlocked(51, 150), isFalse);
+    expect(ClassicLevels.isUnlocked(ClassicLevels.count + 1, 1000), isFalse);
   });
 
   test(

@@ -6,7 +6,7 @@ import 'rewards.dart';
 
 /// Fixed Classic layouts and seeded Daily boards with shared gameplay rules.
 class ClassicLevels {
-  static const count = 50;
+  static int get count => classicLevelDefinitions.length;
   static int requiredStars(int level) => (level.clamp(1, count) - 1) * 2;
   static bool isUnlocked(int level, int stars) =>
       level >= 1 && level <= count && stars >= requiredStars(level);

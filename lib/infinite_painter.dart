@@ -14,11 +14,22 @@ const _comboColors = [
   // x6 turns the board dark violet, x7 goes darker still.
   Color(0xFF412A77),
   Color(0xFF16121E),
+  Color(0xFF18264D), // x8: deep indigo
+  Color(0xFF083B4B), // x9: electric cyan over midnight
+  Color(0xFF49331B), // x10: warm gold maximum
 ];
 
 /// How far the board has gone dark: nothing through x5, full from x6 on.
 double comboDarkness(double power) =>
-    ((power.clamp(0.0, 1.0) - 4 / 6) * 6).clamp(0.0, 1.0);
+    ((power.clamp(0.0, 1.0) * 9) - 4).clamp(0.0, 1.0);
+
+Color comboEnergyColor(double power) => Color.lerp(
+  power < 8 / 9 ? const Color(0xFFCBA8FF) : const Color(0xFF6FEAFF),
+  power < 8 / 9 ? const Color(0xFF6FEAFF) : const Color(0xFFFFD778),
+  power < 8 / 9
+      ? ((power - 5 / 9) * 3).clamp(0.0, 1.0)
+      : ((power - 8 / 9) * 9).clamp(0.0, 1.0),
+)!;
 
 Color comboColor(double power, {bool background = false}) {
   final steps = _comboColors.length - 1;
@@ -74,7 +85,7 @@ void paintInfiniteAtmosphere(Canvas c, BalanceGame game, bool reducedMotion) {
       .clamp(0.0, 1.0);
   if (power < .005) return;
   final tint = comboColor(power);
-  const area = Rect.fromLTWH(10, 10, 340, 540);
+  final area = Rect.fromLTRB(10, game.visibleTop + 10, 350, 550);
   // Opaque color transforms the whole playfield; the start fades in smoothly.
   c.drawRect(
     area,
@@ -124,14 +135,26 @@ void paintInfiniteAtmosphere(Canvas c, BalanceGame game, bool reducedMotion) {
         y = 16 + (i * 137 + game.clock * (25 + 75 * power)) % 520;
     c.drawLine(Offset(x, y), Offset(x, y - 3 - 18 * power), streakPaint);
   }
-  if (darkness > 0) paintComboEmbers(c, game.clock, darkness);
+  if (darkness > 0)
+    paintComboEmbers(
+      c,
+      game.clock,
+      darkness * (.25 + .75 * power),
+      power: power,
+    );
 }
 
 /// Embers that rise through the dark tiers. Positions come from the clock and
 /// the index alone: no particle state to own, reset or leak between runs, and
 /// every ember lands in one of four batched paths to keep the draw count flat.
-void paintComboEmbers(Canvas c, double clock, double darkness) {
-  const violet = Color(0xFFCBA8FF), spark = Color(0xFFFFE6B8);
+void paintComboEmbers(
+  Canvas c,
+  double clock,
+  double darkness, {
+  double power = 1,
+}) {
+  final violet = comboEnergyColor(power);
+  const spark = Color(0xFFFFE6B8);
   final count = (InfiniteTuning.maxParticles * darkness).round();
   final glow = Path(), cores = Path(), sparks = Path(), trails = Path();
   for (var i = 0; i < count; i++) {
@@ -166,35 +189,34 @@ void paintInfiniteItems(Canvas c, BalanceGame game, bool reducedMotion) {
   if (!game.infinite) return;
   for (final item in game.survival.items) {
     final p = Offset(item.x, game.screenY(item.y));
-    if (p.dy < -14 || p.dy > 574) continue;
+    if (p.dy < game.visibleTop - 14 || p.dy > 574) continue;
     // Each pickup bobs on its own phase, so a row of them never pulses as one.
     final phase = item.x * .07;
     final bob = reducedMotion ? 0.0 : math.sin(game.clock * 2.2 + phase) * 1.4;
-    paintPickup(
-      c,
-      Offset(p.dx, p.dy + bob),
-      switch (item.kind) {
-        InfiniteItemKind.combo => PickupFace.combo,
-        InfiniteItemKind.shield => PickupFace.shield,
-        InfiniteItemKind.heart => PickupFace.heart,
-      },
-      reducedMotion ? 0 : (game.clock * .55 + phase) % 1,
-    );
+    paintPickup(c, Offset(p.dx, p.dy + bob), switch (item.kind) {
+      InfiniteItemKind.combo => PickupFace.combo,
+      InfiniteItemKind.shield => PickupFace.shield,
+      InfiniteItemKind.heart => PickupFace.heart,
+    }, reducedMotion ? 0 : (game.clock * .55 + phase) % 1);
   }
 }
 
 /// Bounded, blur-free energy: gradients and shared paths avoid a separate
 /// blur render pass for every spark/arc. Cost does not grow with pace/combo.
 void paintInfiniteEnergy(Canvas c, BalanceGame game, bool reducedMotion) {
-  if (!game.infinite || game.survival.combo < 5) return;
+  if (!game.infinite || game.survival.visualCombo < .15) return;
+  final power = game.survival.visualCombo.clamp(0.0, 1.0);
+  final strength = ((power - .15) / .85).clamp(0.0, 1.0);
   final a = Offset(20, game.screenY(game.left));
   final b = Offset(340, game.screenY(game.right));
   if (math.max(a.dy, b.dy) < -40 || math.min(a.dy, b.dy) > 610) return;
   final direction = b - a, span = direction.distance;
   if (span <= 0) return;
   final time = game.clock;
-  const gold = Color(0xFFFFC247), amber = Color(0xFFFF8A32);
-  final pulse = reducedMotion ? 1.0 : .85 + math.sin(time * 5) * .1;
+  final gold = comboEnergyColor(power),
+      amber = Color.lerp(gold, const Color(0xFFFF8A32), .3)!;
+  final pulse =
+      (reducedMotion ? 1.0 : .85 + math.sin(time * 5) * .1) * strength;
   c.save();
   c.translate(a.dx, a.dy);
   c.rotate(math.atan2(direction.dy, direction.dx));
@@ -218,7 +240,7 @@ void paintInfiniteEnergy(Canvas c, BalanceGame game, bool reducedMotion) {
   );
   if (!reducedMotion) {
     final arcs = Path();
-    for (var arc = 0; arc < 3; arc++) {
+    for (var arc = 0; arc < (1 + 4 * strength).ceil(); arc++) {
       arcs.moveTo(0, 0);
       for (var i = 1; i < 12; i++) {
         final t = i / 12;
@@ -227,7 +249,7 @@ void paintInfiniteEnergy(Canvas c, BalanceGame game, bool reducedMotion) {
         );
         arcs.lineTo(
           t * span,
-          -5 - arc * 1.5 - math.sin(t * math.pi) * wave * 6,
+          -3 - arc * 1.5 - math.sin(t * math.pi) * wave * (2 + 5 * strength),
         );
       }
       arcs.lineTo(span, 0);
@@ -235,7 +257,7 @@ void paintInfiniteEnergy(Canvas c, BalanceGame game, bool reducedMotion) {
     c.drawPath(
       arcs,
       Paint()
-        ..color = amber.withAlpha(40)
+        ..color = amber.withValues(alpha: .18 * strength)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 4
         ..strokeJoin = StrokeJoin.round,
@@ -243,24 +265,27 @@ void paintInfiniteEnergy(Canvas c, BalanceGame game, bool reducedMotion) {
     c.drawPath(
       arcs,
       Paint()
-        ..color = const Color(0xBBFFF0B5)
+        ..color = gold.withValues(alpha: .75 * strength)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.1,
     );
     final sparkPaint = Paint();
-    for (var i = 0; i < 8; i++) {
+    final sparks = Path();
+    for (var i = 0; i < (4 + 12 * strength).ceil(); i++) {
       final life = (time * .65 + i * .117) % 1;
       final x =
           (i * 71 % (span - 10)) + 5 + math.sin(i * 2.71 + time * 4) * 3 * life;
-      sparkPaint.color = const Color(
-        0xFFFFF0B5,
-      ).withValues(alpha: (1 - life) * .65);
-      c.drawCircle(
-        Offset(x, -5 - life * 26),
-        1.8 * (1 - life * .5),
-        sparkPaint,
+      sparks.addOval(
+        Rect.fromCircle(
+          center: Offset(x, -5 - life * (10 + 18 * strength)),
+          radius: 1.8 * (1 - life) * strength,
+        ),
       );
     }
+    c.drawPath(
+      sparks,
+      sparkPaint..color = gold.withValues(alpha: .65 * strength),
+    );
     final surgePaint = Paint()
       ..shader = const RadialGradient(
         colors: [Color(0xEEFFF9DD), Color(0x77FFC247), Color(0x00FFC247)],
@@ -284,11 +309,22 @@ void paintInfiniteEnergy(Canvas c, BalanceGame game, bool reducedMotion) {
     Offset.zero,
     Offset(span, 0),
     Paint()
-      ..color = const Color(0xFFFFF0B5)
-      ..strokeWidth = 2.2
+      ..color = gold.withValues(alpha: .85 * strength)
+      ..strokeWidth = 1 + 1.5 * strength
       ..strokeCap = StrokeCap.round,
   );
   c.restore();
+  if (game.ballScale > 0) {
+    final ball = Offset(game.visualX, game.screenY(game.visualY));
+    c.drawCircle(
+      ball,
+      9 + 6 * strength,
+      Paint()
+        ..color = gold.withValues(alpha: .28 * strength)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1 + 2 * strength,
+    );
+  }
 }
 
 void paintInfiniteShield(Canvas c, BalanceGame game, bool reducedMotion) {
@@ -328,7 +364,7 @@ void paintMazeGates(Canvas c, BalanceGame game, bool reducedMotion) {
   final beams = Path(), posts = Path();
   var brightest = 0.0;
   for (final gate in game.mazeGates) {
-    if (gate.y < -20 || gate.y > 580) continue;
+    if (gate.y < game.visibleTop - 20 || gate.y > 580) continue;
     final lit = gate.intensity;
     brightest = math.max(brightest, lit);
     beams
@@ -338,7 +374,9 @@ void paintMazeGates(Canvas c, BalanceGame game, bool reducedMotion) {
       ..lineTo(MazeGate.edge + MazeGate.span, gate.y);
     // Bright posts mark the opening, so the safe lane reads at a glance.
     for (final x in [gate.gapLeft, gate.gapRight]) {
-      posts.addRect(Rect.fromCenter(center: Offset(x, gate.y), width: 3, height: 15));
+      posts.addRect(
+        Rect.fromCenter(center: Offset(x, gate.y), width: 3, height: 15),
+      );
     }
   }
   if (brightest <= 0) return;
@@ -346,7 +384,9 @@ void paintMazeGates(Canvas c, BalanceGame game, bool reducedMotion) {
   c.drawPath(
     beams,
     Paint()
-      ..color = const Color(0xFFFF343E).withValues(alpha: .26 * pulse * brightest)
+      ..color = const Color(
+        0xFFFF343E,
+      ).withValues(alpha: .26 * pulse * brightest)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 13
       ..strokeCap = StrokeCap.round,

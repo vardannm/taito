@@ -103,6 +103,20 @@
       const label = document.createElement('label'); label.textContent = 'Wave type';
       const select = document.createElement('select'); select.add(new Option('Laser', 'laser')); select.add(new Option('Moving hole', 'movingHole')); select.value = wave.kind;
       select.onchange = () => change(() => {wave.kind = select.value;}); label.append(select); panel.append(label);
+      Object.assign(wave, {...M.waveDefaults, ...wave});
+      for (const [key, title, choices] of [
+        ['motion','Movement path',[['legacy','Original sway'],['stationary','Stationary'],['horizontal','Side to side'],['vertical','Up and down'],['circle','Circle'],['oval','Oval']]],
+        ['orientation','Laser direction',[['vertical','Vertical beam'],['horizontal','Horizontal beam']]],
+      ]) {
+        if(key==='orientation' && wave.kind!=='laser')continue;
+        const label=document.createElement('label');label.textContent=title;
+        const input=document.createElement('select');for(const [value,text] of choices)input.add(new Option(text,value));input.value=wave[key];
+        input.onchange=()=>change(()=>{wave[key]=input.value;});label.append(input);panel.append(label);
+      }
+      field(panel,'Horizontal radius','radiusX',wave,{min:0,max:150});
+      field(panel,'Vertical radius (oval / vertical)','radiusY',wave,{min:0,max:200});
+      field(panel,'Movement period (seconds)','period',wave,{min:.1});
+      field(panel,'Starting angle (radians)','phase',wave);
       field(panel, 'Warning time (seconds)', 'warningSeconds', wave, {min: .1});
       field(panel, 'Active time (seconds)', 'liveSeconds', wave, {min: .1});
     }
@@ -147,6 +161,14 @@
     ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); if (fill) {ctx.fillStyle = fill; ctx.fill();}
     if (stroke) {ctx.strokeStyle = stroke; ctx.lineWidth = width; ctx.stroke();}
   }
+  function movingPoint(w, p, seconds) {
+    const motion = w.motion || 'legacy', angle = (w.phase || 0) + seconds * Math.PI * 2 / (w.period || 4);
+    if (motion === 'circle' || motion === 'oval') return {x:p.x+w.radiusX*Math.cos(angle),y:p.y+(motion==='circle'?w.radiusX:w.radiusY)*Math.sin(angle)};
+    if (motion === 'horizontal') return {x:p.x+w.radiusX*Math.sin(angle),y:p.y};
+    if (motion === 'vertical') return {x:p.x,y:p.y+w.radiusY*Math.sin(angle)};
+    if (motion === 'legacy' && w.kind === 'movingHole') return {x:p.x+48*Math.sin(seconds*2.2),y:p.y};
+    return p;
+  }
   function draw() {
     ctx.setTransform(2, 0, 0, 2, 0, 0); ctx.clearRect(0, 0, 360, 560);
     ctx.fillStyle = '#f3edd9'; ctx.fillRect(0, 0, 360, 560);
@@ -156,9 +178,23 @@
     ctx.strokeStyle = '#b7b291';ctx.lineWidth = 1;ctx.strokeRect(16, 16, 328, 528);
     ctx.font = 'bold 8px Segoe UI';ctx.textAlign = 'center';ctx.fillStyle = '#7e866b';ctx.fillText('GILT  /  CLASSIC', 180, 12);
     for (const [wave, w] of draft.hazards.entries()) for (const [index, p] of w.positions.entries()) {
+      const q = movingPoint(w,p,$('animate').checked ? performance.now()/1000 : 0);
       ctx.save(); ctx.globalAlpha = filter && filter !== p.target ? .06 : .45;
-      if (w.kind === 'laser') {ctx.fillStyle = '#e37965';ctx.fillRect(p.x - 3,33,6,504);ctx.setLineDash([3,4]);ctx.strokeStyle='#b74335';ctx.beginPath();ctx.moveTo(p.x,33);ctx.lineTo(p.x,537);ctx.stroke();}
-      else {circle(p.x,p.y,9,'#c27a4c','#8b4b26');ctx.strokeStyle='#8b4b26';ctx.beginPath();ctx.moveTo(p.x-18,p.y);ctx.lineTo(p.x+18,p.y);ctx.stroke();}
+      ctx.strokeStyle='#b9845f';ctx.lineWidth=1;ctx.setLineDash([3,4]);
+      if(w.motion==='circle'||w.motion==='oval'){
+        ctx.beginPath();ctx.ellipse(p.x,p.y,w.radiusX,w.motion==='circle'?w.radiusX:w.radiusY,0,0,Math.PI*2);ctx.stroke();
+      }else if(w.motion==='horizontal'||w.motion==='vertical'){
+        const dx=w.motion==='horizontal'?w.radiusX:0,dy=w.motion==='vertical'?w.radiusY:0;
+        ctx.beginPath();ctx.moveTo(p.x-dx,p.y-dy);ctx.lineTo(p.x+dx,p.y+dy);ctx.stroke();
+      }
+      ctx.setLineDash([]);
+      if (w.kind === 'laser') {
+        const horizontal=w.orientation==='horizontal';
+        ctx.fillStyle='#e37965';
+        if(horizontal)ctx.fillRect(24,q.y-3,312,6);else ctx.fillRect(q.x-3,33,6,504);
+        ctx.strokeStyle='#b74335';ctx.beginPath();
+        if(horizontal){ctx.moveTo(24,q.y);ctx.lineTo(336,q.y);}else{ctx.moveTo(q.x,33);ctx.lineTo(q.x,537);}ctx.stroke();
+      } else {circle(q.x,q.y,9,'#c27a4c','#8b4b26');}
       ctx.restore();ctx.save();ctx.globalAlpha=filter && filter!==p.target ? .1 : 1;
       circle(p.x,p.y,6,w.kind==='laser'?'#ba4c3c':'#b07435','#fff8e6');
       if (same(selection,{type:'hazard',wave,index})) circle(p.x,p.y,12,null,'#2f7a68',2);
@@ -200,7 +236,7 @@
         draft.spiders.push({...p,zoneRadius:40,phase:0,chaseSpeed:72,bodyRadius:6});selection={type:'spider',index:draft.spiders.length-1};
       }else{
         if(!draft.hazards[waveIndex]||draft.hazards[waveIndex].kind!==tool){
-          draft.hazards.push({kind:tool,warningSeconds:2.4,liveSeconds:tool==='laser'?1.2:3,positions:[]});waveIndex=draft.hazards.length-1;
+          draft.hazards.push({...M.waveDefaults,kind:tool,warningSeconds:2.4,liveSeconds:tool==='laser'?1.2:3,positions:[]});waveIndex=draft.hazards.length-1;
         }
         const positions=draft.hazards[waveIndex].positions;positions.push({...p,target:filter||1});selection={type:'hazard',wave:waveIndex,index:positions.length-1};
       }
@@ -225,7 +261,7 @@
   $('undo').onclick=()=>restore(undo,redo);$('redo').onclick=()=>restore(redo,undo);$('delete').onclick=deleteSelection;
   $('filter').onchange=()=>{filter=Number($('filter').value);draw();};
   $('wave').onchange=()=>{waveIndex=Number($('wave').value);selection=null;render();};
-  $('add-wave').onclick=()=>change(()=>{draft.hazards.push({kind:'laser',warningSeconds:2.4,liveSeconds:1.2,positions:[]});waveIndex=draft.hazards.length-1;selection=null;tool='laser';});
+  $('add-wave').onclick=()=>change(()=>{draft.hazards.push({...M.waveDefaults,kind:'laser',warningSeconds:2.4,liveSeconds:1.2,positions:[]});waveIndex=draft.hazards.length-1;selection=null;tool='laser';});
   $('wave-up').onclick=()=>{if(waveIndex>0)change(()=>{[draft.hazards[waveIndex-1],draft.hazards[waveIndex]]=[draft.hazards[waveIndex],draft.hazards[waveIndex-1]];waveIndex--;selection=null;});};
   $('delete-wave').onclick=()=>{if(waveIndex>=0 && confirm('Delete this wave and all its positions?'))change(()=>{draft.hazards.splice(waveIndex,1);waveIndex=Math.min(waveIndex,draft.hazards.length-1);selection=null;});};
   for(const key of ['number','name','finaleTitle','finaleRule','firstHazardAfter','hazardInterval'])$(key).onchange=()=>{
@@ -262,4 +298,5 @@
     else if(e.key==='Escape'){selection=null;tool='select';render();}
   });
   render();
+  function animate(){if($("animate").checked)draw();requestAnimationFrame(animate);} requestAnimationFrame(animate);
 })();

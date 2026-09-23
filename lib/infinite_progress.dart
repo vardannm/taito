@@ -2,7 +2,18 @@ import 'dart:math' as math;
 
 /// All survival balancing lives here. Pace is a level, not a literal 5x motor.
 abstract final class InfiniteTuning {
-  static const denseScore = 20000.0;
+  static const denseScore = 60000.0;
+  static double difficultyAt(double metres) {
+    final t = (metres / 2400).clamp(0.0, 1.0);
+    return t * t * (3 - 2 * t);
+  }
+
+  // Equipment and combo rewards cannot skip the gentle opening of a run.
+  static double runDensity(num score, double metres) =>
+      math.min(densityAt(score), difficultyAt(metres));
+  static const hazardMilestones = [450, 900, 1500, 2250];
+  static double complexityAt(double metres) =>
+      ((metres - 2400) / 1800).clamp(0.0, 1.0);
   static double densityAt(num score) {
     final t = (score / denseScore).clamp(0.0, 1.0);
     return t * t * (3 - 2 * t);
@@ -10,29 +21,28 @@ abstract final class InfiniteTuning {
 
   static const startSpeed = 68.0, baseTopSpeed = 180.0, paceSpeedBonus = 9.0;
   static const coinSpacing = 85.0, coinSpacingJitter = 65.0;
-  static const visualIntensity = 1.0, maxParticles = 24;
-  static const maxLives = 3, maxPace = 5, maxCombo = 7;
+  static const visualIntensity = 1.0, maxParticles = 42;
+  static const maxLives = 3, maxPace = 5, maxCombo = 10;
   static const shieldSeconds = 10.0, recoverySeconds = 2.5;
-  static const metresPerPace = 150.0, comboPoints = 50;
+  static const metresPerPace = 600.0, comboPoints = 50;
   static const firstComboY = 190.0, firstShieldY = -950.0;
   static const firstHeartY = -1650.0;
   static const comboSpacing = 280.0, shieldSpacing = 2400.0;
+
   /// Laser maze sections, measured in metres climbed: the first arrives here,
   /// each covers this stretch, and the next follows after this much clear air.
   /// Distance, not score, so a lucky crystal cannot cut a maze short.
-  static const mazeFirstMetres = 220.0, mazeSectionMetres = 170.0;
-  static const mazeRestMetres = 380.0, mazeGateSpacing = 290.0;
+  static const mazeFirstMetres = 550.0, mazeSectionMetres = 170.0;
+  static const mazeRestMetres = 600.0, mazeGateSpacing = 290.0;
+
   /// How far a gap may move between gates, so the run is always steerable.
   static const mazeGapShift = 150.0;
+
   /// A section also ends on the clock, so a stalled climb cannot sit inside a
   /// maze that its own distance would never finish.
   static const mazeSectionSeconds = 38.0;
   static const heartSpacing = 3600.0, maxItems = 12;
-  static int startingPace(int bestMetres) => bestMetres >= 450
-      ? 3
-      : bestMetres >= 150
-      ? 2
-      : 1;
+  static int startingPace(int bestMetres) => 1;
 }
 
 enum InfiniteItemKind { combo, shield, heart }

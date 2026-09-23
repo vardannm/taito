@@ -10,7 +10,22 @@ enum BallCosmetic {
   aurora('Aurora', 'Flowing polar light', 360, 0xFF78EBB7, 0, 1.25),
   nebula('Nebula', 'A miniature star field', 500, 0xFFBB8DF2, 0, 1.5),
   nova('Nova', 'A blazing stellar core', 700, 0xFFFFBF60, 8, 2),
-  eclipse('Eclipse', 'Dark heart, luminous orbit', 1000, 0xFFEBA6D9, 0, 2.5);
+  eclipse('Eclipse', 'Dark heart, luminous orbit', 1000, 0xFFEBA6D9, 0, 2.5),
+  pearl('Pearl', 'Lustrous rose nacre', 120, 0xFFF4CCDA, 0, .4),
+  malachite('Malachite', 'Banded green stone', 220, 0xFF51BA8C, 0, .65),
+  titanium('Titanium', 'Machined blue metal', 420, 0xFF98B6CE, 6, 1.3),
+  opal('Opal', 'Iridescent mineral fire', 650, 0xFFB2F3E7, 0, 1.8),
+  plasma('Plasma', 'Violet arcs and a soft wake', 1250, 0xFFC995FF, 0, 2.7),
+  comet('Comet', 'Frozen core with a stardust trail', 1500, 0xFF83E4FF, 6, 3),
+  quasar('Quasar', 'Rose-gold orbital sparks', 1900, 0xFFFFA8C6, 0, 3.25),
+  singularity(
+    'Singularity',
+    'A gold halo around midnight glass',
+    2400,
+    0xFFFFDC87,
+    0,
+    3.5,
+  );
 
   const BallCosmetic(
     this.label,
@@ -23,8 +38,20 @@ enum BallCosmetic {
   final String label, description;
   final int cost, color, sides;
   final double scoreBonus;
-  bool get glowing =>
-      [neon, reactor, aurora, nebula, nova, eclipse].contains(this);
+  bool get glowing => [
+    neon,
+    reactor,
+    aurora,
+    nebula,
+    nova,
+    eclipse,
+    opal,
+    plasma,
+    comet,
+    quasar,
+    singularity,
+  ].contains(this);
+  bool get premium => index >= plasma.index;
 }
 
 String formatBoost(double value) =>

@@ -120,7 +120,7 @@ class PlayerProfile {
   }
 
   int mergeBest = 0, mergeHighest = 2, mergeRuns = 0;
-  bool sound = true, haptics = true;
+  bool sound = true, music = true, haptics = true;
   bool available = true;
   bool tutorialSeen = false;
   ControlMode controlMode = ControlMode.twoFinger;
@@ -248,8 +248,9 @@ class PlayerProfile {
         for (final entry in source.entries) {
           final validKey = pair.$1 == 'levels'
               ? RegExp(
-                  r'^(oneFinger|twoFinger|analog):([1-9]|[1-4][0-9]|50)$',
-                ).hasMatch(entry.key)
+                      r'^(oneFinger|twoFinger|analog):[1-9]\d*$',
+                    ).hasMatch(entry.key) &&
+                    int.parse(entry.key.split(':').last) <= ClassicLevels.count
               : RegExp(
                   r'^(oneFinger|twoFinger|analog):\d{4}-\d{2}-\d{2}$',
                 ).hasMatch(entry.key);
@@ -325,6 +326,8 @@ class PlayerProfile {
       infiniteBest = await storage.getInt('gilt.ascent.best') ?? 0;
       infiniteRuns = await storage.getInt('gilt.ascent.runs') ?? 0;
       sound = await storage.getBool('gilt.sound') ?? true;
+      // Preserve an existing player's mute preference when migrating.
+      music = await storage.getBool('gilt.music') ?? sound;
       haptics = await storage.getBool('gilt.haptics') ?? true;
       _loadRecords(await storage.getString('gilt.mastery.v1'));
       _loadMaze(await storage.getString('gilt.maze.v1'));
@@ -353,6 +356,7 @@ class PlayerProfile {
       await storage.setInt('gilt.ascent.best', infiniteBest);
       await storage.setInt('gilt.ascent.runs', infiniteRuns);
       await storage.setBool('gilt.sound', sound);
+      await storage.setBool('gilt.music', music);
       await storage.setBool('gilt.haptics', haptics);
       await storage.setBool(
         'gilt.oneFinger',
@@ -392,13 +396,15 @@ class GameFeedback {
     _sharedContext = true;
     try {
       await AudioPlayer.global.setAudioContext(
-        AudioContextConfig(focus: AudioContextConfigFocus.mixWithOthers)
-            .build(),
+        AudioContextConfig(
+          focus: AudioContextConfigFocus.mixWithOthers,
+        ).build(),
       );
     } catch (_) {
       /* An unavailable audio platform must never interrupt a run. */
     }
   }
+
   Future<void> play(GameEvent event, PlayerProfile profile) async {
     if (profile.haptics) {
       if (event == GameEvent.miss) {
@@ -446,8 +452,7 @@ class GameFeedback {
         return;
       }
       await _shareAudioFocus();
-      final music = _music ??= AudioPlayer()
-        ..setReleaseMode(ReleaseMode.loop);
+      final music = _music ??= AudioPlayer()..setReleaseMode(ReleaseMode.loop);
       if (track != _track) {
         _track = track;
         _musicPlaying = true;

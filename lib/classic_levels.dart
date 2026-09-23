@@ -52,6 +52,36 @@ part 'classic_levels/level_47.dart';
 part 'classic_levels/level_48.dart';
 part 'classic_levels/level_49.dart';
 part 'classic_levels/level_50.dart';
+part 'classic_levels/level_51.dart';
+part 'classic_levels/level_52.dart';
+part 'classic_levels/level_53.dart';
+part 'classic_levels/level_54.dart';
+part 'classic_levels/level_55.dart';
+part 'classic_levels/level_56.dart';
+part 'classic_levels/level_57.dart';
+part 'classic_levels/level_58.dart';
+part 'classic_levels/level_59.dart';
+part 'classic_levels/level_60.dart';
+part 'classic_levels/level_61.dart';
+part 'classic_levels/level_62.dart';
+part 'classic_levels/level_63.dart';
+part 'classic_levels/level_64.dart';
+part 'classic_levels/level_65.dart';
+part 'classic_levels/level_66.dart';
+part 'classic_levels/level_67.dart';
+part 'classic_levels/level_68.dart';
+part 'classic_levels/level_69.dart';
+part 'classic_levels/level_70.dart';
+part 'classic_levels/level_71.dart';
+part 'classic_levels/level_72.dart';
+part 'classic_levels/level_73.dart';
+part 'classic_levels/level_74.dart';
+part 'classic_levels/level_75.dart';
+part 'classic_levels/level_76.dart';
+part 'classic_levels/level_77.dart';
+part 'classic_levels/level_78.dart';
+part 'classic_levels/level_79.dart';
+part 'classic_levels/level_80.dart';
 
 /// A hand-editable Classic level; holes without a target number are traps.
 class ClassicLevelDefinition {
@@ -102,10 +132,19 @@ class ClassicHazardWave {
     required this.warningSeconds,
     required this.liveSeconds,
     required this.positions,
+    this.motion = HazardMotion.legacy,
+    this.orientation = LaserOrientation.vertical,
+    this.radiusX = 40,
+    this.radiusY = 25,
+    this.period = 4,
+    this.phase = 0,
   });
   final HazardKind kind;
   final double warningSeconds, liveSeconds;
   final List<ClassicHazardPosition> positions;
+  final HazardMotion motion;
+  final LaserOrientation orientation;
+  final double radiusX, radiusY, period, phase;
 }
 
 class ClassicHazardPosition {
@@ -170,4 +209,34 @@ const classicLevelDefinitions = [
   classicLevel48,
   classicLevel49,
   classicLevel50,
+  classicLevel51,
+  classicLevel52,
+  classicLevel53,
+  classicLevel54,
+  classicLevel55,
+  classicLevel56,
+  classicLevel57,
+  classicLevel58,
+  classicLevel59,
+  classicLevel60,
+  classicLevel61,
+  classicLevel62,
+  classicLevel63,
+  classicLevel64,
+  classicLevel65,
+  classicLevel66,
+  classicLevel67,
+  classicLevel68,
+  classicLevel69,
+  classicLevel70,
+  classicLevel71,
+  classicLevel72,
+  classicLevel73,
+  classicLevel74,
+  classicLevel75,
+  classicLevel76,
+  classicLevel77,
+  classicLevel78,
+  classicLevel79,
+  classicLevel80,
 ];

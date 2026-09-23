@@ -192,11 +192,15 @@ class CabinetPicker extends StatelessWidget {
     super.key,
     required this.profile,
     required this.onSelected,
+    this.embedded = false,
   });
   final PlayerProfile profile;
   final ValueChanged<CabinetStyle> onSelected;
+  final bool embedded;
   @override
   Widget build(BuildContext context) => ListView(
+    shrinkWrap: embedded,
+    physics: embedded ? const NeverScrollableScrollPhysics() : null,
     padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
     children: [
       const Text(

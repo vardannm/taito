@@ -44,7 +44,7 @@ void main() {
     },
   );
   test('hard variants alternate only in late encounter sections', () {
-    for (final height in [9000.0, 12600.0, 13500.0, 12000.0]) {
+    for (final height in [9000.0, 24000.0, 43200.0, 42900.0]) {
       final g = BalanceGame(seed: 42)
         ..start(gameMode: GameMode.infinite)
         // Laser maze sections have their own tests; this one is about the
@@ -62,7 +62,7 @@ void main() {
           if (h.sweeping || h.zigzag) variants.add(h.sweeping);
         }
       }
-      if (height == 12000) {
+      if (height == 42900) {
         expect(variants.length, greaterThan(2));
         for (var i = 1; i < variants.length; i++) {
           expect(variants[i], !variants[i - 1]);
@@ -153,9 +153,9 @@ void main() {
       game.step(1 / 120);
       expect(game.specialHazards, isEmpty);
       final seen = <HazardKind>{};
-      for (final height in [1800.0, 3500.0, 6000.0, 9000.0]) {
+      for (final height in [4500.0, 10800.0, 15000.0, 22500.0]) {
         game.maxHeight = height;
-        for (var i = 0; i < 13 * 120; i++) {
+        for (var i = 0; i < 25 * 120; i++) {
           // Isolate scheduling from ordinary traps and the separate idle penalty.
           game.board.clear();
           game.stallTime = 0;

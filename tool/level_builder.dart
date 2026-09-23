@@ -33,7 +33,9 @@ Future<void> main(List<String> args) async {
         request.response.statusCode = HttpStatus.notFound;
       } else {
         request.response.headers.set('Content-Type', asset.$2);
-        request.response.add(await File('${root.path}/level_builder/${asset.$1}').readAsBytes());
+        request.response.add(
+          await File('${root.path}/level_builder/${asset.$1}').readAsBytes(),
+        );
       }
     }
     await request.response.close();
@@ -41,17 +43,42 @@ Future<void> main(List<String> args) async {
 }
 
 Map<String, Object> _json(int number, ClassicLevelDefinition level) => {
-  'version': 1, 'number': number, 'name': level.name,
-  'holes': [for (final h in level.holes) {'x': h.x, 'y': h.y, 'target': h.target}],
-  'spiders': [for (final s in level.spiders) {
-    'x': s.x, 'y': s.y, 'zoneRadius': s.zoneRadius, 'phase': s.phase,
-    'chaseSpeed': s.chaseSpeed, 'bodyRadius': s.bodyRadius,
-  }],
-  'hazards': [for (final h in level.hazards) {
-    'kind': h.kind.name, 'warningSeconds': h.warningSeconds,
-    'liveSeconds': h.liveSeconds,
-    'positions': [for (final p in h.positions) {'target': p.target, 'x': p.x, 'y': p.y}],
-  }],
-  'finaleTitle': level.finaleTitle, 'finaleRule': level.finaleRule,
-  'firstHazardAfter': level.firstHazardAfter, 'hazardInterval': level.hazardInterval,
+  'version': 1,
+  'number': number,
+  'name': level.name,
+  'holes': [
+    for (final h in level.holes) {'x': h.x, 'y': h.y, 'target': h.target},
+  ],
+  'spiders': [
+    for (final s in level.spiders)
+      {
+        'x': s.x,
+        'y': s.y,
+        'zoneRadius': s.zoneRadius,
+        'phase': s.phase,
+        'chaseSpeed': s.chaseSpeed,
+        'bodyRadius': s.bodyRadius,
+      },
+  ],
+  'hazards': [
+    for (final h in level.hazards)
+      {
+        'kind': h.kind.name,
+        'warningSeconds': h.warningSeconds,
+        'liveSeconds': h.liveSeconds,
+        'motion': h.motion.name,
+        'orientation': h.orientation.name,
+        'radiusX': h.radiusX,
+        'radiusY': h.radiusY,
+        'period': h.period,
+        'phase': h.phase,
+        'positions': [
+          for (final p in h.positions) {'target': p.target, 'x': p.x, 'y': p.y},
+        ],
+      },
+  ],
+  'finaleTitle': level.finaleTitle,
+  'finaleRule': level.finaleRule,
+  'firstHazardAfter': level.firstHazardAfter,
+  'hazardInterval': level.hazardInterval,
 };

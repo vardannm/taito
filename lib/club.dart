@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'board_painter.dart';
 import 'friend_challenge.dart';
 import 'game.dart';
+import 'levels.dart';
 import 'next_goal.dart';
 import 'playtest_recorder.dart';
 import 'profile.dart';
@@ -255,8 +256,12 @@ class _ClubScreenState extends State<ClubScreen> {
                 const SizedBox(height: 6),
                 Text(goal.detail),
                 const SizedBox(height: 10),
-                LinearProgressIndicator(value: profile.totalStars / 150),
-                Text('${profile.totalStars}/150 Classic stars'),
+                LinearProgressIndicator(
+                  value: profile.totalStars / (ClassicLevels.count * 3),
+                ),
+                Text(
+                  '${profile.totalStars}/${ClassicLevels.count * 3} Classic stars',
+                ),
                 if (nextCabinet != null)
                   Text(
                     '${nextCabinet.requiredStars - profile.totalStars} more stars unlock ${nextCabinet.title}.',

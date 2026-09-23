@@ -2,6 +2,7 @@
 (function (root) {
   'use strict';
   const clone = value => JSON.parse(JSON.stringify(value));
+  const waveDefaults = {motion: 'legacy', orientation: 'vertical', radiusX: 40, radiusY: 25, period: 4, phase: 0};
   function blank(number = 51) {
     return {version: 1, number, name: 'Untitled level', holes: [], spiders: [], hazards: [],
       finaleTitle: '', finaleRule: '', firstHazardAfter: 3, hazardInterval: 9};
@@ -14,10 +15,13 @@
       throw Error('This is not a supported level-builder draft.');
     }
     const finite = (item, keys) => item && keys.every(k => typeof item[k] === 'number' && Number.isFinite(item[k]));
+    d.hazards = d.hazards.map(w => ({...waveDefaults, ...w}));
     if (!d.holes.every(h => finite(h, ['x', 'y', 'target'])) ||
         !d.spiders.every(s => finite(s, ['x', 'y', 'zoneRadius', 'phase', 'chaseSpeed', 'bodyRadius'])) ||
         !d.hazards.every(w => ['laser', 'movingHole'].includes(w.kind) &&
-          finite(w, ['warningSeconds', 'liveSeconds']) && Array.isArray(w.positions) &&
+          finite(w, ['warningSeconds', 'liveSeconds', 'radiusX', 'radiusY', 'period', 'phase']) &&
+          ['legacy', 'stationary', 'horizontal', 'vertical', 'circle', 'oval'].includes(w.motion) &&
+          ['vertical', 'horizontal'].includes(w.orientation) && Array.isArray(w.positions) &&
           w.positions.length <= 500 && w.positions.every(p => finite(p, ['x', 'y', 'target']))) ||
         !finite(d, ['firstHazardAfter', 'hazardInterval']) ||
         typeof d.finaleTitle !== 'string' || typeof d.finaleRule !== 'string') {
@@ -27,7 +31,7 @@
   }
   function validate(d) {
     const errors = [], warnings = [];
-    try { parseDraft(JSON.stringify(d)); } catch (e) { return {errors: [e.message], warnings}; }
+    try { d = parseDraft(JSON.stringify(d)); } catch (e) { return {errors: [e.message], warnings}; }
     if (!d.name.trim()) errors.push('Give this level a name.');
     const targets = d.holes.filter(h => h.target > 0);
     for (let n = 1; n <= 10; n++) {
@@ -50,13 +54,21 @@
         warnings.push('A spider territory is close to a numbered target.');
     }
     for (const [i, w] of d.hazards.entries()) {
+      if (w.period <= 0 || w.radiusX < 0 || w.radiusY < 0 || w.radiusX > 150 || w.radiusY > 200)
+        errors.push(`Wave ${i + 1} needs a positive period and valid movement radii.`);
       if (w.warningSeconds <= 0 || w.liveSeconds <= 0) errors.push(`Wave ${i + 1} needs positive warning and active times.`);
       if (!w.positions.length) errors.push(`Wave ${i + 1} has no positions. Add one or delete the wave.`);
       for (const p of w.positions) {
         if (!Number.isInteger(p.target) || p.target < 1 || p.target > 10 ||
             p.x < 24 || p.x > 336 || p.y < 24 || p.y > 490) errors.push(`Check wave ${i + 1} target numbers and coordinates.`);
         const h = targets.find(h => h.target === p.target);
-        if (h && Math.abs(h.x - p.x) <= (w.kind === 'laser' ? 32 : 72))
+        const rx = ['horizontal', 'circle', 'oval'].includes(w.motion) ? w.radiusX : 0;
+        const ry = w.motion === 'circle' ? w.radiusX : ['vertical', 'oval'].includes(w.motion) ? w.radiusY : 0;
+        if (w.motion !== 'legacy' && (p.x-rx<24 || p.x+rx>336 || p.y-ry<24 || p.y+ry>490))
+          errors.push(`Wave ${i + 1} movement leaves the board. Move its center or reduce its radii.`);
+        if (h && (w.kind === 'laser' ?
+          (w.orientation === 'horizontal' ? Math.abs(h.y-p.y)<=32+ry : Math.abs(h.x-p.x)<=32+rx) :
+          Math.hypot(Math.max(0,Math.abs(h.x-p.x)-rx), Math.max(0,Math.abs(h.y-p.y)-ry))<=32))
           warnings.push(`Wave ${i + 1} is close to target ${p.target}.`);
       }
     }
@@ -68,6 +80,7 @@
   // JSON quoting plus Dart interpolation escaping; never insert raw draft text as code.
   const str = value => JSON.stringify(value).replace(/\$/g, '\\$').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
   function exportDart(d) {
+    d = parseDraft(JSON.stringify(d));
     const result = validate(d);
     if (result.errors.length) throw Error(result.errors.join('\n'));
     const id = String(d.number).padStart(2, '0');
@@ -80,6 +93,9 @@
     lines.push('  ],', `  finaleTitle: ${str(d.finaleTitle)},`, `  finaleRule: ${str(d.finaleRule)},`, '  hazards: [');
     for (const w of d.hazards) {
       lines.push('    ClassicHazardWave(', `      kind: HazardKind.${w.kind},`,
+        `      motion: HazardMotion.${w.motion},`, `      orientation: LaserOrientation.${w.orientation},`,
+        `      radiusX: ${num(w.radiusX)},`, `      radiusY: ${num(w.radiusY)},`,
+        `      period: ${num(w.period)},`, `      phase: ${num(w.phase)},`,
         `      warningSeconds: ${num(w.warningSeconds)},`, `      liveSeconds: ${num(w.liveSeconds)},`, '      positions: [');
       for (const p of w.positions) lines.push(`        ClassicHazardPosition(target: ${p.target}, x: ${num(p.x)}, y: ${num(p.y)}),`);
       lines.push('      ],', '    ),');
@@ -87,7 +103,7 @@
     lines.push('  ],', `  firstHazardAfter: ${num(d.firstHazardAfter)},`, `  hazardInterval: ${num(d.hazardInterval)},`, ');', '');
     return lines.join('\n');
   }
-  const api = {blank, clone, parseDraft, validate, exportDart};
+  const api = {blank, clone, parseDraft, validate, exportDart, waveDefaults};
   if (typeof module !== 'undefined') module.exports = api;
   else root.LevelModel = api;
 })(globalThis);

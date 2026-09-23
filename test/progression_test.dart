@@ -79,9 +79,9 @@ void main() {
       maxScrolls: 30,
     );
     await tester.pump(const Duration(milliseconds: 200));
-    await tester.drag(
-      find.byType(CustomScrollView).last,
-      const Offset(0, -180),
+    await Scrollable.ensureVisible(
+      tester.element(find.byKey(const ValueKey('level-50'))),
+      alignment: .5,
     );
     await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const ValueKey('level-50')));
@@ -121,6 +121,7 @@ void main() {
         for (final progress in [0, 400, 900, 1600, 2500]) {
           final g = BalanceGame(seed: seed)..start(gameMode: GameMode.infinite);
           g.cameraOffset = progress * 10.0;
+          g.maxHeight = progress * 10.0;
           g.score = progress * 20;
           g.ensureInfiniteBoard();
           var reachable = [for (var x = 60; x <= 300; x += 4) x.toDouble()];
@@ -146,7 +147,7 @@ void main() {
           // Includes the staggered band just beyond the top edge.
           expect(g.board.length, lessThanOrEqualTo(48));
           if (progress == 0) earlyCount += g.board.length;
-          if (progress == 1600) lateCount += g.board.length;
+          if (progress == 2500) lateCount += g.board.length;
         }
       }
       expect(lateCount, greaterThan(earlyCount * 2));
@@ -168,7 +169,7 @@ void main() {
     expect(signatures.length, 20);
     final g = BalanceGame()..start(gameMode: GameMode.infinite);
     var previous = g.ascentSpeed;
-    for (var score = 1; score <= 2000; score++) {
+    for (var score = 1; score <= 3000; score++) {
       g.maxHeight = score * 10.0;
       expect(g.ascentSpeed, inInclusiveRange(previous, previous + .28));
       previous = g.ascentSpeed;
@@ -183,7 +184,7 @@ void main() {
   });
 
   test(
-    'all 50 levels are distinct and all targets complete in both controls',
+    'all registered levels are distinct and all targets complete in every control mode',
     () {
       final layouts = <String>{};
       for (var level = 1; level <= ClassicLevels.count; level++) {

@@ -69,13 +69,13 @@ void main() {
     },
   );
   test(
-    'combo crystals award increasing points once, cap at seven and survive missed items',
+    'combo crystals award increasing points once, cap at ten and survive missed items',
     () {
       final g = run();
       var total = 0;
-      for (var i = 0; i < 6; i++) {
+      for (var i = 0; i < 12; i++) {
         pickup(g, InfiniteItemKind.combo);
-        final combo = math.min(7, i + 2);
+        final combo = math.min(10, i + 2);
         total += 50 * combo;
         expect(g.survival.combo, combo);
         expect(g.score, total);
@@ -85,7 +85,7 @@ void main() {
       expect(g.score, score);
       g.survival.items.add(InfiniteItem(InfiniteItemKind.combo, 40, 650));
       g.step(1 / 120);
-      expect(g.survival.combo, 7);
+      expect(g.survival.combo, 10);
       expect(g.survival.items.any((i) => i.y == 650), false);
     },
   );
@@ -216,12 +216,12 @@ void main() {
     'pace is continuous, capped, and experienced starts remain moderate',
     () {
       expect(InfiniteTuning.startingPace(149), 1);
-      expect(InfiniteTuning.startingPace(150), 2);
-      expect(InfiniteTuning.startingPace(450), 3);
+      expect(InfiniteTuning.startingPace(150), 1);
+      expect(InfiniteTuning.startingPace(450), 1);
       final g = run();
-      g.maxHeight = 1499.9;
+      g.maxHeight = 5999.9;
       final before = g.ascentSpeed;
-      g.maxHeight = 1500.1;
+      g.maxHeight = 6000.1;
       expect(g.paceLevel, 2);
       expect(g.ascentSpeed - before, lessThan(.01));
       g.maxHeight = 90000;

@@ -359,7 +359,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 400));
         final g = tester.widget<PivotBoard>(find.byType(PivotBoard)).game;
         expect(g.maze, true);
-        expect(find.text('LASER MAZE / ROUTE 1'), findsOneWidget);
+        expect(find.text('ROUTE 1'), findsOneWidget);
         expect(g.controlMode, ControlMode.analog);
         expect(p.controlMode, ControlMode.analog);
         expect(find.byKey(const ValueKey('analog-left')), findsOneWidget);

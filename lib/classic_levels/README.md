@@ -1,6 +1,6 @@
 # Classic levels
 
-Each level has its own file, from `level_01.dart` through `level_50.dart`.
+Each level has its own file, from `level_01.dart` through `level_80.dart`.
 Edit that file's `name`, `holes`, `spiders`, and `hazards` to change the level.
 
 ```dart
@@ -25,7 +25,15 @@ An empty list means no spiders. No runtime placement generator is used.
 `hazards` contains waves of lasers or moving holes. Each wave lists exact spawn
 coordinates tagged with the numbered `target` during which they are used.
 Waves repeat in file order; the wave counter selects among that target's listed
-positions in order using modulo. Moving holes move from their listed spawn point.
+positions in order using modulo. With `motion: HazardMotion.legacy`, moving
+holes move from their listed spawn point as in the original levels.
+For `circle` and `oval`, positions are orbit centers; `radiusX`, `radiusY`,
+`period` (seconds per cycle), and `phase` (radians) control their path.
+Circles use `radiusX` for both axes. `horizontal` and `vertical` use sinusoidal
+movement along one axis; `stationary` stays at its center. Motion starts after
+the warning ends. `orientation: LaserOrientation.horizontal` makes a horizontal
+laser beam; the default is vertical. Orientation and movement are independent.
+Keep the entire movement envelope inside the board and clear of the active target.
 Edit `warningSeconds`, `liveSeconds`, `firstHazardAfter`, and `hazardInterval`
 to change timing. Timing restarts with each target attempt. An empty list means
 no hazards. If you move a target hole, update its hazard positions yourself to

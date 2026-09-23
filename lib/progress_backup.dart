@@ -113,10 +113,15 @@ class ProgressBackup {
     p.twoFingerSensitivity = (sensitivity[1] as num).toDouble();
     void records(String name, Map<String, LevelRecord> target, RegExp key) {
       final source = d[name];
-      if (source is! Map<String, dynamic> || source.length > 160) invalid();
+      final maxRecords = name == 'levels' ? ClassicLevels.count * 3 : 160;
+      if (source is! Map<String, dynamic> || source.length > maxRecords)
+        invalid();
       for (final entry in source.entries) {
         final v = entry.value;
         if (!key.hasMatch(entry.key) || v is! Map<String, dynamic>) invalid();
+        if (name == 'levels' &&
+            int.parse(entry.key.split(':').last) > ClassicLevels.count)
+          invalid();
         integer(v['stars'], 7);
         integer(v['score']);
         integer(v['attempts']);
@@ -130,7 +135,7 @@ class ProgressBackup {
     records(
       'levels',
       p.levelRecords,
-      RegExp(r'^(oneFinger|twoFinger|analog):([1-9]|[1-4][0-9]|50)$'),
+      RegExp(r'^(oneFinger|twoFinger|analog):[1-9]\d*$'),
     );
     records(
       'daily',

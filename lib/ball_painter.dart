@@ -73,7 +73,8 @@ void paintCosmetic(
     }
     canvas.restore();
   }
-  if (ball.index >= BallCosmetic.aurora.index) {
+  if (ball.index >= BallCosmetic.aurora.index &&
+      ball.index <= BallCosmetic.eclipse.index) {
     canvas.save();
     canvas.clipPath(shape);
     final phase = reducedMotion ? .5 : time * .65;
@@ -136,19 +137,120 @@ void paintCosmetic(
       Paint()..color = const Color(0xFFF0FFFF),
     );
   }
+  if (ball.index >= BallCosmetic.pearl.index) {
+    final phase = reducedMotion ? 0.0 : time * .7;
+    canvas.save();
+    canvas.clipPath(shape);
+    if (ball == BallCosmetic.singularity) {
+      canvas.drawCircle(
+        center,
+        radius * .8,
+        Paint()..color = const Color(0xFF161627),
+      );
+    } else if (ball == BallCosmetic.opal) {
+      const flecks = [
+        Color(0xFFAAF4D9),
+        Color(0xFFFFD399),
+        Color(0xFFCDA8FF),
+        Color(0xFF8BD7FF),
+      ];
+      for (var i = 0; i < 8; i++) {
+        final a = i * math.pi / 4 + phase * .2;
+        final p = center + Offset(math.cos(a), math.sin(a)) * radius * .55;
+        canvas.drawPath(
+          Path()
+            ..moveTo(center.dx, center.dy)
+            ..lineTo(p.dx + radius * .4, p.dy - radius * .25)
+            ..lineTo(p.dx, p.dy + radius * .3)
+            ..close(),
+          Paint()..color = flecks[i % 4].withAlpha(150),
+        );
+      }
+    } else {
+      for (var i = 0; i < 4; i++) {
+        final paint = Paint()
+          ..color = Color.lerp(
+            tint,
+            i.isEven ? Colors.white : const Color(0xFF19324D),
+            .6,
+          )!.withAlpha(170)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = radius * (ball == BallCosmetic.malachite ? .16 : .09);
+        canvas.drawArc(
+          Rect.fromCenter(
+            center: center + Offset(radius * .3 * math.sin(phase), 0),
+            width: radius * (1 + i * .35),
+            height: radius * (.4 + i * .35),
+          ),
+          phase + i * .7,
+          math.pi * 1.5,
+          false,
+          paint,
+        );
+      }
+    }
+    canvas.restore();
+    if (ball.premium) {
+      final orbit = Rect.fromCenter(
+        center: center,
+        width: radius * 2.7,
+        height: radius * 1.3,
+      );
+      canvas.drawArc(
+        orbit,
+        phase,
+        math.pi * 1.45,
+        false,
+        Paint()
+          ..color = tint.withAlpha(160)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = radius * .09,
+      );
+      if (!reducedMotion)
+        for (var i = 0; i < 3; i++) {
+          final a = phase * 2 + i * math.pi * 2 / 3;
+          canvas.drawCircle(
+            center + Offset(math.cos(a), math.sin(a)) * radius * 1.45,
+            radius * .09,
+            Paint()..color = tint.withAlpha(190),
+          );
+        }
+    }
+  }
+}
+
+void paintCosmeticTrail(
+  Canvas canvas,
+  Offset center,
+  Offset motion,
+  double radius,
+  BallCosmetic ball,
+) {
+  if (!ball.premium || motion.distance < .1) return;
+  final direction = motion / motion.distance;
+  for (var i = 4; i > 0; i--) {
+    canvas.drawCircle(
+      center - direction * (i * radius * .85),
+      radius * (.7 - i * .1),
+      Paint()..color = Color(ball.color).withAlpha(65 - i * 11),
+    );
+  }
 }
 
 class CosmeticPreview extends CustomPainter {
-  const CosmeticPreview(this.ball);
+  CosmeticPreview(this.ball, {this.animation}) : super(repaint: animation);
   final BallCosmetic ball;
+  final AnimationController? animation;
   @override
   void paint(Canvas canvas, Size size) => paintCosmetic(
     canvas,
     size.center(Offset.zero),
     math.min(size.width, size.height) * .28,
     ball,
-    reducedMotion: true,
+    time: (animation?.value ?? 0) * math.pi * 20,
+    reducedMotion: animation == null || !animation!.isAnimating,
   );
   @override
-  bool shouldRepaint(CosmeticPreview oldDelegate) => ball != oldDelegate.ball;
+  bool shouldRepaint(CosmeticPreview oldDelegate) =>
+      ball != oldDelegate.ball || animation != oldDelegate.animation;
 }

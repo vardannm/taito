@@ -167,7 +167,10 @@ void main() {
         maxScrolls: 35,
       );
       await tester.pump(const Duration(milliseconds: 200));
-      await tester.drag(find.byType(CustomScrollView), const Offset(0, -160));
+      await Scrollable.ensureVisible(
+        tester.element(find.byKey(const ValueKey('level-50'))),
+        alignment: .5,
+      );
       await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(find.byKey(const ValueKey('level-50')));
       expect(chosen, 50);

@@ -5,6 +5,7 @@ import 'platforms.dart';
 import 'platform_painter.dart';
 import 'board_painter.dart';
 import 'profile.dart';
+import 'mastery_widgets.dart';
 
 class BallShop extends StatefulWidget {
   const BallShop({super.key, required this.profile});
@@ -13,8 +14,29 @@ class BallShop extends StatefulWidget {
   State<BallShop> createState() => _BallShopState();
 }
 
-class _BallShopState extends State<BallShop> {
-  bool platforms = false;
+class _BallShopState extends State<BallShop>
+    with SingleTickerProviderStateMixin {
+  int category = 0;
+  late final AnimationController preview = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 12),
+  );
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      preview.stop();
+    } else {
+      preview.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    preview.dispose();
+    super.dispose();
+  }
+
   Widget item({
     required String id,
     required String name,
@@ -137,25 +159,24 @@ class _BallShopState extends State<BallShop> {
             style: const TextStyle(fontSize: 11),
           ),
           const SizedBox(height: 16),
-          SegmentedButton<bool>(
-            segments: const [
-              ButtonSegment(
-                value: false,
-                label: Text('Balls'),
-                icon: Icon(Icons.sports_baseball),
-              ),
-              ButtonSegment(
-                value: true,
-                label: Text('Platforms'),
-                icon: Icon(Icons.horizontal_rule),
-              ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              for (final entry in [
+                'Balls',
+                'Platforms',
+                'Cabinet Styles',
+              ].asMap().entries)
+                ChoiceChip(
+                  label: Text(entry.value),
+                  selected: category == entry.key,
+                  onSelected: (_) => setState(() => category = entry.key),
+                ),
             ],
-            selected: {platforms},
-            onSelectionChanged: (values) =>
-                setState(() => platforms = values.first),
           ),
           const SizedBox(height: 16),
-          if (!platforms)
+          if (category == 0)
             for (final b in BallCosmetic.values)
               item(
                 id: 'buy-${b.name}',
@@ -165,10 +186,10 @@ class _BallShopState extends State<BallShop> {
                 bonus: b.scoreBonus,
                 owned: p.ownedBalls.contains(b),
                 selected: p.selectedBall == b,
-                painter: CosmeticPreview(b),
+                painter: CosmeticPreview(b, animation: preview),
                 buy: () => setState(() => p.selectBall(b)),
               ),
-          if (platforms)
+          if (category == 1)
             for (final rail in PlatformStyle.values)
               item(
                 id: 'buy-platform-${rail.name}',
@@ -178,9 +199,18 @@ class _BallShopState extends State<BallShop> {
                 bonus: rail.scoreBonus,
                 owned: p.ownedPlatforms.contains(rail),
                 selected: p.selectedPlatform == rail,
-                painter: PlatformPreview(rail),
+                painter: PlatformPreview(rail, animation: preview),
                 buy: () => setState(() => p.selectPlatform(rail)),
               ),
+          if (category == 2)
+            CabinetPicker(
+              profile: p,
+              embedded: true,
+              onSelected: (style) {
+                setState(() => p.selectCabinet(style));
+                p.save();
+              },
+            ),
         ],
       ),
     );

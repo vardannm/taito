@@ -8,6 +8,7 @@ void paintLaserMaze(
   double clock,
   bool reducedMotion, {
   double cameraOffset = 0,
+  double visibleTop = 0,
 }) {
   final corridor = run.corridor;
   canvas.save();
@@ -15,14 +16,15 @@ void paintLaserMaze(
   // One filled path unions the overlapping legs, so corners blend once only.
   final road = Path();
   for (final rect in corridor.rects) {
-    if (rect.bottom + cameraOffset < 12 || rect.top + cameraOffset > 548)
+    if (rect.bottom + cameraOffset < visibleTop + 12 ||
+        rect.top + cameraOffset > 548)
       continue;
     road.addRect(Rect.fromLTRB(rect.left, rect.top, rect.right, rect.bottom));
   }
   canvas.drawPath(road, Paint()..color = const Color(0xF21A3738));
   final beams = Path();
   for (final wall in corridor.walls) {
-    if (math.max(wall.a.y, wall.b.y) + cameraOffset < 12 ||
+    if (math.max(wall.a.y, wall.b.y) + cameraOffset < visibleTop + 12 ||
         math.min(wall.a.y, wall.b.y) + cameraOffset > 548)
       continue;
     beams
@@ -75,7 +77,7 @@ void paintLaserMaze(
     for (var travel = 26.0; travel < length - 12; travel += 62) {
       final x = a.x + tx * travel, y = a.y + ty * travel;
       final screen = y + cameraOffset;
-      if (screen < 24 || screen > 542) continue;
+      if (screen < visibleTop + 24 || screen > 542) continue;
       canvas.drawPath(
         Path()
           ..moveTo(x - tx * 4 - ty * 4, y - ty * 4 + tx * 4)
@@ -224,5 +226,3 @@ class MazeRoutePreview extends CustomPainter {
   bool shouldRepaint(MazeRoutePreview oldDelegate) =>
       number != oldDelegate.number;
 }
-
-
