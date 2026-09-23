@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+export 'infinite_difficulty.dart';
+
 /// All survival balancing lives here. Pace is a level, not a literal 5x motor.
 abstract final class InfiniteTuning {
   static const denseScore = 60000.0;
@@ -24,6 +26,8 @@ abstract final class InfiniteTuning {
   static const visualIntensity = 1.0, maxParticles = 42;
   static const maxLives = 3, maxPace = 5, maxCombo = 10;
   static const shieldSeconds = 10.0, recoverySeconds = 2.5;
+  static const magnetSeconds = 12.0, magnetRadius = 220.0;
+  static const firstMagnetY = -450.0, magnetSpacing = 2800.0;
   static const metresPerPace = 600.0, comboPoints = 50;
   static const firstComboY = 190.0, firstShieldY = -950.0;
   static const firstHeartY = -1650.0;
@@ -45,7 +49,7 @@ abstract final class InfiniteTuning {
   static int startingPace(int bestMetres) => 1;
 }
 
-enum InfiniteItemKind { combo, shield, heart }
+enum InfiniteItemKind { combo, shield, heart, magnet }
 
 class InfiniteItem {
   InfiniteItem(this.kind, this.x, this.y);
@@ -60,11 +64,13 @@ class InfiniteProgress {
   final double scoreBoost;
   int combo = 1, bestCombo = 1, damageSerial = 0;
   double shield = 0, recovery = 0, points = 0, scoredMetres = 0;
+  double magnet = 0;
   double visualCombo = 0, flash = 0, noticeTime = 0;
   String notice = '';
   double nextComboY = InfiniteTuning.firstComboY;
   double nextShieldY = InfiniteTuning.firstShieldY;
   double nextHeartY = InfiniteTuning.firstHeartY;
+  double nextMagnetY = InfiniteTuning.firstMagnetY;
   final items = <InfiniteItem>[];
   bool get protected => shield > 0 || recovery > 0;
 
@@ -83,6 +89,7 @@ class InfiniteProgress {
   int levelAt(double metres) => paceAt(metres).floor();
   void step(double dt, double metres) {
     shield = math.max(0, shield - dt);
+    magnet = math.max(0, magnet - dt);
     recovery = math.max(0, recovery - dt);
     flash = math.max(0, flash - dt);
     noticeTime = math.max(0, noticeTime - dt);

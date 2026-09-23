@@ -148,7 +148,7 @@ class _BallShopState extends State<BallShop>
             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
           ),
           const Text(
-            'Ball + platform bonuses add to the base x1. They multiply Infinite distance and combo rewards. Handling stays the same.',
+            'Ball + platform bonuses add to the base x1. They multiply Infinite distance and combo rewards. Magnetic balls also collect nearby rewards in Infinite. Handling stays the same.',
             style: TextStyle(fontSize: 12, height: 1.4),
           ),
           const SizedBox(height: 6),
@@ -181,7 +181,7 @@ class _BallShopState extends State<BallShop>
               item(
                 id: 'buy-${b.name}',
                 name: b.label,
-                description: b.description,
+                description: '${b.description}\n${b.magnetLabel} · Infinite',
                 cost: b.cost,
                 bonus: b.scoreBonus,
                 owned: p.ownedBalls.contains(b),

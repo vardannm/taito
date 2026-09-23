@@ -690,11 +690,9 @@ class _GameScreenState extends State<GameScreen>
     super.dispose();
   }
 
-  /// The HUD sits on the Infinite backdrop, which turns dark at x6 and x7.
-  /// Its text follows so a high combo never costs the player their score.
-  Color get chromeInk => game.infinite
-      ? Color.lerp(ink, cream, comboDarkness(game.survival.visualCombo))!
-      : ink;
+  /// Foreground follows the currently visible Infinite background.
+  Color get chromeInk =>
+      game.infinite ? infiniteBoardInk(game, const Offset(180, 500)) : ink;
 
   TextStyle label([Color color = ink]) => TextStyle(
     fontSize: 10,
@@ -836,9 +834,11 @@ class _GameScreenState extends State<GameScreen>
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
         child: AnimatedBuilder(
-          animation: hud,
+          animation: Listenable.merge([hud, backdrop]),
           builder: (context, _) {
-            final color = chromeInk;
+            final color = game.infinite
+                ? infiniteBoardInk(game, const Offset(110, 60))
+                : chromeInk;
             return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -852,7 +852,7 @@ class _GameScreenState extends State<GameScreen>
                       ),
                       decoration: BoxDecoration(
                         color:
-                            (game.infinite && game.survival.combo >= 6
+                            (color == Colors.white
                                     ? Colors.black
                                     : Colors.white)
                                 .withAlpha(45),
@@ -1733,7 +1733,7 @@ class _GameScreenState extends State<GameScreen>
               guideRow(
                 '04',
                 'Go beyond ten.',
-                'Infinite begins with three hearts. Laser maze sections arrive from time to time: the traps stop and wide laser walls come down instead, so steer through their openings. A hit costs a heart and resets your combo; the ball and platform blink for 2.5 seconds of protection while you keep steering from the same position. Gold crystals build combos up to x10; violet and midnight tiers build toward electric cyan at x9 and a golden maximum at x10. Blue shields protect for 10 seconds. Rare hearts restore a life. Keep steering to escape the rising red floor.',
+                'Infinite begins with three hearts. Laser maze sections arrive from time to time: the traps stop and wide laser walls come down instead, so steer through their openings. A hit costs a heart and resets your combo; the ball and platform blink for 2.5 seconds of protection while you keep steering from the same position. Gold crystals build combos up to x10; violet and midnight tiers build toward electric cyan at x9 and a golden maximum at x10. Blue shields protect for 10 seconds. Purple magnets collect nearby coins, combo crystals, shields and hearts for 12 seconds. Rare hearts restore a life. Keep steering to escape the rising red floor.',
               ),
               const Text(
                 'Desktop: W / S = left end. ↑ / ↓ = right end. Esc = pause.',
@@ -1758,7 +1758,7 @@ class _GameScreenState extends State<GameScreen>
               guideRow(
                 '08',
                 'Take the detour.',
-                'Classic and Daily brass coins are worth 250 points. Infinite coins save to your local wallet immediately. Open the Gear Shop for balls and platforms that add Infinite point multipliers; handling stays the same. Each coin can be collected once. Classic stars unlock cabinet styles with identical handling.',
+                'Classic and Daily brass coins are worth 250 points. Infinite coins save to your local wallet immediately. Open the Gear Shop for balls and platforms that add Infinite point multipliers. Selected balls also have permanent magnets with different collection ranges in Infinite; handling stays the same. Each coin can be collected once. Classic stars unlock cabinet styles with identical handling.',
               ),
               guideRow(
                 '09',

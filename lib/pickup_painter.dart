@@ -16,11 +16,7 @@ const _coinFace = Color(0xFFFFE9A8), _coinDeep = Color(0xFFE0A93F);
 void paintBrassCoin(Canvas c, Offset p, double radius, double spin) {
   final turn = .55 + .45 * spin.abs();
   final width = radius * turn;
-  final face = Rect.fromCenter(
-    center: p,
-    width: width * 2,
-    height: radius * 2,
-  );
+  final face = Rect.fromCenter(center: p, width: width * 2, height: radius * 2);
   // Seated shadow, always the full width so the coin never looks unmoored.
   c.drawOval(
     Rect.fromCenter(
@@ -48,11 +44,7 @@ void paintBrassCoin(Canvas c, Offset p, double radius, double spin) {
   );
   // Milled rim, then the raised face inside it.
   c.drawOval(
-    Rect.fromCenter(
-      center: p,
-      width: width * 2 - 3,
-      height: radius * 2 - 3,
-    ),
+    Rect.fromCenter(center: p, width: width * 2 - 3, height: radius * 2 - 3),
     Paint()
       ..color = _coinRim
       ..style = PaintingStyle.stroke
@@ -96,25 +88,14 @@ void paintBrassCoin(Canvas c, Offset p, double radius, double spin) {
   );
 }
 
-/// Faces for the three Infinite pickups, cut as gems rather than flat glyphs.
-enum PickupFace { combo, shield, heart }
+/// Distinct faces for Infinite rewards.
+enum PickupFace { combo, shield, heart, magnet }
 
 const _faces = {
-  PickupFace.combo: (
-    Color(0xFFFFD873),
-    Color(0xFFC27A15),
-    Color(0xFF7A4A0C),
-  ),
-  PickupFace.shield: (
-    Color(0xFF8FD9EC),
-    Color(0xFF2489A6),
-    Color(0xFF0F4B5E),
-  ),
-  PickupFace.heart: (
-    Color(0xFFFF8E97),
-    Color(0xFFD5404C),
-    Color(0xFF7C1F28),
-  ),
+  PickupFace.magnet: (Color(0xFFD0B5FF), Color(0xFF8655CF), Color(0xFF48277E)),
+  PickupFace.combo: (Color(0xFFFFD873), Color(0xFFC27A15), Color(0xFF7A4A0C)),
+  PickupFace.shield: (Color(0xFF8FD9EC), Color(0xFF2489A6), Color(0xFF0F4B5E)),
+  PickupFace.heart: (Color(0xFFFF8E97), Color(0xFFD5404C), Color(0xFF7C1F28)),
 };
 
 /// [glint] runs 0..1 and sweeps the highlight; pass 0 for reduced motion.
@@ -133,6 +114,20 @@ void paintPickup(Canvas c, Offset p, PickupFace face, double glint) {
   );
   final body = Path(), crown = Path();
   switch (face) {
+    case PickupFace.magnet:
+      body
+        ..moveTo(p.dx - 7, p.dy - 7)
+        ..lineTo(p.dx - 7, p.dy + 1)
+        ..cubicTo(p.dx - 7, p.dy + 11, p.dx + 7, p.dy + 11, p.dx + 7, p.dy + 1)
+        ..lineTo(p.dx + 7, p.dy - 7)
+        ..lineTo(p.dx + 3, p.dy - 7)
+        ..lineTo(p.dx + 3, p.dy + 1)
+        ..cubicTo(p.dx + 3, p.dy + 5, p.dx - 3, p.dy + 5, p.dx - 3, p.dy + 1)
+        ..lineTo(p.dx - 3, p.dy - 7)
+        ..close();
+      crown
+        ..addRect(Rect.fromLTWH(p.dx - 7, p.dy - 7, 4, 4))
+        ..addRect(Rect.fromLTWH(p.dx + 3, p.dy - 7, 4, 4));
     case PickupFace.combo:
       // Brilliant cut: flat table, crown shoulders, deep pavilion.
       body

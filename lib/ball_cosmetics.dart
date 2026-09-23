@@ -1,4 +1,4 @@
-/// Visual designs share the same collision sphere; bonuses affect Infinite points.
+/// Designs share the same collision sphere; bonuses and magnets affect Infinite.
 enum BallCosmetic {
   steel('Steel', 'Polished metal', 0, 0xFFE9EADF, 0, 0),
   coral('Coral', 'Warm enamel', 35, 0xFFFF876D, 0, .1),
@@ -38,6 +38,24 @@ enum BallCosmetic {
   final String label, description;
   final int cost, color, sides;
   final double scoreBonus;
+
+  /// Permanent Infinite collection radius. Zero means contact collection only.
+  double get magnetRadius => switch (this) {
+    titanium => 35,
+    eclipse => 50,
+    plasma => 65,
+    quasar => 85,
+    singularity => 110,
+    _ => 0,
+  };
+  String get magnetLabel => switch (this) {
+    titanium => 'Small magnet',
+    eclipse => 'Medium magnet',
+    plasma => 'Strong magnet',
+    quasar => 'Wide magnet',
+    singularity => 'Largest ball magnet',
+    _ => 'No built-in magnet',
+  };
   bool get glowing => [
     neon,
     reactor,

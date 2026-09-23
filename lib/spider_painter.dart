@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'game.dart';
+import 'infinite_painter.dart';
 
 void paintSpiderBackdrop(Canvas c, BalanceGame game) {
   if (game.spiders.isEmpty) return;
@@ -44,17 +45,24 @@ void paintSpiderBackdrop(Canvas c, BalanceGame game) {
   }
   for (final s in game.spiders) {
     final radius = s.zoneRadius;
-    final center = Offset(s.zoneX, game.screenY(s.zoneY)),
-        color = s.chasing
-            ? const Color(0xFFEF6654)
-            : const Color(0xFF725138);
+    final center = Offset(s.zoneX, game.screenY(s.zoneY));
+    final webInk = game.infinite ? infiniteBoardInk(game, center) : null;
+    thread.color =
+        webInk?.withAlpha(180) ?? const Color(0xFF193C38).withAlpha(32);
+    final color = s.chasing
+        ? (webInk == null
+              ? const Color(0xFFEF6654)
+              : webInk == Colors.white
+              ? const Color(0xFFFFB5A3)
+              : const Color(0xFFB72820))
+        : webInk ?? const Color(0xFF725138);
     c.drawCircle(
       center,
       radius,
       Paint()..color = color.withAlpha(s.chasing ? 24 : 12),
     );
     final boundary = Paint()
-      ..color = color.withAlpha(165)
+      ..color = color.withAlpha(game.infinite ? 230 : 165)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.1;
     for (var i = 0; i < 28; i++) {
@@ -85,7 +93,12 @@ void paintSpiders(Canvas c, BalanceGame game, bool reducedMotion) {
     c.translate(spider.x, game.screenY(spider.y));
     c.rotate(spider.heading);
     c.scale(spider.bodyRadius / 6);
-    final color = spider.chasing
+    final webInk = game.infinite
+        ? infiniteBoardInk(game, Offset(spider.x, game.screenY(spider.y)))
+        : null;
+    final color = webInk == Colors.white
+        ? (spider.chasing ? const Color(0xFFFFB5A3) : const Color(0xFFF5EFDC))
+        : spider.chasing
         ? const Color(0xFF80251F)
         : const Color(0xFF253C34);
     final legs = Paint()
@@ -111,7 +124,14 @@ void paintSpiders(Canvas c, BalanceGame game, bool reducedMotion) {
     c.drawOval(const Rect.fromLTWH(-9, -5, 12, 10), Paint()..color = color);
     c.drawCircle(const Offset(4, 0), 4, Paint()..color = color);
     for (final y in [-1.5, 1.5]) {
-      c.drawCircle(Offset(6, y), .85, Paint()..color = const Color(0xFFEAD8A6));
+      c.drawCircle(
+        Offset(6, y),
+        .85,
+        Paint()
+          ..color = webInk == Colors.white
+              ? const Color(0xFF253C34)
+              : const Color(0xFFEAD8A6),
+      );
     }
     c.restore();
   }

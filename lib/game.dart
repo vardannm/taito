@@ -264,8 +264,14 @@ class BalanceGame {
   double get difficulty => difficultyAt(maxHeight / 10);
   double get ascentSpeed =>
       InfiniteTuning.startSpeed +
-      (InfiniteTuning.baseTopSpeed - InfiniteTuning.startSpeed) * difficulty +
-      (infinite ? InfiniteTuning.paceSpeedBonus * (pace - 1) : 0);
+      (InfiniteTuning.baseTopSpeed - InfiniteTuning.startSpeed) *
+          difficulty *
+          InfiniteDifficulty.speedGrowth +
+      (infinite
+          ? InfiniteTuning.paceSpeedBonus *
+                (pace - 1) *
+                InfiniteDifficulty.paceGrowth
+          : 0);
   final specialHazards = <SpecialHazard>[];
 
   /// Infinite's laser maze interludes: a stretch where the hole stream stops
@@ -295,11 +301,12 @@ class BalanceGame {
     if (specialHazards.isNotEmpty ||
         mazeSection ||
         elapsed < _nextHazardTime ||
-        metres < InfiniteTuning.hazardMilestones.first ||
+        metres * InfiniteDifficulty.hazardUnlocks <
+            InfiniteTuning.hazardMilestones.first ||
         section == InfiniteSection.breath)
       return;
     final unlocked = InfiniteTuning.hazardMilestones
-        .where((m) => metres >= m)
+        .where((m) => metres * InfiniteDifficulty.hazardUnlocks >= m)
         .length;
     final index = _introducedHazards < unlocked
         ? _introducedHazards++
@@ -307,7 +314,9 @@ class BalanceGame {
               unlocked;
     _hazardSequence = index;
     final hard =
-        _random.nextDouble() < InfiniteTuning.complexityAt(metres.toDouble()) &&
+        _random.nextDouble() <
+            InfiniteTuning.complexityAt(metres.toDouble()) *
+                InfiniteDifficulty.hardHazards &&
         section == InfiniteSection.encounter &&
         _introducedHazards >= 4;
     final sweeping = hard && _hardHazardSequence.isEven;
@@ -343,7 +352,9 @@ class BalanceGame {
     _nextHazardTime =
         elapsed +
         (section == InfiniteSection.encounter ? 16 : 20) -
-        (section == InfiniteSection.encounter ? 12.5 : 13.5) * difficulty;
+        (section == InfiniteSection.encounter ? 12.5 : 13.5) *
+            difficulty *
+            InfiniteDifficulty.hazardFrequency;
   }
 
   bool get infinite => mode == GameMode.infinite;
@@ -361,12 +372,13 @@ class BalanceGame {
   void ensureInfiniteBoard({bool retainForSweep = false}) {
     if (!infinite) return;
     while (_nextRowY >= -cameraOffset + visibleTop - 120) {
-      final d = InfiniteTuning.runDensity(score, maxHeight / 10);
+      final growth = InfiniteTuning.runDensity(score, maxHeight / 10);
+      final d = growth * InfiniteDifficulty.obstacleDensity;
       final stage = sectionAt(math.max(0, (infiniteStart - _nextRowY) / 10));
       final spacing =
           (210 - 130 * d + _random.nextDouble() * 30) *
           stage.spacingFactor /
-          (1 + (pace - 1) * .035);
+          (1 + (pace - 1) * .035 * InfiniteDifficulty.paceGrowth);
       final previous = _corridor;
       final turn = math.min(52.0, spacing * .42);
       _corridor = (_corridor + (_random.nextDouble() * 2 - 1) * turn).clamp(
@@ -398,7 +410,8 @@ class BalanceGame {
         bool separated(Hole h) =>
             (h.y - y).abs() > 12 &&
             (h.x - x) * (h.x - x) + (h.y - y) * (h.y - y) > 36 * 36;
-        if ((x - safeX).abs() > 46 - 12 * d &&
+        if ((x - safeX).abs() >
+                46 - 12 * growth * InfiniteDifficulty.pathNarrowing &&
             spiders.every(
               (s) =>
                   math.pow(s.zoneX - x, 2) + math.pow(s.zoneY - y, 2) >
@@ -883,7 +896,7 @@ class BalanceGame {
     }
     // A rolling sphere: 5/7 of gravity projected onto the bar, then onto x.
     final slope = (right - left) / 320;
-    velocity += (5 / 7) * 959 * slope / (1 + slope * slope) * dt;
+    velocity += (5 / 7) * 1100 * slope / (1 + slope * slope) * dt;
     velocity *= math.exp(-.48 * dt);
     velocity = velocity.clamp(-265.0, 265.0);
     ballX += velocity * dt;
@@ -1032,15 +1045,20 @@ class BalanceGame {
       if (math.pow(ax + t * dx - coin.x, 2) +
               math.pow(ay + t * dy - coin.y, 2) <=
           12 * 12) {
-        coin.collected = true;
-        coinsCollected++;
-        if (!scrolling) score += 250;
-        lastCoinAge = 0;
-        lastCoinX = coin.x;
-        lastCoinY = coin.y;
-        event = GameEvent.coin;
+        _takeCoin(coin);
       }
     }
+  }
+
+  void _takeCoin(BrassCoin coin) {
+    if (coin.collected) return;
+    coin.collected = true;
+    coinsCollected++;
+    if (!scrolling) score += 250;
+    lastCoinAge = 0;
+    lastCoinX = coin.x;
+    lastCoinY = coin.y;
+    event = GameEvent.coin;
   }
 
   bool _updateSpiders(double dt, double oldX, double oldY) {

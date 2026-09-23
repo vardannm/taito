@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'infinite_difficulty.dart';
+
 enum CabinetStyle { brass, jade, porcelain, ember }
 
 extension CabinetDetails on CabinetStyle {
@@ -68,7 +70,9 @@ enum InfiniteSection { rush, breath, encounter }
 InfiniteSection sectionAt(double meters) {
   final phase = meters % 360;
   // Lengthen recovery stretches early; encounters grow to the original share.
-  final growth = ((meters - 600) / 1800).clamp(0.0, 1.0);
+  final growth =
+      ((meters - 600) / 1800).clamp(0.0, 1.0) *
+      InfiniteDifficulty.sectionPressure;
   return phase < 180
       ? InfiniteSection.rush
       : phase < 360 - 120 * growth

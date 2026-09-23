@@ -323,7 +323,9 @@ class BoardPainter extends CustomPainter {
         'PRECISION IS EVERYTHING',
         const Offset(180, 545),
         6.5,
-        ink.withAlpha(180),
+        game.infinite
+            ? infiniteBoardInk(game, const Offset(180, 545))
+            : ink.withAlpha(180),
         spacing: 2,
       );
     if (game.infinite) {
@@ -336,12 +338,18 @@ class BoardPainter extends CustomPainter {
           BalanceGame.infiniteStart - BalanceGame.ballRadius - mark * 100.0,
         );
         if (mark >= 0 && y > 28 && y < 530) {
-          text(canvas, '${mark * 10}m', Offset(315, y), 7, ink.withAlpha(145));
+          text(
+            canvas,
+            '${mark * 10}m',
+            Offset(315, y),
+            7,
+            infiniteBoardInk(game, Offset(315, y)),
+          );
           canvas.drawLine(
             Offset(30, y),
             Offset(42, y),
             Paint()
-              ..color = ink.withAlpha(90)
+              ..color = infiniteBoardInk(game, Offset(36, y)).withAlpha(180)
               ..strokeWidth = 1,
           );
         }
@@ -396,7 +404,12 @@ class BoardPainter extends CustomPainter {
               (reducedMotion ? 0 : game.lastCoinAge * 20),
         ),
         11,
-        ink,
+        game.infinite
+            ? infiniteBoardInk(
+                game,
+                Offset(game.lastCoinX, game.screenY(game.lastCoinY) - 20),
+              )
+            : ink,
       );
     }
     paintInfiniteItems(canvas, game, reducedMotion);
@@ -642,6 +655,7 @@ class BoardPainter extends CustomPainter {
         reducedMotion: reducedMotion,
         steelPalette: palette.ball,
       );
+      paintInfiniteMagnet(canvas, game, reducedMotion);
       paintInfiniteShield(canvas, game, reducedMotion);
     }
 

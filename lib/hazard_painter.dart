@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'game.dart';
 import 'hazards.dart';
+import 'infinite_painter.dart';
 
 const _red = Color(0xFFE34336), _white = Color(0xFFFFF1D6);
 
@@ -82,6 +83,7 @@ void paintSpecialHazards(Canvas c, BalanceGame game, bool reducedMotion) {
         }
         _caption(
           c,
+          game,
           '${h.countdown.toStringAsFixed(1)}s',
           point(low + 29),
           _red,
@@ -131,7 +133,7 @@ void paintSpecialHazards(Canvas c, BalanceGame game, bool reducedMotion) {
       c.drawCircle(p, 12, warning..strokeWidth = 1);
       for (final d in [-1.0, 1.0])
         c.drawLine(p + Offset(d * 21, 0), p + Offset(d * 27, 0), warning);
-      _caption(c, h.countdown.toStringAsFixed(1), p, _red);
+      _caption(c, game, h.countdown.toStringAsFixed(1), p, _red);
     } else if (h.active) {
       c.drawCircle(p + const Offset(0, 1), 14, Paint()..color = _white);
       c.drawCircle(p, 12, Paint()..color = const Color(0xFF081F22));
@@ -188,23 +190,30 @@ void paintGapWarning(Canvas c, BalanceGame game, bool reducedMotion) {
       }
       _caption(
         c,
+        game,
         'BREAK ${h.countdown.toStringAsFixed(1)}s',
         point(h.x) - const Offset(0, 24),
         _red,
       );
     } else if (h.active) {
       for (final p in [a, b]) c.drawCircle(p, 4, Paint()..color = _red);
-      _caption(c, 'GAP', point(h.x) + const Offset(0, 23), _red);
+      _caption(c, game, 'GAP', point(h.x) + const Offset(0, 23), _red);
     }
   }
 }
 
-void _caption(Canvas c, String value, Offset center, Color color) {
+void _caption(
+  Canvas c,
+  BalanceGame game,
+  String value,
+  Offset center,
+  Color color,
+) {
   final text = TextPainter(
     text: TextSpan(
       text: value,
       style: TextStyle(
-        color: color,
+        color: game.infinite ? infiniteBoardInk(game, center) : color,
         fontSize: 9,
         fontWeight: FontWeight.w900,
         fontFamily: 'monospace',

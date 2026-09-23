@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'game.dart';
+import 'cabinet.dart';
 import 'infinite_progress.dart';
 import 'maze_gates.dart';
 import 'pickup_painter.dart';
@@ -49,6 +50,39 @@ Color comboColor(double power, {bool background = false}) {
         )!
       : color;
 }
+
+/// Match the playfield gradient so foreground colors follow the visible fade,
+/// including transitions back to x1 after a hit, rather than the target combo.
+Color infiniteFieldColor(BalanceGame game, Offset point) {
+  final area = Rect.fromLTRB(10, game.visibleTop + 10, 350, 550);
+  final delta = point - area.topLeft;
+  final t =
+      ((delta.dx * area.width + delta.dy * area.height) /
+              (area.width * area.width + area.height * area.height))
+          .clamp(0.0, 1.0);
+  Color sample(List<Color> colors) => t <= .5
+      ? Color.lerp(colors[0], colors[1], t * 2)!
+      : Color.lerp(colors[1], colors[2], (t - .5) * 2)!;
+  final power = (game.survival.visualCombo * InfiniteTuning.visualIntensity)
+      .clamp(0.0, 1.0);
+  final tint = comboColor(power);
+  return Color.lerp(
+    sample(CabinetPalette.of(game.cabinet).field),
+    sample([
+      Color.lerp(tint, Colors.white, .3)!,
+      tint,
+      Color.lerp(tint, const Color(0xFF77BBB5), .2)!,
+    ]),
+    (power * 4).clamp(0.0, 1.0),
+  )!;
+}
+
+/// Choose the higher-contrast opposite tone; never fade through muddy grey.
+Color contrastInk(Color background) =>
+    background.computeLuminance() > .179 ? Colors.black : Colors.white;
+
+Color infiniteBoardInk(BalanceGame game, Offset point) =>
+    contrastInk(infiniteFieldColor(game, point));
 
 /// Paints behind the entire game, including HUD, controls and screen margins.
 class InfiniteBackdropPainter extends CustomPainter {
@@ -197,6 +231,7 @@ void paintInfiniteItems(Canvas c, BalanceGame game, bool reducedMotion) {
       InfiniteItemKind.combo => PickupFace.combo,
       InfiniteItemKind.shield => PickupFace.shield,
       InfiniteItemKind.heart => PickupFace.heart,
+      InfiniteItemKind.magnet => PickupFace.magnet,
     }, reducedMotion ? 0 : (game.clock * .55 + phase) % 1);
   }
 }
@@ -323,6 +358,69 @@ void paintInfiniteEnergy(Canvas c, BalanceGame game, bool reducedMotion) {
         ..color = gold.withValues(alpha: .28 * strength)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1 + 2 * strength,
+    );
+  }
+}
+
+/// The field shows actual collection reach; the inner arc is the pickup timer.
+void paintInfiniteMagnet(Canvas c, BalanceGame game, bool reducedMotion) {
+  if (!game.infinite || game.magnetRadius <= 0 || game.ballScale <= 0) return;
+  final p = Offset(game.visualX, game.screenY(game.visualY));
+  const tint = Color(0xFF8655CF);
+  final radius = game.magnetRadius;
+  c.save();
+  c.clipRect(Rect.fromLTRB(20, game.visibleTop, 340, 574));
+  c.drawCircle(p, radius, Paint()..color = tint.withAlpha(12));
+  c.drawCircle(
+    p,
+    radius,
+    Paint()
+      ..color = tint.withAlpha(80)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2,
+  );
+  if (!reducedMotion) {
+    final wave = 1 - (game.clock * .6) % 1;
+    c.drawCircle(
+      p,
+      radius * wave,
+      Paint()
+        ..color = tint.withValues(alpha: .12 * (1 - wave))
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+  }
+  c.restore();
+  if (game.survival.magnet > 0) {
+    c.drawArc(
+      Rect.fromCircle(center: p, radius: 21),
+      -math.pi / 2,
+      math.pi * 2 * game.survival.magnet / InfiniteTuning.magnetSeconds,
+      false,
+      Paint()
+        ..color = tint
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
+    final label = TextPainter(
+      text: TextSpan(
+        text: 'MAGNET ${game.survival.magnet.ceil()}s',
+        style: const TextStyle(
+          fontFamily: 'monospace',
+          fontSize: 9,
+          fontWeight: FontWeight.w800,
+          color: tint,
+          backgroundColor: Color(0xEFFFF9ED),
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    label.paint(
+      c,
+      Offset(
+        (p.dx - label.width / 2).clamp(22.0, 338 - label.width),
+        p.dy - 37,
+      ),
     );
   }
 }

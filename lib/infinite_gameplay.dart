@@ -5,6 +5,13 @@ extension InfiniteGameplay on BalanceGame {
   int get paceLevel => survival.levelAt(maxHeight / 10);
   double get pace => survival.paceAt(maxHeight / 10);
 
+  double get magnetRadius => !infinite
+      ? 0
+      : math.max(
+          cosmetic.magnetRadius,
+          survival.magnet > 0 ? InfiniteTuning.magnetRadius : 0,
+        );
+
   void _pruneInfiniteSpiders() {
     spiders.removeWhere(
       (s) => screenY(s.zoneY) - s.zoneRadius > 620 && screenY(s.y) > 620,
@@ -20,8 +27,11 @@ extension InfiniteGameplay on BalanceGame {
     if (y > _nextSpiderY) return;
     // Distance-based encounters, with clear stretches between territories.
     // Consume skipped slots too, so maze/breath sections never build a backlog.
-    _nextSpiderY = y - (1800 - 1200 * difficulty) - _random.nextDouble() * 400;
-    final radius = 38.0 + 2 * (paceLevel - 1);
+    _nextSpiderY =
+        y -
+        (1800 - 1200 * difficulty * InfiniteDifficulty.spiderGrowth) -
+        _random.nextDouble() * 400;
+    final radius = 38.0 + 2 * (paceLevel - 1) * InfiniteDifficulty.spiderGrowth;
     if (mazeSection ||
         stage == InfiniteSection.breath ||
         screenY(y) + radius >= 0 ||
@@ -45,7 +55,8 @@ extension InfiniteGameplay on BalanceGame {
           y,
           radius,
           phase: _random.nextDouble() * math.pi * 2,
-          chaseSpeed: 65 + 4.0 * (paceLevel - 1),
+          chaseSpeed:
+              65 + 4.0 * (paceLevel - 1) * InfiniteDifficulty.spiderGrowth,
         ),
       );
       return;
@@ -107,6 +118,11 @@ extension InfiniteGameplay on BalanceGame {
         spawn(InfiniteItemKind.heart, survival.nextHeartY);
       survival.nextHeartY -=
           InfiniteTuning.heartSpacing + _random.nextDouble() * 1800;
+    }
+    while (survival.nextMagnetY >= ahead) {
+      spawn(InfiniteItemKind.magnet, survival.nextMagnetY);
+      survival.nextMagnetY -=
+          InfiniteTuning.magnetSpacing + _random.nextDouble() * 1000;
     }
   }
 
@@ -176,6 +192,9 @@ extension InfiniteGameplay on BalanceGame {
       case InfiniteItemKind.shield:
         survival.shield = InfiniteTuning.shieldSeconds;
         survival.announce('SHIELD · 10 seconds of invincibility');
+      case InfiniteItemKind.magnet:
+        survival.magnet = InfiniteTuning.magnetSeconds;
+        survival.announce('MAGNET · 12 seconds of nearby rewards');
       case InfiniteItemKind.heart:
         if (lives < InfiniteTuning.maxLives) {
           lives++;
@@ -198,7 +217,15 @@ extension InfiniteGameplay on BalanceGame {
     double dt,
   ) {
     final events =
-        <({double t, InfiniteItem? item, Hole? hole, String? reason})>[];
+        <
+          ({
+            double t,
+            InfiniteItem? item,
+            BrassCoin? coin,
+            Hole? hole,
+            String? reason,
+          })
+        >[];
     for (final spider in spiders) {
       final sx = spider.x, sy = spider.y;
       spider.step(dt, oldX, oldY, ballX, ballY);
@@ -215,18 +242,68 @@ extension InfiniteGameplay on BalanceGame {
         events.add((
           t: t,
           item: null,
+          coin: null,
           hole: null,
           reason: 'Caught by a spider. Stay outside its territory.',
         ));
     }
-    for (final item in survival.items) {
-      final t = circleContact(oldX, oldY, ballX, ballY, item.x, item.y, 13);
-      if (t != null) events.add((t: t, item: item, hole: null, reason: null));
+    // Rebuild only future rewards when a magnet is picked up mid-sweep.
+    // Earlier hazards stay earlier: a distant shield cannot protect retroactively.
+    void queueRewards(double from) {
+      events.removeWhere((e) => e.item != null || e.coin != null);
+      final ax = oldX + (ballX - oldX) * from;
+      final ay = oldY + (ballY - oldY) * from;
+      for (final item in survival.items) {
+        final t = circleContact(
+          ax,
+          ay,
+          ballX,
+          ballY,
+          item.x,
+          item.y,
+          math.max(13, magnetRadius),
+        );
+        if (t != null)
+          events.add((
+            t: from + (1 - from) * t,
+            item: item,
+            coin: null,
+            hole: null,
+            reason: null,
+          ));
+      }
+      for (final coin in coins.where((c) => !c.collected)) {
+        final t = circleContact(
+          ax,
+          ay,
+          ballX,
+          ballY,
+          coin.x,
+          coin.y,
+          math.max(12, magnetRadius),
+        );
+        if (t != null)
+          events.add((
+            t: from + (1 - from) * t,
+            item: null,
+            coin: coin,
+            hole: null,
+            reason: null,
+          ));
+      }
     }
+
+    queueRewards(0);
     for (final hole in board) {
       final t = circleContact(oldX, oldY, ballX, ballY, hole.x, hole.y, 8.5);
       if (t != null)
-        events.add((t: t, item: null, hole: hole, reason: 'Into a trap.'));
+        events.add((
+          t: t,
+          item: null,
+          coin: null,
+          hole: hole,
+          reason: 'Into a trap.',
+        ));
     }
     for (final hazard in specialHazards) {
       final t = hazard.contact(
@@ -240,6 +317,7 @@ extension InfiniteGameplay on BalanceGame {
         events.add((
           t: t,
           item: null,
+          coin: null,
           hole: null,
           reason: switch (hazard.kind) {
             HazardKind.laser => 'Laser hit. Move out of the blinking beam.',
@@ -261,6 +339,7 @@ extension InfiniteGameplay on BalanceGame {
         events.add((
           t: t,
           item: null,
+          coin: null,
           hole: null,
           reason: 'Laser wall. Steer through the gap.',
         ));
@@ -269,33 +348,35 @@ extension InfiniteGameplay on BalanceGame {
       events.add((
         t: 1,
         item: null,
+        coin: null,
         hole: null,
         reason: 'The red caught you. Keep steering.',
       ));
     }
-    // A shield protects only contacts reached after collection. Ties favor pickup.
-    events.sort((a, b) {
-      final order = a.t.compareTo(b.t);
-      return order != 0
-          ? order
-          : (a.item != null ? 0 : 1).compareTo(b.item != null ? 0 : 1);
-    });
-    for (final contact in events) {
+    // Resolve all rewards and hazards in travel order; ties favor rewards.
+    while (events.isNotEmpty) {
+      events.sort((a, b) {
+        final order = a.t.compareTo(b.t);
+        return order != 0
+            ? order
+            : (a.item != null || a.coin != null ? 0 : 1).compareTo(
+                b.item != null || b.coin != null ? 0 : 1,
+              );
+      });
+      final contact = events.removeAt(0);
       if (contact.item != null) {
         _takeInfiniteItem(contact.item!);
+        if (contact.item!.kind == InfiniteItemKind.magnet) {
+          queueRewards(contact.t);
+        }
+      } else if (contact.coin != null) {
+        _takeCoin(contact.coin!);
       } else if (!survival.protected) {
-        _collectCoins(
-          oldX,
-          oldY,
-          oldX + (ballX - oldX) * contact.t,
-          oldY + (ballY - oldY) * contact.t,
-        );
         fellThroughGap = contact.reason == 'The platform broke beneath you.';
         _loseClimb(contact.reason!, hole: contact.hole);
         if (phase != GamePhase.playing) return;
       }
     }
-    _collectCoins(oldX, oldY, ballX, ballY);
   }
 
   void _recoverInfinite() {
