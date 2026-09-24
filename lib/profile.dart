@@ -25,6 +25,17 @@ class PlayerProfile {
   int best = 0, runs = 0;
   int infiniteBest = 0, infiniteRuns = 0, infiniteBestScore = 0;
   int wallet = 0;
+  bool _ballTestCreditApplied = false;
+
+  /// One development credit, persisted with the balance so it cannot refill
+  /// spent coins on every restart. Called by the debug app entry point only.
+  Future<void> grantBallTestCoins() async {
+    if (_ballTestCreditApplied || unlimitedCoins || !available) return;
+    wallet += 10000;
+    _ballTestCreditApplied = true;
+    await saveEconomy();
+  }
+
   BallCosmetic selectedBall = BallCosmetic.steel;
   double analogSensitivity = 1, twoFingerSensitivity = 1;
   PlatformStyle selectedPlatform = PlatformStyle.classic;
@@ -73,6 +84,7 @@ class PlayerProfile {
     // Snapshot and serialize wallet transactions; an older save cannot undo a purchase.
     final data = jsonEncode({
       'wallet': wallet,
+      'ballTestCreditApplied': _ballTestCreditApplied,
       'owned': ownedBalls.map((b) => b.name).toList(),
       'selected': selectedBall.name,
       'bestScore': infiniteBestScore,
@@ -94,6 +106,7 @@ class PlayerProfile {
     try {
       final data = jsonDecode(raw);
       if (data is! Map<String, dynamic>) return;
+      _ballTestCreditApplied = data['ballTestCreditApplied'] == true;
       if (data['wallet'] is int)
         wallet = (data['wallet'] as int).clamp(0, 1 << 30);
       if (data['bestScore'] is int)

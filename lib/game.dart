@@ -4,6 +4,8 @@ import 'maze_gates.dart';
 import 'levels.dart';
 import 'spiders.dart';
 import 'spider_web.dart';
+import 'porcupines.dart';
+import 'snakes.dart';
 import 'rewards.dart';
 import 'merge.dart';
 import 'laser_maze.dart';
@@ -222,6 +224,13 @@ class BalanceGame {
   double _nextSpiderY = -1800;
   final webShots = <SpiderWebShot>[];
   double _nextWebTime = 0;
+  final porcupines = <BoardPorcupine>[];
+  final quills = <PorcupineQuill>[];
+  final snakes = <BoardSnake>[];
+  // Like mazeSectionsEnabled, lets callers isolate the ordinary hazard stream.
+  bool snakeEncountersEnabled = true;
+  double _nextSnakeTime = 0;
+  double _nextPorcupineY = -2700, _nextQuillTime = 0;
   double cameraOffset = 0, maxHeight = 0, stallTime = 0, dangerY = 580;
   double _steeringDistance = 0;
   double _nextCoinY = 380;
@@ -243,6 +252,10 @@ class BalanceGame {
           (s) =>
               math.pow(s.homeX - x, 2) + math.pow(s.homeY - y, 2) <
               math.pow(s.zoneRadius + 12, 2),
+        ))
+          continue;
+        if (porcupines.any(
+          (p) => math.pow(p.x - x, 2) + math.pow(p.y - y, 2) < 42 * 42,
         ))
           continue;
         coins.add(BrassCoin(x, y));
@@ -302,6 +315,9 @@ class BalanceGame {
       hazard.step(dt, ascentSpeed, cameraOffset: cameraOffset);
     }
     if (specialHazards.isNotEmpty ||
+        snakes.isNotEmpty ||
+        quills.isNotEmpty ||
+        porcupines.any((p) => p.charge != null) ||
         mazeSection ||
         elapsed < _nextHazardTime ||
         metres * InfiniteDifficulty.hazardUnlocks <
@@ -404,6 +420,7 @@ class BalanceGame {
         290.0,
       );
       _spawnInfiniteSpider(_nextRowY, previous, _corridor, stage);
+      _spawnInfinitePorcupine(_nextRowY, previous, _corridor, stage);
       final selected = <Hole>[];
       final recent = _endlessHoles.reversed.take(3).toList().reversed.toList();
       final density = ((1 + 3 * d) * stage.densityFactor).clamp(1.0, 4.0);
@@ -435,6 +452,9 @@ class BalanceGame {
                   math.pow(s.zoneX - x, 2) + math.pow(s.zoneY - y, 2) >
                   math.pow(s.zoneRadius + 20, 2),
             ) &&
+            porcupines.every(
+              (p) => math.pow(p.x - x, 2) + math.pow(p.y - y, 2) > 44 * 44,
+            ) &&
             selected.every(separated) &&
             _endlessHoles.where((h) => (h.y - y).abs() < 36).every(separated)) {
           selected.add(Hole(x, y));
@@ -448,6 +468,7 @@ class BalanceGame {
     if (!retainForSweep)
       _endlessHoles.removeWhere((hole) => screenY(hole.y) > 620);
     if (!retainForSweep) _pruneInfiniteSpiders();
+    if (!retainForSweep) _pruneInfinitePorcupines();
   }
 
   void _updateClimb(double dt) {
@@ -695,6 +716,12 @@ class BalanceGame {
     spiders.clear();
     webShots.clear();
     _nextWebTime = 0;
+    porcupines.clear();
+    quills.clear();
+    snakes.clear();
+    _nextSnakeTime = 0;
+    _nextPorcupineY = -2700;
+    _nextQuillTime = 0;
     if (spiderLevel)
       spiders.addAll(
         ClassicLevels.definition(level).spiders.map((s) => s.create()),
@@ -916,7 +943,7 @@ class BalanceGame {
     }
     // A rolling sphere: 5/7 of gravity projected onto the bar, then onto x.
     final slope = (right - left) / 320;
-    velocity += (5 / 7) * 1100 * slope / (1 + slope * slope) * dt;
+    velocity += (5 / 7) * 1300 * slope / (1 + slope * slope) * dt;
     velocity *= math.exp(-.48 * dt);
     velocity = velocity.clamp(-265.0, 265.0);
     ballX += velocity * dt;
@@ -992,6 +1019,7 @@ class BalanceGame {
       return;
     }
     if (infinite) {
+      _updateSnakes(dt);
       _updateSpecialHazards(dt);
       _resolveInfiniteContacts(oldX, oldY, oldScreenY, dt);
       // Discard only after the entire swept movement has been resolved.
@@ -1000,13 +1028,27 @@ class BalanceGame {
       coins.removeWhere((c) => screenY(c.y) > 620);
       survival.items.removeWhere((item) => screenY(item.y) > 610);
       _pruneInfiniteSpiders();
+      _pruneInfinitePorcupines();
+      snakes.removeWhere(
+        (s) =>
+            s.expired ||
+            s.points.every((p) => screenY(p.y) > 640 || p.x < -24 || p.x > 384),
+      );
+      quills.removeWhere(
+        (q) =>
+            q.expired ||
+            q.x < -12 ||
+            q.x > 372 ||
+            screenY(q.y) < visibleTop - 30 ||
+            screenY(q.y) > 622,
+      );
       webShots.removeWhere(
         (shot) =>
             shot.expired ||
             shot.x < 0 ||
             shot.x > 360 ||
-            shot.y < visibleTop - 30 ||
-            shot.y > 610,
+            screenY(shot.y) < visibleTop - 30 ||
+            screenY(shot.y) > 610,
       );
       return;
     }

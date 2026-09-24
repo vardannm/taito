@@ -79,9 +79,9 @@ void main() {
       g.webShots.add(
         SpiderWebShot(
           x: g.ballX,
-          y: g.screenY(g.ballY),
+          y: g.ballY,
           targetX: g.ballX,
-          targetY: g.screenY(g.ballY),
+          targetY: g.ballY,
           speed: 0,
           warningSeconds: 0,
         ),
@@ -126,9 +126,9 @@ void main() {
     g.webShots.add(
       SpiderWebShot(
         x: g.ballX,
-        y: g.screenY(g.ballY),
+        y: g.ballY,
         targetX: g.ballX,
-        targetY: g.screenY(g.ballY),
+        targetY: g.ballY,
         speed: 0,
         warningSeconds: 0,
       ),

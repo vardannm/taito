@@ -61,7 +61,7 @@ class LevelRecord {
 
 class BrassCoin {
   BrassCoin(this.x, this.y);
-  final double x, y;
+  double x, y;
   bool collected = false;
 }
 

@@ -49,9 +49,10 @@ void main() {
       for (final height in [9000.0, 24000.0, 43200.0, 42900.0]) {
         final g = BalanceGame(seed: 42)
           ..start(gameMode: GameMode.infinite)
-          // Laser maze sections have their own tests; this one is about the
+          // Maze and snake encounters have their own tests; this one is about the
           // ordinary hazard scheduler.
-          ..mazeSectionsEnabled = false;
+          ..mazeSectionsEnabled = false
+          ..snakeEncountersEnabled = false;
         final variants = <int>[];
         for (var i = 0; i < 10; i++) {
           g.maxHeight = height;
@@ -158,9 +159,10 @@ void main() {
     () {
       final game = BalanceGame()
         ..start(gameMode: GameMode.infinite)
-        // Laser maze sections have their own tests; this one is about the
+        // Maze and snake encounters have their own tests; this one is about the
         // ordinary hazard scheduler.
-        ..mazeSectionsEnabled = false;
+        ..mazeSectionsEnabled = false
+        ..snakeEncountersEnabled = false;
       game.maxHeight = 290;
       game.step(1 / 120);
       expect(game.specialHazards, isEmpty);

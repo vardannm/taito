@@ -142,14 +142,14 @@ void paintSpiderWebShots(Canvas c, BalanceGame game, bool reducedMotion) {
   if (!game.infinite) return;
   for (final web in game.webShots) {
     if (web.expired) continue;
-    final center = Offset(web.x, web.y);
+    final center = Offset(web.x, game.screenY(web.y));
     final tint = infiniteBoardInk(game, center);
     final paint = Paint()
       ..color = tint
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.3;
     if (web.warning) {
-      final target = Offset(web.targetX, web.targetY);
+      final target = Offset(web.targetX, game.screenY(web.targetY));
       final delta = target - center;
       for (var i = 0; i < 12; i++) {
         c.drawLine(

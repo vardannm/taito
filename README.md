@@ -53,7 +53,7 @@ The app opens directly onto the Infinite board, including on first launch. The b
 
 **Pace x1–x5** advances continuously by one level per 600m. Every run starts at 68 world units/second. Base speed uses a smoothstep curve over 2,400m (previously 900m), with the same 216-unit extreme cap including pace bonuses. Hole density takes the lower of the 60,000-point curve and distance difficulty, so high-tier gear and combos cannot skip the opening. Initial spacing is 210–240 units, tightening toward the existing dense patterns later. Distance points still count only new peak height.
 
-Gold diamond **combo crystals** build x1–x10 and award `50 × new combo × pace level × gear multiplier` points. Further crystals at x10 keep awarding bonuses; missed pickups preserve combo and a lost heart resets it. Early mint, blue, violet and coral colors progress through dark violet, midnight, indigo (8x), electric cyan (9x), and warm gold (10x). The HUD marks the maximum. Particle counts, platform arcs, glow and ball energy rise gradually; sparks use batched paths with no per-particle blur. Reduced motion keeps a quiet static tint/aura. The high-tier render-budget test limits total draw calls and offscreen layers.
+Gold diamond **combo crystals** build x1–x10 and award `50 × new combo × pace level × gear multiplier` points. Further crystals at x10 award a flat +300 points with a visible MAX COMBO notice; missed pickups preserve combo and a lost heart resets it. Early mint, blue, violet and coral colors progress through dark violet, midnight, indigo (8x), electric cyan (9x), and warm gold (10x). The HUD marks the maximum. Particle counts, platform arcs, glow and ball energy rise gradually; sparks use batched paths with no per-particle blur. Reduced motion keeps a quiet static tint/aura. The high-tier render-budget test limits total draw calls and offscreen layers.
 
 Shield pickup, refresh and expiration preserve active touch ownership, drag position and pending movement. The shield status line reserves its space, so effects do not resize the board or controller. Blue **shield** pickups grant 10 seconds of invincibility against every Infinite hazard, with a countdown and a visible ring around the ball. Invincibility preserves hearts and combo. Pink **heart** pickups rarely appear while a heart is missing. Hearts cap at three; one already on the board grants a point bonus if collected at full health. Pickups and moving hazards resolve in swept contact order, so a shield must be reached before it can prevent a collision.
 
@@ -238,3 +238,8 @@ balls, plus carbon, pearl, aurora, plasma, celestial and sovereign platforms.
 Premium gear uses bounded orbit sparks, light channels and short trails; physics
 and collision sizes stay shared. Owned items and equipment continue to save by
 their stable names. Cabinet unlocks still use Classic stars.
+
+
+Infinite tuning: `lib/infinite_difficulty.dart` includes `spiderSpeed` (base chase speed) and `spiderBulletSpeed` (web flight speed), in world units per second. Magnet fields pull rewards toward the ball; their bonuses activate only on physical collection. The Infinite HUD centers the score and combo without a distance readout.
+
+Debug launches apply a one-time +10,000 coin credit for testing ball purchases. The credit is saved with the wallet, so spending and restarting do not refill it. Release launches do not apply the credit.

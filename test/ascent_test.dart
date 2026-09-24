@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/game.dart';
+import 'package:balance_arcade/infinite_progress.dart';
 import 'game_test.dart' show advance;
 
 void main() {
@@ -53,8 +54,21 @@ void main() {
     final game = BalanceGame()..start(gameMode: GameMode.infinite);
     expect(game.ascentSpeed, 68);
     game.maxHeight = 4500;
-    expect(game.ascentSpeed, closeTo(85.0859375, .001));
+    expect(
+      game.ascentSpeed,
+      closeTo(
+        68 +
+            10.3359375 * InfiniteDifficulty.speedGrowth +
+            6.75 * InfiniteDifficulty.paceGrowth,
+        .001,
+      ),
+    );
     game.maxHeight = 100000;
-    expect(game.ascentSpeed, 216);
+    expect(
+      game.ascentSpeed,
+      68 +
+          112 * InfiniteDifficulty.speedGrowth +
+          36 * InfiniteDifficulty.paceGrowth,
+    );
   });
 }

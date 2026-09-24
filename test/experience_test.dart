@@ -48,10 +48,22 @@ void main() {
       var previous = game.ascentSpeed;
       for (var metres = 1; metres <= 5000; metres++) {
         game.maxHeight = metres * 10.0;
-        expect(game.ascentSpeed, inInclusiveRange(previous, previous + .1));
+        // The smoothstep slope peaks at 1.5; allow the configured growth.
+        final maxStep =
+            112 * InfiniteDifficulty.speedGrowth * 1.5 / 2400 +
+            9 * InfiniteDifficulty.paceGrowth / 600;
+        expect(
+          game.ascentSpeed,
+          inInclusiveRange(previous, previous + maxStep + 1e-6),
+        );
         previous = game.ascentSpeed;
       }
-      expect(previous, 216);
+      expect(
+        previous,
+        68 +
+            112 * InfiniteDifficulty.speedGrowth +
+            36 * InfiniteDifficulty.paceGrowth,
+      );
       expect(InfiniteTuning.difficultyAt(900), lessThan(.35));
       expect(InfiniteTuning.difficultyAt(2400), 1);
       expect(InfiniteTuning.runDensity(1000000, 0), 0);

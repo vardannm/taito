@@ -18,7 +18,16 @@ void main() {
           g.ensureInfiniteBoard();
           expect(g.spiders.length, lessThanOrEqualTo(3));
           for (final s in g.spiders) {
-            expect(s.chaseSpeed, inInclusiveRange(44, 56));
+            expect(
+              s.chaseSpeed,
+              inInclusiveRange(
+                InfiniteDifficulty.spiderSpeed,
+                InfiniteDifficulty.spiderSpeed +
+                    InfiniteTuning.spiderChaseBonus *
+                        (InfiniteTuning.maxPace - 1) *
+                        InfiniteDifficulty.spiderGrowth,
+              ),
+            );
             if (seen.add(s)) {
               expect(g.screenY(s.zoneY) + s.zoneRadius, lessThan(0));
             }

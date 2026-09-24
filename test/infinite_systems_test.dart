@@ -76,9 +76,10 @@ void main() {
       for (var i = 0; i < 12; i++) {
         pickup(g, InfiniteItemKind.combo);
         final combo = math.min(10, i + 2);
-        total += 50 * combo;
+        total += i >= 9 ? 300 : 50 * combo;
         expect(g.survival.combo, combo);
         expect(g.score, total);
+        if (i >= 9) expect(g.survival.notice, 'MAX COMBO  +300');
       }
       final score = g.score;
       g.step(1 / 120);
@@ -119,6 +120,18 @@ void main() {
       expect(g.survival.combo, 1);
     },
   );
+  test('extra x10 crystals grant exactly 300 even with gear and high pace', () {
+    final g = run();
+    g.maxHeight = 36000;
+    g.survival = InfiniteProgress(scoreBoost: 4.5)
+      ..combo = 10
+      ..points = 1000
+      ..scoredMetres = 3600;
+    pickup(g, InfiniteItemKind.combo);
+    expect(g.score, 1300);
+    expect(g.survival.combo, 10);
+    expect(g.survival.notice, 'MAX COMBO  +300');
+  });
   for (final kind in HazardKind.values) {
     test('shield blocks $kind and recovery remains independent', () {
       final g = run();
@@ -226,11 +239,21 @@ void main() {
       expect(g.ascentSpeed - before, lessThan(.01));
       g.maxHeight = 90000;
       expect(g.paceLevel, 5);
-      expect(g.ascentSpeed, 216);
+      expect(
+        g.ascentSpeed,
+        InfiniteTuning.startSpeed +
+            (InfiniteTuning.baseTopSpeed - InfiniteTuning.startSpeed) *
+                InfiniteDifficulty.speedGrowth +
+            InfiniteTuning.paceSpeedBonus * 4 * InfiniteDifficulty.paceGrowth,
+      );
       g.infiniteStartingPace = 3;
       g.start(gameMode: GameMode.infinite);
       expect(g.paceLevel, 3);
-      expect(g.ascentSpeed, 86);
+      expect(
+        g.ascentSpeed,
+        InfiniteTuning.startSpeed +
+            InfiniteTuning.paceSpeedBonus * 2 * InfiniteDifficulty.paceGrowth,
+      );
       g.survival.points = 100000;
       g.step(1 / 120);
       expect(g.specialHazards, isEmpty);
@@ -250,12 +273,17 @@ void main() {
           g.stallTime = 0;
           g.survival.shield = 100;
           g.step(1 / 120);
+          final spawned = g.survival.items
+              .where((item) => !seen.contains(item))
+              .toList();
           seen.addAll(g.survival.items);
           expect(
             g.survival.items.length,
             lessThanOrEqualTo(InfiniteTuning.maxItems),
           );
-          for (final item in g.survival.items) {
+          // Placement protects spawn positions; magnets may later pull rewards
+          // across holes on their way to the ball.
+          for (final item in spawned) {
             expect(item.x, inInclusiveRange(45, 315));
             expect(
               g.board.every(

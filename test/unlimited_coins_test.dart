@@ -49,6 +49,23 @@ void main() {
     );
   });
 
+  test(
+    '10,000 test coins are added once and spent purchases survive restart',
+    () async {
+      final profile = PlayerProfile(unlimitedCoins: false)..wallet = 42;
+      await profile.saveEconomy();
+      await profile.grantBallTestCoins();
+      expect(profile.wallet, 10042);
+      expect(profile.selectBall(BallCosmetic.singularity), isTrue);
+      await profile.saveEconomy();
+      final reloaded = PlayerProfile(unlimitedCoins: false);
+      await reloaded.load();
+      await reloaded.grantBallTestCoins();
+      expect(reloaded.wallet, 10042 - BallCosmetic.singularity.cost);
+      expect(reloaded.ownedBalls, contains(BallCosmetic.singularity));
+    },
+  );
+
   testWidgets('zero-wallet test shop enables buying platforms', (tester) async {
     final profile = PlayerProfile(unlimitedCoins: true);
     await tester.pumpWidget(

@@ -11,6 +11,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
@@ -46,6 +47,7 @@ Future<void> main() async {
   );
   final profile = PlayerProfile();
   await profile.load();
+  if (kDebugMode) await profile.grantBallTestCoins();
   final analytics = await AppAnalytics.initialize();
   runApp(ArcadeApp(profile: profile, analytics: analytics));
 }
@@ -839,6 +841,125 @@ class _GameScreenState extends State<GameScreen>
             final color = game.infinite
                 ? infiniteBoardInk(game, const Offset(110, 60))
                 : chromeInk;
+            if (game.infinite) {
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  final sideWidth = math.min(72.0, constraints.maxWidth * .25);
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: sideWidth,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: Semantics(
+                            key: const ValueKey('board-hearts'),
+                            label: '${game.lives} of 3 hearts remaining',
+                            excludeSemantics: true,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  for (var i = 0; i < 3; i++)
+                                    Icon(
+                                      i < game.lives
+                                          ? Icons.favorite_rounded
+                                          : Icons.favorite_border_rounded,
+                                      key: ValueKey('board-heart-$i'),
+                                      size: 20,
+                                      color: i < game.lives
+                                          ? const Color(0xFFEF6958)
+                                          : color.withAlpha(130),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: IgnorePointer(
+                          child: Column(
+                            key: const ValueKey('board-hud'),
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  '${game.score}',
+                                  key: const ValueKey('infinite-score'),
+                                  style: TextStyle(
+                                    color: color,
+                                    fontSize: 30,
+                                    height: 1.15,
+                                    fontWeight: FontWeight.w800,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                '${game.survival.combo}×${game.survival.combo == InfiniteTuning.maxCombo ? ' MAX' : ''}',
+                                style: TextStyle(
+                                  color: color,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              if (game.survival.noticeTime > 0)
+                                Text(
+                                  game.survival.notice,
+                                  key: const ValueKey('infinite-pickup-notice'),
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: color,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              if (game.survival.protected)
+                                Text(
+                                  game.survival.shield > 0
+                                      ? 'SHIELD ${game.survival.shield.ceil()}s'
+                                      : 'RECOVERY ${game.survival.recovery.ceil()}s',
+                                  key: const ValueKey('protection-status'),
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: color, fontSize: 10),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: sideWidth,
+                        child: Align(
+                          alignment: Alignment.topRight,
+                          child: IconButton.filledTonal(
+                            key: const ValueKey('board-pause'),
+                            tooltip: game.paused ? 'Resume' : 'Pause',
+                            onPressed: pause,
+                            style: IconButton.styleFrom(
+                              backgroundColor: color.withAlpha(24),
+                              foregroundColor: color,
+                            ),
+                            icon: Icon(
+                              game.paused
+                                  ? Icons.play_arrow_rounded
+                                  : Icons.pause_rounded,
+                              size: 22,
+                              color: color,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              );
+            }
             return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

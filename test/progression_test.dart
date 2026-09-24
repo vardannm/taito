@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/game.dart';
+import 'package:balance_arcade/infinite_progress.dart';
 import 'package:balance_arcade/levels.dart';
 import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/profile.dart';
@@ -174,7 +175,12 @@ void main() {
       expect(g.ascentSpeed, inInclusiveRange(previous, previous + .28));
       previous = g.ascentSpeed;
     }
-    expect(previous, 216);
+    expect(
+      previous,
+      68 +
+          112 * InfiniteDifficulty.speedGrowth +
+          36 * InfiniteDifficulty.paceGrowth,
+    );
     final a = BalanceGame(seed: 17)..start(gameMode: GameMode.infinite);
     final b = BalanceGame(seed: 17)..start(gameMode: GameMode.infinite);
     expect(a.board.map((h) => h.x), b.board.map((h) => h.x));

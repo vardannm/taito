@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 import 'infinite_progress.dart';
 
-/// Screen-space web shots stay dodgeable even as Infinite ascent accelerates.
+/// World-space web shots move independently of the camera and platform.
 /// Aim is fixed at launch; neither the warning nor the shot tracks the player.
 class SpiderWebShot {
   SpiderWebShot({

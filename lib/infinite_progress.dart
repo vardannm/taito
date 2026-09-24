@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'infinite_difficulty.dart';
 
 export 'infinite_difficulty.dart';
 
@@ -27,14 +28,23 @@ abstract final class InfiniteTuning {
   static const maxLives = 3, maxPace = 5, maxCombo = 10;
   static const shieldSeconds = 10.0, recoverySeconds = 2.5;
   static const magnetSeconds = 12.0, magnetRadius = 220.0;
+  static const magnetPullSpeed = 420.0;
   static const firstMagnetY = -450.0, magnetSpacing = 2800.0;
   // Infinite spiders and their aimed shots: fixed gentle speeds at every pace.
-  static const spiderChaseSpeed = 44.0, spiderChaseBonus = 3.0;
-  static const webSpeed = 90.0, webRadius = 5.0;
+  static const spiderChaseSpeed = InfiniteDifficulty.spiderSpeed,
+      spiderChaseBonus = 3.0;
+  static const webSpeed = InfiniteDifficulty.spiderBulletSpeed, webRadius = 5.0;
   static const webWarningSeconds = 1.0, webLifeSeconds = 4.0;
   static const webInterval = 3.5, maxWebShots = 2;
+  static const quillCount = 12, maxPorcupines = 2;
+  static const quillSpeed = 95.0, quillRadius = 3.0;
+  static const quillWarningSeconds = 1.1, quillLifeSeconds = 3.6;
+  static const quillInterval = 4.8, porcupineSpacing = 2200.0;
+  static const snakeUnlockMetres = 1200.0, snakeInterval = 18.0;
+  static const snakeSideSpeed = 65.0, snakeDownSpeed = 72.0;
   static const orbitRadius = 62.0, orbitPeriod = 5.5, orbitLifeSeconds = 6.0;
   static const metresPerPace = 600.0, comboPoints = 50;
+  static const maxComboPickupPoints = 300;
   static const firstComboY = 190.0, firstShieldY = -950.0;
   static const firstHeartY = -1650.0;
   static const comboSpacing = 280.0, shieldSpacing = 2400.0;
@@ -60,7 +70,7 @@ enum InfiniteItemKind { combo, shield, heart, magnet }
 class InfiniteItem {
   InfiniteItem(this.kind, this.x, this.y);
   final InfiniteItemKind kind;
-  final double x, y;
+  double x, y;
 }
 
 class InfiniteProgress {

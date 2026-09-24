@@ -18,10 +18,36 @@ BalanceGame cleanRun({BallCosmetic ball = BallCosmetic.steel}) {
 }
 
 void tick(BalanceGame g) => g.step(1 / 120);
+void pullFor(BalanceGame g, int ticks) {
+  for (var i = 0; i < ticks; i++) {
+    tick(g);
+  }
+}
 
 void main() {
+  test('pulling pauses in place and only contact activates a shield', () {
+    final g = cleanRun()..survival.magnet = 10;
+    final shield = InfiniteItem(
+      InfiniteItemKind.shield,
+      g.ballX + 150,
+      g.ballY,
+    );
+    g.survival.items.add(shield);
+    tick(g);
+    final at = (shield.x, shield.y);
+    expect(shield.x, lessThan(g.ballX + 150));
+    expect(g.survival.shield, 0);
+    g.setPaused(true);
+    pullFor(g, 120);
+    expect((shield.x, shield.y), at);
+    g.setPaused(false);
+    pullFor(g, 70);
+    expect(g.survival.items, isEmpty);
+    expect(g.survival.shield, greaterThan(0));
+  });
+
   test(
-    'magnet collects every reward kind in range once and leaves distant rewards',
+    'magnet visibly pulls every reward kind before collecting, leaving distant rewards',
     () {
       final g = cleanRun()..lives = 2;
       final far = BrassCoin(g.ballX, g.ballY - 300);
@@ -34,8 +60,17 @@ void main() {
       ]);
       tick(g);
       expect(g.survival.magnet, InfiniteTuning.magnetSeconds);
+      expect(g.survival.combo, 1);
+      expect(g.survival.shield, 0);
+      expect(g.lives, 2);
+      expect(g.coinsCollected, 0);
+      final beforeX = g.coins.first.x;
+      tick(g);
+      expect(g.coins.first.x, lessThan(beforeX));
+      expect(g.coins.first.collected, false);
+      pullFor(g, 70);
       expect(g.survival.combo, 2);
-      expect(g.survival.shield, InfiniteTuning.shieldSeconds);
+      expect(g.survival.shield, greaterThan(9));
       expect(g.lives, 3);
       expect(g.coinsCollected, 1);
       expect(far.collected, false);
@@ -59,6 +94,10 @@ void main() {
         InfiniteItem(InfiniteItemKind.magnet, g.ballX + 100, g.ballY),
       );
       tick(g);
+      expect(g.survival.magnet, lessThan(3));
+      for (var i = 0; i < 120 && g.survival.magnet < 4; i++) {
+        tick(g);
+      }
       expect(g.survival.magnet, 12);
       g.survival.magnet = .001;
       tick(g);
@@ -81,6 +120,9 @@ void main() {
         final far = BrassCoin(g.ballX + 120, g.ballY);
         g.coins.addAll([near, medium, far]);
         tick(g);
+        expect(near.collected, false);
+        expect(medium.collected, false);
+        pullFor(g, 60);
         expect(near.collected, ball.magnetRadius >= 30, reason: ball.name);
         expect(medium.collected, ball.magnetRadius >= 75, reason: ball.name);
         expect(far.collected, false, reason: ball.name);
@@ -105,7 +147,9 @@ void main() {
       g.dragPivot(0, -200);
       g.dragPivot(1, -200);
       tick(g);
-      expect(g.lives, magnetFirst ? 3 : 2);
+      expect(g.lives, 2);
+      expect(g.survival.shield, 0); // It must physically arrive first.
+      pullFor(g, 70);
       expect(g.survival.shield, greaterThan(0));
     });
   }
