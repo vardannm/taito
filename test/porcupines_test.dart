@@ -69,6 +69,19 @@ void main() {
     expect(p.charge, isNull);
   });
 
+  test('a warning near the bottom finishes after scrolling past 470', () {
+    final g = run();
+    g.survival.shield = 10;
+    final p = BoardPorcupine(85, 420);
+    g.porcupines.add(p);
+    g.step(1 / 120);
+    expect(p.charge, 0);
+    advance(g, InfiniteTuning.quillWarningSeconds + .02);
+    expect(g.screenY(p.y), greaterThan(470));
+    expect(p.bursts, 1);
+    expect(g.quills, isNotEmpty);
+  });
+
   test('bursts do not overlap web shots or special hazards', () {
     final g = run();
     final p = BoardPorcupine(85, 260);

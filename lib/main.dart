@@ -6,6 +6,7 @@ import 'club.dart';
 import 'control_options.dart';
 import 'infinite_painter.dart';
 import 'ball_shop.dart';
+import 'daily_prize_sheet.dart';
 import 'infinite_progress.dart';
 import 'dart:async';
 import 'dart:math' as math;
@@ -617,6 +618,17 @@ class _GameScreenState extends State<GameScreen>
         ),
       ),
     );
+  }
+
+  Future<void> showDailyPrizes() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: cream,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (_) => DailyPrizeSheet(profile: profile),
+    );
+    if (mounted) setState(() {});
   }
 
   Future<void> showBallShop() async {
@@ -1537,6 +1549,14 @@ class _GameScreenState extends State<GameScreen>
                   'GILT',
                   style: label().copyWith(letterSpacing: 5, fontSize: 13),
                 ),
+              ),
+            ),
+            IconButton.filledTonal(
+              tooltip: 'Daily prizes',
+              onPressed: carouselMoving ? null : showDailyPrizes,
+              icon: Badge(
+                isLabelVisible: profile.dailyPrizes.canClaim(DateTime.now()),
+                child: const Icon(Icons.redeem_rounded),
               ),
             ),
             if (tutorialActive &&

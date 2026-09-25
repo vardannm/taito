@@ -144,7 +144,9 @@ extension InfiniteGameplay on BalanceGame {
     }
     for (final p in porcupines) {
       final sy = screenY(p.y);
-      if (sy < visibleTop + 32 || sy > 470) {
+      // A committed warning may scroll below the attack-start zone before
+      // completing. Keep it alive until the enemy actually leaves the board.
+      if (sy < visibleTop + 32 || sy > BalanceGame.height + 30) {
         p.charge = null;
         continue;
       }
@@ -168,7 +170,14 @@ extension InfiniteGameplay on BalanceGame {
       final distance = math.sqrt(
         math.pow(p.x - ballX, 2) + math.pow(p.y - ballY, 2),
       );
-      if (sy < visibleTop + 32 || sy > 430 || distance < 85 || distance > 330)
+      final travelDuringWarning =
+          (tutorialCourse ? tutorialAscent : ascentSpeed) *
+          InfiniteTuning.quillWarningSeconds;
+      if (sy < visibleTop + 32 ||
+          sy > 430 ||
+          sy + travelDuringWarning > BalanceGame.height - 20 ||
+          distance < 85 ||
+          distance > 330)
         continue;
       p.charge = 0;
       break;

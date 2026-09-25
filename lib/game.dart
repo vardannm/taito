@@ -75,7 +75,12 @@ class BalanceGame {
 
   /// Modes whose camera follows the climb instead of holding the whole board.
   bool get scrolling => infinite || (maze && mazeRun.route!.tall);
-  double get minPivot => scrolling ? 40 - cameraOffset : 30.0;
+  // Infinite allows manual upward travel of 15% of the board from its start.
+  double get minPivot => infinite
+      ? infiniteStart - height * .25 - cameraOffset
+      : scrolling
+      ? 40 - cameraOffset
+      : 30.0;
   double get maxPivot => scrolling ? 526 - cameraOffset : 526.0;
   LaserMazeRun? _mazeRun;
   LaserMazeRun get mazeRun => _mazeRun ??= LaserMazeRun(1);
@@ -497,8 +502,7 @@ class BalanceGame {
     } else {
       stallTime += dt;
     }
-    // A manual climb may also move the camera; automatic ascent runs every tick.
-    cameraOffset = math.max(cameraOffset, 240 - ballY);
+    // Only automatic ascent moves the camera; manual lifts stop at minPivot.
     if (tutorialCourse) {
       dangerY = 640 - cameraOffset;
       return;

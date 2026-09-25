@@ -11,6 +11,7 @@ import 'levels.dart';
 import 'rewards.dart';
 import 'laser_maze.dart';
 import 'onboarding.dart';
+import 'daily_prizes.dart';
 
 class PlayerProfile {
   PlayerProfile({
@@ -26,6 +27,55 @@ class PlayerProfile {
   int best = 0, runs = 0;
   int infiniteBest = 0, infiniteRuns = 0, infiniteBestScore = 0;
   int wallet = 0;
+  DailyPrizes dailyPrizes = DailyPrizes();
+
+  BallCosmetic? get prizeBall {
+    final choices =
+        BallCosmetic.values.where((b) => !ownedBalls.contains(b)).toList()
+          ..sort((a, b) => a.cost.compareTo(b.cost));
+    return choices.firstOrNull;
+  }
+
+  PlatformStyle? get prizePlatform {
+    final choices =
+        PlatformStyle.values.where((p) => !ownedPlatforms.contains(p)).toList()
+          ..sort((a, b) => a.cost.compareTo(b.cost));
+    return choices.firstOrNull;
+  }
+
+  Future<String?> claimDailyPrize({
+    DateTime? now,
+    bool platform = false,
+  }) async {
+    final date = now ?? DateTime.now();
+    if (!dailyPrizes.canClaim(date)) return null;
+    final day = dailyPrizes.nextDay;
+    final String reward;
+    if (day < 5) {
+      final coins = DailyPrizes.coins[day - 1];
+      wallet += coins;
+      reward = '$coins coins';
+    } else {
+      final ball = prizeBall;
+      final rail = prizePlatform;
+      if (rail != null && (platform || ball == null)) {
+        ownedPlatforms.add(rail);
+        reward = '${rail.label} platform';
+      } else if (ball != null) {
+        ownedBalls.add(ball);
+        reward = '${ball.label} ball';
+      } else {
+        wallet += 100;
+        reward = '100 coins';
+      }
+    }
+    // Update before awaiting storage so rapid taps cannot claim twice.
+    dailyPrizes.claimed++;
+    dailyPrizes.lastClaim = DailyChallenge.day(date);
+    await saveEconomy();
+    return reward;
+  }
+
   bool _ballTestCreditApplied = false;
 
   /// One development credit, persisted with the balance so it cannot refill
@@ -85,6 +135,7 @@ class PlayerProfile {
     // Snapshot and serialize wallet transactions; an older save cannot undo a purchase.
     final data = jsonEncode({
       'wallet': wallet,
+      'dailyPrizes': dailyPrizes.toJson(),
       'ballTestCreditApplied': _ballTestCreditApplied,
       'owned': ownedBalls.map((b) => b.name).toList(),
       'selected': selectedBall.name,
@@ -107,6 +158,7 @@ class PlayerProfile {
     try {
       final data = jsonDecode(raw);
       if (data is! Map<String, dynamic>) return;
+      dailyPrizes = DailyPrizes.fromJson(data['dailyPrizes']);
       _ballTestCreditApplied = data['ballTestCreditApplied'] == true;
       if (data['wallet'] is int)
         wallet = (data['wallet'] as int).clamp(0, 1 << 30);

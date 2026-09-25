@@ -168,27 +168,50 @@ class BoardPainter extends CustomPainter {
       ink.withAlpha(9),
       weight: FontWeight.w900,
     );
+    final railTop = game.infinite ? game.screenY(game.minPivot) : top + 26;
     for (final x in [20.0, 340.0]) {
       canvas.drawLine(
-        Offset(x, top + 26),
+        Offset(x, railTop),
         Offset(x, 534),
         Paint()
           ..color = const Color(0xFF574A31)
           ..strokeWidth = 5,
       );
       canvas.drawLine(
-        Offset(x - 1, top + 26),
+        Offset(x - 1, railTop),
         Offset(x - 1, 534),
         Paint()
           ..color = const Color(0xFFEEE7CC)
           ..strokeWidth = 1,
       );
-      for (double y = top + 32; y < 530; y += 10) {
+      for (double y = railTop + 6; y < 530; y += 10) {
         canvas.drawLine(
           Offset(x == 20 ? 26 : 329, y),
           Offset(x == 20 ? 30 : 333, y),
           grain..color = ink.withAlpha(75),
         );
+      }
+      if (game.infinite) {
+        final stop = RRect.fromRectAndRadius(
+          Rect.fromLTRB(x - 9, railTop - 8, x + 9, railTop),
+          const Radius.circular(2),
+        );
+        canvas.drawRRect(stop.shift(const Offset(0, 2)), Paint()..color = ink);
+        canvas.drawRRect(stop, Paint()..color = brass);
+        canvas.drawLine(
+          Offset(x - 6, railTop - 6),
+          Offset(x + 6, railTop - 6),
+          Paint()
+            ..color = const Color(0xFFFFF2CE)
+            ..strokeWidth = 1,
+        );
+        for (final dx in [-5.0, 5.0]) {
+          canvas.drawCircle(
+            Offset(x + dx, railTop - 3),
+            1,
+            Paint()..color = ink,
+          );
+        }
       }
     }
     if (game.maze)

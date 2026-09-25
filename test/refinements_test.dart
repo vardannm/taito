@@ -127,7 +127,7 @@ void main() {
       g.dragPivot(0, -100);
       g.dragPivot(1, -100);
       g.step(1 / 120);
-      expect(g.cameraOffset, greaterThan(20));
+      expect(g.cameraOffset, lessThan(2));
       expect(h.worldY, y);
       expect(h.y - g.cameraOffset, closeTo(y!, 1e-6));
     },

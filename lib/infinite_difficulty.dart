@@ -33,5 +33,5 @@ abstract final class InfiniteDifficulty {
   static const spiderSpeed = 44.0;
 
   // Speed of the spider's web projectile. Default: 90.
-  static const spiderBulletSpeed = 90.0;
+  static const spiderBulletSpeed = 120.0;
 }

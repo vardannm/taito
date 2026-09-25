@@ -1,4 +1,5 @@
 import 'onboarding.dart';
+import 'daily_prizes.dart';
 import 'dart:convert';
 import 'game.dart';
 import 'profile.dart';
@@ -15,6 +16,7 @@ class ProgressBackup {
     'format': 'gilt-progress',
     'version': 1,
     'testEconomy': p.unlimitedCoins,
+    'dailyPrizes': p.dailyPrizes.toJson(),
     'createdAt': DateTime.now().toUtc().toIso8601String(),
     'counts': [
       p.best,
@@ -109,6 +111,7 @@ class ProgressBackup {
       ..sound = flag('sound')
       ..haptics = flag('haptics')
       ..tutorialSeen = flag('tutorial');
+    p.dailyPrizes = DailyPrizes.fromJson(d['dailyPrizes']);
     p.tutorial = d['onboarding'] is Map<String, dynamic>
         ? TutorialProgress.fromJson(d['onboarding'] as Map<String, dynamic>)
         : TutorialProgress(
@@ -210,6 +213,7 @@ class ProgressBackup {
       ..mergeRuns = source.mergeRuns
       ..mazeRuns = source.mazeRuns
       ..wallet = source.wallet
+      ..dailyPrizes = DailyPrizes.fromJson(source.dailyPrizes.toJson())
       ..controlMode = source.controlMode
       ..classicLevel = source.classicLevel
       ..mazeLevel = source.mazeLevel
