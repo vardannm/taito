@@ -18,7 +18,9 @@ void main() {
         InMemorySharedPreferencesAsync.empty(),
   );
   test('next goals follow completion, clean and time stars per control', () {
-    final p = PlayerProfile()..classicLevel = 5;
+    final p = PlayerProfile()
+      ..controlMode = ControlMode.twoFinger
+      ..classicLevel = 5;
     // Stars earned with another control unlock the recommended boards.
     for (var level = 1; level <= 4; level++) {
       p.levelRecords['analog:$level'] = const LevelRecord(starMask: 7);

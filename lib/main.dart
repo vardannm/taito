@@ -20,7 +20,8 @@ import 'game.dart';
 import 'levels.dart';
 import 'level_picker.dart';
 import 'profile.dart';
-import 'tutorial.dart';
+import 'onboarding.dart';
+import 'tutorial_spotlight.dart';
 import 'rewards.dart';
 import 'mastery_widgets.dart';
 import 'analog_controls.dart';
@@ -98,7 +99,44 @@ class _GameScreenState extends State<GameScreen>
   double accumulator = 0;
   bool recorded = false, newBest = false, briefing = false;
   List<CabinetStyle> newUnlocks = [];
-  late bool tutorialOpen;
+  TutorialRun? tutorialRun;
+  bool tutorialSheetOpen = false;
+  final tutorialShopKey = GlobalKey();
+  final tutorialLevelsKey = GlobalKey();
+  final tutorialDailyKey = GlobalKey();
+  final tutorialHeartsKey = GlobalKey();
+  final tutorialScoreKey = GlobalKey();
+  final tutorialCoinsKey = GlobalKey();
+  bool get tutorialActive => !profile.tutorialSeen && profile.tutorial.active;
+  TutorialStep get tutorialStep => profile.tutorial.step;
+
+  void tutorialChanged() {
+    unawaited(profile.saveTutorial());
+    if (mounted) setState(() {});
+  }
+
+  void advanceTutorial(TutorialStep step) {
+    profile.tutorial.step = step;
+    tutorialChanged();
+  }
+
+  void skipTutorial() {
+    unawaited(profile.completeTutorial());
+    game.endTutorialCourse();
+    tutorialRun = null;
+    setState(() {});
+  }
+
+  void replayTutorial() {
+    unawaited(profile.replayTutorial());
+    profile.controlMode = ControlMode.oneFinger;
+    unawaited(profile.save());
+    setState(() {
+      prepareInfinite();
+      entrance.value = 1;
+    });
+  }
+
   bool readyRetry = false;
   final carouselKey = GlobalKey<ModeCarouselState>();
   final boardKey = GlobalKey();
@@ -128,9 +166,21 @@ class _GameScreenState extends State<GameScreen>
           if (mounted) setState(() {});
         });
     ticker = createTicker(tick);
-    tutorialOpen = false;
-    prepareInfinite();
+    if (profile.tutorialSeen) profile.tutorial.step = TutorialStep.completed;
+    if (tutorialActive && tutorialStep == TutorialStep.shopBrowse) {
+      profile.tutorial.step = TutorialStep.levels;
+      unawaited(profile.saveTutorial());
+    }
+    if (tutorialActive && tutorialStep == TutorialStep.classicPlay) {
+      prepareWorld(1);
+    } else {
+      prepareInfinite();
+    }
+    if (tutorialActive &&
+        (tutorialStep.inInfinite || tutorialStep == TutorialStep.classicPlay))
+      entrance.value = 1;
     game.onInputStarted = () {
+      tutorialRun?.configure();
       analytics.startRun(game);
       if (game.mode == GameMode.classic) profile.classicLevel = game.level;
       if (game.mode == GameMode.laserMaze) profile.mazeLevel = game.level;
@@ -146,6 +196,21 @@ class _GameScreenState extends State<GameScreen>
     };
     WidgetsBinding.instance.addObserver(this);
     HardwareKeyboard.instance.addHandler(onKey);
+    if (tutorialActive &&
+        [
+          TutorialStep.shopBall,
+          TutorialStep.shopPlatform,
+          TutorialStep.level1,
+        ].contains(tutorialStep)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (tutorialStep == TutorialStep.level1) {
+          unawaited(selectLevel());
+        } else {
+          unawaited(showBallShop());
+        }
+      });
+    }
   }
 
   void runTicker() {
@@ -203,6 +268,7 @@ class _GameScreenState extends State<GameScreen>
         '${game.phase}/${game.target}/${game.lives}/${game.inputEpoch}/$recorded';
     while (accumulator >= 1 / 120) {
       game.step(1 / 120);
+      tutorialRun?.tick(1 / 120);
       accumulator -= 1 / 120;
     }
     if (game.lives < observedLives) spawnHeartLoss();
@@ -234,6 +300,13 @@ class _GameScreenState extends State<GameScreen>
         "score": game.score,
         "activeSeconds": game.elapsed,
       });
+      if (tutorialActive &&
+          tutorialStep == TutorialStep.classicPlay &&
+          game.mode == GameMode.classic &&
+          game.level == 1 &&
+          game.won) {
+        advanceTutorial(TutorialStep.dailyChallenge);
+      }
       if (!game.practice) {
         final locked = CabinetStyle.values
             .where((c) => !profile.isUnlocked(c))
@@ -288,7 +361,10 @@ class _GameScreenState extends State<GameScreen>
   }
 
   bool onKey(KeyEvent event) {
-    if (tutorialOpen ||
+    if ((tutorialActive &&
+            game.waitingForInput &&
+            !tutorialStep.inInfinite &&
+            tutorialStep != TutorialStep.classicPlay) ||
         returning ||
         carouselMoving ||
         ModalRoute.of(context)?.isCurrent != true)
@@ -372,7 +448,12 @@ class _GameScreenState extends State<GameScreen>
           ? profile.mazeLevel
           : profile.classicLevel,
       challengeDate: challengeDate,
+      waitForInput:
+          tutorialActive &&
+          tutorialStep == TutorialStep.classicPlay &&
+          mode == GameMode.classic,
     );
+    tutorialRun = null;
     briefing = game.finale;
     analytics.selectMode(game.mode);
     analytics.startRun(game);
@@ -382,32 +463,54 @@ class _GameScreenState extends State<GameScreen>
     enterWorld();
     syncMusic();
   });
-  Future<void> selectLevel() => showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: cream,
-    showDragHandle: true,
-    isScrollControlled: true,
-    builder: (context) => SizedBox(
-      height: MediaQuery.sizeOf(context).height * .84,
-      child: SafeArea(
-        child: LevelPicker(
-          selected: profile.classicLevel,
-          totalStars: profile.totalStars,
-          records: {
-            for (var i = 1; i <= ClassicLevels.count; i++)
-              i: profile.levelRecord(i),
-          },
-          controlLabel: profile.controlMode.label,
-          onSelected: (number) {
-            if (!profile.selectClassicLevel(number)) return;
-            unawaited(profile.save());
-            Navigator.pop(context);
-            start(GameMode.classic);
-          },
+  Future<void> selectLevel() async {
+    setState(() => tutorialSheetOpen = true);
+    if (tutorialActive && tutorialStep == TutorialStep.levels)
+      advanceTutorial(TutorialStep.level1);
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: cream,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => SizedBox(
+        height: MediaQuery.sizeOf(context).height * .84,
+        child: SafeArea(
+          child: LevelPicker(
+            tutorial:
+                tutorialActive &&
+                [
+                  TutorialStep.level1,
+                  TutorialStep.classicPlay,
+                ].contains(tutorialStep),
+            onSkipTutorial: skipTutorial,
+            selected: profile.classicLevel,
+            totalStars: profile.totalStars,
+            records: {
+              for (var i = 1; i <= ClassicLevels.count; i++)
+                i: profile.levelRecord(i),
+            },
+            controlLabel: profile.controlMode.label,
+            onSelected: (number) {
+              if (!profile.selectClassicLevel(number)) return;
+              if (tutorialActive &&
+                  [
+                    TutorialStep.level1,
+                    TutorialStep.classicPlay,
+                  ].contains(tutorialStep) &&
+                  number == 1) {
+                advanceTutorial(TutorialStep.classicPlay);
+              }
+              unawaited(profile.save());
+              Navigator.pop(context);
+              start(GameMode.classic);
+            },
+          ),
         ),
       ),
-    ),
-  );
+    );
+    if (mounted) setState(() => tutorialSheetOpen = false);
+  }
+
   Future<void> selectMaze() => showModalBottomSheet<void>(
     context: context,
     backgroundColor: cream,
@@ -517,6 +620,9 @@ class _GameScreenState extends State<GameScreen>
   }
 
   Future<void> showBallShop() async {
+    setState(() => tutorialSheetOpen = true);
+    if (tutorialActive && tutorialStep == TutorialStep.shop)
+      advanceTutorial(TutorialStep.shopBall);
     analytics.openShop(game.mode);
     await showModalBottomSheet<void>(
       context: context,
@@ -525,11 +631,18 @@ class _GameScreenState extends State<GameScreen>
       backgroundColor: cream,
       builder: (_) => FractionallySizedBox(
         heightFactor: .85,
-        child: BallShop(profile: profile),
+        child: BallShop(
+          profile: profile,
+          onTutorialChanged: tutorialChanged,
+          onSkipTutorial: skipTutorial,
+        ),
       ),
     );
     if (mounted)
       setState(() {
+        tutorialSheetOpen = false;
+        if (tutorialActive && tutorialStep == TutorialStep.shopBrowse)
+          advanceTutorial(TutorialStep.levels);
         game.cosmetic = profile.selectedBall;
         game.platformStyle = profile.selectedPlatform;
         game.cabinet = profile.cabinet;
@@ -545,8 +658,7 @@ class _GameScreenState extends State<GameScreen>
         (game.infinite || game.merging) &&
         profile.music &&
         game.started &&
-        !game.finished &&
-        !tutorialOpen;
+        !game.finished;
     unawaited(
       feedback.updateMusic(
         track: wants ? themeTrack : null,
@@ -579,7 +691,10 @@ class _GameScreenState extends State<GameScreen>
   }
 
   int worldLevel(int index) => switch (arcadeModes[index]) {
-    GameMode.classic => classicContinueLevel,
+    GameMode.classic =>
+      tutorialActive && tutorialStep == TutorialStep.classicPlay
+          ? 1
+          : classicContinueLevel,
     GameMode.laserMaze => profile.mazeLevel.clamp(1, LaserMazeRoute.count),
     _ => 1,
   };
@@ -612,6 +727,10 @@ class _GameScreenState extends State<GameScreen>
       levelNumber: worldLevel(index),
       waitForInput: true,
     );
+    tutorialRun = tutorialActive && tutorialStep.inInfinite && game.infinite
+        ? TutorialRun(game, profile.tutorial, tutorialChanged)
+        : null;
+    tutorialRun?.configure();
     observedLives = game.lives;
     syncMusic();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -662,6 +781,7 @@ class _GameScreenState extends State<GameScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed && game.started && !game.finished) {
+      unawaited(profile.saveTutorial());
       if (game.waitingForInput) {
         clearControls();
         return;
@@ -679,6 +799,7 @@ class _GameScreenState extends State<GameScreen>
   void dispose() {
     game.onInputStarted = null;
     profile.bankCoins(game);
+    unawaited(profile.saveTutorial());
     WidgetsBinding.instance.removeObserver(this);
     HardwareKeyboard.instance.removeHandler(onKey);
     unawaited(feedback.updateMusic(track: null, playing: false));
@@ -704,34 +825,152 @@ class _GameScreenState extends State<GameScreen>
   );
 
   @override
-  Widget build(BuildContext context) {
-    if (tutorialOpen) {
-      return FirstPlayTutorial(
-        control: profile.controlMode,
-        onLessonComplete: (step) => playtest.record("tutorial_step", {
-          "step": step,
-          "control": profile.controlMode.name,
-        }),
-        onExit: (completed) => playtest.record(
-          completed ? "tutorial_completed" : "tutorial_skipped",
-        ),
-        analogSensitivity: profile.analogSensitivity,
-        twoFingerSensitivity: profile.twoFingerSensitivity,
-        onControlChanged: (mode) {
-          playtest.record("tutorial_control_changed", {"control": mode.name});
-          profile.controlMode = mode;
-          unawaited(profile.save());
-        },
-        onDone: () {
-          unawaited(profile.completeTutorial());
-          setState(() {
-            tutorialOpen = false;
-            prepareInfinite();
-          });
-        },
-      );
-    }
-    return playScreen(context);
+  Widget build(BuildContext context) => playScreen(context);
+
+  Widget? tutorialOverlay() {
+    if (!tutorialActive ||
+        tutorialSheetOpen ||
+        returning ||
+        game.paused ||
+        game.finished)
+      return null;
+    final step = tutorialStep;
+    final guidedPlay = step.scripted && game.infinite;
+    final objective =
+        step == TutorialStep.classicPlay &&
+        game.mode == GameMode.classic &&
+        game.waitingForInput;
+    final menu =
+        game.waitingForInput && entrance.isDismissed && !step.inInfinite;
+    if (!guidedPlay && !objective && !menu) return null;
+    if (step == TutorialStep.freePlay) return null;
+    final message = switch (step) {
+      TutorialStep.controls => 'Drag to control the platform.',
+      TutorialStep.heartsHoles => 'Avoid holes. A fall costs 1 heart.',
+      TutorialStep.heartsFeedback =>
+        game.misses > 0
+            ? 'One heart lost. Keep going.'
+            : 'Keep going. Protect your hearts.',
+      TutorialStep.coins => 'Collect coins.',
+      TutorialStep.coinsFeedback => 'Coin saved. Spend it later.',
+      TutorialStep.shield => 'Shield protects you from danger.',
+      TutorialStep.shieldFeedback => 'Protected! Watch the blue ring.',
+      TutorialStep.metrics => 'Climb higher. Grow your score.',
+      TutorialStep.combo => 'Collect the gold crystal.',
+      TutorialStep.comboFeedback => 'Collect crystals to grow your Combo.',
+      TutorialStep.shop ||
+      TutorialStep.shopBall ||
+      TutorialStep.shopPlatform ||
+      TutorialStep.shopBrowse => 'Spend your coins and customize your game.',
+      TutorialStep.levels => 'There are more ways to play. Open Levels.',
+      TutorialStep.level1 => 'Open Levels, then choose Level 1.',
+      TutorialStep.classicPlay =>
+        'Reach glowing holes in order, 1–10. Avoid dark holes. Drag to begin.',
+      TutorialStep.dailyChallenge =>
+        'Daily Challenge: a new board each day. Earn stars and beat your best.',
+      _ => '',
+    };
+    return TutorialSpotlight(
+      key: const ValueKey('onboarding-spotlight'),
+      message: message,
+      onSkip: skipTutorial,
+      listenable: frame,
+      blockOutside: menu && !objective,
+      bottomInset: guidedPlay || objective ? OneFingerControls.height + 12 : 16,
+      messageTop: guidedPlay || objective
+          ? MediaQuery.paddingOf(context).top + 118
+          : null,
+      targets: (layer) {
+        final result = <Rect>[];
+        void ui(GlobalKey key) {
+          final r = tutorialTarget(key, layer);
+          if (r != null) result.add(r);
+        }
+
+        final board = boardKey.currentContext?.findRenderObject() as RenderBox?;
+        void worldPoint(double x, double y, [double radius = 22]) {
+          if (board == null || !board.hasSize) return;
+          final viewport = BoardViewport.forGame(
+            Size(
+              board.size.width,
+              math.max(
+                1,
+                board.size.height -
+                    (game.oneFinger ? OneFingerControls.height : 0),
+              ),
+            ),
+            game,
+            fillWidth: expansion,
+          );
+          final point = layer.globalToLocal(
+            board.localToGlobal(viewport.project(Offset(x, game.screenY(y)))),
+          );
+          result.add(
+            Rect.fromCircle(center: point, radius: radius * viewport.scale),
+          );
+        }
+
+        void controls() {
+          if (game.analog) {
+            ui(analogKey);
+            return;
+          }
+          if (board == null || !board.hasSize) return;
+          if (game.oneFinger) {
+            final top = layer.globalToLocal(
+              board.localToGlobal(
+                Offset(12, board.size.height - OneFingerControls.height + 10),
+              ),
+            );
+            result.add(
+              top & Size(board.size.width - 24, OneFingerControls.height - 20),
+            );
+          } else {
+            worldPoint(20, game.left, 28);
+            worldPoint(340, game.right, 28);
+          }
+        }
+
+        if (objective) {
+          worldPoint(game.activeHole.x, game.activeHole.y);
+          controls();
+        } else if (menu) {
+          ui(
+            step.inShop
+                ? tutorialShopKey
+                : step == TutorialStep.dailyChallenge
+                ? tutorialDailyKey
+                : tutorialLevelsKey,
+          );
+        } else {
+          switch (step) {
+            case TutorialStep.controls:
+              controls();
+            case TutorialStep.heartsHoles:
+              if (tutorialRun?.hole case final hole?)
+                worldPoint(hole.x, hole.y);
+              ui(tutorialHeartsKey);
+            case TutorialStep.heartsFeedback:
+              ui(tutorialHeartsKey);
+            case TutorialStep.coins:
+              if (tutorialRun?.coin case final coin?)
+                worldPoint(coin.x, coin.y);
+            case TutorialStep.coinsFeedback:
+              ui(tutorialCoinsKey);
+            case TutorialStep.shield || TutorialStep.combo:
+              if (tutorialRun?.pickup case final item?)
+                worldPoint(item.x, item.y);
+            case TutorialStep.shieldFeedback:
+              worldPoint(game.ballX, game.ballY, 28);
+            case TutorialStep.metrics || TutorialStep.comboFeedback:
+              ui(tutorialScoreKey);
+            default:
+              break;
+          }
+        }
+        return result;
+      },
+    );
   }
 
   Future<void> showModes() => showModalBottomSheet<void>(
@@ -779,7 +1018,11 @@ class _GameScreenState extends State<GameScreen>
   );
 
   Widget boardChrome() {
-    if (game.waitingForInput) {
+    if (tutorialActive &&
+        tutorialStep == TutorialStep.classicPlay &&
+        game.waitingForInput)
+      return const SizedBox();
+    if (game.waitingForInput && !(tutorialActive && tutorialStep.inInfinite)) {
       if (game.mode != GameMode.classic && !game.maze) return const SizedBox();
       return Center(
         child: Padding(
@@ -849,6 +1092,7 @@ class _GameScreenState extends State<GameScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SizedBox(
+                        key: tutorialHeartsKey,
                         width: sideWidth,
                         child: Padding(
                           padding: const EdgeInsets.only(top: 10),
@@ -881,6 +1125,7 @@ class _GameScreenState extends State<GameScreen>
                       ),
                       Expanded(
                         child: IgnorePointer(
+                          key: tutorialScoreKey,
                           child: Column(
                             key: const ValueKey('board-hud'),
                             mainAxisSize: MainAxisSize.min,
@@ -1149,7 +1394,8 @@ class _GameScreenState extends State<GameScreen>
   };
 
   bool acceptsWorldSwipe(Offset global) {
-    if (!game.waitingForInput ||
+    if (tutorialActive ||
+        !game.waitingForInput ||
         returning ||
         !entrance.isDismissed ||
         carouselMoving ||
@@ -1255,6 +1501,7 @@ class _GameScreenState extends State<GameScreen>
     child: Tooltip(
       message: 'Gear shop',
       child: Material(
+        key: tutorialShopKey,
         color: cream,
         shape: CircleBorder(side: BorderSide(color: ink.withAlpha(40))),
         elevation: 3,
@@ -1282,11 +1529,43 @@ class _GameScreenState extends State<GameScreen>
       children: [
         Row(
           children: [
-            Text(
-              'GILT',
-              style: label().copyWith(letterSpacing: 5, fontSize: 13),
+            Expanded(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'GILT',
+                  style: label().copyWith(letterSpacing: 5, fontSize: 13),
+                ),
+              ),
             ),
-            const Spacer(),
+            if (tutorialActive &&
+                game.waitingForInput &&
+                !returning &&
+                [
+                  TutorialStep.levels,
+                  TutorialStep.level1,
+                  TutorialStep.classicPlay,
+                ].contains(tutorialStep))
+              IconButton.filledTonal(
+                key: tutorialLevelsKey,
+                tooltip: 'Classic levels',
+                onPressed: selectLevel,
+                icon: const Icon(Icons.grid_view_rounded),
+              ),
+            if (tutorialActive &&
+                game.waitingForInput &&
+                !returning &&
+                tutorialStep == TutorialStep.dailyChallenge)
+              IconButton.filledTonal(
+                key: tutorialDailyKey,
+                tooltip: 'Daily Challenge',
+                onPressed: () {
+                  skipTutorial();
+                  showDaily();
+                },
+                icon: const Icon(Icons.today_outlined),
+              ),
             if (game.waitingForInput && !returning) ...[
               shopButton(),
               const SizedBox(width: 8),
@@ -1402,7 +1681,11 @@ class _GameScreenState extends State<GameScreen>
     body: ModeCarousel(
       key: carouselKey,
       selected: selectedMode,
-      locked: !game.waitingForInput || returning || !entrance.isDismissed,
+      locked:
+          tutorialActive ||
+          !game.waitingForInput ||
+          returning ||
+          !entrance.isDismissed,
       expansion: expansion,
       controlInset: game.oneFinger ? OneFingerControls.height : 0,
       acceptSwipe: acceptsWorldSwipe,
@@ -1546,6 +1829,54 @@ class _GameScreenState extends State<GameScreen>
                     child: boardOverlay(),
                   ),
                 ),
+              if (game.infinite && !game.waitingForInput ||
+                  tutorialActive && tutorialStep.inInfinite)
+                Positioned(
+                  top: MediaQuery.paddingOf(context).top + 70,
+                  right: 24,
+                  child: IgnorePointer(
+                    child: AnimatedBuilder(
+                      animation: hud,
+                      builder: (context, _) => Container(
+                        key: tutorialCoinsKey,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: cream.withAlpha(220),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.toll, size: 15, color: orange),
+                            const SizedBox(width: 4),
+                            AnimatedSwitcher(
+                              key: const ValueKey('run-coins'),
+                              duration: MediaQuery.disableAnimationsOf(context)
+                                  ? Duration.zero
+                                  : const Duration(milliseconds: 260),
+                              transitionBuilder: (child, animation) =>
+                                  ScaleTransition(
+                                    scale: animation,
+                                    child: child,
+                                  ),
+                              child: Text(
+                                '${profile.wallet}',
+                                key: ValueKey(profile.wallet),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: ink,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               IgnorePointer(
                 child: RepaintBoundary(
                   key: effectsKey,
@@ -1558,6 +1889,7 @@ class _GameScreenState extends State<GameScreen>
                   ),
                 ),
               ),
+              if (tutorialOverlay() case final overlay?) overlay,
             ],
           ),
         );
@@ -1800,6 +2132,11 @@ class _GameScreenState extends State<GameScreen>
                             start(game.mode, challengeDate: game.dailyDate),
                         child: Text('RESTART RUN', style: label(brass)),
                       ),
+                    if (tutorialActive)
+                      TextButton(
+                        onPressed: skipTutorial,
+                        child: const Text('Skip Tutorial'),
+                      ),
                     TextButton(
                       onPressed: home,
                       child: Text(
@@ -1898,12 +2235,9 @@ class _GameScreenState extends State<GameScreen>
               TextButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  playtest.record("tutorial_started", {
-                    "control": profile.controlMode.name,
-                  });
-                  setState(() => tutorialOpen = true);
+                  replayTutorial();
                 },
-                child: const Text('REPLAY QUICK TUTORIAL'),
+                child: const Text('Replay Tutorial'),
               ),
             ],
           ),
@@ -1983,6 +2317,15 @@ class _GameScreenState extends State<GameScreen>
                 const Text(
                   'Make yourself at home.',
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+                ),
+                TextButton.icon(
+                  key: const ValueKey('replay-tutorial'),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    replayTutorial();
+                  },
+                  icon: const Icon(Icons.school_outlined),
+                  label: const Text('Replay Tutorial'),
                 ),
                 const SizedBox(height: 14),
                 ControlOptions(

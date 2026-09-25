@@ -56,7 +56,8 @@ void main() {
           expect(game.runSerial, run);
           expect(game.screenY(game.left), closeTo(left, .001));
           expect(game.screenY(game.right), closeTo(right, .001));
-          expect(game.ballX, closeTo(x, .1));
+          // The ball keeps rolling while feedback plays, including with stronger gravity.
+          expect(game.ballX, closeTo(x, game.velocity.abs() * .02 + .02));
           expect(game.controlPosition, tilt);
           expectOwned(game);
           if (second != null) expect(game.pivotTargets[1], isNotNull);

@@ -370,7 +370,7 @@ void paintInfiniteMagnet(Canvas c, BalanceGame game, bool reducedMotion) {
   final radius = game.magnetRadius;
   c.save();
   c.clipRect(Rect.fromLTRB(20, game.visibleTop, 340, 574));
-  c.drawCircle(p, radius, Paint()..color = tint.withAlpha(12));
+  c.drawCircle(p, radius, Paint()..color = tint.withValues(alpha: 12 / 255 * 1.15));
   c.drawCircle(
     p,
     radius,

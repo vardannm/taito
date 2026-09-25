@@ -364,7 +364,7 @@ void main() {
         InMemorySharedPreferencesAsync.empty();
     final p = PlayerProfile();
     await p.load();
-    expect(p.controlMode, ControlMode.twoFinger);
+    expect(p.controlMode, ControlMode.oneFinger);
     p.controlMode = ControlMode.oneFinger;
     p.classicLevel = 26;
     await p.save();

@@ -9,9 +9,9 @@ import 'game_test.dart' show placeAt, advance;
 
 void main() {
   test(
-    'all boards scatter targets, change vertical direction and remain deterministic',
+    'boards after the introductory level scatter targets and remain deterministic',
     () {
-      for (var n = 1; n <= ClassicLevels.count; n++) {
+      for (var n = 2; n <= ClassicLevels.count; n++) {
         final a = ClassicLevels.build(n), b = ClassicLevels.build(n);
         final targets = a.where((h) => h.target > 0).toList();
         expect(targets.length, 10);

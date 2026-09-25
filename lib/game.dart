@@ -229,6 +229,23 @@ class BalanceGame {
   final snakes = <BoardSnake>[];
   // Like mazeSectionsEnabled, lets callers isolate the ordinary hazard stream.
   bool snakeEncountersEnabled = true;
+  // Only the guided opening replaces generation; contacts and controls remain real.
+  bool tutorialCourse = false;
+  double tutorialAscent = 30;
+
+  void endTutorialCourse() {
+    if (!tutorialCourse) return;
+    tutorialCourse = false;
+    _nextRowY = ballY - 220;
+    _nextCoinY = ballY - 140;
+    survival.nextComboY = ballY - 300;
+    survival.nextShieldY = ballY - 600;
+    survival.nextHeartY = ballY - 1200;
+    survival.nextMagnetY = ballY - 800;
+    stallTime = 0;
+    dangerY = math.max(dangerY, ballY + 120);
+  }
+
   double _nextSnakeTime = 0;
   double _nextPorcupineY = -2700, _nextQuillTime = 0;
   double cameraOffset = 0, maxHeight = 0, stallTime = 0, dangerY = 580;
@@ -238,7 +255,7 @@ class BalanceGame {
   /// Generate in world coordinates once, then prune below the camera. Coins
   /// remain separate from height so collecting them cannot inflate metres.
   void ensureEndlessExtras({bool retainForSweep = false}) {
-    if (!infinite) return;
+    if (!infinite || tutorialCourse) return;
     final ahead = -cameraOffset - 100;
     while (_nextCoinY >= ahead) {
       final y = _nextCoinY;
@@ -400,11 +417,11 @@ class BalanceGame {
       : _classicBoard;
   int get roundCompleted => completed;
   double screenY(double worldY) => worldY + (scrolling ? cameraOffset : 0);
-  bool get dangerActive => infinite && stallTime >= 3;
+  bool get dangerActive => infinite && !tutorialCourse && stallTime >= 3;
   double get dangerDistance => dangerY - ballY;
 
   void ensureInfiniteBoard({bool retainForSweep = false}) {
-    if (!infinite) return;
+    if (!infinite || tutorialCourse) return;
     while (_nextRowY >= -cameraOffset + visibleTop - 120) {
       final growth = InfiniteTuning.runDensity(score, maxHeight / 10);
       final d = growth * InfiniteDifficulty.obstacleDensity;
@@ -482,6 +499,10 @@ class BalanceGame {
     }
     // A manual climb may also move the camera; automatic ascent runs every tick.
     cameraOffset = math.max(cameraOffset, 240 - ballY);
+    if (tutorialCourse) {
+      dangerY = 640 - cameraOffset;
+      return;
+    }
     dangerY = math.min(dangerY, 580 - cameraOffset);
     if (dangerActive) dangerY -= (24 + math.min(stallTime - 3, 5) * 16) * dt;
     message = dangerActive
@@ -679,6 +700,7 @@ class BalanceGame {
     bool waitForInput = false,
   }) {
     runSerial++;
+    tutorialCourse = false;
     mode = gameMode;
     // Every generated mode holds the baked carousel layout while it waits, so
     // swiping back shows the same starting position instead of a new draw.
@@ -868,7 +890,7 @@ class BalanceGame {
       // Translate the platform and camera equally: grips stay under the fingers
       // while stationary world hazards approach from above. Keep the old world
       // ball position for swept collision against those approaching hazards.
-      final travel = ascentSpeed * dt;
+      final travel = (tutorialCourse ? tutorialAscent : ascentSpeed) * dt;
       cameraOffset += travel;
       left -= travel;
       right -= travel;
@@ -943,7 +965,7 @@ class BalanceGame {
     }
     // A rolling sphere: 5/7 of gravity projected onto the bar, then onto x.
     final slope = (right - left) / 320;
-    velocity += (5 / 7) * 1300 * slope / (1 + slope * slope) * dt;
+    velocity += (6 / 7) * 1300 * slope / (1 + slope * slope) * dt;
     velocity *= math.exp(-.48 * dt);
     velocity = velocity.clamp(-265.0, 265.0);
     ballX += velocity * dt;
@@ -1019,8 +1041,10 @@ class BalanceGame {
       return;
     }
     if (infinite) {
-      _updateSnakes(dt);
-      _updateSpecialHazards(dt);
+      if (!tutorialCourse) {
+        _updateSnakes(dt);
+        _updateSpecialHazards(dt);
+      }
       _resolveInfiniteContacts(oldX, oldY, oldScreenY, dt);
       // Discard only after the entire swept movement has been resolved.
       _endlessHoles.removeWhere((h) => screenY(h.y) > 620);

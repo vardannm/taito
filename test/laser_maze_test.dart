@@ -267,50 +267,48 @@ void main() {
     }
   });
 
-  test(
-    'maze records persist per route and control',
-    () async {
-      final p = PlayerProfile()
-        ..classicLevel = 31
-        ..mazeLevel = 7;
-      final g = BalanceGame()
-        ..start(gameMode: GameMode.laserMaze, levelNumber: 7);
-      g.elapsed = 12;
-      finishMaze(g);
-      expect(p.recordResult(g), true);
-      final first = p.mazeBestTime(7)!;
-      expect(p.recordResult(g), false);
-      expect(p.mazeRuns, 1);
-      g.start(gameMode: GameMode.laserMaze, levelNumber: 7);
-      g.elapsed = 18;
-      finishMaze(g);
-      expect(p.recordResult(g), false);
-      expect(p.mazeBestTime(7), first);
-      g.setControlMode(ControlMode.analog);
-      g.start(gameMode: GameMode.laserMaze, levelNumber: 7);
-      g.elapsed = 8;
-      finishMaze(g);
-      expect(p.recordResult(g), true);
-      expect(p.mazeBestTime(7, ControlMode.twoFinger), first);
-      expect(p.mazeBestTime(7, ControlMode.analog), lessThan(first));
-      expect(p.mazeRuns, 3);
-      expect(p.best, 0);
-      expect(p.runs, 0);
-      expect(p.mergeRuns, 0);
-      expect(p.totalStars, 0);
-      await p.save();
-      final restored = PlayerProfile();
-      await restored.load();
-      expect(restored.classicLevel, 31);
-      expect(restored.mazeLevel, 7);
-      expect(restored.mazeRuns, 3);
-      expect(restored.mazeBestTime(7), p.mazeBestTime(7));
-      expect(
-        restored.mazeBestTime(7, ControlMode.analog),
-        p.mazeBestTime(7, ControlMode.analog),
-      );
-    },
-  );
+  test('maze records persist per route and control', () async {
+    final p = PlayerProfile()
+      ..controlMode = ControlMode.twoFinger
+      ..classicLevel = 31
+      ..mazeLevel = 7;
+    final g = BalanceGame()
+      ..start(gameMode: GameMode.laserMaze, levelNumber: 7);
+    g.elapsed = 12;
+    finishMaze(g);
+    expect(p.recordResult(g), true);
+    final first = p.mazeBestTime(7)!;
+    expect(p.recordResult(g), false);
+    expect(p.mazeRuns, 1);
+    g.start(gameMode: GameMode.laserMaze, levelNumber: 7);
+    g.elapsed = 18;
+    finishMaze(g);
+    expect(p.recordResult(g), false);
+    expect(p.mazeBestTime(7), first);
+    g.setControlMode(ControlMode.analog);
+    g.start(gameMode: GameMode.laserMaze, levelNumber: 7);
+    g.elapsed = 8;
+    finishMaze(g);
+    expect(p.recordResult(g), true);
+    expect(p.mazeBestTime(7, ControlMode.twoFinger), first);
+    expect(p.mazeBestTime(7, ControlMode.analog), lessThan(first));
+    expect(p.mazeRuns, 3);
+    expect(p.best, 0);
+    expect(p.runs, 0);
+    expect(p.mergeRuns, 0);
+    expect(p.totalStars, 0);
+    await p.save();
+    final restored = PlayerProfile();
+    await restored.load();
+    expect(restored.classicLevel, 31);
+    expect(restored.mazeLevel, 7);
+    expect(restored.mazeRuns, 3);
+    expect(restored.mazeBestTime(7), p.mazeBestTime(7));
+    expect(
+      restored.mazeBestTime(7, ControlMode.analog),
+      p.mazeBestTime(7, ControlMode.analog),
+    );
+  });
 
   test('lost routes count an attempt without earning a completion time', () {
     final p = PlayerProfile();

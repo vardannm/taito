@@ -1,3 +1,4 @@
+import 'onboarding.dart';
 import 'dart:convert';
 import 'game.dart';
 import 'profile.dart';
@@ -37,6 +38,11 @@ class ProgressBackup {
     'sound': p.sound,
     'haptics': p.haptics,
     'tutorial': p.tutorialSeen,
+    'onboarding':
+        (p.tutorialSeen
+                ? TutorialProgress(step: TutorialStep.completed)
+                : p.tutorial)
+            .toJson(),
     'sensitivity': [p.analogSensitivity, p.twoFingerSensitivity],
     'cabinet': p.cabinet.name,
     'balls': p.ownedBalls.map((e) => e.name).toList(),
@@ -103,6 +109,14 @@ class ProgressBackup {
       ..sound = flag('sound')
       ..haptics = flag('haptics')
       ..tutorialSeen = flag('tutorial');
+    p.tutorial = d['onboarding'] is Map<String, dynamic>
+        ? TutorialProgress.fromJson(d['onboarding'] as Map<String, dynamic>)
+        : TutorialProgress(
+            step: p.tutorialSeen
+                ? TutorialStep.completed
+                : TutorialStep.controls,
+          );
+    p.tutorialSeen = !p.tutorial.active;
     if (p.classicLevel < 1 || p.mazeLevel < 1 || p.mergeHighest < 2) invalid();
     final sensitivity = d['sensitivity'];
     if (sensitivity is! List ||
@@ -202,6 +216,7 @@ class ProgressBackup {
       ..sound = source.sound
       ..haptics = source.haptics
       ..tutorialSeen = source.tutorialSeen
+      ..tutorial = TutorialProgress.fromJson(source.tutorial.toJson())
       ..analogSensitivity = source.analogSensitivity
       ..twoFingerSensitivity = source.twoFingerSensitivity
       ..cabinet = source.cabinet
@@ -223,6 +238,7 @@ class ProgressBackup {
       ..clear()
       ..addAll(source.ownedPlatforms);
     await target.save();
+    await target.saveTutorial();
     await target.storage.setBool('gilt.tutorial.v1.seen', target.tutorialSeen);
     if (!target.available)
       throw StateError(

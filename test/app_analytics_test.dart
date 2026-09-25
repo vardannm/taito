@@ -79,6 +79,7 @@ void main() {
       await tester.pumpWidget(
         ArcadeApp(
           profile: PlayerProfile()
+            ..tutorialSeen = true
             ..sound = false
             ..haptics = false,
           analytics: AppAnalytics(send: (name, _) async => events.add(name)),

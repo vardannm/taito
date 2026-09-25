@@ -41,7 +41,11 @@ class _ControlOptionsState extends State<ControlOptions>
   @override
   Widget build(BuildContext context) => Column(
     children: [
-      for (final mode in ControlMode.values)
+      for (final mode in [
+        ControlMode.oneFinger,
+        ControlMode.twoFinger,
+        ControlMode.analog,
+      ])
         Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: Material(

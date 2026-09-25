@@ -55,7 +55,9 @@ void main() {
   );
 
   test('goals recommend earning a missing star instead of a locked level', () {
-    final p = PlayerProfile()..classicLevel = 50;
+    final p = PlayerProfile()
+      ..controlMode = ControlMode.twoFinger
+      ..classicLevel = 50;
     expect(NextGoal.forProfile(p).level, 1);
     p.levelRecords['twoFinger:1'] = const LevelRecord(starMask: 1);
     final goal = NextGoal.forProfile(p);
@@ -114,6 +116,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final p = PlayerProfile()
+      ..tutorialSeen = true
       ..sound = false
       ..haptics = false;
     await tester.pumpWidget(ArcadeApp(profile: p));

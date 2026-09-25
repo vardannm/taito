@@ -10,6 +10,7 @@ import 'game.dart';
 import 'levels.dart';
 import 'rewards.dart';
 import 'laser_maze.dart';
+import 'onboarding.dart';
 
 class PlayerProfile {
   PlayerProfile({
@@ -136,7 +137,9 @@ class PlayerProfile {
   bool sound = true, music = true, haptics = true;
   bool available = true;
   bool tutorialSeen = false;
-  ControlMode controlMode = ControlMode.twoFinger;
+  TutorialProgress tutorial = TutorialProgress();
+  Future<void> _tutorialWrites = Future<void>.value();
+  ControlMode controlMode = ControlMode.oneFinger;
   int classicLevel = 1;
   int mazeLevel = 1, mazeRuns = 0;
   final mazeBestTimes = <String, double>{};
@@ -184,11 +187,31 @@ class PlayerProfile {
 
   Future<void> completeTutorial() async {
     tutorialSeen = true;
+    tutorial.step = TutorialStep.completed;
+    await saveTutorial();
     try {
       await storage.setBool('gilt.tutorial.v1.seen', true);
     } catch (_) {
       available = false;
     }
+  }
+
+  Future<void> saveTutorial() {
+    final snapshot = jsonEncode(tutorial.toJson());
+    _tutorialWrites = _tutorialWrites.then((_) async {
+      try {
+        await storage.setString('gilt.tutorial.v2', snapshot);
+      } catch (_) {
+        available = false;
+      }
+    });
+    return _tutorialWrites;
+  }
+
+  Future<void> replayTutorial() {
+    tutorialSeen = false;
+    tutorial = TutorialProgress();
+    return saveTutorial();
   }
 
   bool recordResult(BalanceGame game) {
@@ -312,9 +335,9 @@ class PlayerProfile {
   Future<void> load() async {
     try {
       tutorialSeen = await storage.getBool('gilt.tutorial.v1.seen') ?? false;
-      controlMode = await storage.getBool('gilt.oneFinger') == true
-          ? ControlMode.oneFinger
-          : ControlMode.twoFinger;
+      controlMode = await storage.getBool('gilt.oneFinger') == false
+          ? ControlMode.twoFinger
+          : ControlMode.oneFinger;
       final analog = await storage.getDouble('gilt.analogSensitivity');
       final direct = await storage.getDouble('gilt.twoFingerSensitivity');
       analogSensitivity = analog != null && analog.isFinite
@@ -345,6 +368,24 @@ class PlayerProfile {
       _loadRecords(await storage.getString('gilt.mastery.v1'));
       _loadMaze(await storage.getString('gilt.maze.v1'));
       _loadEconomy(await storage.getString(_economyKey));
+      final savedTutorial = await storage.getString('gilt.tutorial.v2');
+      if (savedTutorial != null) {
+        try {
+          final data = jsonDecode(savedTutorial);
+          if (data is Map<String, dynamic>)
+            tutorial = TutorialProgress.fromJson(data);
+        } catch (_) {
+          /* A damaged tutorial save must not discard the profile. */
+        }
+        tutorialSeen = !tutorial.active;
+      } else if (tutorialSeen ||
+          runs + infiniteRuns + mergeRuns + mazeRuns > 0 ||
+          levelRecords.isNotEmpty ||
+          dailyRecords.isNotEmpty ||
+          mazeBestTimes.isNotEmpty) {
+        tutorial = TutorialProgress(step: TutorialStep.completed);
+        tutorialSeen = true;
+      }
     } catch (_) {
       available = false;
     }
