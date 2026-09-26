@@ -1,3 +1,5 @@
+import 'onboarding.dart';
+import 'daily_prizes.dart';
 import 'dart:convert';
 import 'game.dart';
 import 'profile.dart';
@@ -14,6 +16,7 @@ class ProgressBackup {
     'format': 'gilt-progress',
     'version': 1,
     'testEconomy': p.unlimitedCoins,
+    'dailyPrizes': p.dailyPrizes.toJson(),
     'createdAt': DateTime.now().toUtc().toIso8601String(),
     'counts': [
       p.best,
@@ -25,8 +28,10 @@ class ProgressBackup {
       p.mergeHighest,
       p.mergeRuns,
       p.mazeRuns,
-      p.mazeEndlessBest,
-      p.mazeEndlessRuns,
+      // Two retired Maze Infinite counters. The slots stay so codes written
+      // before the mode was removed still decode by position.
+      0,
+      0,
       p.wallet,
     ],
     'control': p.controlMode.name,
@@ -35,6 +40,11 @@ class ProgressBackup {
     'sound': p.sound,
     'haptics': p.haptics,
     'tutorial': p.tutorialSeen,
+    'onboarding':
+        (p.tutorialSeen
+                ? TutorialProgress(step: TutorialStep.completed)
+                : p.tutorial)
+            .toJson(),
     'sensitivity': [p.analogSensitivity, p.twoFingerSensitivity],
     'cabinet': p.cabinet.name,
     'balls': p.ownedBalls.map((e) => e.name).toList(),
@@ -93,8 +103,7 @@ class ProgressBackup {
       ..mergeHighest = n[6]
       ..mergeRuns = n[7]
       ..mazeRuns = n[8]
-      ..mazeEndlessBest = n[9]
-      ..mazeEndlessRuns = n[10]
+      // n[9] and n[10] are the retired Maze Infinite counters.
       ..wallet = n[11]
       ..controlMode = choice(d['control'], ControlMode.values)
       ..classicLevel = integer(d['level'], ClassicLevels.count)
@@ -102,6 +111,15 @@ class ProgressBackup {
       ..sound = flag('sound')
       ..haptics = flag('haptics')
       ..tutorialSeen = flag('tutorial');
+    p.dailyPrizes = DailyPrizes.fromJson(d['dailyPrizes']);
+    p.tutorial = d['onboarding'] is Map<String, dynamic>
+        ? TutorialProgress.fromJson(d['onboarding'] as Map<String, dynamic>)
+        : TutorialProgress(
+            step: p.tutorialSeen
+                ? TutorialStep.completed
+                : TutorialStep.controls,
+          );
+    p.tutorialSeen = !p.tutorial.active;
     if (p.classicLevel < 1 || p.mazeLevel < 1 || p.mergeHighest < 2) invalid();
     final sensitivity = d['sensitivity'];
     if (sensitivity is! List ||
@@ -112,10 +130,15 @@ class ProgressBackup {
     p.twoFingerSensitivity = (sensitivity[1] as num).toDouble();
     void records(String name, Map<String, LevelRecord> target, RegExp key) {
       final source = d[name];
-      if (source is! Map<String, dynamic> || source.length > 160) invalid();
+      final maxRecords = name == 'levels' ? ClassicLevels.count * 3 : 160;
+      if (source is! Map<String, dynamic> || source.length > maxRecords)
+        invalid();
       for (final entry in source.entries) {
         final v = entry.value;
         if (!key.hasMatch(entry.key) || v is! Map<String, dynamic>) invalid();
+        if (name == 'levels' &&
+            int.parse(entry.key.split(':').last) > ClassicLevels.count)
+          invalid();
         integer(v['stars'], 7);
         integer(v['score']);
         integer(v['attempts']);
@@ -129,7 +152,7 @@ class ProgressBackup {
     records(
       'levels',
       p.levelRecords,
-      RegExp(r'^(oneFinger|twoFinger|analog):([1-9]|[1-4][0-9]|50)$'),
+      RegExp(r'^(oneFinger|twoFinger|analog):[1-9]\d*$'),
     );
     records(
       'daily',
@@ -189,15 +212,15 @@ class ProgressBackup {
       ..mergeHighest = source.mergeHighest
       ..mergeRuns = source.mergeRuns
       ..mazeRuns = source.mazeRuns
-      ..mazeEndlessBest = source.mazeEndlessBest
-      ..mazeEndlessRuns = source.mazeEndlessRuns
       ..wallet = source.wallet
+      ..dailyPrizes = DailyPrizes.fromJson(source.dailyPrizes.toJson())
       ..controlMode = source.controlMode
       ..classicLevel = source.classicLevel
       ..mazeLevel = source.mazeLevel
       ..sound = source.sound
       ..haptics = source.haptics
       ..tutorialSeen = source.tutorialSeen
+      ..tutorial = TutorialProgress.fromJson(source.tutorial.toJson())
       ..analogSensitivity = source.analogSensitivity
       ..twoFingerSensitivity = source.twoFingerSensitivity
       ..cabinet = source.cabinet
@@ -219,6 +242,7 @@ class ProgressBackup {
       ..clear()
       ..addAll(source.ownedPlatforms);
     await target.save();
+    await target.saveTutorial();
     await target.storage.setBool('gilt.tutorial.v1.seen', target.tutorialSeen);
     if (!target.available)
       throw StateError(

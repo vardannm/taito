@@ -168,8 +168,17 @@ void main() {
         isTrue,
       );
       await tester.pump();
-      expect(find.text('INFINITE / POINTS'), findsOneWidget);
-      expect(find.text('THE RUSH'), findsOneWidget);
+      final game = tester.widget<PivotBoard>(find.byType(PivotBoard)).game;
+      game.beginInput();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(find.byKey(const ValueKey('board-hud')), findsOneWidget);
+      expect(
+        tester.getCenter(find.byKey(const ValueKey('infinite-score'))).dx,
+        closeTo(tester.getCenter(find.byType(PivotBoard)).dx, 1),
+      );
+      expect(find.textContaining(RegExp(r'^\d+m$')), findsNothing);
+      expect(find.text('THE RUSH'), findsNothing);
       expect(find.textContaining('HOLE 01'), findsNothing);
       expect(find.byType(PivotBoard), findsOneWidget);
       expect(tester.takeException(), isNull);

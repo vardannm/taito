@@ -10,6 +10,8 @@ import 'game.dart';
 import 'levels.dart';
 import 'rewards.dart';
 import 'laser_maze.dart';
+import 'onboarding.dart';
+import 'daily_prizes.dart';
 
 class PlayerProfile {
   PlayerProfile({
@@ -25,6 +27,66 @@ class PlayerProfile {
   int best = 0, runs = 0;
   int infiniteBest = 0, infiniteRuns = 0, infiniteBestScore = 0;
   int wallet = 0;
+  DailyPrizes dailyPrizes = DailyPrizes();
+
+  BallCosmetic? get prizeBall {
+    final choices =
+        BallCosmetic.values.where((b) => !ownedBalls.contains(b)).toList()
+          ..sort((a, b) => a.cost.compareTo(b.cost));
+    return choices.firstOrNull;
+  }
+
+  PlatformStyle? get prizePlatform {
+    final choices =
+        PlatformStyle.values.where((p) => !ownedPlatforms.contains(p)).toList()
+          ..sort((a, b) => a.cost.compareTo(b.cost));
+    return choices.firstOrNull;
+  }
+
+  Future<String?> claimDailyPrize({
+    DateTime? now,
+    bool platform = false,
+  }) async {
+    final date = now ?? DateTime.now();
+    if (!dailyPrizes.canClaim(date)) return null;
+    final day = dailyPrizes.nextDay;
+    final String reward;
+    if (day < 5) {
+      final coins = DailyPrizes.coins[day - 1];
+      wallet += coins;
+      reward = '$coins coins';
+    } else {
+      final ball = prizeBall;
+      final rail = prizePlatform;
+      if (rail != null && (platform || ball == null)) {
+        ownedPlatforms.add(rail);
+        reward = '${rail.label} platform';
+      } else if (ball != null) {
+        ownedBalls.add(ball);
+        reward = '${ball.label} ball';
+      } else {
+        wallet += 100;
+        reward = '100 coins';
+      }
+    }
+    // Update before awaiting storage so rapid taps cannot claim twice.
+    dailyPrizes.claimed++;
+    dailyPrizes.lastClaim = DailyChallenge.day(date);
+    await saveEconomy();
+    return reward;
+  }
+
+  bool _ballTestCreditApplied = false;
+
+  /// One development credit, persisted with the balance so it cannot refill
+  /// spent coins on every restart. Called by the debug app entry point only.
+  Future<void> grantBallTestCoins() async {
+    if (_ballTestCreditApplied || unlimitedCoins || !available) return;
+    wallet += 10000;
+    _ballTestCreditApplied = true;
+    await saveEconomy();
+  }
+
   BallCosmetic selectedBall = BallCosmetic.steel;
   double analogSensitivity = 1, twoFingerSensitivity = 1;
   PlatformStyle selectedPlatform = PlatformStyle.classic;
@@ -36,7 +98,7 @@ class PlayerProfile {
   Future<void> _economyWrites = Future<void>.value();
 
   bool bankCoins(BalanceGame game) {
-    if (!game.infinite && !game.mazeEndless) return false;
+    if (!game.infinite) return false;
     final previous = _bankedCoins[game];
     final count = previous?.serial == game.runSerial ? previous!.count : 0;
     final delta = game.coinsCollected - count;
@@ -73,6 +135,8 @@ class PlayerProfile {
     // Snapshot and serialize wallet transactions; an older save cannot undo a purchase.
     final data = jsonEncode({
       'wallet': wallet,
+      'dailyPrizes': dailyPrizes.toJson(),
+      'ballTestCreditApplied': _ballTestCreditApplied,
       'owned': ownedBalls.map((b) => b.name).toList(),
       'selected': selectedBall.name,
       'bestScore': infiniteBestScore,
@@ -94,6 +158,8 @@ class PlayerProfile {
     try {
       final data = jsonDecode(raw);
       if (data is! Map<String, dynamic>) return;
+      dailyPrizes = DailyPrizes.fromJson(data['dailyPrizes']);
+      _ballTestCreditApplied = data['ballTestCreditApplied'] == true;
       if (data['wallet'] is int)
         wallet = (data['wallet'] as int).clamp(0, 1 << 30);
       if (data['bestScore'] is int)
@@ -120,13 +186,14 @@ class PlayerProfile {
   }
 
   int mergeBest = 0, mergeHighest = 2, mergeRuns = 0;
-  bool sound = true, haptics = true;
+  bool sound = true, music = true, haptics = true;
   bool available = true;
   bool tutorialSeen = false;
-  ControlMode controlMode = ControlMode.twoFinger;
+  TutorialProgress tutorial = TutorialProgress();
+  Future<void> _tutorialWrites = Future<void>.value();
+  ControlMode controlMode = ControlMode.oneFinger;
   int classicLevel = 1;
   int mazeLevel = 1, mazeRuns = 0;
-  int mazeEndlessBest = 0, mazeEndlessRuns = 0;
   final mazeBestTimes = <String, double>{};
   double? mazeBestTime(int route, [ControlMode? control]) =>
       mazeBestTimes[recordKey(route, control ?? controlMode)];
@@ -172,6 +239,8 @@ class PlayerProfile {
 
   Future<void> completeTutorial() async {
     tutorialSeen = true;
+    tutorial.step = TutorialStep.completed;
+    await saveTutorial();
     try {
       await storage.setBool('gilt.tutorial.v1.seen', true);
     } catch (_) {
@@ -179,16 +248,26 @@ class PlayerProfile {
     }
   }
 
+  Future<void> saveTutorial() {
+    final snapshot = jsonEncode(tutorial.toJson());
+    _tutorialWrites = _tutorialWrites.then((_) async {
+      try {
+        await storage.setString('gilt.tutorial.v2', snapshot);
+      } catch (_) {
+        available = false;
+      }
+    });
+    return _tutorialWrites;
+  }
+
+  Future<void> replayTutorial() {
+    tutorialSeen = false;
+    tutorial = TutorialProgress();
+    return saveTutorial();
+  }
+
   bool recordResult(BalanceGame game) {
     bankCoins(game);
-    if (game.mazeEndless) {
-      if (!game.finished || _recordedRuns[game] == game.runSerial) return false;
-      _recordedRuns[game] = game.runSerial;
-      mazeEndlessRuns++;
-      final improved = game.score > mazeEndlessBest;
-      if (improved) mazeEndlessBest = game.score;
-      return improved;
-    }
     if (game.maze) {
       if (!game.finished || _recordedRuns[game] == game.runSerial) return false;
       _recordedRuns[game] = game.runSerial;
@@ -257,8 +336,9 @@ class PlayerProfile {
         for (final entry in source.entries) {
           final validKey = pair.$1 == 'levels'
               ? RegExp(
-                  r'^(oneFinger|twoFinger|analog):([1-9]|[1-4][0-9]|50)$',
-                ).hasMatch(entry.key)
+                      r'^(oneFinger|twoFinger|analog):[1-9]\d*$',
+                    ).hasMatch(entry.key) &&
+                    int.parse(entry.key.split(':').last) <= ClassicLevels.count
               : RegExp(
                   r'^(oneFinger|twoFinger|analog):\d{4}-\d{2}-\d{2}$',
                 ).hasMatch(entry.key);
@@ -285,10 +365,6 @@ class PlayerProfile {
         mazeLevel = (data['selected'] as int).clamp(1, LaserMazeRoute.count);
       if (data['runs'] is int)
         mazeRuns = (data['runs'] as int).clamp(0, 1 << 30);
-      if (data['endlessBest'] is int)
-        mazeEndlessBest = (data['endlessBest'] as int).clamp(0, 1 << 30);
-      if (data['endlessRuns'] is int)
-        mazeEndlessRuns = (data['endlessRuns'] as int).clamp(0, 1 << 30);
       final times = data['times'];
       if (times is! Map<String, dynamic>) return;
       for (final entry in times.entries) {
@@ -311,9 +387,9 @@ class PlayerProfile {
   Future<void> load() async {
     try {
       tutorialSeen = await storage.getBool('gilt.tutorial.v1.seen') ?? false;
-      controlMode = await storage.getBool('gilt.oneFinger') == true
-          ? ControlMode.oneFinger
-          : ControlMode.twoFinger;
+      controlMode = await storage.getBool('gilt.oneFinger') == false
+          ? ControlMode.twoFinger
+          : ControlMode.oneFinger;
       final analog = await storage.getDouble('gilt.analogSensitivity');
       final direct = await storage.getDouble('gilt.twoFingerSensitivity');
       analogSensitivity = analog != null && analog.isFinite
@@ -338,10 +414,30 @@ class PlayerProfile {
       infiniteBest = await storage.getInt('gilt.ascent.best') ?? 0;
       infiniteRuns = await storage.getInt('gilt.ascent.runs') ?? 0;
       sound = await storage.getBool('gilt.sound') ?? true;
+      // Preserve an existing player's mute preference when migrating.
+      music = await storage.getBool('gilt.music') ?? sound;
       haptics = await storage.getBool('gilt.haptics') ?? true;
       _loadRecords(await storage.getString('gilt.mastery.v1'));
       _loadMaze(await storage.getString('gilt.maze.v1'));
       _loadEconomy(await storage.getString(_economyKey));
+      final savedTutorial = await storage.getString('gilt.tutorial.v2');
+      if (savedTutorial != null) {
+        try {
+          final data = jsonDecode(savedTutorial);
+          if (data is Map<String, dynamic>)
+            tutorial = TutorialProgress.fromJson(data);
+        } catch (_) {
+          /* A damaged tutorial save must not discard the profile. */
+        }
+        tutorialSeen = !tutorial.active;
+      } else if (tutorialSeen ||
+          runs + infiniteRuns + mergeRuns + mazeRuns > 0 ||
+          levelRecords.isNotEmpty ||
+          dailyRecords.isNotEmpty ||
+          mazeBestTimes.isNotEmpty) {
+        tutorial = TutorialProgress(step: TutorialStep.completed);
+        tutorialSeen = true;
+      }
     } catch (_) {
       available = false;
     }
@@ -355,8 +451,6 @@ class PlayerProfile {
         jsonEncode({
           'selected': mazeLevel,
           'runs': mazeRuns,
-          'endlessBest': mazeEndlessBest,
-          'endlessRuns': mazeEndlessRuns,
           'times': mazeBestTimes,
         }),
       );
@@ -368,6 +462,7 @@ class PlayerProfile {
       await storage.setInt('gilt.ascent.best', infiniteBest);
       await storage.setInt('gilt.ascent.runs', infiniteRuns);
       await storage.setBool('gilt.sound', sound);
+      await storage.setBool('gilt.music', music);
       await storage.setBool('gilt.haptics', haptics);
       await storage.setBool(
         'gilt.oneFinger',
@@ -396,6 +491,26 @@ class PlayerProfile {
 
 class GameFeedback {
   AudioPlayer? _player;
+  static bool _sharedContext = false;
+
+  /// Effects and music are two players in one app. Left at the plugin's
+  /// default, every effect requests full audio focus, and Android answers by
+  /// revoking it from the music, which then stops for good. Mixing instead of
+  /// grabbing focus lets the coin land over the loop.
+  Future<void> _shareAudioFocus() async {
+    if (_sharedContext) return;
+    _sharedContext = true;
+    try {
+      await AudioPlayer.global.setAudioContext(
+        AudioContextConfig(
+          focus: AudioContextConfigFocus.mixWithOthers,
+        ).build(),
+      );
+    } catch (_) {
+      /* An unavailable audio platform must never interrupt a run. */
+    }
+  }
+
   Future<void> play(GameEvent event, PlayerProfile profile) async {
     if (profile.haptics) {
       if (event == GameEvent.miss) {
@@ -406,6 +521,7 @@ class GameFeedback {
     }
     if (!profile.sound) return;
     try {
+      await _shareAudioFocus();
       await (_player ??= AudioPlayer()).play(
         AssetSource(
           'audio/${event == GameEvent.merge
@@ -421,7 +537,48 @@ class GameFeedback {
     }
   }
 
+  AudioPlayer? _music;
+  String? _track;
+  bool _musicPlaying = false;
+
+  /// Background music for the modes that want one. Passing a null track stops
+  /// it; [playing] false holds it where it is, so pausing a run and resuming
+  /// picks the loop up again rather than restarting it.
+  Future<void> updateMusic({
+    required String? track,
+    required bool playing,
+    double volume = .32,
+  }) async {
+    if (track == _track && (track == null || playing == _musicPlaying)) return;
+    try {
+      if (track == null) {
+        _track = null;
+        _musicPlaying = false;
+        await _music?.stop();
+        return;
+      }
+      await _shareAudioFocus();
+      final music = _music ??= AudioPlayer()..setReleaseMode(ReleaseMode.loop);
+      if (track != _track) {
+        _track = track;
+        _musicPlaying = true;
+        await music.setVolume(volume);
+        await music.play(AssetSource(track), volume: volume);
+        if (!playing) {
+          _musicPlaying = false;
+          await music.pause();
+        }
+        return;
+      }
+      _musicPlaying = playing;
+      await (playing ? music.resume() : music.pause());
+    } catch (_) {
+      /* Audio restrictions must never interrupt a run. */
+    }
+  }
+
   void dispose() {
     _player?.dispose();
+    _music?.dispose();
   }
 }

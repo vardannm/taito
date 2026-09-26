@@ -38,7 +38,7 @@ class NextGoal {
     }
     return NextGoal(
       'Beat today’s Daily record',
-      'All 150 stars earned with these controls. Try today’s shared board.',
+      'All ${ClassicLevels.count * 3} stars earned with these controls. Try today’s shared board.',
       GameMode.daily,
       15,
       date: DailyChallenge.day(DateTime.now()),

@@ -1,0 +1,30 @@
+part of '../classic_levels.dart';
+
+// Classic level 4. Coordinates use the 360 x 560 board.
+const classicLevel04 = ClassicLevelDefinition(
+  name: "Little wave",
+  holes: [
+    Hole(165.69385550754492, 455.43811591267513, target: 1),
+    Hole(70.71878218692427, 363.827312799777, target: 2),
+    Hole(225.87729047893484, 406.9878093694679, target: 3),
+    Hole(309.8384099923416, 264.026024446105, target: 4),
+    Hole(132.64733423715583, 325.60446185465736, target: 5),
+    Hole(236.88872627934632, 187.437967342251, target: 6),
+    Hole(154.99140885850994, 230.8630642858968, target: 7),
+    Hole(240.46823022830765, 98.169225159839, target: 8),
+    Hole(163.74652482013286, 144.64573593050133, target: 9),
+    Hole(263.9587970028683, 46.780804910794465, target: 10),
+    Hole(121.18138118311424, 139.25943658712131),
+    Hole(213.6144663761048, 357.1457805866908),
+    Hole(196.13880718090192, 207.06138538922164),
+    Hole(78.82701736840065, 409.98809742086735),
+    Hole(41.88918241074561, 255.82049980912285),
+    Hole(151.85807617367456, 378.3671257835996),
+    Hole(114.08825371235689, 277.4233425052205),
+    Hole(52.21030169888087, 162.30645864896988),
+  ],
+  // Spider patrol centers and movement settings.
+  spiders: [],
+  // Spawn positions for each numbered target; waves repeat in order.
+  hazards: [],
+);

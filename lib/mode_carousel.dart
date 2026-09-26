@@ -3,11 +3,10 @@ import 'package:flutter/material.dart';
 
 import 'game.dart';
 
-/// The five arcade worlds, in their permanent navigation order.
+/// The four arcade worlds, in their permanent navigation order.
 const arcadeModes = [
   GameMode.infinite,
   GameMode.classic,
-  GameMode.mazeEndless,
   GameMode.laserMaze,
   GameMode.merge2048,
 ];

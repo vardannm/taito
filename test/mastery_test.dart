@@ -34,7 +34,8 @@ void main() {
   test(
     'stars require completion, track independent goals, and merge across runs',
     () {
-      final p = PlayerProfile(), g = BalanceGame()..start();
+      final p = PlayerProfile()..controlMode = ControlMode.twoFinger;
+      final g = BalanceGame()..start();
       finish(g, won: false);
       expect(g.earnedStarMask, 0);
       p.recordResult(g);
@@ -54,7 +55,8 @@ void main() {
   test(
     'records are idempotent per run, control-specific, and never lose a best',
     () {
-      final p = PlayerProfile(), g = BalanceGame()..start();
+      final p = PlayerProfile()..controlMode = ControlMode.twoFinger;
+      final g = BalanceGame()..start();
       finish(g, time: 100, score: 2000);
       p.recordResult(g);
       p.recordResult(g);
@@ -80,7 +82,8 @@ void main() {
   test(
     'records and earned cabinet persist; locked styles cannot be equipped',
     () async {
-      final p = PlayerProfile(), g = BalanceGame()..start();
+      final p = PlayerProfile()..controlMode = ControlMode.twoFinger;
+      final g = BalanceGame()..start();
       expect(p.selectCabinet(CabinetStyle.jade), isFalse);
       finish(g);
       p.recordResult(g);
@@ -123,7 +126,7 @@ void main() {
       expect(layout(a), isNot(layout(b)));
       expect(a.spiders, isEmpty);
       expect(a.finale, isFalse);
-      final p = PlayerProfile();
+      final p = PlayerProfile()..controlMode = a.controlMode;
       finish(a);
       p.recordResult(a);
       expect(p.dailyRecord('2026-09-09').stars, 3);
@@ -336,10 +339,10 @@ void main() {
     },
   );
   test('Infinite rhythm changes pressure without reducing ascent speed', () {
-    expect(sectionAt(89), InfiniteSection.rush);
-    expect(sectionAt(90), InfiniteSection.breath);
-    expect(sectionAt(120), InfiniteSection.encounter);
-    expect(sectionAt(180), InfiniteSection.rush);
+    expect(sectionAt(179), InfiniteSection.rush);
+    expect(sectionAt(180), InfiniteSection.breath);
+    expect(sectionAt(2490), InfiniteSection.encounter);
+    expect(sectionAt(2520), InfiniteSection.rush);
     expect(
       InfiniteSection.breath.densityFactor,
       lessThan(InfiniteSection.rush.densityFactor),
@@ -409,7 +412,8 @@ void main() {
     tester.view.physicalSize = const Size(320, 568);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    final p = PlayerProfile(), g = BalanceGame()..start();
+    final p = PlayerProfile()..controlMode = ControlMode.twoFinger;
+    final g = BalanceGame()..start();
     finish(g);
     p.recordResult(g);
     await tester.pumpWidget(

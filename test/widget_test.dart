@@ -22,7 +22,7 @@ void main() {
         ..sound = false
         ..haptics = false;
       await tester.pumpWidget(ArcadeApp(profile: profile));
-      expect(find.text('INFINITE / POINTS'), findsOneWidget);
+      expect(find.text('Infinite'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.tap(find.byTooltip('Modes'));
       await tester.pump();

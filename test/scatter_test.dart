@@ -11,12 +11,13 @@ void main() {
       for (var seed = 0; seed < 60; seed++) {
         final game = BalanceGame(seed: seed)
           ..start(gameMode: GameMode.infinite);
-        for (final height in [0, 180, 600, 1200]) {
+        for (final height in [0, 450, 1500, 3000]) {
           game.cameraOffset = height * 10.0;
+          game.maxHeight = height * 10.0;
           game.score = height * 25;
           game.ensureInfiniteBoard();
           final holes = game.board.toList()..sort((a, b) => a.y.compareTo(b.y));
-          if (height >= 600) {
+          if (height >= 3000) {
             expect(holes.any((h) => h.x < 180), isTrue);
             expect(holes.any((h) => h.x > 180), isTrue);
           }

@@ -127,27 +127,28 @@ void main() {
       g.dragPivot(0, -100);
       g.dragPivot(1, -100);
       g.step(1 / 120);
-      expect(g.cameraOffset, greaterThan(20));
+      expect(g.cameraOffset, lessThan(2));
       expect(h.worldY, y);
       expect(h.y - g.cameraOffset, closeTo(y!, 1e-6));
     },
   );
   test(
-    'early layouts are sparse; full density is reserved for 20000 points and restart resets it',
+    'early layouts are sparse; full density is reserved for 60000 points and restart resets it',
     () {
       expect(InfiniteTuning.densityAt(0), 0);
-      expect(InfiniteTuning.densityAt(19999), lessThan(1));
-      expect(InfiniteTuning.densityAt(20000), 1);
+      expect(InfiniteTuning.densityAt(59999), lessThan(1));
+      expect(InfiniteTuning.densityAt(60000), 1);
       var early = 0, middle = 0, late = 0;
       for (var seed = 0; seed < 40; seed++) {
-        for (final score in [0, 5000, 20000]) {
+        for (final score in [0, 15000, 60000]) {
           final g = BalanceGame(seed: seed)..start(gameMode: GameMode.infinite);
           g.score = score;
+          g.maxHeight = score / 2.0;
           g.cameraOffset = 1000;
           g.ensureInfiniteBoard();
           if (score == 0) early += g.board.length;
-          if (score == 5000) middle += g.board.length;
-          if (score == 20000) late += g.board.length;
+          if (score == 15000) middle += g.board.length;
+          if (score == 60000) late += g.board.length;
           g.score = 50000;
           g.start(gameMode: GameMode.infinite);
           expect(g.board.length, lessThanOrEqualTo(6));

@@ -12,7 +12,7 @@ BalanceGame analogGame() => BalanceGame()
   ..setControlMode(ControlMode.analog)
   ..start(gameMode: GameMode.practice);
 void main() {
-  for (final mode in [GameMode.laserMaze, GameMode.mazeEndless]) {
+  for (final mode in [GameMode.laserMaze]) {
     test(
       'selected analog lifts, reverses and holds in $mode without delay',
       () {

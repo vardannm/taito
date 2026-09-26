@@ -30,16 +30,19 @@ void main() {
     for (final mode in [
       GameMode.infinite,
       GameMode.classic,
-      GameMode.mazeEndless,
       GameMode.laserMaze,
       GameMode.merge2048,
     ]) {
+      const onlyMode = String.fromEnvironment('PREVIEW_MODE');
+      if (onlyMode.isNotEmpty && mode.name != onlyMode) continue;
       final count = mode == GameMode.classic
           ? ClassicLevels.count
           : mode == GameMode.laserMaze
           ? LaserMazeRoute.count
           : 1;
       for (var level = 1; level <= count; level++) {
+        const onlyLevel = int.fromEnvironment('PREVIEW_LEVEL');
+        if (onlyLevel > 0 && level != onlyLevel) continue;
         final game = BalanceGame(seed: 710 + level)
           ..start(gameMode: mode, levelNumber: level, waitForInput: true);
         final recording = ui.PictureRecorder();

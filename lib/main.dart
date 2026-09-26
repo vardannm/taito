@@ -1,16 +1,18 @@
 import 'playtest_recorder.dart';
+import 'app_analytics.dart';
 export 'pivot_board.dart';
 import 'pivot_board.dart';
 import 'club.dart';
 import 'control_options.dart';
 import 'infinite_painter.dart';
-import 'ball_cosmetics.dart';
 import 'ball_shop.dart';
+import 'daily_prize_sheet.dart';
 import 'infinite_progress.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
@@ -19,7 +21,8 @@ import 'game.dart';
 import 'levels.dart';
 import 'level_picker.dart';
 import 'profile.dart';
-import 'tutorial.dart';
+import 'onboarding.dart';
+import 'tutorial_spotlight.dart';
 import 'rewards.dart';
 import 'mastery_widgets.dart';
 import 'analog_controls.dart';
@@ -27,7 +30,6 @@ import 'merge_widgets.dart';
 import 'merge.dart';
 import 'laser_maze.dart';
 import 'laser_maze_widgets.dart';
-import 'maze_editor.dart';
 import 'mode_carousel.dart';
 import 'mode_previews.dart';
 import 'heart_loss_effect.dart';
@@ -47,12 +49,15 @@ Future<void> main() async {
   );
   final profile = PlayerProfile();
   await profile.load();
-  runApp(ArcadeApp(profile: profile));
+  if (kDebugMode) await profile.grantBallTestCoins();
+  final analytics = await AppAnalytics.initialize();
+  runApp(ArcadeApp(profile: profile, analytics: analytics));
 }
 
 class ArcadeApp extends StatelessWidget {
-  const ArcadeApp({super.key, required this.profile});
+  const ArcadeApp({super.key, required this.profile, this.analytics});
   final PlayerProfile profile;
+  final AppAnalytics? analytics;
   @override
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
@@ -67,13 +72,14 @@ class ArcadeApp extends StatelessWidget {
         displayColor: ink,
       ),
     ),
-    home: GameScreen(profile: profile),
+    home: GameScreen(profile: profile, analytics: analytics),
   );
 }
 
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key, required this.profile});
+  const GameScreen({super.key, required this.profile, this.analytics});
   final PlayerProfile profile;
+  final AppAnalytics? analytics;
   @override
   State<GameScreen> createState() => _GameScreenState();
 }
@@ -86,6 +92,7 @@ class _GameScreenState extends State<GameScreen>
   final backdrop = ValueNotifier<int>(0);
   final feedback = GameFeedback();
   final playtest = PlaytestRecorder();
+  late final analytics = widget.analytics ?? AppAnalytics();
   final touch = [0.0, 0.0];
   final keyboard = [0.0, 0.0];
   late final Ticker ticker;
@@ -93,8 +100,45 @@ class _GameScreenState extends State<GameScreen>
   double accumulator = 0;
   bool recorded = false, newBest = false, briefing = false;
   List<CabinetStyle> newUnlocks = [];
-  late bool tutorialOpen;
-  bool commandOpen = false, readyRetry = false;
+  TutorialRun? tutorialRun;
+  bool tutorialSheetOpen = false;
+  final tutorialShopKey = GlobalKey();
+  final tutorialLevelsKey = GlobalKey();
+  final tutorialDailyKey = GlobalKey();
+  final tutorialHeartsKey = GlobalKey();
+  final tutorialScoreKey = GlobalKey();
+  final tutorialCoinsKey = GlobalKey();
+  bool get tutorialActive => !profile.tutorialSeen && profile.tutorial.active;
+  TutorialStep get tutorialStep => profile.tutorial.step;
+
+  void tutorialChanged() {
+    unawaited(profile.saveTutorial());
+    if (mounted) setState(() {});
+  }
+
+  void advanceTutorial(TutorialStep step) {
+    profile.tutorial.step = step;
+    tutorialChanged();
+  }
+
+  void skipTutorial() {
+    unawaited(profile.completeTutorial());
+    game.endTutorialCourse();
+    tutorialRun = null;
+    setState(() {});
+  }
+
+  void replayTutorial() {
+    unawaited(profile.replayTutorial());
+    profile.controlMode = ControlMode.oneFinger;
+    unawaited(profile.save());
+    setState(() {
+      prepareInfinite();
+      entrance.value = 1;
+    });
+  }
+
+  bool readyRetry = false;
   final carouselKey = GlobalKey<ModeCarouselState>();
   final boardKey = GlobalKey();
   final analogKey = GlobalKey();
@@ -123,9 +167,22 @@ class _GameScreenState extends State<GameScreen>
           if (mounted) setState(() {});
         });
     ticker = createTicker(tick);
-    tutorialOpen = false;
-    prepareInfinite();
+    if (profile.tutorialSeen) profile.tutorial.step = TutorialStep.completed;
+    if (tutorialActive && tutorialStep == TutorialStep.shopBrowse) {
+      profile.tutorial.step = TutorialStep.levels;
+      unawaited(profile.saveTutorial());
+    }
+    if (tutorialActive && tutorialStep == TutorialStep.classicPlay) {
+      prepareWorld(1);
+    } else {
+      prepareInfinite();
+    }
+    if (tutorialActive &&
+        (tutorialStep.inInfinite || tutorialStep == TutorialStep.classicPlay))
+      entrance.value = 1;
     game.onInputStarted = () {
+      tutorialRun?.configure();
+      analytics.startRun(game);
       if (game.mode == GameMode.classic) profile.classicLevel = game.level;
       if (game.mode == GameMode.laserMaze) profile.mazeLevel = game.level;
       unawaited(profile.save());
@@ -140,6 +197,21 @@ class _GameScreenState extends State<GameScreen>
     };
     WidgetsBinding.instance.addObserver(this);
     HardwareKeyboard.instance.addHandler(onKey);
+    if (tutorialActive &&
+        [
+          TutorialStep.shopBall,
+          TutorialStep.shopPlatform,
+          TutorialStep.level1,
+        ].contains(tutorialStep)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (tutorialStep == TutorialStep.level1) {
+          unawaited(selectLevel());
+        } else {
+          unawaited(showBallShop());
+        }
+      });
+    }
   }
 
   void runTicker() {
@@ -197,9 +269,11 @@ class _GameScreenState extends State<GameScreen>
         '${game.phase}/${game.target}/${game.lives}/${game.inputEpoch}/$recorded';
     while (accumulator >= 1 / 120) {
       game.step(1 / 120);
+      tutorialRun?.tick(1 / 120);
       accumulator -= 1 / 120;
     }
     if (game.lives < observedLives) spawnHeartLoss();
+    syncMusic();
     observedLives = game.lives;
     // Feedback (including a lost heart) must not invalidate held input.
     // Only simulation transitions that actually clear input release keys.
@@ -220,12 +294,20 @@ class _GameScreenState extends State<GameScreen>
     }
     if (game.finished && !recorded) {
       recorded = true;
+      analytics.finishRun(game);
       playtest.record("run_finished", {
         "mode": game.mode.name,
         "won": game.won,
         "score": game.score,
         "activeSeconds": game.elapsed,
       });
+      if (tutorialActive &&
+          tutorialStep == TutorialStep.classicPlay &&
+          game.mode == GameMode.classic &&
+          game.level == 1 &&
+          game.won) {
+        advanceTutorial(TutorialStep.dailyChallenge);
+      }
       if (!game.practice) {
         final locked = CabinetStyle.values
             .where((c) => !profile.isUnlocked(c))
@@ -280,8 +362,10 @@ class _GameScreenState extends State<GameScreen>
   }
 
   bool onKey(KeyEvent event) {
-    if (commandOpen ||
-        tutorialOpen ||
+    if ((tutorialActive &&
+            game.waitingForInput &&
+            !tutorialStep.inInfinite &&
+            tutorialStep != TutorialStep.classicPlay) ||
         returning ||
         carouselMoving ||
         ModalRoute.of(context)?.isCurrent != true)
@@ -352,6 +436,7 @@ class _GameScreenState extends State<GameScreen>
     game.cabinet = profile.cabinet;
     game.cosmetic = profile.selectedBall;
     game.platformStyle = profile.selectedPlatform;
+    game.cabinet = profile.cabinet;
     game.analogSensitivity = profile.analogSensitivity;
     game.twoFingerSensitivity = profile.twoFingerSensitivity;
     game.infiniteStartingPace = InfiniteTuning.startingPace(
@@ -362,43 +447,71 @@ class _GameScreenState extends State<GameScreen>
       gameMode: mode,
       levelNumber: mode == GameMode.laserMaze
           ? profile.mazeLevel
-          : mode == GameMode.mazeEndless
-          ? 1
           : profile.classicLevel,
       challengeDate: challengeDate,
+      waitForInput:
+          tutorialActive &&
+          tutorialStep == TutorialStep.classicPlay &&
+          mode == GameMode.classic,
     );
+    tutorialRun = null;
     briefing = game.finale;
+    analytics.selectMode(game.mode);
+    analytics.startRun(game);
     if (briefing) game.setPaused(true);
     observedLives = game.lives;
     heartEffects.clear();
     enterWorld();
+    syncMusic();
   });
-  Future<void> selectLevel() => showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: cream,
-    showDragHandle: true,
-    isScrollControlled: true,
-    builder: (context) => SizedBox(
-      height: MediaQuery.sizeOf(context).height * .84,
-      child: SafeArea(
-        child: LevelPicker(
-          selected: profile.classicLevel,
-          totalStars: profile.totalStars,
-          records: {
-            for (var i = 1; i <= ClassicLevels.count; i++)
-              i: profile.levelRecord(i),
-          },
-          controlLabel: profile.controlMode.label,
-          onSelected: (number) {
-            if (!profile.selectClassicLevel(number)) return;
-            unawaited(profile.save());
-            Navigator.pop(context);
-            start(GameMode.classic);
-          },
+  Future<void> selectLevel() async {
+    setState(() => tutorialSheetOpen = true);
+    if (tutorialActive && tutorialStep == TutorialStep.levels)
+      advanceTutorial(TutorialStep.level1);
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: cream,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => SizedBox(
+        height: MediaQuery.sizeOf(context).height * .84,
+        child: SafeArea(
+          child: LevelPicker(
+            tutorial:
+                tutorialActive &&
+                [
+                  TutorialStep.level1,
+                  TutorialStep.classicPlay,
+                ].contains(tutorialStep),
+            onSkipTutorial: skipTutorial,
+            selected: profile.classicLevel,
+            totalStars: profile.totalStars,
+            records: {
+              for (var i = 1; i <= ClassicLevels.count; i++)
+                i: profile.levelRecord(i),
+            },
+            controlLabel: profile.controlMode.label,
+            onSelected: (number) {
+              if (!profile.selectClassicLevel(number)) return;
+              if (tutorialActive &&
+                  [
+                    TutorialStep.level1,
+                    TutorialStep.classicPlay,
+                  ].contains(tutorialStep) &&
+                  number == 1) {
+                advanceTutorial(TutorialStep.classicPlay);
+              }
+              unawaited(profile.save());
+              Navigator.pop(context);
+              start(GameMode.classic);
+            },
+          ),
         ),
       ),
-    ),
-  );
+    );
+    if (mounted) setState(() => tutorialSheetOpen = false);
+  }
+
   Future<void> selectMaze() => showModalBottomSheet<void>(
     context: context,
     backgroundColor: cream,
@@ -411,7 +524,6 @@ class _GameScreenState extends State<GameScreen>
         child: LaserMazePicker(
           selected: profile.mazeLevel,
           control: profile.controlMode,
-          endlessBest: profile.mazeEndlessBest,
           bestTimes: {
             for (var i = 1; i <= LaserMazeRoute.count; i++)
               if (profile.mazeBestTime(i, profile.controlMode) case final time?)
@@ -422,10 +534,6 @@ class _GameScreenState extends State<GameScreen>
             unawaited(profile.save());
             Navigator.pop(context);
             start(GameMode.laserMaze);
-          },
-          onEndless: () {
-            Navigator.pop(context);
-            start(GameMode.mazeEndless);
           },
         ),
       ),
@@ -512,30 +620,22 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  Future<void> showCabinet() => showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: cream,
-    showDragHandle: true,
-    isScrollControlled: true,
-    builder: (context) => SafeArea(
-      child: SizedBox(
-        height: MediaQuery.sizeOf(context).height * .84,
-        child: StatefulBuilder(
-          builder: (context, updateSheet) => CabinetPicker(
-            profile: profile,
-            onSelected: (style) {
-              if (!profile.selectCabinet(style)) return;
-              setState(() => game.cabinet = style);
-              updateSheet(() {});
-              unawaited(profile.save());
-            },
-          ),
-        ),
-      ),
-    ),
-  );
+  Future<void> showDailyPrizes() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: cream,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (_) => DailyPrizeSheet(profile: profile),
+    );
+    if (mounted) setState(() {});
+  }
 
   Future<void> showBallShop() async {
+    setState(() => tutorialSheetOpen = true);
+    if (tutorialActive && tutorialStep == TutorialStep.shop)
+      advanceTutorial(TutorialStep.shopBall);
+    analytics.openShop(game.mode);
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -543,21 +643,47 @@ class _GameScreenState extends State<GameScreen>
       backgroundColor: cream,
       builder: (_) => FractionallySizedBox(
         heightFactor: .85,
-        child: BallShop(profile: profile),
+        child: BallShop(
+          profile: profile,
+          onTutorialChanged: tutorialChanged,
+          onSkipTutorial: skipTutorial,
+        ),
       ),
     );
     if (mounted)
       setState(() {
+        tutorialSheetOpen = false;
+        if (tutorialActive && tutorialStep == TutorialStep.shopBrowse)
+          advanceTutorial(TutorialStep.levels);
         game.cosmetic = profile.selectedBall;
         game.platformStyle = profile.selectedPlatform;
+        game.cabinet = profile.cabinet;
         if (game.waitingForInput) prepareWorld(selectedMode);
       });
+  }
+
+  /// Infinite and 2048 run to a loop; every other screen is quiet. Pausing
+  /// holds the track rather than restarting it.
+  static const themeTrack = 'audio/theme.m4a';
+  void syncMusic() {
+    final wants =
+        (game.infinite || game.merging) &&
+        profile.music &&
+        game.started &&
+        !game.finished;
+    unawaited(
+      feedback.updateMusic(
+        track: wants ? themeTrack : null,
+        playing: !game.paused && !game.waitingForInput && !returning,
+      ),
+    );
   }
 
   void pause() => setState(() {
     briefing = false;
     clearControls();
     game.setPaused(!game.paused);
+    syncMusic();
     if (game.paused) {
       ticker.stop();
     } else {
@@ -577,12 +703,16 @@ class _GameScreenState extends State<GameScreen>
   }
 
   int worldLevel(int index) => switch (arcadeModes[index]) {
-    GameMode.classic => classicContinueLevel,
+    GameMode.classic =>
+      tutorialActive && tutorialStep == TutorialStep.classicPlay
+          ? 1
+          : classicContinueLevel,
     GameMode.laserMaze => profile.mazeLevel.clamp(1, LaserMazeRoute.count),
     _ => 1,
   };
 
   void prepareWorld(int index, {bool retry = false}) {
+    analytics.selectMode(arcadeModes[index]);
     ticker.stop();
     previous = null;
     accumulator = 0;
@@ -598,6 +728,7 @@ class _GameScreenState extends State<GameScreen>
     game.cabinet = profile.cabinet;
     game.cosmetic = profile.selectedBall;
     game.platformStyle = profile.selectedPlatform;
+    game.cabinet = profile.cabinet;
     game.analogSensitivity = profile.analogSensitivity;
     game.twoFingerSensitivity = profile.twoFingerSensitivity;
     game.infiniteStartingPace = InfiniteTuning.startingPace(
@@ -608,7 +739,12 @@ class _GameScreenState extends State<GameScreen>
       levelNumber: worldLevel(index),
       waitForInput: true,
     );
+    tutorialRun = tutorialActive && tutorialStep.inInfinite && game.infinite
+        ? TutorialRun(game, profile.tutorial, tutorialChanged)
+        : null;
+    tutorialRun?.configure();
     observedLives = game.lives;
+    syncMusic();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       for (final neighbor in [index - 1, index + 1]) {
@@ -657,6 +793,7 @@ class _GameScreenState extends State<GameScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed && game.started && !game.finished) {
+      unawaited(profile.saveTutorial());
       if (game.waitingForInput) {
         clearControls();
         return;
@@ -667,14 +804,17 @@ class _GameScreenState extends State<GameScreen>
         ticker.stop();
       });
     }
+    syncMusic();
   }
 
   @override
   void dispose() {
     game.onInputStarted = null;
     profile.bankCoins(game);
+    unawaited(profile.saveTutorial());
     WidgetsBinding.instance.removeObserver(this);
     HardwareKeyboard.instance.removeHandler(onKey);
+    unawaited(feedback.updateMusic(track: null, playing: false));
     ticker.dispose();
     entrance.dispose();
     heartEffects.clear();
@@ -685,6 +825,10 @@ class _GameScreenState extends State<GameScreen>
     super.dispose();
   }
 
+  /// Foreground follows the currently visible Infinite background.
+  Color get chromeInk =>
+      game.infinite ? infiniteBoardInk(game, const Offset(180, 500)) : ink;
+
   TextStyle label([Color color = ink]) => TextStyle(
     fontSize: 10,
     letterSpacing: 1.8,
@@ -693,34 +837,152 @@ class _GameScreenState extends State<GameScreen>
   );
 
   @override
-  Widget build(BuildContext context) {
-    if (tutorialOpen) {
-      return FirstPlayTutorial(
-        control: profile.controlMode,
-        onLessonComplete: (step) => playtest.record("tutorial_step", {
-          "step": step,
-          "control": profile.controlMode.name,
-        }),
-        onExit: (completed) => playtest.record(
-          completed ? "tutorial_completed" : "tutorial_skipped",
-        ),
-        analogSensitivity: profile.analogSensitivity,
-        twoFingerSensitivity: profile.twoFingerSensitivity,
-        onControlChanged: (mode) {
-          playtest.record("tutorial_control_changed", {"control": mode.name});
-          profile.controlMode = mode;
-          unawaited(profile.save());
-        },
-        onDone: () {
-          unawaited(profile.completeTutorial());
-          setState(() {
-            tutorialOpen = false;
-            prepareInfinite();
-          });
-        },
-      );
-    }
-    return playScreen(context);
+  Widget build(BuildContext context) => playScreen(context);
+
+  Widget? tutorialOverlay() {
+    if (!tutorialActive ||
+        tutorialSheetOpen ||
+        returning ||
+        game.paused ||
+        game.finished)
+      return null;
+    final step = tutorialStep;
+    final guidedPlay = step.scripted && game.infinite;
+    final objective =
+        step == TutorialStep.classicPlay &&
+        game.mode == GameMode.classic &&
+        game.waitingForInput;
+    final menu =
+        game.waitingForInput && entrance.isDismissed && !step.inInfinite;
+    if (!guidedPlay && !objective && !menu) return null;
+    if (step == TutorialStep.freePlay) return null;
+    final message = switch (step) {
+      TutorialStep.controls => 'Drag to control the platform.',
+      TutorialStep.heartsHoles => 'Avoid holes. A fall costs 1 heart.',
+      TutorialStep.heartsFeedback =>
+        game.misses > 0
+            ? 'One heart lost. Keep going.'
+            : 'Keep going. Protect your hearts.',
+      TutorialStep.coins => 'Collect coins.',
+      TutorialStep.coinsFeedback => 'Coin saved. Spend it later.',
+      TutorialStep.shield => 'Shield protects you from danger.',
+      TutorialStep.shieldFeedback => 'Protected! Watch the blue ring.',
+      TutorialStep.metrics => 'Climb higher. Grow your score.',
+      TutorialStep.combo => 'Collect the gold crystal.',
+      TutorialStep.comboFeedback => 'Collect crystals to grow your Combo.',
+      TutorialStep.shop ||
+      TutorialStep.shopBall ||
+      TutorialStep.shopPlatform ||
+      TutorialStep.shopBrowse => 'Spend your coins and customize your game.',
+      TutorialStep.levels => 'There are more ways to play. Open Levels.',
+      TutorialStep.level1 => 'Open Levels, then choose Level 1.',
+      TutorialStep.classicPlay =>
+        'Reach glowing holes in order, 1–10. Avoid dark holes. Drag to begin.',
+      TutorialStep.dailyChallenge =>
+        'Daily Challenge: a new board each day. Earn stars and beat your best.',
+      _ => '',
+    };
+    return TutorialSpotlight(
+      key: const ValueKey('onboarding-spotlight'),
+      message: message,
+      onSkip: skipTutorial,
+      listenable: frame,
+      blockOutside: menu && !objective,
+      bottomInset: guidedPlay || objective ? OneFingerControls.height + 12 : 16,
+      messageTop: guidedPlay || objective
+          ? MediaQuery.paddingOf(context).top + 118
+          : null,
+      targets: (layer) {
+        final result = <Rect>[];
+        void ui(GlobalKey key) {
+          final r = tutorialTarget(key, layer);
+          if (r != null) result.add(r);
+        }
+
+        final board = boardKey.currentContext?.findRenderObject() as RenderBox?;
+        void worldPoint(double x, double y, [double radius = 22]) {
+          if (board == null || !board.hasSize) return;
+          final viewport = BoardViewport.forGame(
+            Size(
+              board.size.width,
+              math.max(
+                1,
+                board.size.height -
+                    (game.oneFinger ? OneFingerControls.height : 0),
+              ),
+            ),
+            game,
+            fillWidth: expansion,
+          );
+          final point = layer.globalToLocal(
+            board.localToGlobal(viewport.project(Offset(x, game.screenY(y)))),
+          );
+          result.add(
+            Rect.fromCircle(center: point, radius: radius * viewport.scale),
+          );
+        }
+
+        void controls() {
+          if (game.analog) {
+            ui(analogKey);
+            return;
+          }
+          if (board == null || !board.hasSize) return;
+          if (game.oneFinger) {
+            final top = layer.globalToLocal(
+              board.localToGlobal(
+                Offset(12, board.size.height - OneFingerControls.height + 10),
+              ),
+            );
+            result.add(
+              top & Size(board.size.width - 24, OneFingerControls.height - 20),
+            );
+          } else {
+            worldPoint(20, game.left, 28);
+            worldPoint(340, game.right, 28);
+          }
+        }
+
+        if (objective) {
+          worldPoint(game.activeHole.x, game.activeHole.y);
+          controls();
+        } else if (menu) {
+          ui(
+            step.inShop
+                ? tutorialShopKey
+                : step == TutorialStep.dailyChallenge
+                ? tutorialDailyKey
+                : tutorialLevelsKey,
+          );
+        } else {
+          switch (step) {
+            case TutorialStep.controls:
+              controls();
+            case TutorialStep.heartsHoles:
+              if (tutorialRun?.hole case final hole?)
+                worldPoint(hole.x, hole.y);
+              ui(tutorialHeartsKey);
+            case TutorialStep.heartsFeedback:
+              ui(tutorialHeartsKey);
+            case TutorialStep.coins:
+              if (tutorialRun?.coin case final coin?)
+                worldPoint(coin.x, coin.y);
+            case TutorialStep.coinsFeedback:
+              ui(tutorialCoinsKey);
+            case TutorialStep.shield || TutorialStep.combo:
+              if (tutorialRun?.pickup case final item?)
+                worldPoint(item.x, item.y);
+            case TutorialStep.shieldFeedback:
+              worldPoint(game.ballX, game.ballY, 28);
+            case TutorialStep.metrics || TutorialStep.comboFeedback:
+              ui(tutorialScoreKey);
+            default:
+              break;
+          }
+        }
+        return result;
+      },
+    );
   }
 
   Future<void> showModes() => showModalBottomSheet<void>(
@@ -767,124 +1029,351 @@ class _GameScreenState extends State<GameScreen>
     },
   );
 
-  /// Three tight lines. Everything the run needs, and no more, so the board
-  /// keeps the height instead of the chrome.
-  Widget scoreboard() {
-    final infinite = game.infinite;
-    final detail = infinite
-        ? 'PACE x${game.paceLevel} · COMBO x${game.survival.combo}'
-              '${game.survival.scoreBoost > 1 ? ' · GEAR x${formatBoost(game.survival.scoreBoost)}' : ''}'
-        : game.finale
-        ? (game.hazardLabel.isEmpty
-              ? 'FINALE · ${game.finaleTitle}'
-              : game.hazardLabel)
-        : game.practice || game.merging || game.maze
-        ? ''
-        : '${formatRunTime(game.elapsed)} / ${formatRunTime(game.targetTime)} · ${game.coinsCollected}/${game.coins.length} COINS';
-    final caption = infinite
-        ? (game.survival.shield > 0
-              ? 'SHIELD ${game.survival.shield.ceil()}s'
-              : game.survival.recovery > 0
-              ? 'RECOVERY ${game.survival.recovery.ceil()}s'
-              : game.survival.noticeTime > 0
-              ? game.survival.notice
-              : game.dangerActive
-              ? 'RED RISING'
-              : game.hazardLabel.isNotEmpty
-              ? game.hazardLabel
-              : game.section.label)
-        : game.maze
-        ? game.mazeRun.name.toUpperCase()
-        : game.merging
-        ? 'MERGE SMALL · DODGE BIG'
-        : '${game.daily ? 'DAILY' : 'L${game.level.toString().padLeft(2, '0')}'}  •  HOLE ${game.target.clamp(1, 10).toString().padLeft(2, '0')} / 10';
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                game.mazeEndless
-                    ? 'LASER MAZE / ENDLESS'
-                    : game.maze
-                    ? 'LASER MAZE / ROUTE ${game.level}'
-                    : game.merging
-                    ? '2048 / SCORE'
-                    : infinite
-                    ? 'INFINITE / POINTS'
-                    : 'SCORE',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: label(),
-              ),
-            ),
-            if (detail.isNotEmpty)
-              Flexible(
-                child: Text(
-                  detail,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 10,
-                    letterSpacing: .8,
-                    fontWeight: FontWeight.w600,
-                    color: ink.withAlpha(185),
+  Widget boardChrome() {
+    if (tutorialActive &&
+        tutorialStep == TutorialStep.classicPlay &&
+        game.waitingForInput)
+      return const SizedBox();
+    if (game.waitingForInput && !(tutorialActive && tutorialStep.inInfinite)) {
+      if (game.mode != GameMode.classic && !game.maze) return const SizedBox();
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 22),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: SizedBox(
+              width: 240,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FilledButton.icon(
+                    key: const ValueKey('choose-level'),
+                    onPressed: carouselMoving
+                        ? null
+                        : game.maze
+                        ? selectMaze
+                        : selectLevel,
+                    icon: const Icon(Icons.grid_view_rounded, size: 18),
+                    label: const Text('Choose Level'),
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  IgnorePointer(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: cream.withAlpha(220),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'Level ${game.level} · ${game.maze ? game.mazeRun.name : ClassicLevels.definition(game.level).name}',
+                        key: const ValueKey('board-level-name'),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: ink,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-          ],
-        ),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(
-              game.mazeEndless
-                  ? '${game.score}m'
-                  : game.maze
-                  ? '${game.score}%'
-                  : game.score.toString().padLeft(5, '0'),
-              style: const TextStyle(
-                fontSize: 26,
-                height: 1.1,
-                fontWeight: FontWeight.w800,
-                fontFamily: 'monospace',
-              ),
-            ),
-            const Spacer(),
-            Text(
-              game.maze
-                  ? formatRunTime(game.elapsed)
-                  : game.merging
-                  ? 'TOP ${formatMergeNumber(game.mergeRun.highest)}'
-                  : infinite
-                  ? '${game.metres}m'
-                  : game.practice
-                  ? 'PRACTICE'
-                  : '${game.lives} BALLS',
-              style: label(),
-            ),
-          ],
-        ),
-        // Reserved line: notices and timers must never resize the header.
-        SizedBox(
-          height: 15,
-          child: Text(
-            caption,
-            key: const ValueKey('protection-status'),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: label(
-              game.dangerActive ||
-                      game.hazardLabel.isNotEmpty ||
-                      game.survival.shield > 0
-                  ? orange
-                  : ink,
             ),
           ),
         ),
-      ],
+      );
+    }
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        child: AnimatedBuilder(
+          animation: Listenable.merge([hud, backdrop]),
+          builder: (context, _) {
+            final color = game.infinite
+                ? infiniteBoardInk(game, const Offset(110, 60))
+                : chromeInk;
+            if (game.infinite) {
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  final sideWidth = math.min(72.0, constraints.maxWidth * .25);
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        key: tutorialHeartsKey,
+                        width: sideWidth,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: Semantics(
+                            key: const ValueKey('board-hearts'),
+                            label: '${game.lives} of 3 hearts remaining',
+                            excludeSemantics: true,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  for (var i = 0; i < 3; i++)
+                                    Icon(
+                                      i < game.lives
+                                          ? Icons.favorite_rounded
+                                          : Icons.favorite_border_rounded,
+                                      key: ValueKey('board-heart-$i'),
+                                      size: 20,
+                                      color: i < game.lives
+                                          ? const Color(0xFFEF6958)
+                                          : color.withAlpha(130),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: IgnorePointer(
+                          key: tutorialScoreKey,
+                          child: Column(
+                            key: const ValueKey('board-hud'),
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  '${game.score}',
+                                  key: const ValueKey('infinite-score'),
+                                  style: TextStyle(
+                                    color: color,
+                                    fontSize: 30,
+                                    height: 1.15,
+                                    fontWeight: FontWeight.w800,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                '${game.survival.combo}×${game.survival.combo == InfiniteTuning.maxCombo ? ' MAX' : ''}',
+                                style: TextStyle(
+                                  color: color,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              if (game.survival.noticeTime > 0)
+                                Text(
+                                  game.survival.notice,
+                                  key: const ValueKey('infinite-pickup-notice'),
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: color,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              if (game.survival.protected)
+                                Text(
+                                  game.survival.shield > 0
+                                      ? 'SHIELD ${game.survival.shield.ceil()}s'
+                                      : 'RECOVERY ${game.survival.recovery.ceil()}s',
+                                  key: const ValueKey('protection-status'),
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: color, fontSize: 10),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: sideWidth,
+                        child: Align(
+                          alignment: Alignment.topRight,
+                          child: IconButton.filledTonal(
+                            key: const ValueKey('board-pause'),
+                            tooltip: game.paused ? 'Resume' : 'Pause',
+                            onPressed: pause,
+                            style: IconButton.styleFrom(
+                              backgroundColor: color.withAlpha(24),
+                              foregroundColor: color,
+                            ),
+                            icon: Icon(
+                              game.paused
+                                  ? Icons.play_arrow_rounded
+                                  : Icons.pause_rounded,
+                              size: 22,
+                              color: color,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: IgnorePointer(
+                    child: Container(
+                      key: const ValueKey('board-hud'),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color:
+                            (color == Colors.white
+                                    ? Colors.black
+                                    : Colors.white)
+                                .withAlpha(45),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  game.maze
+                                      ? '${game.score}%'
+                                      : '${game.score}',
+                                  maxLines: 1,
+                                  style: TextStyle(
+                                    color: color,
+                                    fontSize: 21,
+                                    height: 1,
+                                    fontWeight: FontWeight.w800,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ),
+                              Flexible(
+                                child: Text(
+                                  game.scrolling
+                                      ? '${game.metres}m'
+                                      : game.merging
+                                      ? 'TOP ${formatMergeNumber(game.mergeRun.highest)}'
+                                      : formatRunTime(game.elapsed),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: color,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            game.infinite
+                                ? 'PACE ${game.paceLevel} · ${game.survival.combo}×${game.survival.combo == InfiniteTuning.maxCombo ? ' MAX' : ''}'
+                                : game.maze
+                                ? 'ROUTE ${game.level}'
+                                : game.merging
+                                ? 'MERGE'
+                                : game.practice
+                                ? 'PRACTICE'
+                                : 'L${game.level} · TARGET ${game.target.clamp(1, 10)}/10',
+                            style: TextStyle(
+                              color: color.withAlpha(210),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          if (game.merging)
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: SizedBox(
+                                width: 240,
+                                child: MergeStatus(run: game.mergeRun),
+                              ),
+                            ),
+                          if (!game.practice)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Semantics(
+                                key: const ValueKey('board-hearts'),
+                                label:
+                                    '${game.lives} of ${game.maze || game.merging ? 1 : 3} hearts remaining',
+                                excludeSemantics: true,
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerLeft,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      for (
+                                        var i = 0;
+                                        i < (game.maze || game.merging ? 1 : 3);
+                                        i++
+                                      )
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            right: 4,
+                                          ),
+                                          child: Icon(
+                                            i < game.lives
+                                                ? Icons.favorite_rounded
+                                                : Icons.favorite_border_rounded,
+                                            key: ValueKey('board-heart-$i'),
+                                            size: 20,
+                                            color: i < game.lives
+                                                ? const Color(0xFFEF6958)
+                                                : color.withAlpha(130),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          if (game.infinite && game.survival.protected)
+                            Text(
+                              game.survival.shield > 0
+                                  ? 'SHIELD ${game.survival.shield.ceil()}s'
+                                  : 'RECOVERY ${game.survival.recovery.ceil()}s',
+                              key: const ValueKey('protection-status'),
+                              style: TextStyle(color: color, fontSize: 10),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filledTonal(
+                  key: const ValueKey('board-pause'),
+                  tooltip: game.paused ? 'Resume' : 'Pause',
+                  onPressed: pause,
+                  style: IconButton.styleFrom(
+                    backgroundColor: color.withAlpha(24),
+                    foregroundColor: color,
+                  ),
+                  icon: Icon(
+                    game.paused
+                        ? Icons.play_arrow_rounded
+                        : Icons.pause_rounded,
+                    size: 22,
+                    color: color,
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -899,16 +1388,14 @@ class _GameScreenState extends State<GameScreen>
   String worldTitle(int index) => switch (index) {
     0 => 'Infinite',
     1 => 'Classic',
-    2 => 'Maze Infinite',
-    3 => 'Maze',
+    2 => 'Maze',
     _ => '2048 Merge',
   };
 
   String worldSubtitle(int index) => switch (index) {
     0 => 'NO FINISH LINE. FIND YOUR FLOW.',
     1 => 'Classic • Level ${worldLevel(index)}',
-    2 => 'ONE ROAD. ENDLESS POSSIBILITIES.',
-    3 => 'Maze • Level ${worldLevel(index)}',
+    2 => 'Maze • Level ${worldLevel(index)}',
     _ => 'SMALL NUMBERS. BIG POSSIBILITIES.',
   };
 
@@ -919,7 +1406,8 @@ class _GameScreenState extends State<GameScreen>
   };
 
   bool acceptsWorldSwipe(Offset global) {
-    if (!game.waitingForInput ||
+    if (tutorialActive ||
+        !game.waitingForInput ||
         returning ||
         !entrance.isDismissed ||
         carouselMoving ||
@@ -973,58 +1461,20 @@ class _GameScreenState extends State<GameScreen>
         ),
       ),
       child: active
-          ? Stack(
-              fit: StackFit.expand,
-              children: [
-                IgnorePointer(
-                  ignoring: carouselMoving,
-                  child: PivotBoard(
-                    key: boardKey,
-                    game: game,
-                    frame: frame,
-                    fillWidth: expansion,
-                    showHint:
-                        game.waitingForInput &&
-                        !carouselMoving &&
-                        !returning &&
-                        entrance.isDismissed,
-                  ),
-                ),
-                // Rides the cabinet's top-right corner while the board waits.
-                if (game.waitingForInput && !returning)
-                  LayoutBuilder(
-                    builder: (context, bounds) {
-                      final corner = BoardViewport.forGame(
-                        Size(
-                          bounds.maxWidth,
-                          math.max(
-                            1,
-                            bounds.maxHeight -
-                                (game.oneFinger
-                                    ? OneFingerControls.height
-                                    : 0),
-                          ),
-                        ),
-                        game,
-                        fillWidth: expansion,
-                      ).rect.topRight;
-                      return Stack(
-                        children: [
-                          Positioned(
-                            // Straddle the corner outward so the coin badge
-                            // beneath it stays readable.
-                            right: (bounds.maxWidth - corner.dx - 29).clamp(
-                              2.0,
-                              bounds.maxWidth,
-                            ),
-                            top: (corner.dy - 29).clamp(2.0, bounds.maxHeight),
-                            child: shopButton(),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-              ],
+          ? IgnorePointer(
+              ignoring: carouselMoving,
+              child: PivotBoard(
+                key: boardKey,
+                game: game,
+                frame: frame,
+                fillWidth: expansion,
+                overlay: boardChrome(),
+                showHint:
+                    game.waitingForInput &&
+                    !carouselMoving &&
+                    !returning &&
+                    entrance.isDismissed,
+              ),
             )
           : Opacity(
               opacity: 1 - expansion,
@@ -1056,13 +1506,14 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  /// Corner shortcut into the gear shop, offered only while a board waits.
+  /// Fixed header shortcut into the gear shop while selecting a mode.
   Widget shopButton() => Semantics(
     button: true,
     label: 'Gear shop',
     child: Tooltip(
       message: 'Gear shop',
       child: Material(
+        key: tutorialShopKey,
         color: cream,
         shape: CircleBorder(side: BorderSide(color: ink.withAlpha(40))),
         elevation: 3,
@@ -1074,11 +1525,7 @@ class _GameScreenState extends State<GameScreen>
           child: const SizedBox(
             width: 42,
             height: 42,
-            child: Icon(
-              Icons.storefront_rounded,
-              size: 22,
-              color: ink,
-            ),
+            child: Icon(Icons.storefront_rounded, size: 22, color: ink),
           ),
         ),
       ),
@@ -1094,11 +1541,55 @@ class _GameScreenState extends State<GameScreen>
       children: [
         Row(
           children: [
-            Text(
-              'GILT',
-              style: label().copyWith(letterSpacing: 5, fontSize: 13),
+            Expanded(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'GILT',
+                  style: label().copyWith(letterSpacing: 5, fontSize: 13),
+                ),
+              ),
             ),
-            const Spacer(),
+            IconButton.filledTonal(
+              tooltip: 'Daily prizes',
+              onPressed: carouselMoving ? null : showDailyPrizes,
+              icon: Badge(
+                isLabelVisible: profile.dailyPrizes.canClaim(DateTime.now()),
+                child: const Icon(Icons.redeem_rounded),
+              ),
+            ),
+            if (tutorialActive &&
+                game.waitingForInput &&
+                !returning &&
+                [
+                  TutorialStep.levels,
+                  TutorialStep.level1,
+                  TutorialStep.classicPlay,
+                ].contains(tutorialStep))
+              IconButton.filledTonal(
+                key: tutorialLevelsKey,
+                tooltip: 'Classic levels',
+                onPressed: selectLevel,
+                icon: const Icon(Icons.grid_view_rounded),
+              ),
+            if (tutorialActive &&
+                game.waitingForInput &&
+                !returning &&
+                tutorialStep == TutorialStep.dailyChallenge)
+              IconButton.filledTonal(
+                key: tutorialDailyKey,
+                tooltip: 'Daily Challenge',
+                onPressed: () {
+                  skipTutorial();
+                  showDaily();
+                },
+                icon: const Icon(Icons.today_outlined),
+              ),
+            if (game.waitingForInput && !returning) ...[
+              shopButton(),
+              const SizedBox(width: 8),
+            ],
             IconButton(
               tooltip: 'Modes',
               onPressed: carouselMoving ? null : showModes,
@@ -1166,7 +1657,7 @@ class _GameScreenState extends State<GameScreen>
       ),
       for (var index = 0; index < arcadeModes.length; index++)
         Semantics(
-          label: '${worldTitle(index)}, ${index + 1} of 5',
+          label: '${worldTitle(index)}, ${index + 1} of ${arcadeModes.length}',
           selected: selectedMode == index,
           button: true,
           child: GestureDetector(
@@ -1198,7 +1689,7 @@ class _GameScreenState extends State<GameScreen>
       IconButton(
         tooltip: 'Next mode',
         visualDensity: VisualDensity.compact,
-        onPressed: selectedMode < 4 && !carouselMoving
+        onPressed: selectedMode < arcadeModes.length - 1 && !carouselMoving
             ? () => carouselKey.currentState?.select(selectedMode + 1)
             : null,
         icon: const Icon(Icons.chevron_right_rounded, size: 18),
@@ -1210,7 +1701,11 @@ class _GameScreenState extends State<GameScreen>
     body: ModeCarousel(
       key: carouselKey,
       selected: selectedMode,
-      locked: !game.waitingForInput || returning || !entrance.isDismissed,
+      locked:
+          tutorialActive ||
+          !game.waitingForInput ||
+          returning ||
+          !entrance.isDismissed,
       expansion: expansion,
       controlInset: game.oneFinger ? OneFingerControls.height : 0,
       acceptSwipe: acceptsWorldSwipe,
@@ -1236,9 +1731,7 @@ class _GameScreenState extends State<GameScreen>
                 MediaQuery.textScalerOf(context).scale(10) <= 10
             ? 104.0
             : 144.0;
-        final headerHeight =
-            menuHeaderHeight +
-            ((game.infinite ? 72.0 : 66.0) - menuHeaderHeight) * expansion;
+        final headerHeight = menuHeaderHeight * (1 - expansion);
         return ColoredBox(
           color: background,
           child: Stack(
@@ -1262,116 +1755,33 @@ class _GameScreenState extends State<GameScreen>
                 key: const ValueKey('arcade-stage'),
                 child: Column(
                   children: [
-                    SizedBox(
-                      height: headerHeight,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 4,
-                        ),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            IgnorePointer(
+                    if (headerHeight > .1)
+                      SizedBox(
+                        height: headerHeight,
+                        child: ClipRect(
+                          child: OverflowBox(
+                            alignment: Alignment.topCenter,
+                            minHeight: menuHeaderHeight,
+                            maxHeight: menuHeaderHeight,
+                            child: IgnorePointer(
                               ignoring: !ready,
                               child: ExcludeSemantics(
                                 excluding: !ready,
                                 child: Opacity(
                                   opacity: chromeOpacity,
-
-                                  child: FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    alignment: Alignment.topLeft,
-                                    child: SizedBox(
-                                      width:
-                                          MediaQuery.sizeOf(context).width - 40,
-                                      height: menuHeaderHeight - 8,
-                                      child: selectionHeader(page),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                      vertical: 4,
                                     ),
+                                    child: selectionHeader(page),
                                   ),
                                 ),
                               ),
                             ),
-                            IgnorePointer(
-                              ignoring: ready,
-                              child: ExcludeSemantics(
-                                excluding: ready,
-                                child: Opacity(
-                                  opacity: 1 - chromeOpacity,
-
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: AnimatedBuilder(
-                                          animation: hud,
-                                          builder: (context, _) => FittedBox(
-                                            fit: BoxFit.scaleDown,
-                                            alignment: Alignment.centerLeft,
-                                            child: SizedBox(
-                                              width:
-                                                  MediaQuery.sizeOf(
-                                                    context,
-                                                  ).width -
-                                                  100,
-                                              child: scoreboard(),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      IconButton.filledTonal(
-                                        tooltip: game.paused
-                                            ? 'Resume'
-                                            : 'Pause',
-                                        onPressed: pause,
-                                        iconSize: 30,
-                                        constraints: const BoxConstraints
-                                            .tightFor(width: 52, height: 52),
-                                        style: IconButton.styleFrom(
-                                          padding: EdgeInsets.zero,
-                                          backgroundColor: ink.withAlpha(22),
-                                          foregroundColor: ink,
-                                        ),
-                                        icon: Icon(
-                                          game.paused
-                                              ? Icons.play_arrow_rounded
-                                              : Icons.pause_rounded,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                    // This slot stays the same size after the starting touch.
-                    SizedBox(
-                      height: 26,
-                      child: chromeOpacity > 0
-                          ? Opacity(
-                              opacity: chromeOpacity,
-                              child: Center(
-                                child: Text(
-                                  '$startInstruction · ${profile.controlMode.label}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            )
-                          : game.merging
-                          ? AnimatedBuilder(
-                              animation: frame,
-                              builder: (context, _) =>
-                                  MergeStatus(run: game.mergeRun),
-                            )
-                          : status(),
-                    ),
                     Expanded(
                       child: Padding(
                         padding: EdgeInsets.symmetric(
@@ -1439,6 +1849,54 @@ class _GameScreenState extends State<GameScreen>
                     child: boardOverlay(),
                   ),
                 ),
+              if (game.infinite && !game.waitingForInput ||
+                  tutorialActive && tutorialStep.inInfinite)
+                Positioned(
+                  top: MediaQuery.paddingOf(context).top + 70,
+                  right: 24,
+                  child: IgnorePointer(
+                    child: AnimatedBuilder(
+                      animation: hud,
+                      builder: (context, _) => Container(
+                        key: tutorialCoinsKey,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: cream.withAlpha(220),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.toll, size: 15, color: orange),
+                            const SizedBox(width: 4),
+                            AnimatedSwitcher(
+                              key: const ValueKey('run-coins'),
+                              duration: MediaQuery.disableAnimationsOf(context)
+                                  ? Duration.zero
+                                  : const Duration(milliseconds: 260),
+                              transitionBuilder: (child, animation) =>
+                                  ScaleTransition(
+                                    scale: animation,
+                                    child: child,
+                                  ),
+                              child: Text(
+                                '${profile.wallet}',
+                                key: ValueKey(profile.wallet),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: ink,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               IgnorePointer(
                 child: RepaintBoundary(
                   key: effectsKey,
@@ -1451,6 +1909,7 @@ class _GameScreenState extends State<GameScreen>
                   ),
                 ),
               ),
+              if (tutorialOverlay() case final overlay?) overlay,
             ],
           ),
         );
@@ -1469,7 +1928,7 @@ class _GameScreenState extends State<GameScreen>
           fontWeight: FontWeight.w600,
           color: game.phase == GamePhase.sinking && !game.lastSuccess
               ? orange
-              : ink.withAlpha(190),
+              : chromeInk.withAlpha(190),
         ),
       ),
     ),
@@ -1513,7 +1972,7 @@ class _GameScreenState extends State<GameScreen>
           game: game,
           newBest: newBest,
           onRetry: () => start(game.mode),
-          onNext: !game.mazeEndless && game.level < LaserMazeRoute.count
+          onNext: game.level < LaserMazeRoute.count
               ? () {
                   profile.mazeLevel = game.level + 1;
                   unawaited(profile.save());
@@ -1693,6 +2152,11 @@ class _GameScreenState extends State<GameScreen>
                             start(game.mode, challengeDate: game.dailyDate),
                         child: Text('RESTART RUN', style: label(brass)),
                       ),
+                    if (tutorialActive)
+                      TextButton(
+                        onPressed: skipTutorial,
+                        child: const Text('Skip Tutorial'),
+                      ),
                     TextButton(
                       onPressed: home,
                       child: Text(
@@ -1747,7 +2211,7 @@ class _GameScreenState extends State<GameScreen>
               guideRow(
                 '04',
                 'Go beyond ten.',
-                'Infinite begins with three hearts. A hit costs a heart and resets your combo; the ball and platform blink for 2.5 seconds of protection while you keep steering from the same position. Gold crystals build combos up to x5. Blue shields protect for 10 seconds. Rare hearts restore a life. Keep steering to escape the rising red floor.',
+                'Infinite begins with three hearts. Laser maze sections arrive from time to time: the traps stop and wide laser walls come down instead, so steer through their openings. A hit costs a heart and resets your combo; the ball and platform blink for 2.5 seconds of protection while you keep steering from the same position. Gold crystals build combos up to x10; violet and midnight tiers build toward electric cyan at x9 and a golden maximum at x10. Blue shields protect for 10 seconds. Purple magnets collect nearby coins, combo crystals, shields and hearts for 12 seconds. Rare hearts restore a life. Keep steering to escape the rising red floor.',
               ),
               const Text(
                 'Desktop: W / S = left end. ↑ / ↓ = right end. Esc = pause.',
@@ -1756,12 +2220,12 @@ class _GameScreenState extends State<GameScreen>
               guideRow(
                 '05',
                 'Watch the warnings.',
-                'Infinite starts with open spaces and builds difficulty with height. Warning holes unlock at 180m, moving holes at 350m, lasers at 600m and platform gaps at 900m. Move away from red warnings before they activate.',
+                'Infinite starts with open spaces and builds difficulty with height. Warning holes unlock at 180m, moving holes at 350m, lasers at 600m and platform gaps at 900m. Move away from red warnings before they activate. In late Infinite encounters, orbiting holes follow a marked circle.',
               ),
               guideRow(
                 '06',
                 'Stay out of the web.',
-                'Classic levels 31–50 have slow patrolling spiders. Enter a marked territory and its spider chases you. Contact ends the run immediately. Each successful target resets the spiders.',
+                'Classic levels 31–50 have slow patrolling spiders. Enter a marked territory and its spider chases you. Contact ends the run immediately. Each successful target resets the spiders. In Infinite, spiders move slowly and fire aimed webs: move away from the marked line before the slow shot arrives. Web hits cost a heart; shields block them.',
               ),
               const SizedBox(height: 20),
               guideRow(
@@ -1772,12 +2236,12 @@ class _GameScreenState extends State<GameScreen>
               guideRow(
                 '08',
                 'Take the detour.',
-                'Classic and Daily brass coins are worth 250 points. Infinite and Laser Endless coins save to your local wallet immediately. Open the Gear Shop for balls and platforms that add Infinite point multipliers; handling stays the same. Each coin can be collected once. Classic stars unlock cabinet styles with identical handling.',
+                'Classic and Daily brass coins are worth 250 points. Infinite coins save to your local wallet immediately. Open the Gear Shop for balls and platforms that add Infinite point multipliers. Selected balls also have permanent magnets with different collection ranges in Infinite; handling stays the same. Each coin can be collected once. Classic stars unlock cabinet styles with identical handling.',
               ),
               guideRow(
                 '09',
                 'Return for the daily.',
-                'The daily board changes at midnight UTC. Retry its fixed layout to improve your local record. Infinite pace rises smoothly from x1 to x5, increasing speed, distance points and obstacle frequency. A best of 150m starts future runs at x2; 450m starts at x3. Combo crystals award 50 × combo × pace points. Missing a crystal keeps your combo; losing a heart resets it.',
+                'The daily board changes at midnight UTC. Retry its fixed layout to improve your local record. Infinite pace rises smoothly from x1 to x5, increasing speed, distance points and obstacle frequency. Every run starts gently at x1; pace rises gradually over longer distances. Combo crystals award 50 × combo × pace points. Missing a crystal keeps your combo; losing a heart resets it.',
               ),
               guideRow(
                 '10',
@@ -1791,12 +2255,9 @@ class _GameScreenState extends State<GameScreen>
               TextButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  playtest.record("tutorial_started", {
-                    "control": profile.controlMode.name,
-                  });
-                  setState(() => tutorialOpen = true);
+                  replayTutorial();
                 },
-                child: const Text('REPLAY QUICK TUTORIAL'),
+                child: const Text('Replay Tutorial'),
               ),
             ],
           ),
@@ -1839,28 +2300,6 @@ class _GameScreenState extends State<GameScreen>
     ),
   );
 
-  Future<void> openCommandPanel() async {
-    commandOpen = true;
-    clearControls();
-    ticker.stop();
-    try {
-      await showMazeEditorCommand(
-        context,
-        control: profile.controlMode,
-        analogSensitivity: profile.analogSensitivity,
-        twoFingerSensitivity: profile.twoFingerSensitivity,
-      );
-    } finally {
-      if (mounted) {
-        commandOpen = false;
-        previous = null;
-        accumulator = 0;
-        if (!game.waitingForInput && !game.paused && !game.finished)
-          runTicker();
-      }
-    }
-  }
-
   Future<void> showClub() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -1898,6 +2337,15 @@ class _GameScreenState extends State<GameScreen>
                 const Text(
                   'Make yourself at home.',
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+                ),
+                TextButton.icon(
+                  key: const ValueKey('replay-tutorial'),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    replayTutorial();
+                  },
+                  icon: const Icon(Icons.school_outlined),
+                  label: const Text('Replay Tutorial'),
                 ),
                 const SizedBox(height: 14),
                 ControlOptions(
@@ -1939,10 +2387,23 @@ class _GameScreenState extends State<GameScreen>
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Arcade sounds'),
+                  title: const Text('Sound Effects'),
+                  subtitle: Text(profile.sound ? 'ON' : 'OFF'),
                   value: profile.sound,
                   onChanged: (v) {
                     update(() => profile.sound = v);
+
+                    unawaited(profile.save());
+                  },
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Music'),
+                  subtitle: Text(profile.music ? 'ON' : 'OFF'),
+                  value: profile.music,
+                  onChanged: (v) {
+                    update(() => profile.music = v);
+                    syncMusic();
                     unawaited(profile.save());
                   },
                 ),
@@ -1981,10 +2442,10 @@ class _GameScreenState extends State<GameScreen>
                 TextButton.icon(
                   onPressed: () {
                     Navigator.pop(context);
-                    showCabinet();
+                    showBallShop();
                   },
                   icon: const Icon(Icons.palette_outlined),
-                  label: const Text('Cabinet styles'),
+                  label: const Text('Shop'),
                 ),
                 TextButton.icon(
                   onPressed: () {
@@ -1993,15 +2454,6 @@ class _GameScreenState extends State<GameScreen>
                   },
                   icon: const Icon(Icons.emoji_events_outlined),
                   label: const Text('Goals, friends & backup'),
-                ),
-                TextButton.icon(
-                  key: const ValueKey('open-command'),
-                  onPressed: () {
-                    Navigator.pop(context);
-                    unawaited(openCommandPanel());
-                  },
-                  icon: const Icon(Icons.terminal, size: 18),
-                  label: const Text('Command'),
                 ),
               ],
             ),

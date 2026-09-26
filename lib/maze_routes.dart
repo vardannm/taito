@@ -11,20 +11,17 @@ class MazeLeg {
     required this.openB,
     required this.arcStart,
     required this.arcEnd,
-    required this.chunk,
   });
   final MazePoint a, b;
   final MazeRect rect;
   final double halfWidth, arcStart, arcEnd;
   final bool primary, openA, openB;
-  final int chunk;
 }
 
 class MazeBranch {
-  MazeBranch(this.points, this.halfWidth, this.fromArc, this.toArc, this.chunk);
+  MazeBranch(this.points, this.halfWidth, this.fromArc, this.toArc);
   final List<MazePoint> points;
   final double halfWidth, fromArc, toArc;
-  final int chunk;
   double get length {
     var total = 0.0;
     for (var i = 1; i < points.length; i++) {
@@ -201,18 +198,12 @@ void _buildPlan(
   double height,
   double wide,
   double narrow,
-  int chunk,
 ) {
   MazePoint point(int cell) =>
       MazePoint(columns[cell % 4], bottom - height + cell ~/ 4 * height / 5);
   final arcs = <int, double>{plan.cells.first: road.pathLength};
   for (var i = 1; i < plan.cells.length; i++) {
-    road.addLeg(
-      point(plan.cells[i - 1]),
-      point(plan.cells[i]),
-      wide,
-      chunk: chunk,
-    );
+    road.addLeg(point(plan.cells[i - 1]), point(plan.cells[i]), wide);
     arcs[plan.cells[i]] = road.pathLength;
   }
   for (final shortcut in plan.shortcuts) {
@@ -221,17 +212,12 @@ void _buildPlan(
       narrow,
       arcs[shortcut.first]!,
       arcs[shortcut.last]!,
-      chunk: chunk,
     );
   }
 }
 
 class LaserMazeRoute extends LaserMazeCorridor {
   LaserMazeRoute(int number) : number = number.clamp(1, count) {
-    if (this.number > 20) {
-      _buildCustom(customMazeLevels[this.number - 21]);
-      return;
-    }
     final random = math.Random(72031 + this.number * 997);
     if (this.number > 10) {
       _buildExpert(random);
@@ -263,7 +249,6 @@ class LaserMazeRoute extends LaserMazeCorridor {
       entryY - 96,
       halfWidth,
       15 - (this.number - 1) * .2,
-      0,
     );
     addLeg(
       centers.last,
@@ -309,7 +294,6 @@ class LaserMazeRoute extends LaserMazeCorridor {
         height,
         halfWidth,
         13 - difficulty * .15,
-        section,
       );
       bottom -= height;
     }
@@ -323,70 +307,9 @@ class LaserMazeRoute extends LaserMazeCorridor {
     rebuildWalls();
   }
 
-  LaserMazeRoute.custom(CustomMazeDefinition definition) : number = 0 {
-    _buildCustom(definition);
-  }
-  CustomMazeDefinition? _custom;
-  Map<MazeNode, int> _customDistances = {};
-  void _buildCustom(CustomMazeDefinition definition) {
-    final check = definition.analyze();
-    if (!check.valid) throw ArgumentError(check.errors.join('\n'));
-    _custom = definition;
-    _customDistances = check.distances;
-    halfWidth = check.path.last.halfWidth;
-    structure = MazeStructure.windingLoop;
-    routeTop = definition.finish.y - 40;
-    openStart = openFinish = true;
-    addLeg(
-      const MazePoint(180, bottomY),
-      CustomMazeDefinition.launch,
-      20,
-      capA: false,
-    );
-    for (final road in check.path) addLeg(road.from, road.to, road.halfWidth);
-    addLeg(
-      definition.finish,
-      MazePoint(definition.finish.x, routeTop),
-      halfWidth,
-      capB: false,
-    );
-    for (final road in definition.roads) {
-      addLeg(road.from, road.to, road.halfWidth, primary: false);
-    }
-    rebuildWalls();
-  }
-
-  @override
-  double progressAt(double x, double y) {
-    if (_custom == null) return super.progressAt(x, y);
-    var nearest = double.infinity, remaining = 0.0;
-    final gx = (x / 10).round() * 10, gy = (y / 10).round() * 10;
-    // Only nearby road nodes can be closest while the ball is on the road.
-    // This bounds authored-map progress work even for an eight-screen maze.
-    for (var dx = -50; dx <= 50; dx += 10) {
-      for (var dy = -50; dy <= 50; dy += 10) {
-        final nx = gx + dx, ny = gy + dy;
-        final value = _customDistances[(nx, ny)];
-        if (value == null) continue;
-        final distance = math.sqrt(math.pow(x - nx, 2) + math.pow(y - ny, 2));
-        if (distance < nearest) {
-          nearest = distance;
-          remaining = value + distance;
-        }
-      }
-    }
-    if (!nearest.isFinite) return 0;
-    final total = _customDistances[(180, 480)]! + 39;
-    return (1 - remaining / total).clamp(0.0, 1.0);
-  }
-
-  static int get count => 20 + customMazeLevels.length;
+  static const count = 20;
   static const bottomY = 548.0, entryY = 480.0, topY = 24.0;
-  static List<String> get names => [
-    ..._builtInNames,
-    ...customMazeLevels.map((l) => l.name),
-  ];
-  static const _builtInNames = [
+  static const names = [
     'Return bend',
     'Long crossing',
     'Split decision',
@@ -422,128 +345,16 @@ class LaserMazeRoute extends LaserMazeCorridor {
   ];
   final int number;
   double routeTop = topY;
-  bool get tall =>
-      _custom != null ? finishLineY < LaserMazeCorridor.finishY : number > 10;
-  double get finishLineY => _custom?.finish.y ?? routeTop + 20;
+  bool get tall => number > 10;
+  double get finishLineY => routeTop + 20;
   double get mapHeight => bottomY - routeTop + 24;
   late final double halfWidth;
   late final MazeStructure structure;
-  String get name => _custom?.name ?? names[number - 1];
+  String get name => names[number - 1];
   double get finishX => centers.last.x;
   int get turns => legs.where((l) => l.primary && l.a.y == l.b.y).length;
   @override
   double get finishArc => pathLength - 20;
   @override
   double get startArc => bottomY - LaserMazeCorridor.startY;
-}
-
-class MazeChunk {
-  const MazeChunk(
-    this.id,
-    this.bottom,
-    this.top,
-    this.structure,
-    this.signature,
-  );
-  final int id;
-  final double bottom, top;
-  final MazeStructure structure;
-  final String signature;
-}
-
-class EndlessMaze extends LaserMazeCorridor {
-  EndlessMaze({int? seed}) : _random = math.Random(seed) {
-    openStart = true;
-    addLeg(
-      const MazePoint(180, 548),
-      const MazePoint(180, firstTurnY),
-      halfWidthAt(0),
-      capA: false,
-    );
-    extendTo(0);
-  }
-  static const firstTurnY = 440.0, ramp = 6000.0;
-  final math.Random _random;
-  final chunks = <MazeChunk>[];
-  final _bag = <MazeStructure>[], _recent = <String>[];
-  MazeStructure? _lastStructure;
-  double _lane = 180, _topY = firstTurnY;
-  int _serial = 0, prunedLegs = 0;
-  double get lane => _lane;
-  double get topY => _topY;
-  double get climbed => 548 - _topY;
-  /// The opening is roomy and squeezes down to the veteran width over the
-  /// ramp, so the first climb is not the hardest part of a run.
-  static double halfWidthAt(double climbed) =>
-      34 - 13 * (climbed / ramp).clamp(0.0, 1.0);
-  static double legHeightAt(double climbed) =>
-      108 - 20 * (climbed / ramp).clamp(0.0, 1.0);
-
-  void extendTo(double aheadY, {double? behindY}) {
-    var changed = false;
-    while (_topY > aheadY) {
-      if (_bag.isEmpty) {
-        _bag.addAll(MazeStructure.values);
-        _bag.shuffle(_random);
-        if (_bag.last == _lastStructure) {
-          final first = _bag.first;
-          _bag[0] = _bag.last;
-          _bag[_bag.length - 1] = first;
-        }
-      }
-      final structure = _bag.removeLast();
-      _lastStructure = structure;
-      var plan = _MazePlan.generate(_random, structure);
-      for (
-        var retry = 0;
-        retry < 8 && _recent.contains(plan.signature);
-        retry++
-      ) {
-        plan = _MazePlan.generate(_random, structure);
-      }
-      _recent.add(plan.signature);
-      if (_recent.length > 8) _recent.removeAt(0);
-      final columns = [
-        60.0,
-        132.0 + _random.nextDouble() * 14,
-        212.0 + _random.nextDouble() * 14,
-        300.0,
-      ];
-      final wide = halfWidthAt(climbed), narrow = math.max(13.0, wide - 11);
-      final height =
-          legHeightAt(climbed) * 5 * (.96 + _random.nextDouble() * .12);
-      final entryX = columns[plan.cells.first % 4];
-      final id = _serial++;
-      addLeg(
-        MazePoint(_lane, _topY),
-        MazePoint(entryX, _topY),
-        wide,
-        chunk: id,
-      );
-      _buildPlan(this, plan, columns, _topY, height, wide, narrow, id);
-      chunks.add(
-        MazeChunk(id, _topY, _topY - height, structure, plan.signature),
-      );
-      _lane = columns[plan.cells.last % 4];
-      _topY -= height;
-      changed = true;
-    }
-    if (behindY != null) {
-      final stale = chunks
-          .where((c) => c.top > behindY)
-          .map((c) => c.id)
-          .toSet();
-      if (stale.isNotEmpty) {
-        if (stale.contains(0)) stale.add(-1);
-        prunedLegs += legs.where((l) => stale.contains(l.chunk)).length;
-        dropChunks(stale);
-        chunks.removeWhere((c) => stale.contains(c.id));
-        changed = true;
-      }
-    }
-    if (changed) rebuildWalls();
-  }
-
-  @override
-  double progressAt(double x, double y) => 0;
 }

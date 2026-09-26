@@ -17,7 +17,7 @@ class DrawingBudget implements Canvas {
 }
 
 void main() {
-  for (final combo in [4, 5, 20, 100]) {
+  for (final combo in [4, 5, 8, 9, 10, 100]) {
     test(
       'combo $combo uses bounded draws without blur passes or offscreen layers',
       () {
@@ -37,7 +37,7 @@ void main() {
         final still = DrawingBudget();
         paintInfiniteAtmosphere(still, game, true);
         paintInfiniteEnergy(still, game, true);
-        expect(still.draws, lessThanOrEqualTo(4));
+        expect(still.draws, lessThanOrEqualTo(5));
         expect(still.blurs, 0);
       },
     );

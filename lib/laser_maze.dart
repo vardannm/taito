@@ -1,8 +1,6 @@
 import 'dart:math' as math;
 
 part 'maze_routes.dart';
-part 'maze_editor_model.dart';
-part 'custom_maze_levels.dart';
 
 class MazePoint {
   const MazePoint(this.x, this.y);
@@ -62,7 +60,6 @@ class LaserMazeCorridor {
     bool primary = true,
     double? arcStart,
     double? arcEnd,
-    int chunk = -1,
   }) {
     if (a.x == b.x && a.y == b.y) return;
     assert(a.x == b.x || a.y == b.y);
@@ -98,7 +95,6 @@ class LaserMazeCorridor {
         openB: !capB,
         arcStart: arcStart ?? _lengths.last,
         arcEnd: arcEnd ?? _lengths.last + length,
-        chunk: chunk,
       ),
     );
     if (primary) {
@@ -111,10 +107,9 @@ class LaserMazeCorridor {
     List<MazePoint> points,
     double halfWidth,
     double fromArc,
-    double toArc, {
-    int chunk = -1,
-  }) {
-    final branch = MazeBranch(points, halfWidth, fromArc, toArc, chunk);
+    double toArc,
+  ) {
+    final branch = MazeBranch(points, halfWidth, fromArc, toArc);
     branches.add(branch);
     var covered = 0.0;
     for (var i = 1; i < points.length; i++) {
@@ -127,7 +122,6 @@ class LaserMazeCorridor {
         arcStart: fromArc + (toArc - fromArc) * covered / branch.length,
         arcEnd:
             fromArc + (toArc - fromArc) * (covered + length) / branch.length,
-        chunk: chunk,
       );
       covered += length;
     }
@@ -274,22 +268,6 @@ class LaserMazeCorridor {
 
   bool contains(double x, double y) => rects.any((rect) => rect.contains(x, y));
 
-  /// Prune complete modules, retaining their branch geometry as a unit.
-  void dropChunks(Set<int> ids) {
-    final primaryCount = legs
-        .where((l) => l.primary && ids.contains(l.chunk))
-        .length;
-    legs.removeWhere((l) => ids.contains(l.chunk));
-    rects
-      ..clear()
-      ..addAll(legs.map((l) => l.rect));
-    branches.removeWhere((b) => ids.contains(b.chunk));
-    if (primaryCount > 0) {
-      centers.removeRange(0, primaryCount);
-      _lengths.removeRange(0, primaryCount);
-    }
-  }
-
   /// Branches interpolate between their junctions on the main route. A short
   /// route and its long detour therefore agree when they reconnect.
   double progressAt(double x, double y) {
@@ -394,32 +372,20 @@ class LaserMazeCorridor {
 
 class LaserMazeRun {
   LaserMazeRun(int level) : corridor = LaserMazeRoute(level);
-  LaserMazeRun.custom(CustomMazeDefinition definition)
-    : corridor = LaserMazeRoute.custom(definition);
-  LaserMazeRun.endless({int? seed}) : corridor = EndlessMaze(seed: seed);
   final LaserMazeCorridor corridor;
-  bool get endless => corridor is EndlessMaze;
   LaserMazeRoute? get route =>
       corridor is LaserMazeRoute ? corridor as LaserMazeRoute : null;
-  String get name => route?.name ?? 'Endless climb';
+  String get name => route!.name;
   bool hitLaser = false, won = false;
   double progress = 0, contactX = 180, contactY = LaserMazeCorridor.startY;
   double contactFraction = 1;
   bool get ended => hitLaser || won;
 
-  /// Keeps the endless corridor generated above the ball and trimmed below it.
-  void ensure(double ballY) {
-    final maze = corridor;
-    if (maze is EndlessMaze) {
-      maze.extendTo(ballY - 620, behindY: ballY + 800);
-    }
-  }
-
   void step(double ax, double ay, double bx, double by, double radius) {
     if (ended) return;
     final hit = corridor.firstContact(ax, ay, bx, by, radius);
     final finishY = route?.finishLineY ?? LaserMazeCorridor.finishY;
-    var finish = !endless && by < ay && ay >= finishY && by <= finishY
+    var finish = by < ay && ay >= finishY && by <= finishY
         ? (ay - finishY) / (ay - by)
         : null;
     // Only the last leg reaches the finish line: crossing it elsewhere is a

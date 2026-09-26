@@ -19,7 +19,7 @@ void main() {
 
   test('all star thresholds are reachable and exact, with level 1 free', () {
     expect(ClassicLevels.isUnlocked(1, 0), isTrue);
-    for (var level = 2; level <= 50; level++) {
+    for (var level = 2; level <= ClassicLevels.count; level++) {
       final stars = ClassicLevels.requiredStars(level);
       expect(stars, (level - 1) * 2);
       expect(stars, lessThanOrEqualTo((level - 1) * 3));
@@ -27,7 +27,7 @@ void main() {
       expect(ClassicLevels.isUnlocked(level, stars), isTrue);
     }
     expect(ClassicLevels.isUnlocked(0, 150), isFalse);
-    expect(ClassicLevels.isUnlocked(51, 150), isFalse);
+    expect(ClassicLevels.isUnlocked(ClassicLevels.count + 1, 1000), isFalse);
   });
 
   test(
@@ -55,7 +55,9 @@ void main() {
   );
 
   test('goals recommend earning a missing star instead of a locked level', () {
-    final p = PlayerProfile()..classicLevel = 50;
+    final p = PlayerProfile()
+      ..controlMode = ControlMode.twoFinger
+      ..classicLevel = 50;
     expect(NextGoal.forProfile(p).level, 1);
     p.levelRecords['twoFinger:1'] = const LevelRecord(starMask: 1);
     final goal = NextGoal.forProfile(p);
@@ -114,6 +116,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final p = PlayerProfile()
+      ..tutorialSeen = true
       ..sound = false
       ..haptics = false;
     await tester.pumpWidget(ArcadeApp(profile: p));

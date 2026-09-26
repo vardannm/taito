@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/club.dart';
 import 'package:balance_arcade/friend_challenge.dart';
 import 'package:balance_arcade/game.dart';
+import 'package:balance_arcade/levels.dart';
 import 'package:balance_arcade/profile.dart';
 import 'package:balance_arcade/progress_backup.dart';
 import 'package:balance_arcade/rewards.dart';
@@ -17,7 +18,9 @@ void main() {
         InMemorySharedPreferencesAsync.empty(),
   );
   test('next goals follow completion, clean and time stars per control', () {
-    final p = PlayerProfile()..classicLevel = 5;
+    final p = PlayerProfile()
+      ..controlMode = ControlMode.twoFinger
+      ..classicLevel = 5;
     // Stars earned with another control unlock the recommended boards.
     for (var level = 1; level <= 4; level++) {
       p.levelRecords['analog:$level'] = const LevelRecord(starMask: 7);
@@ -25,11 +28,11 @@ void main() {
     expect(NextGoal.forProfile(p).level, 5);
     p.levelRecords['twoFinger:5'] = const LevelRecord(starMask: 1);
     expect(NextGoal.forProfile(p).level, 6);
-    for (var i = 1; i <= 50; i++) {
+    for (var i = 1; i <= ClassicLevels.count; i++) {
       p.levelRecords['twoFinger:$i'] = const LevelRecord(starMask: 1);
     }
     expect(NextGoal.forProfile(p).title, contains('without a miss'));
-    for (var i = 1; i <= 50; i++) {
+    for (var i = 1; i <= ClassicLevels.count; i++) {
       p.levelRecords['twoFinger:$i'] = const LevelRecord(starMask: 7);
     }
     expect(NextGoal.forProfile(p).mode, GameMode.daily);

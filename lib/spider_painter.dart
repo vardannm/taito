@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'game.dart';
-import 'spiders.dart';
+import 'infinite_painter.dart';
 
 void paintSpiderBackdrop(Canvas c, BalanceGame game) {
   if (game.spiders.isEmpty) return;
@@ -44,66 +44,25 @@ void paintSpiderBackdrop(Canvas c, BalanceGame game) {
     c.restore();
   }
   for (final s in game.spiders) {
-    final bug = s is MazeSpider ? s : null;
-    final radius = bug?.catchingRadius ?? s.zoneRadius;
-    final center = Offset(s.zoneX, game.screenY(s.zoneY)),
-        color = bug != null
-            ? bug.active
-                  ? const Color(0xFFF25454)
-                  : bug.warning
-                  ? const Color(0xFFFFC568)
-                  : const Color(0xFF728E83)
-            : s.chasing
-            ? const Color(0xFFEF6654)
-            : const Color(0xFF725138);
-    if (bug != null && (bug.warning || bug.active)) {
-      final road = Path();
-      for (final r in game.mazeRun.corridor.rects) {
-        road.addRect(
-          Rect.fromLTRB(
-            r.left,
-            game.screenY(r.top),
-            r.right,
-            game.screenY(r.bottom),
-          ),
-        );
-      }
-      c.save();
-      c.clipPath(road);
-      c.drawCircle(
-        center,
-        radius,
-        Paint()..color = color.withAlpha(bug.active ? 105 : 40),
-      );
-      c.restore();
-      if (bug.warning) {
-        c.drawCircle(
-          center,
-          bug.maxZone,
-          Paint()
-            ..color = color.withAlpha(70)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1,
-        );
-        c.drawArc(
-          Rect.fromCircle(center: center, radius: bug.maxZone + 2),
-          -math.pi / 2,
-          math.pi * 2 * bug.warningProgress,
-          false,
-          Paint()
-            ..color = color
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 2,
-        );
-      }
-    }
+    final radius = s.zoneRadius;
+    final center = Offset(s.zoneX, game.screenY(s.zoneY));
+    final webInk = game.infinite ? infiniteBoardInk(game, center) : null;
+    thread.color =
+        webInk?.withAlpha(180) ?? const Color(0xFF193C38).withAlpha(32);
+    final color = s.chasing
+        ? (webInk == null
+              ? const Color(0xFFEF6654)
+              : webInk == Colors.white
+              ? const Color(0xFFFFB5A3)
+              : const Color(0xFFB72820))
+        : webInk ?? const Color(0xFF725138);
     c.drawCircle(
       center,
       radius,
       Paint()..color = color.withAlpha(s.chasing ? 24 : 12),
     );
     final boundary = Paint()
-      ..color = color.withAlpha(165)
+      ..color = color.withAlpha(game.infinite ? 230 : 165)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.1;
     for (var i = 0; i < 28; i++) {
@@ -134,13 +93,11 @@ void paintSpiders(Canvas c, BalanceGame game, bool reducedMotion) {
     c.translate(spider.x, game.screenY(spider.y));
     c.rotate(spider.heading);
     c.scale(spider.bodyRadius / 6);
-    final bug = spider is MazeSpider ? spider : null;
-    final color = bug != null
-        ? bug.active
-              ? const Color(0xFF9E262C)
-              : bug.warning
-              ? const Color(0xFF92601F)
-              : const Color(0xFF253C34)
+    final webInk = game.infinite
+        ? infiniteBoardInk(game, Offset(spider.x, game.screenY(spider.y)))
+        : null;
+    final color = webInk == Colors.white
+        ? (spider.chasing ? const Color(0xFFFFB5A3) : const Color(0xFFF5EFDC))
         : spider.chasing
         ? const Color(0xFF80251F)
         : const Color(0xFF253C34);
@@ -167,8 +124,75 @@ void paintSpiders(Canvas c, BalanceGame game, bool reducedMotion) {
     c.drawOval(const Rect.fromLTWH(-9, -5, 12, 10), Paint()..color = color);
     c.drawCircle(const Offset(4, 0), 4, Paint()..color = color);
     for (final y in [-1.5, 1.5]) {
-      c.drawCircle(Offset(6, y), .85, Paint()..color = const Color(0xFFEAD8A6));
+      c.drawCircle(
+        Offset(6, y),
+        .85,
+        Paint()
+          ..color = webInk == Colors.white
+              ? const Color(0xFF253C34)
+              : const Color(0xFFEAD8A6),
+      );
     }
     c.restore();
+  }
+}
+
+/// A fixed aiming line precedes each slow, non-homing web projectile.
+void paintSpiderWebShots(Canvas c, BalanceGame game, bool reducedMotion) {
+  if (!game.infinite) return;
+  for (final web in game.webShots) {
+    if (web.expired) continue;
+    final center = Offset(web.x, game.screenY(web.y));
+    final tint = infiniteBoardInk(game, center);
+    final paint = Paint()
+      ..color = tint
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.3;
+    if (web.warning) {
+      final target = Offset(web.targetX, game.screenY(web.targetY));
+      final delta = target - center;
+      for (var i = 0; i < 12; i++) {
+        c.drawLine(
+          center + delta * (i / 12),
+          center + delta * ((i + .5) / 12),
+          Paint()
+            ..color = tint.withAlpha(120)
+            ..strokeWidth = 1,
+        );
+      }
+      c.drawCircle(
+        target,
+        10,
+        Paint()
+          ..color = tint.withAlpha(130)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1,
+      );
+      c.drawArc(
+        Rect.fromCircle(center: center, radius: 14),
+        -math.pi / 2,
+        math.pi * 2 * web.age / web.warningSeconds,
+        false,
+        paint,
+      );
+    }
+    final radius = web.warning ? 7.0 : 9.0;
+    c.drawCircle(
+      center,
+      radius + 2,
+      Paint()
+        ..color = (tint == Colors.white ? Colors.black : Colors.white)
+            .withAlpha(160),
+    );
+    c.drawCircle(center, radius, paint);
+    c.drawCircle(center, radius * .45, paint);
+    for (var i = 0; i < 6; i++) {
+      final a = i * math.pi / 3 + (reducedMotion ? 0 : web.age * .7);
+      c.drawLine(
+        center,
+        center + Offset(math.cos(a), math.sin(a)) * radius,
+        paint,
+      );
+    }
   }
 }

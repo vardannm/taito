@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/game.dart';
+import 'package:balance_arcade/infinite_progress.dart';
 import 'package:balance_arcade/levels.dart';
 import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/profile.dart';
@@ -79,9 +80,9 @@ void main() {
       maxScrolls: 30,
     );
     await tester.pump(const Duration(milliseconds: 200));
-    await tester.drag(
-      find.byType(CustomScrollView).last,
-      const Offset(0, -180),
+    await Scrollable.ensureVisible(
+      tester.element(find.byKey(const ValueKey('level-50'))),
+      alignment: .5,
     );
     await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const ValueKey('level-50')));
@@ -121,6 +122,7 @@ void main() {
         for (final progress in [0, 400, 900, 1600, 2500]) {
           final g = BalanceGame(seed: seed)..start(gameMode: GameMode.infinite);
           g.cameraOffset = progress * 10.0;
+          g.maxHeight = progress * 10.0;
           g.score = progress * 20;
           g.ensureInfiniteBoard();
           var reachable = [for (var x = 60; x <= 300; x += 4) x.toDouble()];
@@ -146,7 +148,7 @@ void main() {
           // Includes the staggered band just beyond the top edge.
           expect(g.board.length, lessThanOrEqualTo(48));
           if (progress == 0) earlyCount += g.board.length;
-          if (progress == 1600) lateCount += g.board.length;
+          if (progress == 2500) lateCount += g.board.length;
         }
       }
       expect(lateCount, greaterThan(earlyCount * 2));
@@ -168,12 +170,17 @@ void main() {
     expect(signatures.length, 20);
     final g = BalanceGame()..start(gameMode: GameMode.infinite);
     var previous = g.ascentSpeed;
-    for (var score = 1; score <= 2000; score++) {
+    for (var score = 1; score <= 3000; score++) {
       g.maxHeight = score * 10.0;
       expect(g.ascentSpeed, inInclusiveRange(previous, previous + .28));
       previous = g.ascentSpeed;
     }
-    expect(previous, 216);
+    expect(
+      previous,
+      68 +
+          112 * InfiniteDifficulty.speedGrowth +
+          36 * InfiniteDifficulty.paceGrowth,
+    );
     final a = BalanceGame(seed: 17)..start(gameMode: GameMode.infinite);
     final b = BalanceGame(seed: 17)..start(gameMode: GameMode.infinite);
     expect(a.board.map((h) => h.x), b.board.map((h) => h.x));
@@ -183,7 +190,7 @@ void main() {
   });
 
   test(
-    'all 50 levels are distinct and all targets complete in both controls',
+    'all registered levels are distinct and all targets complete in every control mode',
     () {
       final layouts = <String>{};
       for (var level = 1; level <= ClassicLevels.count; level++) {
@@ -292,7 +299,7 @@ void main() {
       final g = BalanceGame()
         ..setControlMode(ControlMode.oneFinger)
         ..start(gameMode: mode);
-      if (g.infinite) g.board.clear();
+      g.board.clear(); // Platform travel only; no holes to sink into.
       final frame = ValueNotifier(0);
       await tester.pumpWidget(
         MaterialApp(
@@ -307,12 +314,37 @@ void main() {
       final scale = tester.widget<OneFingerControls>(pad).boardScale;
       final start = tester.getCenter(pad);
       final finger = await tester.startGesture(start);
+      // Tilt fully from mid-board, where every mode has room for the whole bar.
+      await finger.moveBy(Offset(0, -160 * scale));
+      g.step(1 / 120);
       await finger.moveBy(Offset(200 * scale, 0));
       g.step(1 / 120);
       expect(g.right - g.left, closeTo(140, .001));
       await finger.moveBy(Offset(-400 * scale, 0));
       g.step(1 / 120);
       expect(g.right - g.left, closeTo(-140, .001));
+      if (g.infinite) {
+        // Infinite steers one-to-one: the platform tracks the finger exactly,
+        // and a held position adds nothing of its own.
+        final before = (g.left + g.right) / 2;
+        await finger.moveBy(Offset(0, -40 * scale));
+        g.step(1 / 120);
+        expect((g.left + g.right) / 2, lessThan(before - 39));
+      } else {
+        // Levels and mazes hold a stick: pushed up and held, the platform
+        // climbs on its own until it reaches the top of its travel.
+        await finger.moveBy(const Offset(0, -60));
+        for (var i = 0; i < 360; i++) {
+          g.step(1 / 120);
+        }
+        expect(math.min(g.left, g.right), closeTo(g.minPivot, .001));
+        // Pushed the other way it runs all the way back down.
+        await finger.moveBy(const Offset(0, 400));
+        for (var i = 0; i < 720; i++) {
+          g.step(1 / 120);
+        }
+        expect(math.max(g.left, g.right), closeTo(g.maxPivot, .001));
+      }
       g.setPaused(true);
       final left = g.left;
       await finger.moveBy(Offset(50, 0));
@@ -332,7 +364,7 @@ void main() {
         InMemorySharedPreferencesAsync.empty();
     final p = PlayerProfile();
     await p.load();
-    expect(p.controlMode, ControlMode.twoFinger);
+    expect(p.controlMode, ControlMode.oneFinger);
     p.controlMode = ControlMode.oneFinger;
     p.classicLevel = 26;
     await p.save();

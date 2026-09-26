@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'game.dart';
 import 'hazards.dart';
+import 'infinite_painter.dart';
 
 const _red = Color(0xFFE34336), _white = Color(0xFFFFF1D6);
 
@@ -29,66 +30,101 @@ void paintSpecialHazards(Canvas c, BalanceGame game, bool reducedMotion) {
           ..strokeWidth = 2,
       );
     }
-    if (h.kind == HazardKind.laser) {
-      if (h.sweeping) {
+    if ((h.warning || (h.active && h.motion == HazardMotion.circle)) &&
+        h.motion != HazardMotion.legacy &&
+        h.motion != HazardMotion.stationary) {
+      final path = Paint()
+        ..color = _red.withAlpha(80)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5;
+      if (h.motion == HazardMotion.circle || h.motion == HazardMotion.oval) {
+        c.drawOval(
+          Rect.fromCenter(
+            center: Offset(h.originX, h.originY),
+            width: h.radiusX * 2,
+            height:
+                (h.motion == HazardMotion.circle ? h.radiusX : h.radiusY) * 2,
+          ),
+          path,
+        );
+      } else {
+        final delta = h.motion == HazardMotion.horizontal
+            ? Offset(h.radiusX, 0)
+            : Offset(0, h.radiusY);
         c.drawLine(
-          Offset(h.originX - 65, 48),
-          Offset(h.originX + 65, 48),
+          Offset(h.originX, h.originY) - delta,
+          Offset(h.originX, h.originY) + delta,
+          path,
+        );
+      }
+    }
+    if (h.kind == HazardKind.laser) {
+      final horizontal = h.orientation == LaserOrientation.horizontal;
+      Offset point(double along) =>
+          horizontal ? Offset(along, h.y) : Offset(h.x, along);
+      final low = horizontal ? 24.0 : SpecialHazard.laserTop(game.visibleTop),
+          high = horizontal ? 336.0 : 537.0;
+      if (h.sweeping && h.warning) {
+        c.drawLine(
+          Offset(h.originX - 65, low + 15),
+          Offset(h.originX + 65, low + 15),
           warning,
         );
-        for (final direction in [-1.0, 1.0]) {
-          final tip = Offset(h.originX + direction * 65, 48);
-          c.drawLine(tip, tip + Offset(-direction * 6, -5), warning);
-          c.drawLine(tip, tip + Offset(-direction * 6, 5), warning);
-        }
       }
       if (h.warning) {
         c.drawRect(
-          Rect.fromLTRB(h.x - 10, 35, h.x + 10, 535),
+          horizontal
+              ? Rect.fromLTRB(24, h.y - 10, 336, h.y + 10)
+              : Rect.fromLTRB(h.x - 10, low, h.x + 10, high),
           Paint()..color = _red.withAlpha(30),
         );
-        for (double y = 40; y < 530; y += 16) {
-          c.drawLine(Offset(h.x, y), Offset(h.x, y + 8), warning);
+        for (var along = low + 6; along < high - 8; along += 16) {
+          c.drawLine(point(along), point(along + 8), warning);
         }
         _caption(
           c,
+          game,
           '${h.countdown.toStringAsFixed(1)}s',
-          Offset(h.x, 62),
+          point(low + 29),
           _red,
         );
       } else if (h.active) {
         c.drawLine(
-          Offset(h.x, 40),
-          Offset(h.x, 530),
+          point(low),
+          point(high),
           Paint()
             ..color = _red.withAlpha(160)
             ..strokeWidth = 14
             ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
         );
         c.drawLine(
-          Offset(h.x, 40),
-          Offset(h.x, 530),
+          point(low),
+          point(high),
           Paint()
             ..color = _red
             ..strokeWidth = 6,
         );
         c.drawLine(
-          Offset(h.x, 40),
-          Offset(h.x, 530),
+          point(low),
+          point(high),
           Paint()
             ..color = _white
             ..strokeWidth = 2,
         );
       }
-      for (final y in [34.0, 536.0]) {
+      for (final end in [low, high]) {
         c.drawRRect(
           RRect.fromRectAndRadius(
-            Rect.fromCenter(center: Offset(h.x, y), width: 22, height: 12),
+            Rect.fromCenter(
+              center: point(end),
+              width: horizontal ? 12 : 22,
+              height: horizontal ? 22 : 12,
+            ),
             const Radius.circular(3),
           ),
           Paint()..color = const Color(0xFF163D3B),
         );
-        c.drawCircle(Offset(h.x, y), 3, Paint()..color = _red);
+        c.drawCircle(point(end), 3, Paint()..color = _red);
       }
       continue;
     }
@@ -97,7 +133,7 @@ void paintSpecialHazards(Canvas c, BalanceGame game, bool reducedMotion) {
       c.drawCircle(p, 12, warning..strokeWidth = 1);
       for (final d in [-1.0, 1.0])
         c.drawLine(p + Offset(d * 21, 0), p + Offset(d * 27, 0), warning);
-      _caption(c, h.countdown.toStringAsFixed(1), p, _red);
+      _caption(c, game, h.countdown.toStringAsFixed(1), p, _red);
     } else if (h.active) {
       c.drawCircle(p + const Offset(0, 1), 14, Paint()..color = _white);
       c.drawCircle(p, 12, Paint()..color = const Color(0xFF081F22));
@@ -112,7 +148,15 @@ void paintSpecialHazards(Canvas c, BalanceGame game, bool reducedMotion) {
           ..strokeWidth = 2,
       );
     }
-    if (h.kind == HazardKind.movingHole) {
+    if (h.kind == HazardKind.movingHole && h.motion == HazardMotion.circle) {
+      // Tangent arrow communicates the circular direction, not a sideways sweep.
+      final angle = math.atan2(h.y - h.originY, h.x - h.originX);
+      final direction = Offset(-math.sin(angle), math.cos(angle));
+      final normal = Offset(-direction.dy, direction.dx);
+      final tip = p + direction * 23;
+      c.drawLine(tip, tip - direction * 6 + normal * 4, warning);
+      c.drawLine(tip, tip - direction * 6 - normal * 4, warning);
+    } else if (h.kind == HazardKind.movingHole) {
       for (final d in [-1.0, 1.0]) {
         final tip = p + Offset(d * 29, 0);
         c.drawLine(tip, tip + Offset(-d * 5, -5), warning);
@@ -154,23 +198,30 @@ void paintGapWarning(Canvas c, BalanceGame game, bool reducedMotion) {
       }
       _caption(
         c,
+        game,
         'BREAK ${h.countdown.toStringAsFixed(1)}s',
         point(h.x) - const Offset(0, 24),
         _red,
       );
     } else if (h.active) {
       for (final p in [a, b]) c.drawCircle(p, 4, Paint()..color = _red);
-      _caption(c, 'GAP', point(h.x) + const Offset(0, 23), _red);
+      _caption(c, game, 'GAP', point(h.x) + const Offset(0, 23), _red);
     }
   }
 }
 
-void _caption(Canvas c, String value, Offset center, Color color) {
+void _caption(
+  Canvas c,
+  BalanceGame game,
+  String value,
+  Offset center,
+  Color color,
+) {
   final text = TextPainter(
     text: TextSpan(
       text: value,
       style: TextStyle(
-        color: color,
+        color: game.infinite ? infiniteBoardInk(game, center) : color,
         fontSize: 9,
         fontWeight: FontWeight.w900,
         fontFamily: 'monospace',

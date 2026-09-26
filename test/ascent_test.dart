@@ -1,8 +1,29 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/game.dart';
+import 'package:balance_arcade/infinite_progress.dart';
 import 'game_test.dart' show advance;
 
 void main() {
+  test('repeated analog lifts at the top do not accelerate the camera', () {
+    final game = BalanceGame()..start(gameMode: GameMode.infinite);
+    game.setControlMode(ControlMode.analog);
+    game.survival.shield = 10;
+    for (var i = 0; i < 10; i++) {
+      game.grabPivot(0);
+      game.grabPivot(1);
+      game.dragPivot(0, -100);
+      game.dragPivot(1, -100);
+      final camera = game.cameraOffset;
+      final travel = game.ascentSpeed / 120;
+      game.step(1 / 120);
+      expect(game.cameraOffset - camera, closeTo(travel, 1e-8));
+      expect(game.screenY(game.left), closeTo(356, 1e-8));
+      expect(game.screenY(game.right), closeTo(356, 1e-8));
+      game.releasePivot(0);
+      game.releasePivot(1);
+    }
+  });
+
   test(
     'holes approach continuously while platform stays at its screen height',
     () {
@@ -27,7 +48,10 @@ void main() {
   test('an approaching hole catches a ball even without any steering', () {
     final game = BalanceGame()..start(gameMode: GameMode.infinite);
     game.lives = 1; // Exercise final-life capture.
-    final hole = game.board.first;
+    const hole = Hole(180, 390);
+    game.board
+      ..clear()
+      ..add(hole);
     game.left = game.right = hole.y + 30;
     game.ballX = hole.x;
     advance(game, 1.5);
@@ -53,8 +77,21 @@ void main() {
     final game = BalanceGame()..start(gameMode: GameMode.infinite);
     expect(game.ascentSpeed, 68);
     game.maxHeight = 4500;
-    expect(game.ascentSpeed, 151);
+    expect(
+      game.ascentSpeed,
+      closeTo(
+        68 +
+            10.3359375 * InfiniteDifficulty.speedGrowth +
+            6.75 * InfiniteDifficulty.paceGrowth,
+        .001,
+      ),
+    );
     game.maxHeight = 100000;
-    expect(game.ascentSpeed, 216);
+    expect(
+      game.ascentSpeed,
+      68 +
+          112 * InfiniteDifficulty.speedGrowth +
+          36 * InfiniteDifficulty.paceGrowth,
+    );
   });
 }

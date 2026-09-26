@@ -53,7 +53,7 @@ void main() {
         InMemorySharedPreferencesAsync.empty();
     final game = await launch(tester, ControlMode.oneFinger);
     final preview = layout(game);
-    for (final index in [1, 2, 3, 4, 1]) {
+    for (final index in [1, 2, 3, 1]) {
       await selectWorld(tester, index);
       await selectWorld(tester, 0);
       expect(game.waitingForInput, isTrue);

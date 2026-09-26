@@ -3,6 +3,10 @@ import 'infinite_progress.dart';
 
 enum HazardKind { formingHole, movingHole, laser, platformGap }
 
+enum HazardMotion { legacy, stationary, horizontal, vertical, circle, oval }
+
+enum LaserOrientation { vertical, horizontal }
+
 /// Screen-space hazards keep their full warning visible before activation.
 /// Opened forming holes are anchored in world space, including manual camera movement.
 class SpecialHazard {
@@ -14,12 +18,25 @@ class SpecialHazard {
     this.liveSeconds = 3.0,
     this.sweeping = false,
     this.zigzag = false,
+    this.motion = HazardMotion.legacy,
+    this.orientation = LaserOrientation.vertical,
+    this.radiusX = 40,
+    this.radiusY = 25,
+    this.period = 4,
+    this.phase = 0,
     double? cameraOffset,
-  }) : originX = x,
-       _lastCameraOffset = cameraOffset;
+  }) : assert(period > 0),
+       originX = x,
+       originY = y,
+       _lastCameraOffset = cameraOffset {
+    if (motion != HazardMotion.legacy) _positionAt(0);
+  }
   final HazardKind kind;
   final bool sweeping, zigzag;
-  final double originX, warningSeconds, liveSeconds;
+  final double originX, originY, warningSeconds, liveSeconds;
+  final HazardMotion motion;
+  final LaserOrientation orientation;
+  final double radiusX, radiusY, period, phase;
   double x, y, age = 0;
   double? _worldY, _lastCameraOffset;
   double? get worldY => _worldY;
@@ -33,7 +50,9 @@ class SpecialHazard {
   String get label => switch (kind) {
     HazardKind.formingHole => warning ? 'HOLE OPENING' : 'HOLE OPEN',
     HazardKind.movingHole =>
-      zigzag
+      motion == HazardMotion.circle
+          ? (warning ? 'ORBITING HOLE INCOMING' : 'ORBITING HOLE')
+          : zigzag
           ? (warning ? 'ZIGZAG INCOMING' : 'ZIGZAG HOLE')
           : (warning ? 'MOVING HOLE INCOMING' : 'MOVING HOLE'),
     HazardKind.laser =>
@@ -51,6 +70,11 @@ class SpecialHazard {
     _from = ((warningSeconds - before) / dt).clamp(0.0, 1.0);
     _until = ((warningSeconds + liveSeconds - before) / dt).clamp(0.0, 1.0);
     final liveDt = math.max(0.0, _until - _from) * dt;
+    if (motion != HazardMotion.legacy) {
+      if (liveDt > 0)
+        _positionAt((age - warningSeconds).clamp(0.0, liveSeconds));
+      return;
+    }
     if (kind == HazardKind.formingHole && cameraOffset != null) {
       final previousCamera =
           _lastCameraOffset ?? cameraOffset - scrollSpeed * dt;
@@ -82,10 +106,42 @@ class SpecialHazard {
     }
   }
 
-  bool hits(double oldX, double oldY, double newX, double newY) =>
-      contact(oldX, oldY, newX, newY) != null;
+  void _positionAt(double seconds) {
+    final angle = phase + seconds * math.pi * 2 / period;
+    final offset = switch (motion) {
+      HazardMotion.horizontal => (radiusX * math.sin(angle), 0.0),
+      HazardMotion.vertical => (0.0, radiusY * math.sin(angle)),
+      HazardMotion.circle => (
+        radiusX * math.cos(angle),
+        radiusX * math.sin(angle),
+      ),
+      HazardMotion.oval => (
+        radiusX * math.cos(angle),
+        radiusY * math.sin(angle),
+      ),
+      _ => (0.0, 0.0),
+    };
+    x = originX + offset.$1;
+    y = originY + offset.$2;
+  }
 
-  double? contact(double oldX, double oldY, double newX, double newY) {
+  bool hits(
+    double oldX,
+    double oldY,
+    double newX,
+    double newY, {
+    double boardTop = 0,
+  }) => contact(oldX, oldY, newX, newY, boardTop: boardTop) != null;
+
+  static double laserTop(double boardTop) => boardTop + 33;
+
+  double? contact(
+    double oldX,
+    double oldY,
+    double newX,
+    double newY, {
+    double boardTop = 0,
+  }) {
     if (_until <= _from) return null;
     final ax = oldX + (newX - oldX) * _from;
     final ay = oldY + (newY - oldY) * _from;
@@ -93,7 +149,18 @@ class SpecialHazard {
     final by = oldY + (newY - oldY) * _until;
     final double? t;
     if (kind == HazardKind.laser) {
-      t = _rectContact(ax - _oldX, ay, bx - x, by, -10, 10, 33, 537);
+      t = orientation == LaserOrientation.horizontal
+          ? _rectContact(ax, ay - _oldY, bx, by - y, 24, 336, -10, 10)
+          : _rectContact(
+              ax - _oldX,
+              ay,
+              bx - x,
+              by,
+              -10,
+              10,
+              laserTop(boardTop),
+              537,
+            );
     } else if (kind == HazardKind.platformGap) {
       t = _rectContact(ax, 0, bx, 0, gapLeft + 3, gapRight - 3, -1, 1);
     } else {

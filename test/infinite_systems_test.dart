@@ -69,23 +69,24 @@ void main() {
     },
   );
   test(
-    'combo crystals award increasing points once, cap at five and survive missed items',
+    'combo crystals award increasing points once, cap at ten and survive missed items',
     () {
       final g = run();
       var total = 0;
-      for (var i = 0; i < 6; i++) {
+      for (var i = 0; i < 12; i++) {
         pickup(g, InfiniteItemKind.combo);
-        final combo = math.min(5, i + 2);
-        total += 50 * combo;
+        final combo = math.min(10, i + 2);
+        total += i >= 9 ? 300 : 50 * combo;
         expect(g.survival.combo, combo);
         expect(g.score, total);
+        if (i >= 9) expect(g.survival.notice, 'MAX COMBO  +300');
       }
       final score = g.score;
       g.step(1 / 120);
       expect(g.score, score);
       g.survival.items.add(InfiniteItem(InfiniteItemKind.combo, 40, 650));
       g.step(1 / 120);
-      expect(g.survival.combo, 5);
+      expect(g.survival.combo, 10);
       expect(g.survival.items.any((i) => i.y == 650), false);
     },
   );
@@ -119,6 +120,18 @@ void main() {
       expect(g.survival.combo, 1);
     },
   );
+  test('extra x10 crystals grant exactly 300 even with gear and high pace', () {
+    final g = run();
+    g.maxHeight = 36000;
+    g.survival = InfiniteProgress(scoreBoost: 4.5)
+      ..combo = 10
+      ..points = 1000
+      ..scoredMetres = 3600;
+    pickup(g, InfiniteItemKind.combo);
+    expect(g.score, 1300);
+    expect(g.survival.combo, 10);
+    expect(g.survival.notice, 'MAX COMBO  +300');
+  });
   for (final kind in HazardKind.values) {
     test('shield blocks $kind and recovery remains independent', () {
       final g = run();
@@ -216,21 +229,31 @@ void main() {
     'pace is continuous, capped, and experienced starts remain moderate',
     () {
       expect(InfiniteTuning.startingPace(149), 1);
-      expect(InfiniteTuning.startingPace(150), 2);
-      expect(InfiniteTuning.startingPace(450), 3);
+      expect(InfiniteTuning.startingPace(150), 1);
+      expect(InfiniteTuning.startingPace(450), 1);
       final g = run();
-      g.maxHeight = 1499.9;
+      g.maxHeight = 5999.9;
       final before = g.ascentSpeed;
-      g.maxHeight = 1500.1;
+      g.maxHeight = 6000.1;
       expect(g.paceLevel, 2);
       expect(g.ascentSpeed - before, lessThan(.01));
       g.maxHeight = 90000;
       expect(g.paceLevel, 5);
-      expect(g.ascentSpeed, 216);
+      expect(
+        g.ascentSpeed,
+        InfiniteTuning.startSpeed +
+            (InfiniteTuning.baseTopSpeed - InfiniteTuning.startSpeed) *
+                InfiniteDifficulty.speedGrowth +
+            InfiniteTuning.paceSpeedBonus * 4 * InfiniteDifficulty.paceGrowth,
+      );
       g.infiniteStartingPace = 3;
       g.start(gameMode: GameMode.infinite);
       expect(g.paceLevel, 3);
-      expect(g.ascentSpeed, 86);
+      expect(
+        g.ascentSpeed,
+        InfiniteTuning.startSpeed +
+            InfiniteTuning.paceSpeedBonus * 2 * InfiniteDifficulty.paceGrowth,
+      );
       g.survival.points = 100000;
       g.step(1 / 120);
       expect(g.specialHazards, isEmpty);
@@ -250,12 +273,17 @@ void main() {
           g.stallTime = 0;
           g.survival.shield = 100;
           g.step(1 / 120);
+          final spawned = g.survival.items
+              .where((item) => !seen.contains(item))
+              .toList();
           seen.addAll(g.survival.items);
           expect(
             g.survival.items.length,
             lessThanOrEqualTo(InfiniteTuning.maxItems),
           );
-          for (final item in g.survival.items) {
+          // Placement protects spawn positions; magnets may later pull rewards
+          // across holes on their way to the ball.
+          for (final item in spawned) {
             expect(item.x, inInclusiveRange(45, 315));
             expect(
               g.board.every(
@@ -300,7 +328,7 @@ void main() {
       p.selectBall(BallCosmetic.steel);
       p.selectBall(BallCosmetic.neon);
       expect(p.wallet, 5);
-      g.start(gameMode: GameMode.mazeEndless);
+      g.start(gameMode: GameMode.infinite);
       g.coinsCollected = 3;
       p.bankCoins(g);
       await p.saveEconomy();

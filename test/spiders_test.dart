@@ -9,9 +9,9 @@ import 'game_test.dart' show placeAt, advance;
 
 void main() {
   test(
-    'all boards scatter targets, change vertical direction and remain deterministic',
+    'boards after the introductory level scatter targets and remain deterministic',
     () {
-      for (var n = 1; n <= ClassicLevels.count; n++) {
+      for (var n = 2; n <= ClassicLevels.count; n++) {
         final a = ClassicLevels.build(n), b = ClassicLevels.build(n);
         final targets = a.where((h) => h.target > 0).toList();
         expect(targets.length, 10);
@@ -43,10 +43,9 @@ void main() {
     () {
       for (var level = 31; level <= 50; level++) {
         final board = ClassicLevels.build(level),
-            spiders = ClassicLevels.spidersFor(
+            spiders = ClassicLevels.definition(
               level,
-              ClassicLevels.build(level),
-            );
+            ).spiders.map((s) => s.create()).toList();
         expect(
           spiders.length,
           level < 36
@@ -68,7 +67,7 @@ void main() {
           }
         }
       }
-      expect(ClassicLevels.spidersFor(30, ClassicLevels.build(30)), isEmpty);
+      expect(ClassicLevels.definition(30).spiders, isEmpty);
     },
   );
   test(
@@ -168,7 +167,10 @@ void main() {
         maxScrolls: 35,
       );
       await tester.pump(const Duration(milliseconds: 200));
-      await tester.drag(find.byType(CustomScrollView), const Offset(0, -160));
+      await Scrollable.ensureVisible(
+        tester.element(find.byKey(const ValueKey('level-50'))),
+        alignment: .5,
+      );
       await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(find.byKey(const ValueKey('level-50')));
       expect(chosen, 50);

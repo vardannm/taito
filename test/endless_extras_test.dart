@@ -4,12 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/main.dart';
-import 'package:balance_arcade/laser_maze.dart';
 import 'package:balance_arcade/rewards.dart';
-import 'package:balance_arcade/spiders.dart';
 
 void main() {
-  for (final mode in [GameMode.infinite, GameMode.mazeEndless]) {
+  for (final mode in [GameMode.infinite]) {
     test('$mode generates safe random coins and bounds long-run storage', () {
       final layouts = <String>{};
       for (var seed = 0; seed < 12; seed++) {
@@ -18,25 +16,17 @@ void main() {
         layouts.add(g.coins.map((c) => '${c.x}/${c.y}').join(','));
         for (var section = 0; section < 80; section++) {
           g.cameraOffset = section * 140.0;
-          if (g.mazeEndless) g.mazeRun.ensure(360 - g.cameraOffset);
-          if (g.infinite) g.ensureInfiniteBoard();
+          g.ensureInfiniteBoard();
           g.ensureEndlessExtras();
           expect(g.coins.length, lessThan(12));
           expect(g.spiders.length, lessThan(7));
           for (final c in g.coins) {
-            if (g.mazeEndless) {
-              expect(
-                g.mazeRun.corridor.firstContact(c.x, c.y, c.x, c.y, 12),
-                isNull,
-              );
-            } else {
-              expect(
-                g.board.every(
-                  (h) => math.pow(h.x - c.x, 2) + math.pow(h.y - c.y, 2) >= 900,
-                ),
-                true,
-              );
-            }
+            expect(
+              g.board.every(
+                (h) => math.pow(h.x - c.x, 2) + math.pow(h.y - c.y, 2) >= 900,
+              ),
+              true,
+            );
           }
         }
       }
@@ -46,7 +36,7 @@ void main() {
       '$mode collects once, preserves metres and resets coins on replay',
       () {
         final g = BalanceGame(seed: 3)..start(gameMode: mode);
-        if (g.infinite) g.board.clear();
+        g.board.clear();
         g.spiders.clear();
         final coin = BrassCoin(g.ballX, g.ballY);
         g.coins
@@ -66,53 +56,17 @@ void main() {
     );
   }
 
-  test('bugs patrol outside and always protect all route centerlines', () {
-    var total = 0;
-    for (var seed = 0; seed < 16; seed++) {
-      final g = BalanceGame(seed: seed)..start(gameMode: GameMode.mazeEndless);
-      for (final s in g.spiders.cast<MazeSpider>()) {
-        total++;
-        for (var frame = 0; frame < 1200; frame++) {
-          s.step(1 / 120, -100, -100, -100, -100);
-          expect(g.mazeRun.corridor.circleOverlapsRoad(s.x, s.y, 10), false);
-          final point = MazePoint(s.x, s.y);
-          expect(
-            g.mazeRun.corridor.centerlineDistanceAlong(point, point),
-            greaterThan(s.maxZone + 7),
-          );
-        }
-      }
-    }
-    expect(total, greaterThan(8));
-  });
-  test('amber is harmless, only a red zone overlapping the road catches', () {
-    final road = LaserMazeCorridor()
-      ..addLeg(const MazePoint(180, 550), const MazePoint(180, 20), 26)
-      ..rebuildWalls();
-    final s = MazeSpider(218, 280, road, tangentX: 0, tangentY: 1, maxZone: 28);
-    expect(s.step(.01, 196, 280, 196, 280), false);
-    s.time = 4;
-    expect(s.step(.01, 196, 280, 196, 280), false);
-    expect(s.warning, true);
-    s.time = 5.2;
-    expect(s.step(.01, 196, 280, 196, 280), true);
-    expect(s.active, true);
-    expect(s.step(.01, 180, 250, 180, 320), false);
-    expect(s.step(.01, 236, 280, 236, 280), false);
-    s.time = 8;
-    expect(s.step(.01, 196, 280, 196, 280), false);
-  });
-  test('pause freezes spiders, coins, camera and pending manual lift', () {
+  test('pause freezes coins, camera and pending manual lift', () {
     final g = BalanceGame(seed: 3)
       ..setControlMode(ControlMode.oneFinger)
-      ..start(gameMode: GameMode.mazeEndless);
-    final s = g.spiders.first, c = g.coins.first;
-    final x = s.x, y = s.y, coinY = c.y, left = g.left;
+      ..start(gameMode: GameMode.infinite);
+    final c = g.coins.first;
+    final coinY = c.y, left = g.left;
     g.grabControl();
     g.dragControlVertical(-60);
     g.setPaused(true);
     g.step(.1);
-    expect((s.x, s.y, c.y, g.left), (x, y, coinY, left));
+    expect((c.y, g.left), (coinY, left));
     expect(g.controlHeld, false);
     g.setPaused(false);
     g.step(1 / 120);

@@ -12,11 +12,13 @@ class PivotBoard extends StatefulWidget {
     required this.frame,
     this.fillWidth = 0,
     this.showHint = false,
+    this.overlay,
   });
   final BalanceGame game;
   final Listenable frame;
   final double fillWidth;
   final bool showHint;
+  final Widget? overlay;
   @override
   State<PivotBoard> createState() => _PivotBoardState();
 }
@@ -80,6 +82,7 @@ class _PivotBoardState extends State<PivotBoard> {
       game,
       fillWidth: widget.fillWidth,
     );
+    game.visibleTop = -viewportNow().topExtension;
     void release(PointerEvent event) {
       synchronize();
       final side = pointers.remove(event.pointer);
@@ -125,10 +128,10 @@ class _PivotBoardState extends State<PivotBoard> {
         label:
             (game.infinite ? '${game.lives} of 3 hearts. ' : '') +
             (game.analog
-            ? 'Use the bottom left and right vertical joysticks to move the platform ends'
-            : game.oneFinger
-            ? 'Use the thumb area below the board to tilt and lift'
-            : 'Drag the left and right ends of the platform up or down'),
+                ? 'Use the bottom left and right vertical joysticks to move the platform ends'
+                : game.oneFinger
+                ? 'Use the thumb area below the board to tilt and lift'
+                : 'Drag the left and right ends of the platform up or down'),
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -139,6 +142,7 @@ class _PivotBoardState extends State<PivotBoard> {
                   repaint: widget.frame,
                   reducedMotion: MediaQuery.of(context).disableAnimations,
                   fillWidth: widget.fillWidth,
+                  showHud: widget.overlay == null,
                 ),
                 child: const SizedBox.expand(),
               ),
@@ -154,6 +158,13 @@ class _PivotBoardState extends State<PivotBoard> {
                       ),
                     ),
                 ],
+              ),
+            if (widget.overlay != null)
+              Positioned.fromRect(
+                rect: viewportNow().rect.intersect(
+                  Offset.zero & bounds.biggest,
+                ),
+                child: widget.overlay!,
               ),
           ],
         ),

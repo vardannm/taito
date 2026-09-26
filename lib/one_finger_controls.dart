@@ -25,6 +25,15 @@ class _OneFingerControlsState extends State<OneFingerControls> {
   Offset? contact;
   double initialTilt = 0;
 
+  /// Stick travel, in logical pixels, that means a full-speed climb or drop.
+  static const throw_ = 42.0, deadZone = 7.0;
+  double deflection(Offset point) {
+    final offset = point.dy - origin.dy;
+    if (offset.abs() <= deadZone) return 0;
+    final past = offset.abs() - deadZone;
+    return offset.sign * (past / (throw_ - deadZone)).clamp(0.0, 1.0);
+  }
+
   void synchronize() {
     if (epoch != widget.game.inputEpoch) {
       pointer = null;
@@ -42,8 +51,10 @@ class _OneFingerControlsState extends State<OneFingerControls> {
       contact = null;
     } else if (oldWidget.boardScale != widget.boardScale) {
       // A layout change is not a release. Rebase tilt at the held contact so
-      // resizing never drops pointer ownership or jumps to a new tilt.
-      origin = previous;
+      // resizing never drops pointer ownership or jumps to a new tilt. The
+      // vertical reference stays put: the pad keeps its own frame, and moving
+      // it must not re-centre a stick the player is still holding.
+      origin = Offset(previous.dx, origin.dy);
       initialTilt = widget.game.controlPosition;
     }
   }
@@ -84,6 +95,7 @@ class _OneFingerControlsState extends State<OneFingerControls> {
                   origin = previous = limited(position);
                   initialTilt = game.controlPosition;
                   game.grabControl();
+                  if (game.stickLift) game.setLiftInput(0);
                   setState(() => contact = origin);
                 },
                 onPointerMove: (event) {
@@ -99,7 +111,14 @@ class _OneFingerControlsState extends State<OneFingerControls> {
                   game.setControlPosition(
                     initialTilt + (point.dx - origin.dx) / (110 * scale),
                   );
-                  game.dragControlVertical((point.dy - previous.dy) / scale);
+                  if (game.stickLift) {
+                    // Levels and mazes read a stick: hold it up and the
+                    // platform keeps climbing until it reaches the rail.
+                    game.setLiftInput(deflection(point));
+                  } else {
+                    // Infinite and 2048 steer one-to-one with the finger.
+                    game.dragControlVertical((point.dy - previous.dy) / scale);
+                  }
                   previous = point;
                   setState(() => contact = point);
                 },
