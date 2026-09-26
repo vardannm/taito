@@ -249,6 +249,7 @@ class PlayerProfile {
   TutorialProgress tutorial = TutorialProgress();
   Future<void> _tutorialWrites = Future<void>.value();
   ControlMode controlMode = ControlMode.oneFinger;
+  bool floatingOneFinger = false;
   int classicLevel = 1;
   int mazeLevel = 1, mazeRuns = 0;
   final mazeBestTimes = <String, double>{};
@@ -455,6 +456,8 @@ class PlayerProfile {
       twoFingerSensitivity = direct != null && direct.isFinite
           ? direct.clamp(0.0, 1.0)
           : 1;
+      floatingOneFinger =
+          await storage.getBool('gilt.floatingOneFinger') ?? false;
       final savedMode = await storage.getString('gilt.controlMode');
       controlMode =
           ControlMode.values.where((m) => m.name == savedMode).firstOrNull ??
@@ -526,6 +529,7 @@ class PlayerProfile {
         controlMode == ControlMode.oneFinger,
       );
       await storage.setString('gilt.controlMode', controlMode.name);
+      await storage.setBool('gilt.floatingOneFinger', floatingOneFinger);
       await storage.setDouble('gilt.analogSensitivity', analogSensitivity);
       await storage.setDouble(
         'gilt.twoFingerSensitivity',

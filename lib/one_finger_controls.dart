@@ -9,11 +9,13 @@ class OneFingerControls extends StatefulWidget {
     required this.game,
     required this.frame,
     required this.boardScale,
+    this.floating = false,
   });
   static const height = 96.0;
   final BalanceGame game;
   final Listenable frame;
   final double boardScale;
+  final bool floating;
   @override
   State<OneFingerControls> createState() => _OneFingerControlsState();
 }
@@ -45,7 +47,8 @@ class _OneFingerControlsState extends State<OneFingerControls> {
   @override
   void didUpdateWidget(covariant OneFingerControls oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.game != widget.game) {
+    if (oldWidget.game != widget.game ||
+        oldWidget.floating != widget.floating) {
       oldWidget.game.releaseControl();
       pointer = null;
       contact = null;
@@ -79,8 +82,9 @@ class _OneFingerControlsState extends State<OneFingerControls> {
             p.dy, // Vertical input follows the finger beyond the visible pad.
           );
           return Semantics(
-            label:
-                'One-finger thumb area below the board. Drag sideways to tilt, up to lift, down to lower. Keep dragging beyond the area to move further.',
+            label: widget.floating
+                ? 'Floating one-finger control. Touch the board and drag sideways to tilt, up to lift, down to lower. Release to hide the control.'
+                : 'One-finger thumb area below the board. Drag sideways to tilt, up to lift, down to lower. Keep dragging beyond the area to move further.',
             child: GestureDetector(
               onPanUpdate:
                   (_) {}, // Keep tutorial page scrolling out of control drags.
@@ -141,7 +145,12 @@ class _OneFingerControlsState extends State<OneFingerControls> {
                   });
                 },
                 child: CustomPaint(
-                  painter: _ThumbPadPainter(game, contact),
+                  painter: widget.floating
+                      ? _FloatingStickPainter(
+                          game.canControl ? contact : null,
+                          origin,
+                        )
+                      : _ThumbPadPainter(game, contact),
                   child: const SizedBox.expand(),
                 ),
               ),
@@ -225,4 +234,49 @@ class _ThumbPadPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ThumbPadPainter oldDelegate) => true;
+}
+
+/// The visual fits inside the board; input remains anchored to the real touch.
+class _FloatingStickPainter extends CustomPainter {
+  _FloatingStickPainter(this.contact, this.origin);
+  final Offset? contact;
+  final Offset origin;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (contact == null) return;
+    const radius = 30.0;
+    final insetX = size.width < 88 ? size.width / 2 : 44.0;
+    final insetY = size.height < 88 ? size.height / 2 : 44.0;
+    final center = Offset(
+      origin.dx.clamp(insetX, size.width - insetX),
+      origin.dy.clamp(insetY, size.height - insetY),
+    );
+    final delta = contact! - origin;
+    final knob =
+        center +
+        (delta.distance > radius ? delta / delta.distance * radius : delta);
+    canvas.drawCircle(center, radius, Paint()..color = cream.withAlpha(60));
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..color = ink.withAlpha(140)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
+    canvas.drawCircle(knob, 11, Paint()..color = ink.withAlpha(150));
+    canvas.drawCircle(
+      knob,
+      11,
+      Paint()
+        ..color = brass.withAlpha(220)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _FloatingStickPainter oldDelegate) =>
+      oldDelegate.contact != contact || oldDelegate.origin != origin;
 }

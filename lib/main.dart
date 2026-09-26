@@ -113,6 +113,9 @@ class _GameScreenState extends State<GameScreen>
   final tutorialCoinsKey = GlobalKey();
   bool get tutorialActive => !profile.tutorialSeen && profile.tutorial.active;
   TutorialStep get tutorialStep => profile.tutorial.step;
+  bool get floatingOneFinger =>
+      game.oneFinger && profile.floatingOneFinger && !tutorialActive;
+  bool get bottomOneFinger => game.oneFinger && !floatingOneFinger;
 
   void tutorialChanged() {
     unawaited(profile.saveTutorial());
@@ -242,7 +245,7 @@ class _GameScreenState extends State<GameScreen>
         board.size.width,
         math.max(
           1,
-          board.size.height - (game.oneFinger ? OneFingerControls.height : 0),
+          board.size.height - (bottomOneFinger ? OneFingerControls.height : 0),
         ),
       ),
       game,
@@ -925,7 +928,7 @@ class _GameScreenState extends State<GameScreen>
               math.max(
                 1,
                 board.size.height -
-                    (game.oneFinger ? OneFingerControls.height : 0),
+                    (bottomOneFinger ? OneFingerControls.height : 0),
               ),
             ),
             game,
@@ -1425,7 +1428,10 @@ class _GameScreenState extends State<GameScreen>
 
   String get startInstruction => switch (game.controlMode) {
     ControlMode.analog => 'Touch a joystick to play',
-    ControlMode.oneFinger => 'Drag the thumb area to play',
+    ControlMode.oneFinger =>
+      floatingOneFinger
+          ? 'Touch and drag anywhere on the board to play'
+          : 'Drag the thumb area to play',
     ControlMode.twoFinger => 'Move a platform end to play',
   };
 
@@ -1449,7 +1455,8 @@ class _GameScreenState extends State<GameScreen>
     final point = board.globalToLocal(global);
     if (!(Offset.zero & board.size).contains(point)) return true;
     if (game.oneFinger)
-      return point.dy < board.size.height - OneFingerControls.height;
+      return !floatingOneFinger &&
+          point.dy < board.size.height - OneFingerControls.height;
     if (game.analog) return true;
     final viewport = BoardViewport(board.size);
     for (final side in [0, 1]) {
@@ -1489,6 +1496,7 @@ class _GameScreenState extends State<GameScreen>
               ignoring: carouselMoving,
               child: PivotBoard(
                 key: boardKey,
+                floatingOneFinger: floatingOneFinger,
                 game: game,
                 frame: frame,
                 fillWidth: expansion,
@@ -1521,7 +1529,7 @@ class _GameScreenState extends State<GameScreen>
                         ),
                       ),
                     ),
-                    if (game.oneFinger)
+                    if (bottomOneFinger)
                       const SizedBox(height: OneFingerControls.height),
                   ],
                 ),
@@ -1731,7 +1739,7 @@ class _GameScreenState extends State<GameScreen>
           returning ||
           !entrance.isDismissed,
       expansion: expansion,
-      controlInset: game.oneFinger ? OneFingerControls.height : 0,
+      controlInset: bottomOneFinger ? OneFingerControls.height : 0,
       acceptSwipe: acceptsWorldSwipe,
       onMoving: (moving) => setState(() {
         carouselMoving = moving;
@@ -2392,6 +2400,22 @@ class _GameScreenState extends State<GameScreen>
                   },
                 ),
                 const SizedBox(height: 8),
+                if (profile.controlMode == ControlMode.oneFinger)
+                  SwitchListTile.adaptive(
+                    key: const ValueKey('floating-control-setting'),
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Floating one-finger control'),
+                    subtitle: const Text(
+                      'Experimental: touch anywhere on the board. The stick appears while held. Turn off to use the bottom pad.',
+                    ),
+                    value: profile.floatingOneFinger,
+                    onChanged: (enabled) {
+                      game.clearInput();
+                      update(() => profile.floatingOneFinger = enabled);
+                      setState(() {});
+                      unawaited(profile.save());
+                    },
+                  ),
                 SensitivitySetting(
                   id: 'analog-sensitivity',
                   title: 'Vertical Analog sensitivity',

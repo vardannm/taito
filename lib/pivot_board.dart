@@ -12,12 +12,14 @@ class PivotBoard extends StatefulWidget {
     required this.frame,
     this.fillWidth = 0,
     this.showHint = false,
+    this.floatingOneFinger = false,
     this.overlay,
   });
   final BalanceGame game;
   final Listenable frame;
   final double fillWidth;
   final bool showHint;
+  final bool floatingOneFinger;
   final Widget? overlay;
   @override
   State<PivotBoard> createState() => _PivotBoardState();
@@ -37,7 +39,9 @@ class _PivotBoardState extends State<PivotBoard> {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, bounds) {
-      if (!widget.game.oneFinger) return buildBoard(context, bounds);
+      if (!widget.game.oneFinger || widget.floatingOneFinger) {
+        return buildBoard(context, bounds);
+      }
       final boardHeight = (bounds.maxHeight - OneFingerControls.height).clamp(
         1.0,
         double.infinity,
@@ -130,7 +134,9 @@ class _PivotBoardState extends State<PivotBoard> {
             (game.analog
                 ? 'Use the bottom left and right vertical joysticks to move the platform ends'
                 : game.oneFinger
-                ? 'Use the thumb area below the board to tilt and lift'
+                ? (widget.floatingOneFinger
+                      ? 'Touch anywhere on the board to tilt and lift'
+                      : 'Use the thumb area below the board to tilt and lift')
                 : 'Drag the left and right ends of the platform up or down'),
         child: Stack(
           fit: StackFit.expand,
@@ -147,6 +153,19 @@ class _PivotBoardState extends State<PivotBoard> {
                 child: const SizedBox.expand(),
               ),
             ),
+            if (game.oneFinger && widget.floatingOneFinger)
+              Positioned.fromRect(
+                rect: viewportNow().rect.intersect(
+                  Offset.zero & bounds.biggest,
+                ),
+                child: OneFingerControls(
+                  key: const ValueKey('floating-one-finger'),
+                  game: game,
+                  frame: widget.frame,
+                  boardScale: viewportNow().scale,
+                  floating: true,
+                ),
+              ),
             if (widget.showHint && !game.analog && !game.oneFinger)
               ControlHint(
                 anchors: [
