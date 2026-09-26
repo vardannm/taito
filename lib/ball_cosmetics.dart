@@ -41,11 +41,11 @@ enum BallCosmetic {
 
   /// Permanent Infinite collection radius. Zero means contact collection only.
   double get magnetRadius => switch (this) {
-    titanium => 35,
-    eclipse => 50,
-    plasma => 65,
-    quasar => 85,
-    singularity => 110,
+    titanium => 21,
+    eclipse => 30,
+    plasma => 39,
+    quasar => 51,
+    singularity => 66,
     _ => 0,
   };
   String get magnetLabel => switch (this) {

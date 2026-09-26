@@ -77,6 +77,15 @@ class PlayerProfile {
   }
 
   bool _ballTestCreditApplied = false;
+  bool _temporaryNormalCreditApplied = false;
+
+  /// Temporary one-time credit, including release builds, in the normal wallet.
+  Future<void> grantTemporaryNormalCoins() async {
+    if (_temporaryNormalCreditApplied || unlimitedCoins || !available) return;
+    wallet += 100000;
+    _temporaryNormalCreditApplied = true;
+    await saveEconomy();
+  }
 
   /// One development credit, persisted with the balance so it cannot refill
   /// spent coins on every restart. Called by the debug app entry point only.
@@ -137,6 +146,7 @@ class PlayerProfile {
       'wallet': wallet,
       'dailyPrizes': dailyPrizes.toJson(),
       'ballTestCreditApplied': _ballTestCreditApplied,
+      'temporaryNormalCreditApplied': _temporaryNormalCreditApplied,
       'owned': ownedBalls.map((b) => b.name).toList(),
       'selected': selectedBall.name,
       'bestScore': infiniteBestScore,
@@ -160,6 +170,8 @@ class PlayerProfile {
       if (data is! Map<String, dynamic>) return;
       dailyPrizes = DailyPrizes.fromJson(data['dailyPrizes']);
       _ballTestCreditApplied = data['ballTestCreditApplied'] == true;
+      _temporaryNormalCreditApplied =
+          data['temporaryNormalCreditApplied'] == true;
       if (data['wallet'] is int)
         wallet = (data['wallet'] as int).clamp(0, 1 << 30);
       if (data['bestScore'] is int)

@@ -27,7 +27,7 @@ abstract final class InfiniteTuning {
   static const visualIntensity = 1.0, maxParticles = 42;
   static const maxLives = 3, maxPace = 5, maxCombo = 10;
   static const shieldSeconds = 10.0, recoverySeconds = 2.5;
-  static const magnetSeconds = 12.0, magnetRadius = 220.0;
+  static const magnetSeconds = 12.0, magnetRadius = 132.0;
   static const magnetPullSpeed = 420.0;
   static const firstMagnetY = -450.0, magnetSpacing = 2800.0;
   // Infinite spiders and their aimed shots: fixed gentle speeds at every pace.

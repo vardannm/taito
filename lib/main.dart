@@ -49,6 +49,8 @@ Future<void> main() async {
   );
   final profile = PlayerProfile();
   await profile.load();
+  // Temporary normal-mode credit; remove this call after testing.
+  await profile.grantTemporaryNormalCoins();
   if (kDebugMode) await profile.grantBallTestCoins();
   final analytics = await AppAnalytics.initialize();
   runApp(ArcadeApp(profile: profile, analytics: analytics));

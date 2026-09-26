@@ -42,6 +42,26 @@ void main() {
     },
   );
 
+  test(
+    'temporary normal credit is additive and granted once across restarts',
+    () async {
+      final profile = PlayerProfile(unlimitedCoins: false)..wallet = 42;
+      await profile.grantTemporaryNormalCoins();
+      expect(profile.wallet, 100042);
+      await profile.grantTemporaryNormalCoins();
+      expect(profile.wallet, 100042);
+      expect(profile.selectBall(BallCosmetic.singularity), isTrue);
+      await profile.saveEconomy();
+      final reloaded = PlayerProfile(unlimitedCoins: false);
+      await reloaded.load();
+      await reloaded.grantTemporaryNormalCoins();
+      expect(reloaded.wallet, 100042 - BallCosmetic.singularity.cost);
+      final unlimited = PlayerProfile(unlimitedCoins: true);
+      await unlimited.grantTemporaryNormalCoins();
+      expect(unlimited.wallet, 0);
+    },
+  );
+
   test('build flag selects the expected coin mode', () {
     expect(
       PlayerProfile().unlimitedCoins,

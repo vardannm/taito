@@ -25,17 +25,30 @@ void pullFor(BalanceGame g, int ticks) {
 }
 
 void main() {
+  test('smaller magnet pulls only rewards inside its visible radius', () {
+    for (final ball in [BallCosmetic.steel, BallCosmetic.singularity]) {
+      final g = cleanRun(ball: ball)..survival.magnet = 10;
+      final inside = BrassCoin(g.ballX + 125, g.ballY);
+      final outside = BrassCoin(g.ballX + 140, g.ballY);
+      g.coins.addAll([inside, outside]);
+      tick(g);
+      expect(g.magnetRadius, 132);
+      expect(inside.x, lessThan(g.ballX + 125));
+      expect(outside.x, g.ballX + 140);
+      expect(outside.collected, false);
+    }
+  });
   test('pulling pauses in place and only contact activates a shield', () {
     final g = cleanRun()..survival.magnet = 10;
     final shield = InfiniteItem(
       InfiniteItemKind.shield,
-      g.ballX + 150,
+      g.ballX + 120,
       g.ballY,
     );
     g.survival.items.add(shield);
     tick(g);
     final at = (shield.x, shield.y);
-    expect(shield.x, lessThan(g.ballX + 150));
+    expect(shield.x, lessThan(g.ballX + 120));
     expect(g.survival.shield, 0);
     g.setPaused(true);
     pullFor(g, 120);
