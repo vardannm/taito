@@ -22,14 +22,18 @@ abstract final class InfiniteTuning {
     return t * t * (3 - 2 * t);
   }
 
-  static const startSpeed = 68.0, baseTopSpeed = 180.0, paceSpeedBonus = 9.0;
+  static const startSpeed = 89.0, baseTopSpeed = 180.0, paceSpeedBonus = 9.0;
   static const coinSpacing = 85.0, coinSpacingJitter = 65.0;
   static const visualIntensity = 1.0, maxParticles = 42;
   static const maxLives = 3, maxPace = 5, maxCombo = 10;
-  static const shieldSeconds = 10.0, recoverySeconds = 2.5;
-  static const magnetSeconds = 12.0, magnetRadius = 132.0;
+  static const shieldSeconds = InfiniteDifficulty.shieldSeconds,
+      recoverySeconds = 2.5;
+  static const magnetSeconds = InfiniteDifficulty.magnetSeconds,
+      magnetRadius = 132.0;
   static const magnetPullSpeed = 420.0;
-  static const firstMagnetY = -450.0, magnetSpacing = 2800.0;
+  static const firstMagnetY = -450.0;
+  // Convert displayed metres to board coordinates: 10 world units per metre.
+  static const magnetSpacing = InfiniteDifficulty.magnetSpacingMetres * 10;
   // Infinite spiders and their aimed shots: fixed gentle speeds at every pace.
   static const spiderChaseSpeed = InfiniteDifficulty.spiderSpeed,
       spiderChaseBonus = 3.0;
@@ -47,7 +51,8 @@ abstract final class InfiniteTuning {
   static const maxComboPickupPoints = 300;
   static const firstComboY = 190.0, firstShieldY = -950.0;
   static const firstHeartY = -1650.0;
-  static const comboSpacing = 280.0, shieldSpacing = 2400.0;
+  static const comboSpacing = 280.0;
+  static const shieldSpacing = InfiniteDifficulty.shieldSpacingMetres * 10;
 
   /// Laser maze sections, measured in metres climbed: the first arrives here,
   /// each covers this stretch, and the next follows after this much clear air.
@@ -61,7 +66,10 @@ abstract final class InfiniteTuning {
   /// A section also ends on the clock, so a stalled climb cannot sit inside a
   /// maze that its own distance would never finish.
   static const mazeSectionSeconds = 38.0;
-  static const heartSpacing = 3600.0, maxItems = 12;
+  static const heartSpacing = InfiniteDifficulty.heartSpacingMetres * 10;
+  static const heartSpacingJitter =
+      InfiniteDifficulty.heartSpacingJitterMetres * 10;
+  static const maxItems = 12;
   static int startingPace(int bestMetres) => 1;
 }
 

@@ -199,7 +199,7 @@ void main() {
     final g = cleanRun();
     g.survival.nextMagnetY = InfiniteTuning.firstMagnetY;
     final seen = <InfiniteItem>{};
-    for (var i = 0; i < 140; i++) {
+    for (var i = 0; i < 400; i++) {
       g.cameraOffset = i * 60.0;
       g.left = g.right = 440 - g.cameraOffset;
       g.survival.shield = 100;

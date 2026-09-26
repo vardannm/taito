@@ -8,6 +8,22 @@ abstract final class InfiniteDifficulty {
   // Pace's extra speed and tighter spacing; scoring/pace labels stay the same.
   static const paceGrowth = 1.0;
 
+  // Fixed distance between recurring pickups, in displayed metres (must be > 0).
+  // First pickup positions are configured separately in InfiniteTuning.
+  static const magnetSpacingMetres = 2000.0;
+  static const shieldSpacingMetres = 3500.0;
+
+  // Active duration after collecting a pickup, in seconds (must be > 0).
+  // Collecting another pickup refreshes its timer to this duration.
+  static const shieldSeconds = 8.0;
+  static const magnetSeconds = 9.0;
+
+  // Hearts: minimum spacing plus a random extra distance, in displayed metres.
+  // Spacing must be > 0; jitter can be 0 for fixed spacing.
+  // Hearts only spawn while below maximum lives. Defaults give 360-540m gaps.
+  static const heartSpacingMetres = 760.0;
+  static const heartSpacingJitterMetres = 180.0;
+
   // More holes and shorter row spacing as score and distance increase.
   static const obstacleDensity = 1.2;
 
@@ -30,8 +46,8 @@ abstract final class InfiniteDifficulty {
   static const spiderGrowth = 1.2;
 
   // Base chase speed; pace adds its existing bonus. Default: 44.
-  static const spiderSpeed = 44.0;
+  static const spiderSpeed = 90.0;
 
   // Speed of the spider's web projectile. Default: 90.
-  static const spiderBulletSpeed = 120.0;
+  static const spiderBulletSpeed = 180.0;
 }

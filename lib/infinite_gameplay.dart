@@ -320,19 +320,18 @@ extension InfiniteGameplay on BalanceGame {
     }
     while (survival.nextShieldY >= ahead) {
       spawn(InfiniteItemKind.shield, survival.nextShieldY);
-      survival.nextShieldY -=
-          InfiniteTuning.shieldSpacing + _random.nextDouble() * 1400;
+      survival.nextShieldY -= InfiniteTuning.shieldSpacing;
     }
     while (survival.nextHeartY >= ahead) {
       if (lives < InfiniteTuning.maxLives)
         spawn(InfiniteItemKind.heart, survival.nextHeartY);
       survival.nextHeartY -=
-          InfiniteTuning.heartSpacing + _random.nextDouble() * 1800;
+          InfiniteTuning.heartSpacing +
+          _random.nextDouble() * InfiniteTuning.heartSpacingJitter;
     }
     while (survival.nextMagnetY >= ahead) {
       spawn(InfiniteItemKind.magnet, survival.nextMagnetY);
-      survival.nextMagnetY -=
-          InfiniteTuning.magnetSpacing + _random.nextDouble() * 1000;
+      survival.nextMagnetY -= InfiniteTuning.magnetSpacing;
     }
   }
 
@@ -406,10 +405,14 @@ extension InfiniteGameplay on BalanceGame {
         );
       case InfiniteItemKind.shield:
         survival.shield = InfiniteTuning.shieldSeconds;
-        survival.announce('SHIELD · 10 seconds of invincibility');
+        survival.announce(
+          'SHIELD · ${InfiniteTuning.shieldSeconds} seconds of invincibility',
+        );
       case InfiniteItemKind.magnet:
         survival.magnet = InfiniteTuning.magnetSeconds;
-        survival.announce('MAGNET · 12 seconds of nearby rewards');
+        survival.announce(
+          'MAGNET · ${InfiniteTuning.magnetSeconds} seconds of nearby rewards',
+        );
       case InfiniteItemKind.heart:
         if (lives < InfiniteTuning.maxLives) {
           lives++;

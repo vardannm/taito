@@ -7,6 +7,7 @@ import 'control_options.dart';
 import 'infinite_painter.dart';
 import 'ball_shop.dart';
 import 'daily_prize_sheet.dart';
+import 'achievement_sheet.dart';
 import 'infinite_progress.dart';
 import 'dart:async';
 import 'dart:math' as math;
@@ -622,6 +623,20 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
+  Future<void> showAchievements() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: cream,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (_) => FractionallySizedBox(
+        heightFactor: .85,
+        child: AchievementSheet(profile: profile),
+      ),
+    );
+    if (mounted) setState(() {});
+  }
+
   Future<void> showDailyPrizes() async {
     await showModalBottomSheet<void>(
       context: context,
@@ -1018,6 +1033,13 @@ class _GameScreenState extends State<GameScreen>
                 () => start(GameMode.practice),
               ),
               choice('GEAR SHOP', Icons.palette_outlined, showBallShop),
+              choice(
+                profile.achievementsReady > 0
+                    ? 'ACHIEVEMENTS (${profile.achievementsReady} ready)'
+                    : 'ACHIEVEMENTS',
+                Icons.workspace_premium_outlined,
+                showAchievements,
+              ),
               choice(
                 'Goals, friends & backup',
                 Icons.emoji_events_outlined,
@@ -2064,6 +2086,15 @@ class _GameScreenState extends State<GameScreen>
                           color: Color(0xFFB5C5BB),
                         ),
                       ),
+                      if (profile.achievementsReady > 0)
+                        TextButton.icon(
+                          onPressed: showAchievements,
+                          style: TextButton.styleFrom(foregroundColor: brass),
+                          icon: const Icon(Icons.emoji_events_outlined),
+                          label: Text(
+                            '${profile.achievementsReady} achievement rewards ready',
+                          ),
+                        ),
                       if (!game.infinite &&
                           !game.practice &&
                           !game.merging &&
@@ -2213,7 +2244,7 @@ class _GameScreenState extends State<GameScreen>
               guideRow(
                 '04',
                 'Go beyond ten.',
-                'Infinite begins with three hearts. Laser maze sections arrive from time to time: the traps stop and wide laser walls come down instead, so steer through their openings. A hit costs a heart and resets your combo; the ball and platform blink for 2.5 seconds of protection while you keep steering from the same position. Gold crystals build combos up to x10; violet and midnight tiers build toward electric cyan at x9 and a golden maximum at x10. Blue shields protect for 10 seconds. Red-and-blue magnets collect nearby coins, combo crystals, shields and hearts for 12 seconds. Rare hearts restore a life. Keep steering to escape the rising red floor.',
+                'Infinite begins with three hearts. Laser maze sections arrive from time to time: the traps stop and wide laser walls come down instead, so steer through their openings. A hit costs a heart and resets your combo; the ball and platform blink for 2.5 seconds of protection while you keep steering from the same position. Gold crystals build combos up to x10; violet and midnight tiers build toward electric cyan at x9 and a golden maximum at x10. Blue shields protect for ${InfiniteTuning.shieldSeconds} seconds. Red-and-blue magnets collect nearby coins, combo crystals, shields and hearts for ${InfiniteTuning.magnetSeconds} seconds. Rare hearts restore a life. Keep steering to escape the rising red floor.',
               ),
               const Text(
                 'Desktop: W / S = left end. ↑ / ↓ = right end. Esc = pause.',

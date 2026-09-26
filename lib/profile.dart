@@ -12,6 +12,7 @@ import 'rewards.dart';
 import 'laser_maze.dart';
 import 'onboarding.dart';
 import 'daily_prizes.dart';
+import 'achievements.dart';
 
 class PlayerProfile {
   PlayerProfile({
@@ -28,6 +29,43 @@ class PlayerProfile {
   int infiniteBest = 0, infiniteRuns = 0, infiniteBestScore = 0;
   int wallet = 0;
   DailyPrizes dailyPrizes = DailyPrizes();
+  final _claimedAchievements = <Achievement>{};
+
+  bool achievementClaimed(Achievement achievement) =>
+      _claimedAchievements.contains(achievement);
+
+  int achievementProgress(Achievement achievement) {
+    if (achievementClaimed(achievement)) return achievement.target;
+    final progress = switch (achievement) {
+      Achievement.firstRun || Achievement.runs25 => infiniteRuns,
+      Achievement.distance500 ||
+      Achievement.distance1000 ||
+      Achievement.distance2500 => infiniteBest,
+      Achievement.score10000 => infiniteBestScore,
+      Achievement.stars12 => totalStars,
+      Achievement.mazeClear => mazeBestTimes.isEmpty ? 0 : 1,
+      Achievement.merge128 => mergeHighest,
+    };
+    return progress.clamp(0, achievement.target);
+  }
+
+  bool achievementEarned(Achievement achievement) =>
+      achievementProgress(achievement) >= achievement.target;
+
+  int get achievementsReady => Achievement.values
+      .where((a) => achievementEarned(a) && !achievementClaimed(a))
+      .length;
+
+  Future<bool> claimAchievement(Achievement achievement) async {
+    if (achievementClaimed(achievement) || !achievementEarned(achievement)) {
+      return false;
+    }
+    // Mark and credit together before awaiting, so repeated taps cannot pay twice.
+    _claimedAchievements.add(achievement);
+    wallet += achievement.coins;
+    await saveEconomy();
+    return true;
+  }
 
   BallCosmetic? get prizeBall {
     final choices =
@@ -145,6 +183,7 @@ class PlayerProfile {
     final data = jsonEncode({
       'wallet': wallet,
       'dailyPrizes': dailyPrizes.toJson(),
+      'claimedAchievements': _claimedAchievements.map((a) => a.name).toList(),
       'ballTestCreditApplied': _ballTestCreditApplied,
       'temporaryNormalCreditApplied': _temporaryNormalCreditApplied,
       'owned': ownedBalls.map((b) => b.name).toList(),
@@ -169,6 +208,12 @@ class PlayerProfile {
       final data = jsonDecode(raw);
       if (data is! Map<String, dynamic>) return;
       dailyPrizes = DailyPrizes.fromJson(data['dailyPrizes']);
+      final claimed = data['claimedAchievements'];
+      if (claimed is List) {
+        _claimedAchievements.addAll(
+          Achievement.values.where((a) => claimed.contains(a.name)),
+        );
+      }
       _ballTestCreditApplied = data['ballTestCreditApplied'] == true;
       _temporaryNormalCreditApplied =
           data['temporaryNormalCreditApplied'] == true;
