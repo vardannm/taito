@@ -128,21 +128,6 @@ class BalanceGame {
 
   void releaseControl() {
     controlHeld = false;
-    _liftInput = 0;
-  }
-
-  /// Levels and mazes read the one-finger pad as a stick, so a held deflection
-  /// keeps climbing. Infinite and 2048 keep their one-to-one finger drag.
-  bool get stickLift => oneFinger && !infinite && !merging;
-
-  /// Held deflection of that stick, -1 (full up) to 1 (full down).
-  double _liftInput = 0;
-
-  /// Board units a second at full deflection: a whole rail in about 3.5s.
-  static const liftMotor = 140.0;
-  void setLiftInput(double value) {
-    if (!canControl || !oneFinger || !value.isFinite) return;
-    _liftInput = value.clamp(-1.0, 1.0);
   }
 
   void dragControlVertical(double delta) {
@@ -656,7 +641,6 @@ class BalanceGame {
   void clearInput() {
     controlHeld = false;
     _controlLift = 0;
-    _liftInput = 0;
     leftSpeed = rightSpeed = 0;
     pivotTargets.fillRange(0, 2, null);
     _released.fillRange(0, 2, false);
@@ -932,30 +916,13 @@ class BalanceGame {
       }
     }
     if (oneFinger) {
-      // A held handle supplies both axes. Only mazes auto-lift on release.
+      // All one-finger controls use direct drag. Stopping or releasing holds
+      // height; each mode keeps its own rail limits and tilt headroom.
       final halfTilt = controlPosition * 70;
-      // The automatic climb only rises while there is road overhead, so a
-      // sideways leg holds its height until the ball reaches the next column.
-      final climbing =
-          !maze ||
-          mazeRun.corridor.canClimb(ballX, ballY, mazeClearance) ||
-          ballY <= mazeRun.route!.finishLineY + mazeClearance;
-      final lift = climbing ? 14 * dt : 0.0;
-      // Two lift models. Infinite reads the finger one-to-one. Levels and
-      // mazes read the pad as a stick, so a held deflection keeps climbing
-      // until the platform reaches the rail. Both keep the headroom the tilt
-      // needs, so the bar never hangs off the board.
-      final push = stickLift ? _liftInput * liftMotor * dt : 0.0;
-      final center =
-          (controlHeld || _controlLift != 0
-                  ? (left + right) / 2 + _controlLift + push
-                  : maze
-                  ? math.max(
-                      mazeRun.route!.finishLineY + ballRadius,
-                      (left + right) / 2 - lift,
-                    )
-                  : (left + right) / 2)
-              .clamp(minimum + halfTilt.abs(), maximum - halfTilt.abs());
+      final center = ((left + right) / 2 + _controlLift).clamp(
+        minimum + halfTilt.abs(),
+        maximum - halfTilt.abs(),
+      );
       left = center - halfTilt;
       right = center + halfTilt;
       _controlLift = 0;

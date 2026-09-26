@@ -20,7 +20,10 @@ void finishMaze(BalanceGame game) {
   game.velocity = 0;
   if (game.oneFinger) {
     game.setControlPosition(0);
-    for (var i = 0; i < 20 && !game.finished; i++) game.step(.1);
+    game.grabControl();
+    game.dragControlVertical(-25);
+    game.step(1 / 120);
+    game.releaseControl();
   } else {
     for (var side = 0; side < 2; side++) {
       game.grabPivot(side);
@@ -205,10 +208,7 @@ void main() {
       expect(g.ballY, LaserMazeCorridor.startY);
       g.step(.1);
       expect(g.controlMode, control);
-      expect(
-        g.ballY,
-        closeTo(control == ControlMode.oneFinger ? 517.6 : 519, .001),
-      );
+      expect(g.ballY, closeTo(519, .001));
       g.setPaused(true);
       final before = (g.ballX, g.ballY, g.elapsed, g.mazeRun.progress);
       g.step(.1);
