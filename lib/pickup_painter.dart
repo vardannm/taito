@@ -92,7 +92,7 @@ void paintBrassCoin(Canvas c, Offset p, double radius, double spin) {
 enum PickupFace { combo, shield, heart, magnet }
 
 const _faces = {
-  PickupFace.magnet: (Color(0xFFD0B5FF), Color(0xFF8655CF), Color(0xFF48277E)),
+  PickupFace.magnet: (Color(0xFFEAF3FF), Color(0xFF3988DB), Color(0xFF243B59)),
   PickupFace.combo: (Color(0xFFFFD873), Color(0xFFC27A15), Color(0xFF7A4A0C)),
   PickupFace.shield: (Color(0xFF8FD9EC), Color(0xFF2489A6), Color(0xFF0F4B5E)),
   PickupFace.heart: (Color(0xFFFF8E97), Color(0xFFD5404C), Color(0xFF7C1F28)),
@@ -203,12 +203,19 @@ void paintPickup(Canvas c, Offset p, PickupFace face, double glint) {
   c.drawPath(
     body,
     Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [light, mid, dark],
-        stops: const [0, .55, 1],
-      ).createShader(bounds),
+      ..shader =
+          (face == PickupFace.magnet
+                  ? const LinearGradient(
+                      colors: [Color(0xFFE4474F), Color(0xFF287FD1)],
+                      stops: [.5, .5],
+                    )
+                  : LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [light, mid, dark],
+                      stops: const [0, .55, 1],
+                    ))
+              .createShader(bounds),
   );
   // The upper facet catches the light; the lower body keeps its depth.
   c.drawPath(crown, Paint()..color = light.withAlpha(150));

@@ -362,15 +362,19 @@ void paintInfiniteEnergy(Canvas c, BalanceGame game, bool reducedMotion) {
   }
 }
 
-/// The field shows actual collection reach; the inner arc is the pickup timer.
+/// A compact field indicates magnet activity; the inner arc is the pickup timer.
 void paintInfiniteMagnet(Canvas c, BalanceGame game, bool reducedMotion) {
   if (!game.infinite || game.magnetRadius <= 0 || game.ballScale <= 0) return;
   final p = Offset(game.visualX, game.screenY(game.visualY));
   const tint = Color(0xFF8655CF);
-  final radius = game.magnetRadius;
+  final radius = game.magnetRadius * .6;
   c.save();
   c.clipRect(Rect.fromLTRB(20, game.visibleTop, 340, 574));
-  c.drawCircle(p, radius, Paint()..color = tint.withValues(alpha: 12 / 255 * 1.15));
+  c.drawCircle(
+    p,
+    radius,
+    Paint()..color = tint.withValues(alpha: 12 / 255 * 1.15),
+  );
   c.drawCircle(
     p,
     radius,
