@@ -1,11 +1,13 @@
+import 'support/mode_navigation.dart';
+import 'package:balance_arcade/one_finger_controls.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/levels.dart';
 import 'package:balance_arcade/main.dart';
-import 'package:balance_arcade/board_painter.dart';
 import 'package:balance_arcade/profile.dart';
+import 'package:balance_arcade/rewards.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'game_test.dart' show advance, placeAt;
@@ -48,6 +50,9 @@ void main() {
       ..tutorialSeen = true
       ..sound = false
       ..haptics = false;
+    for (var level = 1; level <= 33; level++) {
+      p.levelRecords['twoFinger:$level'] = const LevelRecord(starMask: 7);
+    }
     await tester.pumpWidget(ArcadeApp(profile: p));
     await tester.tap(find.byTooltip('Settings'));
     await tester.pump();
@@ -55,7 +60,8 @@ void main() {
     await tester.tap(find.text('Two-Finger Control'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    await tester.tap(find.text('One-Finger Control').last);
+    await tester.ensureVisible(find.byKey(const ValueKey('control-oneFinger')));
+    await tester.tap(find.byKey(const ValueKey('control-oneFinger')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(p.controlMode, ControlMode.oneFinger);
@@ -63,7 +69,7 @@ void main() {
     Navigator.of(tester.element(find.text('Make yourself at home.'))).pop();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    await tester.tap(find.text('CLASSIC'));
+    await openClassicLevels(tester);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await tester.scrollUntilVisible(
@@ -90,17 +96,21 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  test('one-finger lift waits at the target height rather than passing it', () {
+  test('one-finger levels hold height before and after manual lifting', () {
     final g = BalanceGame()
       ..setControlMode(ControlMode.oneFinger)
       ..start();
     g.ballX = g.activeHole.x < 180 ? 300 : 60;
     g.board.removeWhere((h) => h.target != 1);
+    final initialHeight = (g.left + g.right) / 2;
     advance(g, 8);
-    expect(
-      (g.left + g.right) / 2,
-      closeTo(g.activeHole.y + BalanceGame.ballRadius, .001),
-    );
+    expect((g.left + g.right) / 2, closeTo(initialHeight, .001));
+    g.grabControl();
+    g.dragControlVertical(-30);
+    g.step(1 / 120);
+    g.releaseControl();
+    advance(g, 2);
+    expect((g.left + g.right) / 2, closeTo(initialHeight - 30, .001));
     expect(g.canControl, isTrue);
   });
   test(
@@ -111,6 +121,7 @@ void main() {
         for (final progress in [0, 400, 900, 1600, 2500]) {
           final g = BalanceGame(seed: seed)..start(gameMode: GameMode.infinite);
           g.cameraOffset = progress * 10.0;
+          g.score = progress * 20;
           g.ensureInfiniteBoard();
           var reachable = [for (var x = 60; x <= 300; x += 4) x.toDouble()];
           for (var screenY = 620; screenY >= -120; screenY -= 8) {
@@ -147,7 +158,7 @@ void main() {
     for (var seed = 0; seed < 20; seed++) {
       final g = BalanceGame(seed: seed)..start(gameMode: GameMode.infinite);
       signatures.add(g.board.map((h) => '${h.x},${h.y}').join('/'));
-      expect(g.board.length, inInclusiveRange(4, 12));
+      expect(g.board.length, inInclusiveRange(1, 6));
       final rows = g.board.map((h) => h.y).toSet().toList()..sort();
       for (var i = 1; i < rows.length; i++) {
         expect(rows[i] - rows[i - 1], greaterThan(12));
@@ -159,10 +170,10 @@ void main() {
     var previous = g.ascentSpeed;
     for (var score = 1; score <= 2000; score++) {
       g.maxHeight = score * 10.0;
-      expect(g.ascentSpeed, inInclusiveRange(previous, previous + .21));
+      expect(g.ascentSpeed, inInclusiveRange(previous, previous + .28));
       previous = g.ascentSpeed;
     }
-    expect(previous, 180);
+    expect(previous, 216);
     final a = BalanceGame(seed: 17)..start(gameMode: GameMode.infinite);
     final b = BalanceGame(seed: 17)..start(gameMode: GameMode.infinite);
     expect(a.board.map((h) => h.x), b.board.map((h) => h.x));
@@ -292,14 +303,14 @@ void main() {
           ),
         ),
       );
-      final rect = tester.getRect(find.byType(PivotBoard));
-      final view = BoardViewport(rect.size);
-      final start = rect.topLeft + view.project(Offset(180, g.controlY));
+      final pad = find.byType(OneFingerControls);
+      final scale = tester.widget<OneFingerControls>(pad).boardScale;
+      final start = tester.getCenter(pad);
       final finger = await tester.startGesture(start);
-      await finger.moveBy(Offset(200 * view.scale, 0));
+      await finger.moveBy(Offset(200 * scale, 0));
       g.step(1 / 120);
       expect(g.right - g.left, closeTo(140, .001));
-      await finger.moveBy(Offset(-400 * view.scale, 0));
+      await finger.moveBy(Offset(-400 * scale, 0));
       g.step(1 / 120);
       expect(g.right - g.left, closeTo(-140, .001));
       g.setPaused(true);

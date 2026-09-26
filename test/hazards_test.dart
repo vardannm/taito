@@ -166,6 +166,7 @@ void main() {
     'special hazard pause, death and replay state are isolated from Classic',
     () {
       final game = BalanceGame()..start(gameMode: GameMode.infinite);
+      game.lives = 1;
       final h = SpecialHazard(
         HazardKind.platformGap,
         x: 180,

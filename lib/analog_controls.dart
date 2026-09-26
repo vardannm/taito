@@ -116,8 +116,8 @@ class _VerticalAnalogState extends State<VerticalAnalog> {
                 -1.0,
                 1.0,
               );
-              // Direct displacement: no dead zone, easing, or velocity integration.
-              game.dragPivot(widget.side, event.localDelta.dy * 180 / travel);
+              // Reduced travel, with direct response on the next physics tick.
+              game.dragPivot(widget.side, event.localDelta.dy * 145 / travel);
               game.setAnalogInput(widget.side, raw);
             },
             onPointerUp: release,

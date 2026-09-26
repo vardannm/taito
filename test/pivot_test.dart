@@ -3,7 +3,9 @@ import 'package:balance_arcade/game.dart';
 
 void main() {
   test('fast pivot swipes remain swept through traps', () {
-    final game = BalanceGame()..start(gameMode: GameMode.infinite);
+    final game = BalanceGame()
+      ..start(gameMode: GameMode.infinite)
+      ..lives = 1;
     final trap = game.board.first;
     game.left = game.right = trap.y + 30;
     game.ballX = trap.x;
@@ -18,7 +20,9 @@ void main() {
     expect(game.pivotTargets, [null, null]);
   });
   test('scrolling does not move held targets and regrabbing has no jump', () {
-    final game = BalanceGame()..start(gameMode: GameMode.infinite);
+    final game = BalanceGame()
+      ..start(gameMode: GameMode.infinite)
+      ..lives = 1;
     game.left = game.right = -200;
     game.cameraOffset = 500;
     game.grabPivot(0);

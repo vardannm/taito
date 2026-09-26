@@ -380,6 +380,9 @@ void main() {
       ..sound = false
       ..haptics = false;
     await tester.pumpWidget(ArcadeApp(profile: p));
+    await tester.tap(find.byTooltip('Modes'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.text('DAILY'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));

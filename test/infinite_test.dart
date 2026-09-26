@@ -44,7 +44,7 @@ void main() {
     placeAtSafeHeight(game, 80);
     expect(game.score, 8);
     expect(game.completed, 0);
-    expect(game.lives, 1);
+    expect(game.lives, 3);
   });
   test(
     'camera and generated hazards continue far beyond the original board',
@@ -57,15 +57,17 @@ void main() {
       }
       expect(game.finished, isFalse);
       expect(game.won, isFalse);
-      expect(game.score, 500);
+      expect(game.metres, 500);
+      expect(game.score, greaterThan(500));
       expect(game.cameraOffset, greaterThan(4500));
       expect(game.screenY(game.ballY), closeTo(300, .01));
       expect(game.board.length, lessThan(40));
       expect(game.board.every((h) => h.target == 0), isTrue);
     },
   );
-  test('staying still raises the red floor and ends the run', () {
+  test('staying still raises the red floor and ends the last life', () {
     final game = BalanceGame()..start(gameMode: GameMode.infinite);
+    game.lives = 1;
     advanceWithoutTraps(game, 2.8);
     expect(game.dangerActive, isFalse);
     expect(game.score, greaterThan(0));
@@ -114,26 +116,25 @@ void main() {
       expect(game.screenY(game.dangerY), closeTo(recoveredRed, .001));
     },
   );
-  test(
-    'every hole ends Infinite immediately and replay starts at ground level',
-    () {
-      final game = BalanceGame()..start(gameMode: GameMode.infinite);
-      placeAt(game, game.board.first);
-      advance(game, 1);
-      expect(game.finished, isTrue);
-      expect(game.won, isFalse);
-      game.start(gameMode: game.mode);
-      expect(game.cameraOffset, 0);
-      expect(game.score, 0);
-      expect(game.lives, 1);
-      expect(game.dangerY, 580);
-      expect(game.stallTime, 0);
-    },
-  );
+  test('a final-life hole ends Infinite and replay restores three hearts', () {
+    final game = BalanceGame()..start(gameMode: GameMode.infinite);
+    game.lives = 1;
+    placeAt(game, game.board.first);
+    advance(game, 1);
+    expect(game.finished, isTrue);
+    expect(game.won, isFalse);
+    game.start(gameMode: game.mode);
+    expect(game.cameraOffset, 0);
+    expect(game.score, 0);
+    expect(game.lives, 3);
+    expect(game.dangerY, 580);
+    expect(game.stallTime, 0);
+  });
   test('climb records remain separate from Classic and Practice', () {
     final profile = PlayerProfile()..best = 999;
     final game = BalanceGame()..start(gameMode: GameMode.infinite);
     game.score = 500;
+    game.maxHeight = 5000;
     game.phase = GamePhase.over;
     expect(profile.recordResult(game), isTrue);
     expect(profile.best, 999);
@@ -162,9 +163,12 @@ void main() {
         ..sound = false
         ..haptics = false;
       await tester.pumpWidget(ArcadeApp(profile: profile));
-      await tester.tap(find.text('INFINITE'));
+      expect(
+        tester.widget<PivotBoard>(find.byType(PivotBoard)).game.waitingForInput,
+        isTrue,
+      );
       await tester.pump();
-      expect(find.text('HEIGHT / METERS'), findsOneWidget);
+      expect(find.text('INFINITE / POINTS'), findsOneWidget);
       expect(find.text('THE RUSH'), findsOneWidget);
       expect(find.textContaining('HOLE 01'), findsNothing);
       expect(find.byType(PivotBoard), findsOneWidget);

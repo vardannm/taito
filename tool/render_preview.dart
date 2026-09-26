@@ -1,3 +1,4 @@
+import '../test/support/mode_navigation.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -67,7 +68,7 @@ void main() {
     }
 
     await capture('gilt-home');
-    await tester.tap(find.text('CLASSIC'));
+    await openClassicLevels(tester);
     await tester.pump(const Duration(milliseconds: 100));
     await capture('gilt-game');
     await tester.tap(find.byTooltip('Pause'));

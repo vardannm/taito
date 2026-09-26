@@ -1,18 +1,22 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'game.dart';
+import 'spiders.dart';
 
 void paintSpiderBackdrop(Canvas c, BalanceGame game) {
-  if (!game.spiderLevel) return;
+  if (game.spiders.isEmpty) return;
   final thread = Paint()
     ..color = const Color(0xFF193C38).withAlpha(32)
     ..style = PaintingStyle.stroke
     ..strokeWidth = .7;
-  for (final (corner, rotation) in [
-    (const Offset(18, 18), 0.0),
-    (const Offset(342, 542), math.pi),
-    (const Offset(342, 18), math.pi / 2),
-  ]) {
+  for (final (corner, rotation)
+      in game.spiderLevel
+          ? [
+              (const Offset(18, 18), 0.0),
+              (const Offset(342, 542), math.pi),
+              (const Offset(342, 18), math.pi / 2),
+            ]
+          : <(Offset, double)>[]) {
     c.save();
     c.translate(corner.dx, corner.dy);
     c.rotate(rotation);
@@ -40,11 +44,62 @@ void paintSpiderBackdrop(Canvas c, BalanceGame game) {
     c.restore();
   }
   for (final s in game.spiders) {
-    final center = Offset(s.homeX, s.homeY),
-        color = s.chasing ? const Color(0xFFBA392E) : const Color(0xFF725138);
+    final bug = s is MazeSpider ? s : null;
+    final radius = bug?.catchingRadius ?? s.zoneRadius;
+    final center = Offset(s.zoneX, game.screenY(s.zoneY)),
+        color = bug != null
+            ? bug.active
+                  ? const Color(0xFFF25454)
+                  : bug.warning
+                  ? const Color(0xFFFFC568)
+                  : const Color(0xFF728E83)
+            : s.chasing
+            ? const Color(0xFFEF6654)
+            : const Color(0xFF725138);
+    if (bug != null && (bug.warning || bug.active)) {
+      final road = Path();
+      for (final r in game.mazeRun.corridor.rects) {
+        road.addRect(
+          Rect.fromLTRB(
+            r.left,
+            game.screenY(r.top),
+            r.right,
+            game.screenY(r.bottom),
+          ),
+        );
+      }
+      c.save();
+      c.clipPath(road);
+      c.drawCircle(
+        center,
+        radius,
+        Paint()..color = color.withAlpha(bug.active ? 105 : 40),
+      );
+      c.restore();
+      if (bug.warning) {
+        c.drawCircle(
+          center,
+          bug.maxZone,
+          Paint()
+            ..color = color.withAlpha(70)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1,
+        );
+        c.drawArc(
+          Rect.fromCircle(center: center, radius: bug.maxZone + 2),
+          -math.pi / 2,
+          math.pi * 2 * bug.warningProgress,
+          false,
+          Paint()
+            ..color = color
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2,
+        );
+      }
+    }
     c.drawCircle(
       center,
-      s.zoneRadius,
+      radius,
       Paint()..color = color.withAlpha(s.chasing ? 24 : 12),
     );
     final boundary = Paint()
@@ -53,7 +108,7 @@ void paintSpiderBackdrop(Canvas c, BalanceGame game) {
       ..strokeWidth = 1.1;
     for (var i = 0; i < 28; i++) {
       c.drawArc(
-        Rect.fromCircle(center: center, radius: s.zoneRadius),
+        Rect.fromCircle(center: center, radius: radius),
         i * math.pi * 2 / 28,
         .13,
         false,
@@ -64,22 +119,29 @@ void paintSpiderBackdrop(Canvas c, BalanceGame game) {
       final a = i * math.pi / 4;
       c.drawLine(
         center,
-        center + Offset(math.cos(a), math.sin(a)) * s.zoneRadius,
+        center + Offset(math.cos(a), math.sin(a)) * radius,
         thread,
       );
     }
-    c.drawCircle(center, s.zoneRadius * .45, thread);
-    c.drawCircle(center, s.zoneRadius * .75, thread);
+    c.drawCircle(center, radius * .45, thread);
+    c.drawCircle(center, radius * .75, thread);
   }
 }
 
 void paintSpiders(Canvas c, BalanceGame game, bool reducedMotion) {
   for (final spider in game.spiders) {
     c.save();
-    c.translate(spider.x, spider.y);
+    c.translate(spider.x, game.screenY(spider.y));
     c.rotate(spider.heading);
     c.scale(spider.bodyRadius / 6);
-    final color = spider.chasing
+    final bug = spider is MazeSpider ? spider : null;
+    final color = bug != null
+        ? bug.active
+              ? const Color(0xFF9E262C)
+              : bug.warning
+              ? const Color(0xFF92601F)
+              : const Color(0xFF253C34)
+        : spider.chasing
         ? const Color(0xFF80251F)
         : const Color(0xFF253C34);
     final legs = Paint()

@@ -13,10 +13,13 @@ void main() {
           ..start(gameMode: GameMode.infinite);
         for (final height in [0, 180, 600, 1200]) {
           game.cameraOffset = height * 10.0;
+          game.score = height * 25;
           game.ensureInfiniteBoard();
           final holes = game.board.toList()..sort((a, b) => a.y.compareTo(b.y));
-          expect(holes.any((h) => h.x < 180), isTrue);
-          expect(holes.any((h) => h.x > 180), isTrue);
+          if (height >= 600) {
+            expect(holes.any((h) => h.x < 180), isTrue);
+            expect(holes.any((h) => h.x > 180), isTrue);
+          }
           for (var i = 0; i < holes.length; i++) {
             final h = holes[i];
             zones[((h.x - 28) / 102).floor().clamp(0, 2)]++;

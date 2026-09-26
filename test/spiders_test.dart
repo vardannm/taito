@@ -151,7 +151,11 @@ void main() {
               textScaler: const TextScaler.linear(1.4),
             ),
             child: Scaffold(
-              body: LevelPicker(selected: 31, onSelected: (n) => chosen = n),
+              body: LevelPicker(
+                selected: 31,
+                totalStars: 98,
+                onSelected: (n) => chosen = n,
+              ),
             ),
           ),
         ),

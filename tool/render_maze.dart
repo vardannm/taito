@@ -1,3 +1,4 @@
+import '../test/support/mode_navigation.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -7,6 +8,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/profile.dart';
 import 'package:balance_arcade/game.dart';
+import 'package:balance_arcade/laser_maze.dart';
+import 'package:balance_arcade/spiders.dart';
+import 'package:balance_arcade/laser_maze_widgets.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
@@ -71,19 +75,36 @@ void main() {
     }
 
     await capture('maze-home');
-    await tester.ensureVisible(find.text('LASER MAZE'));
-    await tester.tap(find.text('LASER MAZE'));
+
+    await openMazeRoutes(tester);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await capture('maze-picker');
-    await tester.ensureVisible(find.byKey(const ValueKey('maze-route-1')));
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('maze-route-20')).hitTestable(),
+      200,
+      scrollable: find.descendant(
+        of: find.byType(LaserMazePicker),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await capture('maze-expert-picker');
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('maze-route-1')).hitTestable(),
+      -160,
+      scrollable: find.descendant(
+        of: find.byType(LaserMazePicker),
+        matching: find.byType(Scrollable),
+      ),
+    );
     await tester.tap(find.byKey(const ValueKey('maze-route-1')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     final game = tester.widget<PivotBoard>(find.byType(PivotBoard)).game;
     await capture('maze-route-1');
-    game.ballX = 180;
-    game.left = game.right = 60;
+    // The finish sits above the route's last lane, not above the launch column.
+    game.ballX = game.mazeRun.route!.finishX;
+    game.left = game.right = 62;
     game.elapsed = 25;
     for (var side = 0; side < 2; side++) {
       game.grabPivot(side);
@@ -98,6 +119,65 @@ void main() {
     game.start(gameMode: GameMode.laserMaze, levelNumber: 10);
     await tester.pump(const Duration(milliseconds: 20));
     await capture('maze-route-10');
+    for (final number in [2, 3, 4, 5, 6, 8]) {
+      game.start(gameMode: GameMode.laserMaze, levelNumber: number);
+      await tester.pump(const Duration(milliseconds: 20));
+      await capture('maze-structure-$number');
+    }
+    for (final number in [11, 20]) {
+      game.start(gameMode: GameMode.laserMaze, levelNumber: number);
+      await tester.pump(const Duration(milliseconds: 20));
+      await capture('maze-expert-$number-start');
+      final route = game.mazeRun.route!;
+      final leg = route.legs.firstWhere(
+        (l) => l.primary && l.b.y < l.a.y && l.a.y < -500,
+      );
+      game.ballX = leg.a.x;
+      game.left = game.right = (leg.a.y + leg.b.y) / 2 + BalanceGame.ballRadius;
+      game.cameraOffset = 360 - game.ballY;
+      for (var frame = 0; frame < 16; frame++) {
+        for (var side = 0; side < 2; side++) {
+          game.grabPivot(side);
+          game.dragPivot(side, -1.5);
+        }
+        game.step(1 / 120);
+      }
+      for (var side = 0; side < 2; side++) game.dragPivot(side, -1.5);
+      await tester.pump(const Duration(milliseconds: 8));
+      expect(game.finished, false);
+      await capture('maze-expert-$number-climb');
+      game.clearInput();
+      game.ballX = route.finishX;
+      game.left = game.right = route.finishLineY + 42;
+      game.cameraOffset = 360 - game.ballY;
+      await tester.pump(const Duration(milliseconds: 20));
+      await capture('maze-expert-$number-summit');
+    }
+    game.start(gameMode: GameMode.mazeEndless);
+    await tester.pump(const Duration(milliseconds: 20));
+    await capture('maze-endless-start');
+    expect(game.controlMode, ControlMode.twoFinger);
+    for (final bug in game.spiders.cast<MazeSpider>())
+      bug.time = 4.1 - bug.phase;
+    await tester.pump(const Duration(milliseconds: 20));
+    await capture('maze-bug-warning');
+    for (final bug in game.spiders.cast<MazeSpider>())
+      bug.time = 5.2 - bug.phase;
+    await tester.pump(const Duration(milliseconds: 20));
+    await capture('maze-bug-active');
+    // Lift along the generated centerline so the scrolled corridor is visible.
+    final maze = game.mazeRun.corridor as EndlessMaze;
+    final high = maze.centers.firstWhere((p) => p.y < 240);
+    game.ballX = high.x;
+    game.left = game.right = high.y + BalanceGame.ballRadius;
+    game.maxHeight = LaserMazeCorridor.startY - high.y;
+    await tester.pump(const Duration(milliseconds: 20));
+    await capture('maze-endless-climb');
+    game.start(gameMode: GameMode.infinite);
+    await tester.pump(const Duration(milliseconds: 20));
+    await capture('infinite-random-coins');
+    game.start(gameMode: GameMode.laserMaze, levelNumber: 10);
+    await tester.pump(const Duration(milliseconds: 20));
     tester.view.physicalSize = const Size(320, 568);
     await tester.pump(const Duration(milliseconds: 20));
     await capture('maze-small-phone');
@@ -108,6 +188,24 @@ void main() {
     await tester.pump(const Duration(milliseconds: 20));
     expect(game.mazeRun.hitLaser, true);
     await capture('maze-laser-contact');
+    await tester.tap(find.text('ALL ROUTES'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('maze-route-20')).hitTestable(),
+      200,
+      scrollable: find.descendant(
+        of: find.byType(LaserMazePicker),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('maze-route-20')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(game.level, 20);
+    expect(game.finished, false);
+    expect(find.byType(LaserMazeResult), findsNothing);
+    await capture('maze-expert-small-phone');
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

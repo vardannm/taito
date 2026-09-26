@@ -1,3 +1,4 @@
+import '../test/support/mode_navigation.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -66,17 +67,8 @@ void main() {
       await tester.runAsync(() => saveImage(image, 'artifacts/$name.png'));
     }
 
-    await capture('tutorial-controls');
-    await tester.tap(find.text('NEXT'));
-    await tester.pump();
-    await capture('tutorial-classic');
-    await tester.tap(find.text('NEXT'));
-    await tester.pump();
-    await capture('tutorial-infinite');
-    await tester.tap(find.text("LET'S PLAY"));
-    await tester.pump();
     await capture('drag-home');
-    await tester.tap(find.text('CLASSIC'));
+    await openClassicLevels(tester);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await capture('classic-levels');
@@ -100,23 +92,24 @@ void main() {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.padding = FakeViewPadding(top: 44, bottom: 34);
     await tester.pump();
-    classic.start(levelNumber:31);
-    await tester.pump(const Duration(milliseconds:16));
+    classic.start(levelNumber: 31);
+    await tester.pump(const Duration(milliseconds: 16));
     await capture('spider-level-31');
-    classic.start(levelNumber:50);
-    await tester.pump(const Duration(milliseconds:16));
+    classic.start(levelNumber: 50);
+    await tester.pump(const Duration(milliseconds: 16));
     await capture('spider-level-50');
-    classic.spiders.first.chasing=true;
-    await tester.pump(const Duration(milliseconds:16));
+    classic.spiders.first.chasing = true;
+    await tester.pump(const Duration(milliseconds: 16));
     await capture('spider-alert');
     classic.start();
-    await tester.pump(const Duration(milliseconds:16));
+    await tester.pump(const Duration(milliseconds: 16));
     await tester.tap(find.byTooltip('Pause'));
     await tester.pump(const Duration(milliseconds: 100));
     await capture('drag-pause');
     await tester.tap(find.text('BACK TO CLUB'));
     await tester.pump();
-    await tester.tap(find.text('INFINITE'));
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.keyW);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.keyW);
     await tester.pump();
     await capture('ascent-start');
     for (var i = 0; i < 40; i++) {

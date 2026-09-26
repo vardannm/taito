@@ -1,3 +1,4 @@
+import '../test/support/mode_navigation.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -64,7 +65,7 @@ void main() {
       ),
     );
     await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(find.text('CLASSIC'));
+    await openClassicLevels(tester);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.text('First steps'));
