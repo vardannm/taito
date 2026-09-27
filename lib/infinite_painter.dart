@@ -362,7 +362,7 @@ void paintInfiniteEnergy(Canvas c, BalanceGame game, bool reducedMotion) {
   }
 }
 
-/// The field shows actual collection reach; the inner arc is the pickup timer.
+/// The field shows actual collection reach; a compact badge tracks pickup time.
 void paintInfiniteMagnet(Canvas c, BalanceGame game, bool reducedMotion) {
   if (!game.infinite || game.magnetRadius <= 0 || game.ballScale <= 0) return;
   final p = Offset(game.visualX, game.screenY(game.visualY));
@@ -396,35 +396,67 @@ void paintInfiniteMagnet(Canvas c, BalanceGame game, bool reducedMotion) {
   }
   c.restore();
   if (game.survival.magnet > 0) {
-    c.drawArc(
-      Rect.fromCircle(center: p, radius: 21),
-      -math.pi / 2,
-      math.pi * 2 * game.survival.magnet / InfiniteTuning.magnetSeconds,
-      false,
-      Paint()
-        ..color = tint
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2,
+    final remaining = game.survival.magnet;
+    final fraction = (remaining / InfiniteTuning.magnetSeconds).clamp(0.0, 1.0);
+    // Fixed geometry prevents a jump when the countdown changes digit count.
+    final badge = Rect.fromLTWH(
+      (p.dx - 31).clamp(23.0, 275.0),
+      (p.dy - 56).clamp(game.visibleTop + 4, 542.0),
+      62,
+      28,
     );
+    final shape = RRect.fromRectAndRadius(badge, const Radius.circular(10));
+    c.drawRRect(
+      shape.shift(const Offset(0, 1)),
+      Paint()..color = const Color(0x24243B59),
+    );
+    c.drawRRect(shape, Paint()..color = const Color(0xF5FFF9ED));
+    c.drawRRect(
+      shape,
+      Paint()
+        ..color = const Color(0x40243B59)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .7,
+    );
+    c.save();
+    c.translate(badge.left + 13, badge.top + 11);
+    c.scale(.57);
+    paintPickup(c, Offset.zero, PickupFace.magnet, 0);
+    c.restore();
     final label = TextPainter(
       text: TextSpan(
-        text: 'MAGNET ${game.survival.magnet.ceil()}s',
+        text: '${remaining.ceil()}s',
         style: const TextStyle(
           fontFamily: 'monospace',
-          fontSize: 9,
-          fontWeight: FontWeight.w800,
-          color: tint,
-          backgroundColor: Color(0xEFFFF9ED),
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF243B59),
         ),
       ),
       textDirection: TextDirection.ltr,
-    )..layout();
+      textAlign: TextAlign.center,
+    )..layout(minWidth: 32, maxWidth: 32);
     label.paint(
       c,
-      Offset(
-        (p.dx - label.width / 2).clamp(22.0, 338 - label.width),
-        p.dy - 37,
+      Offset(badge.left + 24, badge.top + (22 - label.height) / 2),
+    );
+    final track = Rect.fromLTWH(badge.left + 9, badge.bottom - 6, 44, 2.5);
+    c.drawRRect(
+      RRect.fromRectAndRadius(track, const Radius.circular(2)),
+      Paint()..color = const Color(0x20243B59),
+    );
+    // The bar tracks fractional seconds continuously; the digits update once a second.
+    c.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          track.left,
+          track.top,
+          track.width * fraction,
+          track.height,
+        ),
+        const Radius.circular(2),
       ),
+      Paint()..color = const Color(0xFF287FD1),
     );
   }
 }

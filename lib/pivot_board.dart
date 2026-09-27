@@ -69,6 +69,7 @@ class _PivotBoardState extends State<PivotBoard> {
                   ControlHint(
                     anchors: [Offset(bounds.maxWidth / 2, 60)],
                     sideways: true,
+                    highlightBorder: true,
                   ),
               ],
             ),

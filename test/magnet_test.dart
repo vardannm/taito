@@ -83,7 +83,7 @@ void main() {
       expect(g.coins.first.collected, false);
       pullFor(g, 70);
       expect(g.survival.combo, 2);
-      expect(g.survival.shield, greaterThan(9));
+      expect(g.survival.shield, greaterThan(InfiniteTuning.shieldSeconds - 1));
       expect(g.lives, 3);
       expect(g.coinsCollected, 1);
       expect(far.collected, false);
@@ -111,7 +111,7 @@ void main() {
       for (var i = 0; i < 120 && g.survival.magnet < 4; i++) {
         tick(g);
       }
-      expect(g.survival.magnet, 12);
+      expect(g.survival.magnet, InfiniteTuning.magnetSeconds);
       g.survival.magnet = .001;
       tick(g);
       expect(g.survival.magnet, 0);

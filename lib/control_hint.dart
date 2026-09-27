@@ -4,9 +4,15 @@ import 'board_painter.dart';
 
 /// A decorative demonstration, never a gesture target or a simulation ticker.
 class ControlHint extends StatefulWidget {
-  const ControlHint({super.key, required this.anchors, this.sideways = false});
+  const ControlHint({
+    super.key,
+    required this.anchors,
+    this.sideways = false,
+    this.highlightBorder = false,
+  });
   final List<Offset> anchors;
   final bool sideways;
+  final bool highlightBorder;
   @override
   State<ControlHint> createState() => _ControlHintState();
 }
@@ -43,6 +49,31 @@ class _ControlHintState extends State<ControlHint>
           final wave = math.sin(motion.value * math.pi * 2);
           return Stack(
             children: [
+              if (widget.highlightBorder)
+                Positioned.fill(
+                  child: Container(
+                    key: const ValueKey('one-finger-glow'),
+                    margin: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: const Color(
+                          0xFFE9B64F,
+                        ).withValues(alpha: .75 + .2 * wave),
+                        width: 2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(
+                            0xFFE9B64F,
+                          ).withValues(alpha: .18 + .08 * wave),
+                          blurRadius: 8 + 3 * wave,
+                          spreadRadius: 1 + wave,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               for (var i = 0; i < widget.anchors.length; i++)
                 Positioned(
                   left:

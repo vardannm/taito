@@ -22,6 +22,10 @@ void main() {
       (tester) async {
         final game = await launch(tester, control);
         expect(find.byType(ControlHint), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('one-finger-glow')),
+          control == ControlMode.oneFinger ? findsOneWidget : findsNothing,
+        );
         final fingerIcon = find.byKey(const ValueKey('hint-finger-0'));
         final initial = tester.getTopLeft(fingerIcon);
         await tester.pump(const Duration(milliseconds: 550));

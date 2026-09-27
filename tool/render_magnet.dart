@@ -91,6 +91,7 @@ void main() {
       Navigator.of(tester.element(find.byType(BallShop))).pop();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
+      await capture('one-finger-highlight-${width.toInt()}');
       await tester.sendKeyDownEvent(LogicalKeyboardKey.keyW);
       await tester.sendKeyUpEvent(LogicalKeyboardKey.keyW);
       await tester.pump();
@@ -98,7 +99,7 @@ void main() {
       g.survival.combo = 5;
       g.survival.visualCombo = 1;
       g.survival.shield = 7.4;
-      g.survival.magnet = 9.2;
+      g.survival.magnet = InfiniteTuning.magnetSeconds - .8;
       g.beginInput();
       g.survival.announce('MAGNET - Nearby rewards collected');
       g.survival.points = 4280;
