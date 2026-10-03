@@ -253,3 +253,17 @@ their stable names. Cabinet unlocks still use Classic stars.
 Infinite tuning: `lib/infinite_difficulty.dart` includes `spiderSpeed` (base chase speed) and `spiderBulletSpeed` (web flight speed), in world units per second. Magnet fields pull rewards toward the ball; their bonuses activate only on physical collection. The Infinite HUD centers the score and combo without a distance readout.
 
 Debug launches apply a one-time +10,000 coin credit for testing ball purchases. The credit is saved with the wallet, so spending and restarting do not refill it. Release launches do not apply the credit.
+
+### 2048 difficulty configuration
+
+Edit `lib/merge_difficulty.dart`, just like `lib/infinite_difficulty.dart`, then hot restart and begin a fresh Merge run. The defaults retain the current balance.
+
+- `startSpeed`, `speedPerDoubling`, `maxSpeed`: falling-ball speed and its growth.
+- `waveSpacing`: distance between waves; higher values give more time to react.
+- `initialRowSpacing`, `orbSeparation`, `rowJitter`: opening layout and spacing within waves.
+- `dangerChance`: chance the third ball is larger than the head (0 to 1).
+- `gateInterval`: score between gates; higher values produce fewer gates.
+- `gateSpeedBonus`, `gateCooldownSeconds`: gate travel speed and pause before the next queued gate.
+- `gateValueOffset`: power-of-two difficulty adjustment; -1 halves requirements, +1 doubles them. The head still needs to be strictly greater than the gate.
+
+For an easier starting point, try `startSpeed = 24.0`, `speedPerDoubling = 2.0`, `maxSpeed = 50.0`, `waveSpacing = 140.0`, `dangerChance = 0.5`, and `gateValueOffset = -1`. Increasing `gateInterval` reduces gate frequency but also raises the score at which the first gate is calculated; use `gateValueOffset` to lower the required ball value separately. Supported ranges are documented beside each setting and checked by assertions in debug/test builds.

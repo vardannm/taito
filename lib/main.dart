@@ -567,11 +567,11 @@ class _GameScreenState extends State<GameScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Steer the solid middle ball into numbers. The largest number stays in the middle, with smaller numbers connected on both sides. Matching values combine anywhere in the snake and can cascade into one bigger ball.',
+                        'Steer the solid head ball into numbers. Smaller balls trail below it from largest to smallest, following your turns like a snake. Matching values combine anywhere in the snake and can cascade into one bigger ball.',
                       ),
                       const SizedBox(height: 16),
                       const Text(
-                        'Collect equal or smaller numbers with the middle ball. Touching a larger number ends the run: dodge the red rings! Every 400 score sends a numbered gate down from the top. Your main ball must be strictly greater than its number to pass. Matching values merge anywhere in the snake. Play continues beyond 2048.',
+                        'Collect equal or smaller numbers with the head ball. Touching a larger number ends the run: dodge the red rings! Every ${MergeRun.gateInterval} score sends a numbered gate down from the top. Your main ball must be strictly greater than its number to pass. Matching values merge anywhere in the snake. Play continues beyond 2048.',
                       ),
                       const SizedBox(height: 16),
                       Text(

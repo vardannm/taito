@@ -37,14 +37,32 @@ class PlayerProfile {
   int achievementProgress(Achievement achievement) {
     if (achievementClaimed(achievement)) return achievement.target;
     final progress = switch (achievement) {
-      Achievement.firstRun || Achievement.runs25 => infiniteRuns,
+      Achievement.firstRun ||
+      Achievement.runs25 ||
+      Achievement.runs100 => infiniteRuns,
       Achievement.distance500 ||
       Achievement.distance1000 ||
-      Achievement.distance2500 => infiniteBest,
-      Achievement.score10000 => infiniteBestScore,
-      Achievement.stars12 => totalStars,
-      Achievement.mazeClear => mazeBestTimes.isEmpty ? 0 : 1,
-      Achievement.merge128 => mergeHighest,
+      Achievement.distance2500 ||
+      Achievement.distance5000 => infiniteBest,
+      Achievement.score10000 || Achievement.score25000 => infiniteBestScore,
+      Achievement.stars12 ||
+      Achievement.stars30 ||
+      Achievement.stars60 ||
+      Achievement.stars120 => totalStars,
+      Achievement.mazeClear || Achievement.maze5 || Achievement.maze10 =>
+        mazeBestTimes.keys.map((key) => key.split(':').last).toSet().length,
+      Achievement.merge128 ||
+      Achievement.merge256 ||
+      Achievement.merge512 ||
+      Achievement.merge1024 ||
+      Achievement.merge2048 ||
+      Achievement.merge4096 => mergeHighest,
+      Achievement.mergeRuns25 || Achievement.mergeRuns100 => mergeRuns,
+      Achievement.visits3 ||
+      Achievement.visits7 ||
+      Achievement.visits14 ||
+      Achievement.visits30 ||
+      Achievement.visits60 => dailyPrizes.claimed,
     };
     return progress.clamp(0, achievement.target);
   }

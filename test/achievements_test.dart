@@ -80,6 +80,67 @@ void main() {
     }
   });
 
+  test('twenty new milestones use existing saved records', () async {
+    expect(Achievement.values.length, 29);
+    final p = PlayerProfile()
+      ..infiniteBest = 5000
+      ..infiniteBestScore = 25000
+      ..infiniteRuns = 100
+      ..mergeHighest = 4096
+      ..mergeRuns = 100;
+    for (var level = 1; level <= 40; level++) {
+      p.levelRecords[p.recordKey(level, ControlMode.oneFinger)] =
+          const LevelRecord(starMask: 7);
+    }
+    for (var route = 1; route <= 10; route++) {
+      p.mazeBestTimes[p.recordKey(route, ControlMode.oneFinger)] = 45;
+    }
+    p.dailyPrizes.claimed = 60;
+    p.dailyPrizes.lastClaim = DateTime.utc(2026, 9, 30);
+    await p.save();
+    final loaded = PlayerProfile();
+    await loaded.load();
+    for (final achievement in Achievement.values.skip(9)) {
+      expect(
+        loaded.achievementEarned(achievement),
+        true,
+        reason: achievement.name,
+      );
+    }
+  });
+  test('maze milestones count routes once across control modes', () {
+    final p = PlayerProfile();
+    for (final control in ControlMode.values) {
+      p.mazeBestTimes[p.recordKey(1, control)] = 45;
+    }
+    expect(p.achievementProgress(Achievement.maze5), 1);
+  });
+  test(
+    'return visits survive missed days, restarts and duplicate claims',
+    () async {
+      final p = PlayerProfile(unlimitedCoins: false);
+      final day = DateTime.utc(2026, 1, 1);
+      for (final offset in [0, 3, 9]) {
+        final date = day.add(Duration(days: offset));
+        expect(await p.claimDailyPrize(now: date), isNotNull);
+        expect(await p.claimDailyPrize(now: date), isNull);
+      }
+      final loaded = PlayerProfile(unlimitedCoins: false);
+      await loaded.load();
+      expect(loaded.achievementEarned(Achievement.visits3), true);
+      expect(loaded.achievementProgress(Achievement.visits7), 3);
+      expect(await loaded.claimDailyPrize(now: day), isNull);
+      final wallet = loaded.wallet;
+      expect(await loaded.claimAchievement(Achievement.visits3), true);
+      expect(await loaded.claimAchievement(Achievement.visits3), false);
+      expect(loaded.wallet, wallet + Achievement.visits3.coins);
+      final restarted = PlayerProfile(unlimitedCoins: false);
+      await restarted.load();
+      expect(restarted.achievementClaimed(Achievement.visits3), true);
+      expect(restarted.achievementProgress(Achievement.visits60), 3);
+    },
+  );
+
   for (final scale in [1.0, 1.5]) {
     testWidgets(
       'achievement sheet fits a small phone at text scale $scale and claims',
@@ -109,7 +170,11 @@ void main() {
         await tester.pump(const Duration(milliseconds: 400));
         expect(p.wallet, Achievement.firstRun.coins);
         expect(find.text('CLAIMED'), findsOneWidget);
-        await tester.scrollUntilVisible(find.text('Power of two'), 300);
+        await tester.scrollUntilVisible(
+          find.text('Part of the arcade'),
+          400,
+          maxScrolls: 60,
+        );
         expect(tester.takeException(), isNull);
       },
     );
@@ -127,7 +192,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.byType(AchievementSheet), findsOneWidget);
-    expect(find.text('0 of 9 earned'), findsOneWidget);
+    expect(find.text('0 of 29 earned'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

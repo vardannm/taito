@@ -52,14 +52,30 @@ class BoardViewport {
     Size size,
     BalanceGame game, {
     double fillWidth = 0,
-  }) => BoardViewport(
-    size,
-    fillWidth: fillWidth,
-    focusY: game.screenY((game.left + game.right) / 2),
-  );
+  }) {
+    final viewport = BoardViewport(
+      size,
+      fillWidth: fillWidth,
+      focusY: game.screenY((game.left + game.right) / 2),
+    );
+    if (game.merging && game.mergeRun.segments.length > 1) {
+      // Short screens crop the board. Keep the last link above the controls,
+      // using the same transform for the platform and its touch targets.
+      final bottom =
+          game.screenY(game.ballY) +
+          game.mergeRun.tailExtent +
+          MergeRun.ballRadius +
+          8;
+      viewport.offset = Offset(
+        viewport.offset.dx,
+        math.min(viewport.offset.dy, size.height - bottom * viewport.scale),
+      );
+    }
+    return viewport;
+  }
   late final double scale;
   late final double topExtension;
-  late final Offset offset;
+  late Offset offset;
   Offset project(Offset point) => offset + point * scale;
   Rect get rect =>
       (offset - Offset(0, topExtension * scale)) &
@@ -623,22 +639,16 @@ class BoardPainter extends CustomPainter {
     if (game.merging) {
       final run = game.mergeRun;
       Offset segmentCenter(int i) {
-        final x = run.segmentX(game.visualX, i);
-        return Offset(x, game.screenY(game.platformY(x) - MergeRun.ballRadius));
+        return Offset(
+          reducedMotion ? game.visualX : run.segmentX(game.visualX, i),
+          run.segmentY(game.screenY(game.visualY), i),
+        );
       }
 
-      if (run.segments.length > 1) {
-        final leftX = game.visualX - run.leftSpan;
-        final rightX = game.visualX + run.rightSpan;
+      for (var i = 1; i < run.segments.length; i++) {
         canvas.drawLine(
-          Offset(
-            leftX,
-            game.screenY(game.platformY(leftX) - MergeRun.ballRadius),
-          ),
-          Offset(
-            rightX,
-            game.screenY(game.platformY(rightX) - MergeRun.ballRadius),
-          ),
+          segmentCenter(i - 1),
+          segmentCenter(i),
           Paint()
             ..color = ink.withAlpha(85)
             ..strokeWidth = 3
@@ -650,8 +660,8 @@ class BoardPainter extends CustomPainter {
           canvas,
           segmentCenter(i),
           run.segments[i],
-          MergeRun.ballRadius - 1,
-          opacity: .38,
+          run.segmentRadius(i),
+          opacity: .65,
           match: i == run.segments.length - 1,
         );
       }

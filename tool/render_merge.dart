@@ -55,6 +55,7 @@ void main() {
     final profile = PlayerProfile()
       ..tutorialSeen = true
       ..sound = false
+      ..music = false
       ..haptics = false;
     profile.controlMode = ControlMode.analog;
     await tester.pumpWidget(
@@ -74,13 +75,13 @@ void main() {
 
     await capture('merge-home');
 
-    await selectWorld(tester, 4);
+    await selectWorld(tester, 3);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 600));
     await capture('merge-guide');
     await startWorld(tester);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 600));
     final game = tester.widget<PivotBoard>(find.byType(PivotBoard)).game;
     game.mergeRun.segments
       ..clear()
@@ -163,6 +164,22 @@ void main() {
     game.mergeRun.gates.add(MergeGate(4096, y: game.ballY));
     await tester.pump(const Duration(milliseconds: 20));
     await capture('merge-gate-loss');
+    await tester.tap(find.text('PLAY AGAIN'));
+    await tester.pump(const Duration(milliseconds: 20));
+    game.mergeRun.orbs.clear();
+    game.mergeRun.gates.clear();
+    game.mergeRun.segments
+      ..clear()
+      ..addAll([32, 16, 8, 4, 2]);
+    game.mergeRun.highest = 32;
+    game.left = game.right = 340;
+    for (var frame = 0; frame < 18; frame++) {
+      final from = game.ballX;
+      game.ballX += 3;
+      game.mergeRun.step(1 / 60, from, game.ballY, game.ballX, game.ballY);
+    }
+    await tester.pump(const Duration(milliseconds: 16));
+    await capture('merge-snake-turn-small');
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

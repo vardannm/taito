@@ -81,7 +81,11 @@ class BalanceGame {
       : scrolling
       ? 40 - cameraOffset
       : 30.0;
-  double get maxPivot => scrolling ? 526 - cameraOffset : 526.0;
+  double get maxPivot => scrolling
+      ? 526 - cameraOffset
+      : merging
+      ? 526 - mergeRun.tailExtent
+      : 526.0;
   LaserMazeRun? _mazeRun;
   LaserMazeRun get mazeRun => _mazeRun ??= LaserMazeRun(1);
   set mazeRun(LaserMazeRun value) => _mazeRun = value;
@@ -1029,8 +1033,11 @@ class BalanceGame {
     if (merging) {
       final collectedBefore = mergeRun.collected;
       mergeRun.step(dt, oldX, oldY, ballX, ballY);
-      // Make room for new segments without treating the attachment as a sweep.
+      // Keep a growing downward tail inside the board. This repositioning is
+      // visual accommodation, not a swept pickup or gate collision.
       ballX = ballX.clamp(mergeRun.minHeadX, mergeRun.maxHeadX);
+      left = math.min(left, maxPivot);
+      right = math.min(right, maxPivot);
       score = mergeRun.score;
       message = mergeRun.notice;
       if (mergeRun.collected != collectedBefore) event = GameEvent.merge;

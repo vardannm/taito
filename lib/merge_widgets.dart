@@ -28,9 +28,9 @@ class MergeStatus extends StatelessWidget {
     padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
     child: Semantics(
       label:
-          'Snake from highest in the middle to smallest outside: ${run.segments.join(', ')}. '
+          'Snake from largest at the top to smallest at the bottom: ${run.segments.join(', ')}. '
           'Next gate requires more than ${run.upcomingGateValue}. '
-          'Collect equal or smaller numbers with the solid middle ball. Larger numbers are fatal.',
+          'Collect equal or smaller numbers with the solid head ball. Larger numbers are fatal.',
       excludeSemantics: true,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,

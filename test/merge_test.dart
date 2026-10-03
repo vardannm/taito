@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/merge.dart';
+import 'package:balance_arcade/board_painter.dart';
 import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/profile.dart';
 import 'package:balance_arcade/merge_widgets.dart';
@@ -60,27 +61,26 @@ void main() {
     }
   });
 
-  test(
-    'requested centered 2 16 32 8 4 layout cascades to 64 with another 2',
-    () {
-      final run = emptyRun()..segments.insert(0, 32);
-      for (final value in [16, 8, 4]) {
-        run.collect(value);
-        expect(run.head, 32);
-        expect(run.segmentX(180, 0), 180);
-      }
-      final order = List.generate(run.segments.length, (i) => i)
-        ..sort((a, b) => run.segmentSlot(a).compareTo(run.segmentSlot(b)));
-      expect(order.map((i) => run.segments[i]), [2, 16, 32, 8, 4]);
-      expect(run.leftSpan, run.rightSpan);
-      run.collect(2);
-      expect(run.segments, [64]);
-      expect(run.lastChain, 5);
-      expect(run.lastMergeScore, 124);
-      expect(run.score, 124);
-      expect(run.ended, false);
-    },
-  );
+  test('descending tail cascades to 64 with another 2', () {
+    final run = emptyRun()..segments.insert(0, 32);
+    for (final value in [16, 8, 4]) {
+      run.collect(value);
+      expect(run.head, 32);
+      expect(run.segmentX(180, 0), 180);
+    }
+    expect(run.segments, [32, 16, 8, 4, 2]);
+    for (var i = 1; i < run.segments.length; i++) {
+      expect(run.segmentX(180, i), 180);
+      expect(run.segmentY(300, i), greaterThan(run.segmentY(300, i - 1)));
+      expect(run.segmentRadius(i), lessThan(run.segmentRadius(i - 1)));
+    }
+    run.collect(2);
+    expect(run.segments, [64]);
+    expect(run.lastChain, 5);
+    expect(run.lastMergeScore, 124);
+    expect(run.score, 124);
+    expect(run.ended, false);
+  });
   test(
     'matching any number merges across the snake, not only the smallest',
     () {
@@ -98,41 +98,31 @@ void main() {
       expect(run.score, 192);
     },
   );
-  test(
-    '4 keeps the middle and a faint 2 attaches left before merging to 8',
-    () {
-      final run = emptyRun()..collect(2);
-      run.collect(2);
-      expect(run.segments, [4, 2]);
-      expect(run.segmentSlot(0), 0);
-      expect(run.segmentSlot(1), -1);
-      run.collect(2);
-      expect(run.segments, [8]);
-      expect(run.lastMergeScore, 12);
-    },
-  );
-  test(
-    'every length grows on both sides with the biggest in a middle slot',
-    () {
-      final run = emptyRun();
-      for (var count = 1; count <= MergeRun.maxSegments; count++) {
-        run.segments
-          ..clear()
-          ..addAll(List.generate(count, (i) => 1 << (count - i)));
-        final slots = List.generate(count, run.segmentSlot)..sort();
-        expect(slots.toSet().length, count);
-        expect(slots.last - slots.first + 1, count);
-        expect(
-          (run.leftSpan - run.rightSpan).abs(),
-          lessThanOrEqualTo(MergeRun.segmentSpacing),
-        );
-        expect(run.segmentSlot(0), 0);
-        expect(run.head, 1 << count);
-        expect(run.length, lessThanOrEqualTo(MergeRun.platformWidth));
-        expect(run.minHeadX, lessThanOrEqualTo(run.maxHeadX));
+  test('4 leads and a smaller 2 attaches below before merging to 8', () {
+    final run = emptyRun()..collect(2);
+    run.collect(2);
+    expect(run.segments, [4, 2]);
+    expect(run.segmentY(300, 0), 300);
+    expect(run.segmentY(300, 1), greaterThan(300));
+    run.collect(2);
+    expect(run.segments, [8]);
+    expect(run.lastMergeScore, 12);
+  });
+  test('every length grows downward with the biggest at the head', () {
+    final run = emptyRun();
+    for (var count = 1; count <= MergeRun.maxSegments; count++) {
+      run.segments
+        ..clear()
+        ..addAll(List.generate(count, (i) => 1 << (count - i)));
+      for (var i = 0; i < count; i++) {
+        expect(run.segmentX(180, i), 180);
+        expect(run.segmentY(200, i), 200 + i * run.spacing);
       }
-    },
-  );
+      expect(run.head, 1 << count);
+      expect(run.length, lessThanOrEqualTo(MergeRun.platformWidth));
+      expect(run.minHeadX, lessThanOrEqualTo(run.maxHeadX));
+    }
+  });
   test('long snakes compress and never lose to platform capacity', () {
     final run = emptyRun();
     run.segments
@@ -157,6 +147,80 @@ void main() {
     expect(run.segments, [8192]);
     expect(run.lastChain, 12);
     expect(run.ended, false);
+  });
+  test('turns propagate down the tail and settle when the head stops', () {
+    final run = emptyRun();
+    run.segments
+      ..clear()
+      ..addAll([32, 16, 8, 4, 2]);
+    run.step(1 / 60, 180, 100, 180, 100);
+    run.step(1 / 60, 180, 100, 192, 100);
+    expect(run.segmentX(192, 1), lessThan(192));
+    expect(run.segmentX(192, 1), greaterThan(run.segmentX(192, 4)));
+    for (var i = 0; i < 180; i++) {
+      run.orbs.clear();
+      run.step(1 / 60, 192, 100, 192, 100);
+    }
+    expect(run.segmentX(192, 4), closeTo(192, .01));
+    run.collect(2);
+    expect(run.segments, [64]);
+    run.step(1 / 60, 90, 100, 90, 100);
+    run.collect(2);
+    expect(run.segmentX(90, 1), 90);
+  });
+  test('tail motion stays bounded at both edges and after a reversal', () {
+    final run = emptyRun();
+    run.segments
+      ..clear()
+      ..addAll(fullSnake());
+    for (final x in [32.0, 328.0, 32.0]) {
+      run.step(1 / 60, 180, 100, x, 100);
+      for (var i = 1; i < run.segments.length; i++) {
+        expect(
+          run.segmentX(x, i),
+          inInclusiveRange(run.minHeadX, run.maxHeadX),
+        );
+        expect(
+          (run.segmentX(x, i) - run.segmentX(x, i - 1)).abs(),
+          lessThanOrEqualTo(run.spacing * .65 + .001),
+        );
+      }
+    }
+  });
+  test('the full tail fits below the platform for every control mode', () {
+    for (final control in ControlMode.values) {
+      final g = BalanceGame()
+        ..preferredControlMode = control
+        ..start(gameMode: GameMode.merge2048);
+      clearStream(g);
+      g.mergeRun.segments
+        ..clear()
+        ..addAll(fullSnake());
+      g.step(1 / 120);
+      final run = g.mergeRun;
+      expect(
+        run.segmentY(g.ballY, run.segments.length - 1) +
+            run.segmentRadius(run.segments.length - 1),
+        lessThan(550),
+      );
+      for (final size in [const Size(320, 300), const Size(390, 580)]) {
+        final viewport = BoardViewport.forGame(size, g, fillWidth: 1);
+        final tailBottom = viewport.project(
+          Offset(
+            g.ballX,
+            g.ballY +
+                run.tailExtent +
+                run.segmentRadius(run.segments.length - 1),
+          ),
+        );
+        expect(tailBottom.dy, lessThan(size.height));
+        expect(
+          viewport.project(Offset(g.ballX, g.ballY - MergeRun.ballRadius)).dy,
+          greaterThan(0),
+        );
+      }
+      expect(g.finished, false);
+    }
   });
   test('large number labels use binary thousands and millions', () {
     for (final entry in {
@@ -194,27 +258,25 @@ void main() {
       expect(run.orbs.length, lessThan(22));
     }
   });
-  test(
-    'only the middle ball collects; ghosts pass through dangerous numbers',
-    () {
-      final g = BalanceGame()..start(gameMode: GameMode.merge2048);
-      clearStream(g);
-      g.mergeRun.segments
-        ..clear()
-        ..addAll([16, 8, 4, 2]);
-      final ghostX = g.mergeRun.segmentX(g.ballX, 3);
-      g.mergeRun.orbs.add(NumberOrb(ghostX, g.ballY, 16));
+  test('only the head collects; tail passes through dangerous numbers', () {
+    final g = BalanceGame()..start(gameMode: GameMode.merge2048);
+    clearStream(g);
+    g.mergeRun.segments
+      ..clear()
+      ..addAll([16, 8, 4, 2]);
+    g.left = g.right = 400;
+    final ghostX = g.mergeRun.segmentX(g.ballX, 3);
+    g.mergeRun.orbs.add(NumberOrb(ghostX, g.mergeRun.segmentY(g.ballY, 3), 32));
 
-      g.step(1 / 120);
-      expect(g.mergeRun.segments, [16, 8, 4, 2]);
-      expect(g.mergeRun.orbs.length, 1);
-      expect(g.finished, false);
-      clearStream(g);
-      g.mergeRun.orbs.add(NumberOrb(g.ballX, g.ballY, 2));
-      g.step(1 / 120);
-      expect(g.mergeRun.segments, [32]);
-    },
-  );
+    g.step(1 / 120);
+    expect(g.mergeRun.segments, [16, 8, 4, 2]);
+    expect(g.mergeRun.orbs.length, 1);
+    expect(g.finished, false);
+    clearStream(g);
+    g.mergeRun.orbs.add(NumberOrb(g.ballX, g.ballY, 2));
+    g.step(1 / 120);
+    expect(g.mergeRun.segments, [32]);
+  });
   test(
     'equal and smaller numbers are safe; larger numbers end immediately',
     () {
@@ -379,7 +441,7 @@ void main() {
         closeTo(g.platformY(g.ballX) - MergeRun.ballRadius, .001),
       );
       // Collected segments never shorten the head's reach: it still travels to
-      // either edge of the platform while they trail past the ends.
+      // either edge of the platform while the tail trails below.
       expect(g.mergeRun.minHeadX, MergeRun.platformLeft + MergeRun.ballRadius);
       expect(g.mergeRun.maxHeadX, MergeRun.platformRight - MergeRun.ballRadius);
       for (final direction in [-1, 1]) {
