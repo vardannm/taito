@@ -6,7 +6,7 @@ abstract final class MergeDifficulty {
   // of the highest ball above 2, capped at maxSpeed.
   // startSpeed > 0; speedPerDoubling >= 0; maxSpeed >= startSpeed.
   static const startSpeed = 30.0;
-  static const speedPerDoubling = 3.0;
+  static const speedPerDoubling = 5.0;
   static const maxSpeed = 66.0;
 
   // Distance between new waves (> 0). Larger means more breathing room.
