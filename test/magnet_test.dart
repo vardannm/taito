@@ -141,7 +141,7 @@ void main() {
         expect(far.collected, false, reason: ball.name);
         g.start(gameMode: GameMode.classic);
         expect(g.magnetRadius, 0);
-        g.start(gameMode: GameMode.laserMaze);
+        g.start(gameMode: GameMode.classic);
         expect(g.magnetRadius, 0);
       }
     },

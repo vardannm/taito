@@ -4,7 +4,6 @@ import 'dart:convert';
 import 'game.dart';
 import 'profile.dart';
 import 'levels.dart';
-import 'laser_maze.dart';
 import 'ball_cosmetics.dart';
 import 'platforms.dart';
 import 'rewards.dart';
@@ -27,7 +26,7 @@ class ProgressBackup {
       p.mergeBest,
       p.mergeHighest,
       p.mergeRuns,
-      p.mazeRuns,
+      0, // Retired Maze run counter; keep version 1 positions stable.
       // Two retired Maze Infinite counters. The slots stay so codes written
       // before the mode was removed still decode by position.
       0,
@@ -36,7 +35,7 @@ class ProgressBackup {
     ],
     'control': p.controlMode.name,
     'level': p.classicLevel,
-    'maze': p.mazeLevel,
+    'maze': 1, // Reserved for version 1 readers.
     'sound': p.sound,
     'haptics': p.haptics,
     'tutorial': p.tutorialSeen,
@@ -53,7 +52,7 @@ class ProgressBackup {
     'platform': p.selectedPlatform.name,
     'levels': p.levelRecords.map((k, v) => MapEntry(k, v.toJson())),
     'daily': p.dailyRecords.map((k, v) => MapEntry(k, v.toJson())),
-    'times': p.mazeBestTimes,
+    'times': <String, double>{}, // Retired route records.
   });
 
   static PlayerProfile decode(String raw, {required bool testEconomy}) {
@@ -102,12 +101,10 @@ class ProgressBackup {
       ..mergeBest = n[5]
       ..mergeHighest = n[6]
       ..mergeRuns = n[7]
-      ..mazeRuns = n[8]
-      // n[9] and n[10] are the retired Maze Infinite counters.
+      // n[8], n[9] and n[10] belong to retired modes.
       ..wallet = n[11]
       ..controlMode = choice(d['control'], ControlMode.values)
       ..classicLevel = integer(d['level'], ClassicLevels.count)
-      ..mazeLevel = integer(d['maze'], LaserMazeRoute.count)
       ..sound = flag('sound')
       ..haptics = flag('haptics')
       ..tutorialSeen = flag('tutorial');
@@ -120,7 +117,7 @@ class ProgressBackup {
                 : TutorialStep.controls,
           );
     p.tutorialSeen = !p.tutorial.active;
-    if (p.classicLevel < 1 || p.mazeLevel < 1 || p.mergeHighest < 2) invalid();
+    if (p.classicLevel < 1 || p.mergeHighest < 2) invalid();
     final sensitivity = d['sensitivity'];
     if (sensitivity is! List ||
         sensitivity.length != 2 ||
@@ -152,27 +149,15 @@ class ProgressBackup {
     records(
       'levels',
       p.levelRecords,
-      RegExp(r'^(oneFinger|twoFinger|analog):[1-9]\d*$'),
+      RegExp(r'^(oneFinger|twoFinger|analog|tiltLift|boardTilt):[1-9]\d*$'),
     );
     records(
       'daily',
       p.dailyRecords,
-      RegExp(r'^(oneFinger|twoFinger|analog):\d{4}-\d{2}-\d{2}$'),
+      RegExp(
+        r'^(oneFinger|twoFinger|analog|tiltLift|boardTilt):\d{4}-\d{2}-\d{2}$',
+      ),
     );
-    final times = d['times'];
-    if (times is! Map<String, dynamic> ||
-        times.length > LaserMazeRoute.count * 3)
-      invalid();
-    for (final entry in times.entries) {
-      final parts = entry.key.split(':');
-      if (parts.length != 2) invalid();
-      choice(parts[0], ControlMode.values);
-      final route = int.tryParse(parts[1]);
-      if (route == null || route < 1 || route > LaserMazeRoute.count) invalid();
-      final t = entry.value;
-      if (t is! num || !t.isFinite || t <= 0 || t > 1e9) invalid();
-      p.mazeBestTimes[entry.key] = t.toDouble();
-    }
     void owned<T extends Enum>(String key, Set<T> target, List<T> values) {
       final source = d[key];
       if (source is! List || source.isEmpty || source.length > values.length)
@@ -211,12 +196,10 @@ class ProgressBackup {
       ..mergeBest = source.mergeBest
       ..mergeHighest = source.mergeHighest
       ..mergeRuns = source.mergeRuns
-      ..mazeRuns = source.mazeRuns
       ..wallet = source.wallet
       ..dailyPrizes = DailyPrizes.fromJson(source.dailyPrizes.toJson())
       ..controlMode = source.controlMode
       ..classicLevel = source.classicLevel
-      ..mazeLevel = source.mazeLevel
       ..sound = source.sound
       ..haptics = source.haptics
       ..tutorialSeen = source.tutorialSeen
@@ -232,9 +215,6 @@ class ProgressBackup {
     target.dailyRecords
       ..clear()
       ..addAll(source.dailyRecords);
-    target.mazeBestTimes
-      ..clear()
-      ..addAll(source.mazeBestTimes);
     target.ownedBalls
       ..clear()
       ..addAll(source.ownedBalls);

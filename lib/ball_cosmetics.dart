@@ -2,7 +2,7 @@
 enum BallCosmetic {
   steel('Steel', 'Polished metal', 0, 0xFFE9EADF, 0, 0),
   coral('Coral', 'Warm enamel', 35, 0xFFFF876D, 0, .1),
-  circuit('Circuit', 'Striped ceramic', 65, 0xFF84CCC2, 0, .2),
+  circuit('Circuit', 'Jade ceramic circuits', 65, 0xFF84CCC2, 0, .2),
   neon('Neon', 'Radiant energy sphere', 100, 0xFF73FFF0, 0, .35),
   obsidian('Obsidian', 'Faceted dark crystal', 140, 0xFF9D89C8, 6, .5),
   prism('Prism', 'Floating diamond', 180, 0xFFFFD671, 4, .75),

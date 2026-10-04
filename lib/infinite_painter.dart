@@ -1,7 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'game.dart';
-import 'cabinet.dart';
+import 'ball_world.dart';
+import 'ball_cosmetics.dart';
 import 'infinite_progress.dart';
 import 'maze_gates.dart';
 import 'pickup_painter.dart';
@@ -51,6 +52,36 @@ Color comboColor(double power, {bool background = false}) {
       : color;
 }
 
+/// Combo energy recolors the equipped world without replacing its identity.
+List<Color> boardFieldColors(BalanceGame game) {
+  final world = BallWorld.of(game.cosmetic);
+  if (!game.infinite) return world.field;
+  final power = (game.survival.visualCombo * InfiniteTuning.visualIntensity)
+      .clamp(0.0, 1.0);
+  var tint = comboColor(power);
+  if (game.cosmetic != BallCosmetic.steel) {
+    tint = Color.lerp(
+      tint,
+      Color.lerp(world.field[1], world.accent, .35),
+      .65,
+    )!;
+    tint = Color.lerp(
+      tint,
+      Color.lerp(world.top, const Color(0xFF090D1D), .75),
+      comboDarkness(power) * .8,
+    )!;
+  }
+  final energized = [
+    Color.lerp(tint, Colors.white, .3)!,
+    tint,
+    Color.lerp(tint, const Color(0xFF77BBB5), .2)!,
+  ];
+  return [
+    for (var i = 0; i < 3; i++)
+      Color.lerp(world.field[i], energized[i], (power * 4).clamp(0.0, 1.0))!,
+  ];
+}
+
 /// Match the playfield gradient so foreground colors follow the visible fade,
 /// including transitions back to x1 after a hit, rather than the target combo.
 Color infiniteFieldColor(BalanceGame game, Offset point) {
@@ -63,18 +94,7 @@ Color infiniteFieldColor(BalanceGame game, Offset point) {
   Color sample(List<Color> colors) => t <= .5
       ? Color.lerp(colors[0], colors[1], t * 2)!
       : Color.lerp(colors[1], colors[2], (t - .5) * 2)!;
-  final power = (game.survival.visualCombo * InfiniteTuning.visualIntensity)
-      .clamp(0.0, 1.0);
-  final tint = comboColor(power);
-  return Color.lerp(
-    sample(CabinetPalette.of(game.cabinet).field),
-    sample([
-      Color.lerp(tint, Colors.white, .3)!,
-      tint,
-      Color.lerp(tint, const Color(0xFF77BBB5), .2)!,
-    ]),
-    (power * 4).clamp(0.0, 1.0),
-  )!;
+  return sample(boardFieldColors(game));
 }
 
 /// Choose the higher-contrast opposite tone; never fade through muddy grey.
@@ -90,27 +110,36 @@ class InfiniteBackdropPainter extends CustomPainter {
     this.game, {
     required this.reducedMotion,
     Listenable? repaint,
-  }) : super(repaint: repaint);
+  }) : world = BallWorld.of(game.cosmetic),
+       super(repaint: repaint);
   final BalanceGame game;
+  final BallWorld world;
   final bool reducedMotion;
   @override
   void paint(Canvas c, Size size) {
     final power = game.survival.visualCombo;
-    final color = comboColor(power, background: true);
+    // Keep the control area light enough for every controller's dark labels.
+    final color = Color.lerp(
+      world.surround,
+      boardFieldColors(game)[1],
+      power * .12,
+    )!;
     c.drawRect(
       Offset.zero & size,
       Paint()
         ..shader = LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [color, Color.lerp(color, comboColor(power), .65)!],
+          colors: [color, Color.lerp(color, world.surround, .35)!],
         ).createShader(Offset.zero & size),
     );
   }
 
   @override
   bool shouldRepaint(InfiniteBackdropPainter old) =>
-      old.game != game || old.reducedMotion != reducedMotion;
+      old.game != game ||
+      old.world != world ||
+      old.reducedMotion != reducedMotion;
 }
 
 void paintInfiniteAtmosphere(Canvas c, BalanceGame game, bool reducedMotion) {
@@ -118,28 +147,8 @@ void paintInfiniteAtmosphere(Canvas c, BalanceGame game, bool reducedMotion) {
   final power = (game.survival.visualCombo * InfiniteTuning.visualIntensity)
       .clamp(0.0, 1.0);
   if (power < .005) return;
-  final tint = comboColor(power);
-  final area = Rect.fromLTRB(10, game.visibleTop + 10, 350, 550);
-  // Opaque color transforms the whole playfield; the start fades in smoothly.
-  c.drawRect(
-    area,
-    Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors:
-            [
-                  Color.lerp(tint, Colors.white, .3)!,
-                  tint,
-                  Color.lerp(tint, const Color(0xFF77BBB5), .2)!,
-                ]
-                .map(
-                  (color) =>
-                      color.withValues(alpha: (power * 4).clamp(0.0, 1.0)),
-                )
-                .toList(),
-      ).createShader(area),
-  );
+  // BoardPainter already paints the combo-colored field. Avoid a second
+  // full-screen gradient pass on every frame.
   if (reducedMotion) return;
   final darkness = comboDarkness(power);
   for (var band = 0; band < 3; band++) {

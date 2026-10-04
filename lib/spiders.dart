@@ -75,6 +75,3 @@ class BoardSpider {
         math.pow(7 + bodyRadius, 2);
   }
 }
-
-/// A bug patrols outside the road. Amber warns before the expanding circle
-/// becomes red and active. Every placement protects all route centerlines.

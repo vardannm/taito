@@ -6,6 +6,7 @@ import 'club.dart';
 import 'control_options.dart';
 import 'infinite_painter.dart';
 import 'ball_shop.dart';
+import 'ball_world.dart';
 import 'daily_prize_sheet.dart';
 import 'achievement_sheet.dart';
 import 'infinite_progress.dart';
@@ -27,12 +28,11 @@ import 'tutorial_spotlight.dart';
 import 'rewards.dart';
 import 'mastery_widgets.dart';
 import 'analog_controls.dart';
+import 'tilt_lift_controls.dart';
 import 'merge_widgets.dart';
 import 'merge.dart';
-import 'laser_maze.dart';
-import 'laser_maze_widgets.dart';
 import 'mode_carousel.dart';
-import 'mode_previews.dart';
+import 'mode_world_preview.dart';
 import 'heart_loss_effect.dart';
 import 'control_hint.dart';
 import 'one_finger_controls.dart';
@@ -187,7 +187,6 @@ class _GameScreenState extends State<GameScreen>
       tutorialRun?.configure();
       analytics.startRun(game);
       if (game.mode == GameMode.classic) profile.classicLevel = game.level;
-      if (game.mode == GameMode.laserMaze) profile.mazeLevel = game.level;
       unawaited(profile.save());
       playtest.record("run_started", {
         "mode": game.mode.name,
@@ -401,6 +400,10 @@ class _GameScreenState extends State<GameScreen>
     return true;
   }
 
+  // Temporary level-control trial; preserve the preference for other modes.
+  ControlMode controlForMode(GameMode mode) =>
+      mode == GameMode.classic ? ControlMode.tiltLift : profile.controlMode;
+
   void start(GameMode mode, {DateTime? challengeDate}) => setState(() {
     if (mode == GameMode.infinite) {
       prepareInfinite(retry: game.infinite && game.finished);
@@ -420,22 +423,19 @@ class _GameScreenState extends State<GameScreen>
     }
     playtest.record("run_started", {
       "mode": mode.name,
-      "control": profile.controlMode.name,
-      "level": mode == GameMode.laserMaze
-          ? profile.mazeLevel
-          : profile.classicLevel,
+      "control": controlForMode(mode).name,
+      "level": profile.classicLevel,
       "retry":
           game.finished &&
           game.mode == mode &&
           (mode != GameMode.classic || profile.classicLevel == game.level) &&
-          (mode != GameMode.laserMaze || profile.mazeLevel == game.level) &&
           (mode != GameMode.daily ||
               DailyChallenge.key(challengeDate ?? DateTime.now()) ==
                   game.dailyKey),
     });
     clearControls();
     recorded = newBest = false;
-    game.setControlMode(profile.controlMode);
+    game.setControlMode(controlForMode(mode));
     game.cabinet = profile.cabinet;
     game.cosmetic = profile.selectedBall;
     game.platformStyle = profile.selectedPlatform;
@@ -448,9 +448,7 @@ class _GameScreenState extends State<GameScreen>
     newUnlocks = [];
     game.start(
       gameMode: mode,
-      levelNumber: mode == GameMode.laserMaze
-          ? profile.mazeLevel
-          : profile.classicLevel,
+      levelNumber: profile.classicLevel,
       challengeDate: challengeDate,
       waitForInput:
           tutorialActive &&
@@ -491,9 +489,9 @@ class _GameScreenState extends State<GameScreen>
             totalStars: profile.totalStars,
             records: {
               for (var i = 1; i <= ClassicLevels.count; i++)
-                i: profile.levelRecord(i),
+                i: profile.levelRecord(i, controlForMode(GameMode.classic)),
             },
-            controlLabel: profile.controlMode.label,
+            controlLabel: controlForMode(GameMode.classic).label,
             onSelected: (number) {
               if (!profile.selectClassicLevel(number)) return;
               if (tutorialActive &&
@@ -515,33 +513,6 @@ class _GameScreenState extends State<GameScreen>
     if (mounted) setState(() => tutorialSheetOpen = false);
   }
 
-  Future<void> selectMaze() => showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: cream,
-    showDragHandle: true,
-    isScrollControlled: true,
-    useSafeArea: true,
-    builder: (context) => SizedBox(
-      height: MediaQuery.sizeOf(context).height * .84,
-      child: SafeArea(
-        child: LaserMazePicker(
-          selected: profile.mazeLevel,
-          control: profile.controlMode,
-          bestTimes: {
-            for (var i = 1; i <= LaserMazeRoute.count; i++)
-              if (profile.mazeBestTime(i, profile.controlMode) case final time?)
-                i: time,
-          },
-          onSelected: (number) {
-            profile.mazeLevel = number;
-            unawaited(profile.save());
-            Navigator.pop(context);
-            start(GameMode.laserMaze);
-          },
-        ),
-      ),
-    ),
-  );
   Future<void> showMerge() => showModalBottomSheet<void>(
     context: context,
     backgroundColor: cream,
@@ -571,7 +542,7 @@ class _GameScreenState extends State<GameScreen>
                       ),
                       const SizedBox(height: 16),
                       const Text(
-                        'Collect equal or smaller numbers with the head ball. Touching a larger number ends the run: dodge the red rings! Every ${MergeRun.gateInterval} score sends a numbered gate down from the top. Your main ball must be strictly greater than its number to pass. Matching values merge anywhere in the snake. Play continues beyond 2048.',
+                        'Collect equal or smaller numbers with the head ball. Touching a larger number ends the run: dodge the red rings! The first gate arrives at ${MergeRun.gateInterval} score. After clearing it, earn at least ${MergeRun.gateInterval} fresh points for the next; this gap grows with your main ball. Gates scale with your ball and at least double each time. Your main ball must be strictly greater than its number to pass. Matching values merge anywhere in the snake. Play continues beyond 2048.',
                       ),
                       const SizedBox(height: 16),
                       Text(
@@ -724,7 +695,6 @@ class _GameScreenState extends State<GameScreen>
       tutorialActive && tutorialStep == TutorialStep.classicPlay
           ? 1
           : classicContinueLevel,
-    GameMode.laserMaze => profile.mazeLevel.clamp(1, LaserMazeRoute.count),
     _ => 1,
   };
 
@@ -741,7 +711,7 @@ class _GameScreenState extends State<GameScreen>
     clearControls();
     recorded = newBest = briefing = false;
     newUnlocks = [];
-    game.setControlMode(profile.controlMode);
+    game.setControlMode(controlForMode(arcadeModes[index]));
     game.cabinet = profile.cabinet;
     game.cosmetic = profile.selectedBall;
     game.platformStyle = profile.selectedPlatform;
@@ -762,21 +732,6 @@ class _GameScreenState extends State<GameScreen>
     tutorialRun?.configure();
     observedLives = game.lives;
     syncMusic();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      for (final neighbor in [index - 1, index + 1]) {
-        if (neighbor >= 0 && neighbor < arcadeModes.length) {
-          unawaited(
-            precacheImage(
-              AssetImage(
-                modePreviewAsset(arcadeModes[neighbor], worldLevel(neighbor)),
-              ),
-              context,
-            ),
-          );
-        }
-      }
-    });
     frame.value++;
   }
 
@@ -843,8 +798,7 @@ class _GameScreenState extends State<GameScreen>
   }
 
   /// Foreground follows the currently visible Infinite background.
-  Color get chromeInk =>
-      game.infinite ? infiniteBoardInk(game, const Offset(180, 500)) : ink;
+  Color get chromeInk => infiniteBoardInk(game, const Offset(180, 500));
 
   TextStyle label([Color color = ink]) => TextStyle(
     fontSize: 10,
@@ -940,7 +894,11 @@ class _GameScreenState extends State<GameScreen>
         }
 
         void controls() {
-          if (game.analog) {
+          if (game.boardTilt) {
+            ui(boardKey);
+            return;
+          }
+          if (game.bottomControls) {
             ui(analogKey);
             return;
           }
@@ -1025,7 +983,6 @@ class _GameScreenState extends State<GameScreen>
             children: [
               const ListTile(title: Text('Your arcade')),
               choice('Classic levels', Icons.adjust, selectLevel),
-              choice('Maze routes', Icons.route_rounded, selectMaze),
               choice('DAILY', Icons.today_outlined, showDaily),
               choice(
                 'PRACTICE',
@@ -1059,7 +1016,7 @@ class _GameScreenState extends State<GameScreen>
         game.waitingForInput)
       return const SizedBox();
     if (game.waitingForInput && !(tutorialActive && tutorialStep.inInfinite)) {
-      if (game.mode != GameMode.classic && !game.maze) return const SizedBox();
+      if (game.mode != GameMode.classic) return const SizedBox();
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 22),
@@ -1072,11 +1029,7 @@ class _GameScreenState extends State<GameScreen>
                 children: [
                   FilledButton.icon(
                     key: const ValueKey('choose-level'),
-                    onPressed: carouselMoving
-                        ? null
-                        : game.maze
-                        ? selectMaze
-                        : selectLevel,
+                    onPressed: carouselMoving ? null : selectLevel,
                     icon: const Icon(Icons.grid_view_rounded, size: 18),
                     label: const Text('Choose Level'),
                   ),
@@ -1092,7 +1045,7 @@ class _GameScreenState extends State<GameScreen>
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        'Level ${game.level} · ${game.maze ? game.mazeRun.name : ClassicLevels.definition(game.level).name}',
+                        'Level ${game.level} · ${ClassicLevels.definition(game.level).name}',
                         key: const ValueKey('board-level-name'),
                         textAlign: TextAlign.center,
                         style: const TextStyle(
@@ -1268,9 +1221,7 @@ class _GameScreenState extends State<GameScreen>
                             children: [
                               Expanded(
                                 child: Text(
-                                  game.maze
-                                      ? '${game.score}%'
-                                      : '${game.score}',
+                                  '${game.score}',
                                   maxLines: 1,
                                   style: TextStyle(
                                     color: color,
@@ -1303,8 +1254,6 @@ class _GameScreenState extends State<GameScreen>
                           Text(
                             game.infinite
                                 ? 'PACE ${game.paceLevel} · ${game.survival.combo}×${game.survival.combo == InfiniteTuning.maxCombo ? ' MAX' : ''}'
-                                : game.maze
-                                ? 'ROUTE ${game.level}'
                                 : game.merging
                                 ? 'MERGE'
                                 : game.practice
@@ -1330,7 +1279,7 @@ class _GameScreenState extends State<GameScreen>
                               child: Semantics(
                                 key: const ValueKey('board-hearts'),
                                 label:
-                                    '${game.lives} of ${game.maze || game.merging ? 1 : 3} hearts remaining',
+                                    '${game.lives} of ${game.merging ? 1 : 3} hearts remaining',
                                 excludeSemantics: true,
                                 child: FittedBox(
                                   fit: BoxFit.scaleDown,
@@ -1340,7 +1289,7 @@ class _GameScreenState extends State<GameScreen>
                                     children: [
                                       for (
                                         var i = 0;
-                                        i < (game.maze || game.merging ? 1 : 3);
+                                        i < (game.merging ? 1 : 3);
                                         i++
                                       )
                                         Padding(
@@ -1404,27 +1353,25 @@ class _GameScreenState extends State<GameScreen>
   static const worldColors = [
     Color(0xFFE9E9DC),
     Color(0xFFF1E4C8),
-    Color(0xFFD5E8E5),
     Color(0xFFE4E3F1),
-    Color(0xFFF3DFD0),
   ];
 
   String worldTitle(int index) => switch (index) {
     0 => 'Infinite',
     1 => 'Classic',
-    2 => 'Maze',
     _ => '2048 Merge',
   };
 
   String worldSubtitle(int index) => switch (index) {
     0 => 'NO FINISH LINE. FIND YOUR FLOW.',
     1 => 'Classic • Level ${worldLevel(index)}',
-    2 => 'Maze • Level ${worldLevel(index)}',
     _ => 'SMALL NUMBERS. BIG POSSIBILITIES.',
   };
 
   String get startInstruction => switch (game.controlMode) {
     ControlMode.analog => 'Touch a joystick to play',
+    ControlMode.tiltLift => 'Drag sideways to play',
+    ControlMode.boardTilt => 'Drag on the board to tilt',
     ControlMode.oneFinger => 'Drag the thumb area to play',
     ControlMode.twoFinger => 'Move a platform end to play',
   };
@@ -1438,19 +1385,22 @@ class _GameScreenState extends State<GameScreen>
         ModalRoute.of(context)?.isCurrent != true)
       return false;
     final analog = analogKey.currentContext?.findRenderObject() as RenderBox?;
-    if (game.analog && analog != null) {
+    if (game.bottomControls && analog != null) {
       final point = analog.globalToLocal(global);
       if ((Offset.zero & analog.size).contains(point) &&
-          (point.dx <= 106 || point.dx >= analog.size.width - 106))
+          (game.tiltLift ||
+              point.dx <= 106 ||
+              point.dx >= analog.size.width - 106))
         return false;
     }
     final board = boardKey.currentContext?.findRenderObject() as RenderBox?;
     if (board == null) return true;
     final point = board.globalToLocal(global);
     if (!(Offset.zero & board.size).contains(point)) return true;
+    if (game.boardTilt) return false;
     if (game.oneFinger)
       return point.dy < board.size.height - OneFingerControls.height;
-    if (game.analog) return true;
+    if (game.bottomControls) return true;
     final viewport = BoardViewport(board.size);
     for (final side in [0, 1]) {
       final pivot = viewport.project(
@@ -1464,6 +1414,30 @@ class _GameScreenState extends State<GameScreen>
         return false;
     }
     return true;
+  }
+
+  final Map<int, BalanceGame> _themedPreviews = {};
+
+  /// Frozen boards reflect the equipped ball, without advancing any simulation.
+  BalanceGame themedPreview(int index) {
+    final existing = _themedPreviews[index];
+    if (existing != null &&
+        existing.level == worldLevel(index) &&
+        existing.cosmetic == profile.selectedBall &&
+        existing.cabinet == profile.cabinet &&
+        existing.controlMode == controlForMode(arcadeModes[index]) &&
+        existing.platformStyle == profile.selectedPlatform)
+      return existing;
+    return _themedPreviews[index] = BalanceGame(seed: index + 1)
+      ..cosmetic = profile.selectedBall
+      ..cabinet = profile.cabinet
+      ..platformStyle = profile.selectedPlatform
+      ..setControlMode(controlForMode(arcadeModes[index]))
+      ..start(
+        gameMode: arcadeModes[index],
+        levelNumber: worldLevel(index),
+        waitForInput: true,
+      );
   }
 
   Widget world(BuildContext context, int index) {
@@ -1507,17 +1481,10 @@ class _GameScreenState extends State<GameScreen>
                   children: [
                     Expanded(
                       child: RepaintBoundary(
-                        child: Image.asset(
-                          modePreviewAsset(
-                            arcadeModes[index],
-                            worldLevel(index),
-                          ),
+                        child: CustomPaint(
                           key: ValueKey('mode-preview-$index'),
-                          fit: BoxFit.contain,
-                          width: double.infinity,
-                          height: double.infinity,
-                          cacheWidth: 180,
-                          excludeFromSemantics: true,
+                          painter: ModeWorldPreview(themedPreview(index)),
+                          child: const SizedBox.expand(),
                         ),
                       ),
                     ),
@@ -1742,10 +1709,19 @@ class _GameScreenState extends State<GameScreen>
       }),
       worldBuilder: world,
       builder: (context, worlds, page) {
-        final low = page.floor().clamp(0, 4), high = page.ceil().clamp(0, 4);
+        final low = page.floor().clamp(0, arcadeModes.length - 1),
+            high = page.ceil().clamp(0, arcadeModes.length - 1);
         final background = Color.lerp(
-          worldColors[low],
-          worldColors[high],
+          Color.lerp(
+            worldColors[low],
+            BallWorld.of(game.cosmetic).surround,
+            .85,
+          ),
+          Color.lerp(
+            worldColors[high],
+            BallWorld.of(game.cosmetic).surround,
+            .85,
+          ),
           page - page.floor(),
         )!;
         final ready =
@@ -1833,7 +1809,7 @@ class _GameScreenState extends State<GameScreen>
                         ),
                       ),
                     ),
-                    if (game.analog)
+                    if (game.bottomControls)
                       SizedBox(
                         key: analogKey,
                         height: (MediaQuery.sizeOf(context).height * .19).clamp(
@@ -1846,15 +1822,26 @@ class _GameScreenState extends State<GameScreen>
                             builder: (context, bounds) => Stack(
                               fit: StackFit.expand,
                               children: [
-                                AnalogControls(game: game, frame: frame),
+                                if (game.tiltLift)
+                                  TiltLiftControls(game: game, frame: frame)
+                                else
+                                  AnalogControls(game: game, frame: frame),
                                 if (ready && !carouselMoving)
                                   ControlHint(
+                                    sideways: game.tiltLift,
                                     anchors: [
-                                      Offset(62, bounds.maxHeight / 2),
-                                      Offset(
-                                        bounds.maxWidth - 62,
-                                        bounds.maxHeight / 2,
-                                      ),
+                                      if (game.tiltLift)
+                                        Offset(
+                                          bounds.maxWidth / 2,
+                                          bounds.maxHeight / 2,
+                                        )
+                                      else ...[
+                                        Offset(62, bounds.maxHeight / 2),
+                                        Offset(
+                                          bounds.maxWidth - 62,
+                                          bounds.maxHeight / 2,
+                                        ),
+                                      ],
                                     ],
                                   ),
                               ],
@@ -1952,7 +1939,7 @@ class _GameScreenState extends State<GameScreen>
           fontWeight: FontWeight.w600,
           color: game.phase == GamePhase.sinking && !game.lastSuccess
               ? orange
-              : chromeInk.withAlpha(190),
+              : ink.withAlpha(190),
         ),
       ),
     ),
@@ -1991,22 +1978,7 @@ class _GameScreenState extends State<GameScreen>
         ),
       );
 
-  Widget boardOverlay() => game.maze && game.finished
-      ? LaserMazeResult(
-          game: game,
-          newBest: newBest,
-          onRetry: () => start(game.mode),
-          onNext: game.level < LaserMazeRoute.count
-              ? () {
-                  profile.mazeLevel = game.level + 1;
-                  unawaited(profile.save());
-                  start(GameMode.laserMaze);
-                }
-              : null,
-          onLevels: selectMaze,
-          onHome: home,
-        )
-      : game.merging && game.finished
+  Widget boardOverlay() => game.merging && game.finished
       ? MergeResult(
           run: game.mergeRun,
           newBest: newBest,
@@ -2095,10 +2067,7 @@ class _GameScreenState extends State<GameScreen>
                             '${profile.achievementsReady} achievement rewards ready',
                           ),
                         ),
-                      if (!game.infinite &&
-                          !game.practice &&
-                          !game.merging &&
-                          !game.maze)
+                      if (!game.infinite && !game.practice && !game.merging)
                         MasteryResult(
                           game: game,
                           record: game.daily
@@ -2244,7 +2213,7 @@ class _GameScreenState extends State<GameScreen>
               guideRow(
                 '04',
                 'Go beyond ten.',
-                'Infinite begins with three hearts. Laser maze sections arrive from time to time: the traps stop and wide laser walls come down instead, so steer through their openings. A hit costs a heart and resets your combo; the ball and platform blink for 2.5 seconds of protection while you keep steering from the same position. Gold crystals build combos up to x10; violet and midnight tiers build toward electric cyan at x9 and a golden maximum at x10. Blue shields protect for ${InfiniteTuning.shieldSeconds} seconds. Red-and-blue magnets collect nearby coins, combo crystals, shields and hearts for ${InfiniteTuning.magnetSeconds} seconds. Rare hearts restore a life. Keep steering to escape the rising red floor.',
+                'Infinite begins with three hearts. Laser-wall sections arrive from time to time: the traps stop and wide laser walls come down instead, so steer through their openings. A hit costs a heart and resets your combo; the ball and platform blink for 2.5 seconds of protection while you keep steering from the same position. Gold crystals build combos up to x10; violet and midnight tiers build toward electric cyan at x9 and a golden maximum at x10. Blue shields protect for ${InfiniteTuning.shieldSeconds} seconds. Red-and-blue magnets collect nearby coins, combo crystals, shields and hearts for ${InfiniteTuning.magnetSeconds} seconds. Rare hearts restore a life. Keep steering to escape the rising red floor.',
               ),
               const Text(
                 'Desktop: W / S = left end. ↑ / ↓ = right end. Esc = pause.',
@@ -2275,11 +2244,6 @@ class _GameScreenState extends State<GameScreen>
                 '09',
                 'Return for the daily.',
                 'The daily board changes at midnight UTC. Retry its fixed layout to improve your local record. Infinite pace rises smoothly from x1 to x5, increasing speed, distance points and obstacle frequency. Every run starts gently at x1; pace rises gradually over longer distances. Combo crystals award 50 × combo × pace points. Missing a crystal keeps your combo; losing a heart resets it.',
-              ),
-              guideRow(
-                '10',
-                'Follow the laser road.',
-                'Laser Maze uses your selected controls, including responsive Vertical Analog. Follow arrows up, sideways and down. Gold shortcuts are narrow; wide detours reconnect. In Endless, bugs patrol outside the road. Amber circles warn for two seconds; red areas overlapping the road catch the ball. The center of every route stays clear.',
               ),
               primary('TRY PRACTICE', () {
                 Navigator.pop(context);
@@ -2386,7 +2350,7 @@ class _GameScreenState extends State<GameScreen>
                   onChanged: (mode) {
                     update(() => profile.controlMode = mode);
                     setState(() {
-                      game.setControlMode(mode);
+                      game.setControlMode(controlForMode(game.mode));
                     });
                     unawaited(profile.save());
                   },

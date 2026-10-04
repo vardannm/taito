@@ -60,28 +60,23 @@ void main() {
     expect(p.achievementEarned(Achievement.distance2500), isFalse);
   });
 
-  test('Classic, Maze and Merge achievements use saved mode records', () async {
+  test('Classic and Merge achievements use saved mode records', () async {
     final p = PlayerProfile();
     for (var level = 1; level <= 4; level++) {
       p.levelRecords[p.recordKey(level, ControlMode.oneFinger)] =
           const LevelRecord(starMask: 7);
     }
-    p.mazeBestTimes[p.recordKey(1, ControlMode.oneFinger)] = 45;
     p.mergeHighest = 128;
     await p.save();
     final loaded = PlayerProfile();
     await loaded.load();
-    for (final a in [
-      Achievement.stars12,
-      Achievement.mazeClear,
-      Achievement.merge128,
-    ]) {
+    for (final a in [Achievement.stars12, Achievement.merge128]) {
       expect(loaded.achievementEarned(a), isTrue, reason: a.name);
     }
   });
 
-  test('twenty new milestones use existing saved records', () async {
-    expect(Achievement.values.length, 29);
+  test('additional milestones use existing saved records', () async {
+    expect(Achievement.values.length, 26);
     final p = PlayerProfile()
       ..infiniteBest = 5000
       ..infiniteBestScore = 25000
@@ -92,28 +87,18 @@ void main() {
       p.levelRecords[p.recordKey(level, ControlMode.oneFinger)] =
           const LevelRecord(starMask: 7);
     }
-    for (var route = 1; route <= 10; route++) {
-      p.mazeBestTimes[p.recordKey(route, ControlMode.oneFinger)] = 45;
-    }
     p.dailyPrizes.claimed = 60;
     p.dailyPrizes.lastClaim = DateTime.utc(2026, 9, 30);
     await p.save();
     final loaded = PlayerProfile();
     await loaded.load();
-    for (final achievement in Achievement.values.skip(9)) {
+    for (final achievement in Achievement.values.skip(8)) {
       expect(
         loaded.achievementEarned(achievement),
         true,
         reason: achievement.name,
       );
     }
-  });
-  test('maze milestones count routes once across control modes', () {
-    final p = PlayerProfile();
-    for (final control in ControlMode.values) {
-      p.mazeBestTimes[p.recordKey(1, control)] = 45;
-    }
-    expect(p.achievementProgress(Achievement.maze5), 1);
   });
   test(
     'return visits survive missed days, restarts and duplicate claims',
@@ -192,7 +177,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.byType(AchievementSheet), findsOneWidget);
-    expect(find.text('0 of 29 earned'), findsOneWidget);
+    expect(find.text('0 of 26 earned'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

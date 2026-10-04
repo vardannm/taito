@@ -1,4 +1,5 @@
 import 'one_finger_controls.dart';
+import 'board_tilt_controls.dart';
 import 'control_hint.dart';
 import 'package:flutter/material.dart';
 import 'board_painter.dart';
@@ -89,11 +90,15 @@ class _PivotBoardState extends State<PivotBoard> {
       if (side != null && side < 2) game.releasePivot(side);
     }
 
-    return Listener(
+    final board = Listener(
       behavior: HitTestBehavior.opaque,
       onPointerDown: (event) {
         synchronize();
-        if (!game.canControl || game.analog || game.oneFinger) return;
+        if (!game.canControl ||
+            game.bottomControls ||
+            game.oneFinger ||
+            game.boardTilt)
+          return;
         final viewport = viewportNow();
         if (!viewport.rect.contains(event.localPosition)) return;
         final side = event.localPosition.dx < viewport.rect.center.dx ? 0 : 1;
@@ -127,7 +132,11 @@ class _PivotBoardState extends State<PivotBoard> {
         // Lives are painted on the board itself, so they are announced here.
         label:
             (game.infinite ? '${game.lives} of 3 hearts. ' : '') +
-            (game.analog
+            (game.boardTilt
+                ? 'Drag anywhere on the board sideways to tilt. Release to keep the angle. No manual lift.'
+                : game.tiltLift
+                ? 'Drag the bottom slider sideways to tilt. Manual lift is disabled in this test mode.'
+                : game.analog
                 ? 'Use the bottom left and right vertical joysticks to move the platform ends'
                 : game.oneFinger
                 ? 'Use the thumb area below the board to tilt and lift'
@@ -147,7 +156,10 @@ class _PivotBoardState extends State<PivotBoard> {
                 child: const SizedBox.expand(),
               ),
             ),
-            if (widget.showHint && !game.analog && !game.oneFinger)
+            if (widget.showHint &&
+                !game.bottomControls &&
+                !game.oneFinger &&
+                !game.boardTilt)
               ControlHint(
                 anchors: [
                   for (final side in [0, 1])
@@ -170,5 +182,8 @@ class _PivotBoardState extends State<PivotBoard> {
         ),
       ),
     );
+    return game.boardTilt
+        ? BoardTiltControls(game: game, frame: widget.frame, child: board)
+        : board;
   }
 }

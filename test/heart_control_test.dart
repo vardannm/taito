@@ -24,9 +24,11 @@ void main() {
           pointer: 61,
         );
         TestGesture? second;
-        if (!game.oneFinger) {
+        if (!game.oneFinger && !game.tiltOnly) {
           final board = find.byType(PivotBoard);
-          final right = game.analog
+          final right = game.tiltOnly
+              ? tester.getCenter(find.byKey(const ValueKey('tilt-lift-tilt')))
+              : game.analog
               ? tester.getCenter(find.byKey(const ValueKey('analog-right')))
               : tester.getTopLeft(board) +
                     BoardViewport(
@@ -34,7 +36,9 @@ void main() {
                     ).project(Offset(340, game.screenY(game.right)));
           second = await tester.startGesture(right, pointer: 62);
         }
-        await first.moveBy(const Offset(0, -3));
+        await first.moveBy(
+          game.tiltOnly ? const Offset(3, 0) : const Offset(0, -3),
+        );
         await second?.moveBy(const Offset(0, -1));
         await tester.pump(const Duration(milliseconds: 16));
         await tester.pump(const Duration(milliseconds: 600));
@@ -60,7 +64,11 @@ void main() {
           expect(game.ballX, closeTo(x, game.velocity.abs() * .02 + .02));
           expect(game.controlPosition, tilt);
           expectOwned(game);
-          if (second != null) expect(game.pivotTargets[1], isNotNull);
+          if (game.tiltOnly) {
+            expect(game.tiltHeld, isTrue);
+          } else if (second != null) {
+            expect(game.pivotTargets[1], isNotNull);
+          }
           expect(tester.state(controller(mode)), same(state));
           expect(tester.getRect(controller(mode)), rect);
           expect(find.textContaining('RECOVERY '), findsOneWidget);
@@ -70,7 +78,9 @@ void main() {
           game.board.clear();
           game.survival.recovery = .01;
           final before = game.left;
-          await first.moveBy(const Offset(0, -5));
+          await first.moveBy(
+            game.tiltOnly ? const Offset(5, 0) : const Offset(0, -5),
+          );
           await second?.moveBy(const Offset(0, -4));
           await tester.pump(const Duration(milliseconds: 32));
           expect(game.survival.recovery, 0);
@@ -78,7 +88,9 @@ void main() {
           expect(game.lives, hearts);
           expect(game.inputEpoch, epoch);
           expectOwned(game);
-          await first.moveBy(const Offset(0, 2));
+          await first.moveBy(
+            game.tiltOnly ? const Offset(-2, 0) : const Offset(0, 2),
+          );
           await second?.moveBy(const Offset(0, 2));
           await tester.pump(const Duration(milliseconds: 16));
           expectOwned(game);

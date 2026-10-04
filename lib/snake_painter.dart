@@ -11,6 +11,10 @@ void paintSnakes(Canvas canvas, BalanceGame game, bool reducedMotion) {
     (Color(0xFF743E25), Color(0xFFD39654), Color(0xFFFFE7AB)),
   ];
   for (final snake in game.snakes) {
+    // Include the whole tail: an off-screen head can still have a visible body.
+    if (snake.points.every((p) => game.screenY(p.y) < game.visibleTop - 24) ||
+        snake.points.every((p) => game.screenY(p.y) > 584))
+      continue;
     final (dark, scales, gold) = palettes[snake.variant % palettes.length];
     final points = snake.points
         .map((p) => Offset(p.x, game.screenY(p.y)))

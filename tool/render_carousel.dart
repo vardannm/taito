@@ -63,7 +63,6 @@ void main() {
           ..sound = false
           ..haptics = false
           ..classicLevel = 18
-          ..mazeLevel = 12
           ..controlMode = control;
         for (var i = 1; i <= 17; i++) {
           profile.levelRecords[profile.recordKey(i, control)] =
@@ -76,7 +75,7 @@ void main() {
           ),
         );
         await tester.pump();
-        for (var index = 0; index < 5; index++) {
+        for (var index = 0; index < 3; index++) {
           await selectWorld(tester, index);
           await capture(
             'carousel-$index-${control.name}-${size.width.toInt()}',

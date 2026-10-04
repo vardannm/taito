@@ -72,6 +72,7 @@ class MergeRun {
   final gates = <MergeGate>[];
   int score = 0, highest = 2, lastChain = 0, collected = 0, lastMergeScore = 0;
   int nextGateScore = gateInterval, gatesPassed = 0;
+  int lastGateValue = 0;
   int? rejectedValue, failedGate;
   double gateCooldown = 0;
   double spawnTime = 0, flash = 0;
@@ -91,24 +92,22 @@ class MergeRun {
               (highest.bitLength - 2) * MergeDifficulty.speedPerDoubling)
           .clamp(MergeDifficulty.startSpeed, MergeDifficulty.maxSpeed);
   double get gateSpeed => speed + MergeDifficulty.gateSpeedBonus;
-  int get pendingGates => math.max(
-    0,
-    (score - nextGateScore) ~/ gateInterval + (score >= nextGateScore ? 1 : 0),
-  );
-  int get upcomingGateValue =>
-      gates.isNotEmpty ? gates.first.requiredValue : gateValueAt(nextGateScore);
+  int get gateScoreGap => math.max(gateInterval, head);
+  int get upcomingGateValue => gates.isNotEmpty
+      ? gates.first.requiredValue
+      : gateValueForHead(head, previous: lastGateValue);
 
-  /// 400 score -> 128, 800 -> 256, 1200 -> 512, 16400 -> 8192.
-  /// Scale with earned score, rather than doubling every 400 indefinitely.
-  static int gateValueAt(int milestone) => math
-      .pow(
-        2,
-        math.max(
-          1,
-          (milestone ~/ 2).bitLength - 1 + MergeDifficulty.gateValueOffset,
-        ),
-      )
-      .toInt();
+  /// Follow the current ball rather than stale score milestones, and never
+  /// repeat a cleared gate. A spawned gate keeps its number until contact.
+  static int gateValueForHead(int head, {int previous = 0}) => math.max(
+    previous * 2,
+    math
+        .pow(
+          2,
+          math.max(1, head.bitLength - 2 + MergeDifficulty.gateValueOffset),
+        )
+        .toInt(),
+  );
 
   final _followerX = <int, double>{};
   double get tailExtent => (segments.length - 1) * spacing;
@@ -290,6 +289,7 @@ class MergeRun {
       if ((a.$3 != null) == (b.$3 != null)) return 0;
       return a.$3 != null ? -1 : 1;
     });
+    var clearedGate = false;
     for (final contact in contacts) {
       if (contact.$3 != null) {
         final gate = contact.$3!;
@@ -301,6 +301,7 @@ class MergeRun {
         }
         gates.remove(gate);
         gatesPassed++;
+        clearedGate = true;
         gateCooldown = MergeDifficulty.gateCooldownSeconds;
         flash = .8;
         notice = 'GATE ${gate.requiredValue} CLEARED';
@@ -311,10 +312,14 @@ class MergeRun {
       if (ended) return;
     }
     orbs.removeWhere((orb) => orb.y > 580);
+    // Score gained while a gate was approaching is not a queue of old gates.
+    // Start the next milestone after all pickups in this tick have resolved.
+    if (clearedGate) nextGateScore = score + gateScoreGap;
     gateCooldown = math.max(0, gateCooldown - dt);
     if (score >= nextGateScore && gates.isEmpty && gateCooldown == 0) {
-      gates.add(MergeGate(gateValueAt(nextGateScore), scoreAt: nextGateScore));
-      nextGateScore += gateInterval;
+      lastGateValue = upcomingGateValue;
+      gates.add(MergeGate(lastGateValue, scoreAt: score));
+      nextGateScore = score + gateScoreGap;
     }
     spawnTime += dt;
     if (spawnTime >= MergeDifficulty.waveSpacing / speed) {

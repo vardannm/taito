@@ -3,6 +3,7 @@ import 'tutorial_spotlight.dart';
 import 'package:flutter/material.dart';
 import 'ball_cosmetics.dart';
 import 'ball_painter.dart';
+import 'ball_world.dart';
 import 'platforms.dart';
 import 'platform_painter.dart';
 import 'board_painter.dart';
@@ -82,6 +83,7 @@ class _BallShopState extends State<BallShop>
     required CustomPainter painter,
     required VoidCallback buy,
     bool example = false,
+    BallCosmetic? worldBall,
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 10),
     child: Container(
@@ -94,7 +96,20 @@ class _BallShopState extends State<BallShop>
       padding: const EdgeInsets.all(12),
       child: Row(
         children: [
-          SizedBox(width: 58, height: 64, child: CustomPaint(painter: painter)),
+          SizedBox(
+            width: worldBall == null ? 58 : 100,
+            height: worldBall == null ? 64 : 146,
+            child: RepaintBoundary(
+              child: CustomPaint(
+                key: worldBall == null
+                    ? null
+                    : ValueKey('world-preview-${worldBall.name}'),
+                painter: worldBall == null
+                    ? painter
+                    : BallWorldPreview(worldBall, animation: preview),
+              ),
+            ),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -108,6 +123,31 @@ class _BallShopState extends State<BallShop>
                   ),
                 ),
                 Text(description, style: const TextStyle(fontSize: 11)),
+                if (worldBall != null) ...[
+                  const SizedBox(height: 7),
+                  Text(
+                    BallWorld.of(worldBall).name,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: ink,
+                    ),
+                  ),
+                  Text(
+                    BallWorld.of(worldBall).description,
+                    style: const TextStyle(fontSize: 11, height: 1.3),
+                  ),
+                  const SizedBox(height: 3),
+                  const Text(
+                    'WORLD INCLUDED · ALL MODES',
+                    style: TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: .4,
+                      color: ink,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 5),
                 if (!example)
                   Text(
@@ -194,6 +234,7 @@ class _BallShopState extends State<BallShop>
               if (guiding && category == 0)
                 item(
                   id: 'buy-steel',
+                  worldBall: BallCosmetic.steel,
                   name: BallCosmetic.steel.label,
                   description: 'Free starter ball',
                   cost: 0,
@@ -239,8 +280,16 @@ class _BallShopState extends State<BallShop>
                 ),
               ),
               if (!guiding)
+                const Padding(
+                  padding: EdgeInsets.only(top: 6, bottom: 6),
+                  child: Text(
+                    'A new ball. A new world.',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              if (!guiding)
                 const Text(
-                  'Ball + platform bonuses add to the base x1. They multiply Infinite distance and combo rewards. Magnetic balls also collect nearby rewards in Infinite. Handling stays the same.',
+                  'Every ball includes its own scenery in every mode. Equip it to enter its world. Ball + platform bonuses multiply Infinite points; magnetic balls also collect nearby rewards. Handling stays the same.',
                   style: TextStyle(fontSize: 12, height: 1.4),
                 ),
               const SizedBox(height: 6),
@@ -274,6 +323,7 @@ class _BallShopState extends State<BallShop>
                 for (final b in BallCosmetic.values)
                   item(
                     id: 'buy-${b.name}',
+                    worldBall: b,
                     example: guiding && b == BallCosmetic.steel,
                     name: b.label,
                     description:

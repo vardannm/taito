@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'analog_controls.dart';
+import 'tilt_lift_controls.dart';
 import 'board_painter.dart';
 import 'game.dart';
 import 'pivot_board.dart';
@@ -112,13 +113,17 @@ class _FirstPlayTutorialState extends State<FirstPlayTutorial>
 
   String get instruction => switch (lesson) {
     0 =>
-      game.oneFinger
+      game.tiltOnly
+          ? 'Tilt-only test: manual lift is disabled. Select another control mode to practice lifting.'
+          : game.oneFinger
           ? 'Drag up in the thumb area below the board, then let go. The platform holds its height.'
           : game.analog
           ? 'Drag both bottom joysticks up, then let go. The platform holds its height.'
           : 'Drag both end grips up, then let go. The platform holds its height.',
     1 =>
-      game.oneFinger
+      game.tiltOnly
+          ? 'Drag sideways to tilt until the ball rolls.'
+          : game.oneFinger
           ? 'Drag sideways in the thumb area below the board. Tilt until the ball rolls to either side.'
           : game.analog
           ? 'Move one bottom joystick up or down. Tilt until the ball rolls to either side.'
@@ -208,12 +213,14 @@ class _FirstPlayTutorialState extends State<FirstPlayTutorial>
                             ),
                           ),
                         ),
-                        if (game.analog)
+                        if (game.bottomControls)
                           SizedBox(
                             height: 104,
                             child: GestureDetector(
                               onPanUpdate: (_) {},
-                              child: AnalogControls(game: game, frame: frame),
+                              child: game.tiltLift
+                                  ? TiltLiftControls(game: game, frame: frame)
+                                  : AnalogControls(game: game, frame: frame),
                             ),
                           ),
                         Semantics(

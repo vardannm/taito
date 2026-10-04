@@ -8,7 +8,6 @@ import 'porcupines.dart';
 import 'snakes.dart';
 import 'rewards.dart';
 import 'merge.dart';
-import 'laser_maze.dart';
 import 'infinite_progress.dart';
 import 'ball_cosmetics.dart';
 import 'platforms.dart';
@@ -24,15 +23,17 @@ enum GamePhase { playing, sinking, returning, over }
 
 enum GameEvent { target, miss, complete, coin, merge }
 
-enum GameMode { classic, infinite, practice, daily, merge2048, laserMaze }
+enum GameMode { classic, infinite, practice, daily, merge2048 }
 
-enum ControlMode { twoFinger, oneFinger, analog }
+enum ControlMode { twoFinger, oneFinger, analog, tiltLift, boardTilt }
 
 extension ControlModeLabel on ControlMode {
   String get label => switch (this) {
     ControlMode.twoFinger => 'Two-finger',
     ControlMode.oneFinger => 'One-finger',
     ControlMode.analog => 'Vertical analog',
+    ControlMode.tiltLift => 'Tilt Only',
+    ControlMode.boardTilt => 'Board Tilt',
   };
 }
 
@@ -68,32 +69,66 @@ class BalanceGame {
   }
 
   bool get oneFinger => controlMode == ControlMode.oneFinger;
+  bool get tiltLift => controlMode == ControlMode.tiltLift;
+  bool get boardTilt => controlMode == ControlMode.boardTilt;
+  bool get tiltOnly => tiltLift || boardTilt;
+  bool get bottomControls => analog || tiltLift;
+  bool tiltHeld = false, liftHeld = false;
+  bool _tiltPending = false;
+  double liftInput = 0;
+
+  void grabTiltLiftAxis({required bool tilt}) {
+    if (!canControl || !tiltOnly || (boardTilt && !tilt)) return;
+    beginInput();
+    if (tilt) {
+      tiltHeld = true;
+      controlPosition = ((right - left) / 140).clamp(-1.0, 1.0);
+    } else {
+      liftHeld = true;
+    }
+    controlHeld = tiltHeld || liftHeld;
+  }
+
+  void releaseTiltLiftAxis({required bool tilt}) {
+    if (tilt) {
+      tiltHeld = false;
+    } else {
+      liftHeld = false;
+      liftInput = 0;
+    }
+    controlHeld = tiltHeld || liftHeld;
+  }
+
+  void setTiltLiftInput({required bool tilt, required double value}) {
+    if (!canControl || !tiltOnly || !value.isFinite || (boardTilt && !tilt))
+      return;
+    if (tilt && tiltHeld) {
+      setControlPosition(value);
+      _tiltPending = true;
+    } else if (!tilt && liftHeld) {
+      liftInput = value.clamp(-1.0, 1.0);
+    }
+  }
+
   int level = 1, runSerial = 0;
   CabinetStyle cabinet = CabinetStyle.brass;
   DateTime? dailyDate;
-  bool get maze => mode == GameMode.laserMaze;
 
   /// Modes whose camera follows the climb instead of holding the whole board.
-  bool get scrolling => infinite || (maze && mazeRun.route!.tall);
+  bool get scrolling => infinite;
   // Infinite allows manual upward travel of 15% of the board from its start.
   double get minPivot => infinite
       ? infiniteStart - height * .25 - cameraOffset
-      : scrolling
-      ? 40 - cameraOffset
       : 30.0;
   double get maxPivot => scrolling
       ? 526 - cameraOffset
       : merging
       ? 526 - mergeRun.tailExtent
       : 526.0;
-  LaserMazeRun? _mazeRun;
-  LaserMazeRun get mazeRun => _mazeRun ??= LaserMazeRun(1);
-  set mazeRun(LaserMazeRun value) => _mazeRun = value;
   bool get merging => mode == GameMode.merge2048;
   MergeRun? _mergeRun;
   MergeRun get mergeRun => _mergeRun ??= MergeRun();
   set mergeRun(MergeRun value) => _mergeRun = value;
-  bool get hasMazeResources => _mazeRun != null;
   bool get hasMergeResources => _mergeRun != null;
   bool get daily => mode == GameMode.daily;
   String get dailyKey =>
@@ -108,8 +143,7 @@ class BalanceGame {
   double lastCoinAge = 99, lastCoinX = 0, lastCoinY = 0;
   double targetTime = 180, _nextFinaleAt = 3;
   int _finaleSequence = 0;
-  int get earnedStarMask =>
-      !finished || !won || practice || infinite || merging || maze
+  int get earnedStarMask => !finished || !won || practice || infinite || merging
       ? 0
       : 1 | (misses == 0 ? 2 : 0) | (elapsed <= targetTime ? 4 : 0);
   InfiniteSection get section => sectionAt(maxHeight / 10);
@@ -135,7 +169,7 @@ class BalanceGame {
     _liftInput = 0;
   }
 
-  /// Levels and mazes read the one-finger pad as a stick, so a held deflection
+  /// Levels read the one-finger pad as a stick, so a held deflection
   /// keeps climbing. Infinite and 2048 keep their one-to-one finger drag.
   bool get stickLift => oneFinger && !infinite && !merging;
 
@@ -183,9 +217,6 @@ class BalanceGame {
 
   static const width = 360.0, height = 560.0, ballRadius = 7.0;
 
-  /// Road the automatic climb needs overhead before it lifts again. Larger
-  /// than the fatal contact distance, so the gate stops short of a beam.
-  static const mazeClearance = ballRadius + 9;
   static const holes = <Hole>[
     Hole(103, 461, target: 1),
     Hole(265, 417, target: 2),
@@ -419,7 +450,7 @@ class BalanceGame {
 
   bool get infinite => mode == GameMode.infinite;
   bool get practice => mode == GameMode.practice;
-  List<Hole> get board => merging || maze
+  List<Hole> get board => merging
       ? const []
       : infinite
       ? _endlessHoles
@@ -658,6 +689,8 @@ class BalanceGame {
   }
 
   void clearInput() {
+    tiltHeld = liftHeld = _tiltPending = false;
+    liftInput = 0;
     controlHeld = false;
     _controlLift = 0;
     _liftInput = 0;
@@ -687,9 +720,7 @@ class BalanceGame {
     for (final spider in spiders) {
       spider.reset();
     }
-    left = right = maze
-        ? 526
-        : infinite
+    left = right = infinite
         ? infiniteStart
         : oneFinger
         ? 500
@@ -717,7 +748,6 @@ class BalanceGame {
         : null;
     // A mode switch releases the previous mode's generated world. These
     // objects own no tickers; the screen drives only this active simulation.
-    if (!maze) _mazeRun = null;
     if (!merging) _mergeRun = null;
     survival = InfiniteProgress(
       startingPace: infiniteStartingPace,
@@ -728,14 +758,8 @@ class BalanceGame {
     dailyDate = daily
         ? DailyChallenge.day(challengeDate ?? DateTime.now())
         : null;
-    level = daily
-        ? 15
-        : levelNumber.clamp(
-            1,
-            maze ? LaserMazeRoute.count : ClassicLevels.count,
-          );
-    if (mode == GameMode.laserMaze) mazeRun = LaserMazeRun(level);
-    _classicBoard = infinite || merging || maze
+    level = daily ? 15 : levelNumber.clamp(1, ClassicLevels.count);
+    _classicBoard = infinite || merging
         ? []
         : practice
         ? List<Hole>.of(holes)
@@ -758,7 +782,7 @@ class BalanceGame {
       );
     caughtBySpider = false;
     coins.clear();
-    if (!infinite && !practice && !merging && !maze)
+    if (!infinite && !practice && !merging)
       coins.addAll(ClassicLevels.coinsFor(_classicBoard, spiders));
     coinsCollected = 0;
     lastCoinAge = 99;
@@ -798,7 +822,7 @@ class BalanceGame {
     _nextCoinY = 380;
     ensureEndlessExtras();
     target = 1;
-    lives = merging || maze ? 1 : InfiniteTuning.maxLives;
+    lives = merging ? 1 : InfiniteTuning.maxLives;
     score = streak = bestStreak = completed = misses = 0;
     elapsed = phaseTime = 0;
     won = paused = false;
@@ -807,9 +831,7 @@ class BalanceGame {
     inputLocked = false;
     phase = GamePhase.playing;
     event = null;
-    message = maze
-        ? 'Stay between the red lasers. Reach the checkered finish.'
-        : merging
+    message = merging
         ? mergeRun.notice
         : infinite
         ? 'Tilt to dodge. The board keeps moving.'
@@ -892,7 +914,6 @@ class BalanceGame {
     lastCoinAge += dt;
     legTime += dt;
     final oldX = ballX, oldY = ballY;
-    final oldLeft = left, oldRight = right;
     final oldScreenY = screenY(ballY);
     if (infinite) {
       // Translate the platform and camera equally: grips stay under the fingers
@@ -935,29 +956,34 @@ class BalanceGame {
         }
       }
     }
+    if (tiltOnly && (_tiltPending || liftHeld)) {
+      final halfTilt =
+          (_tiltPending ? controlPosition * 70 : (right - left) / 2).clamp(
+            -(maximum - minimum) / 2,
+            (maximum - minimum) / 2,
+          );
+      final previousCenter = (left + right) / 2;
+      final center = (previousCenter + liftInput * liftMotor * dt).clamp(
+        minimum + halfTilt.abs(),
+        maximum - halfTilt.abs(),
+      );
+      left = center - halfTilt;
+      right = center + halfTilt;
+      _tiltPending = false;
+      if (infinite) {
+        _steeringDistance += (center - previousCenter).abs();
+        if (_steeringDistance >= 8) {
+          stallTime = 0;
+          _steeringDistance = 0;
+        }
+      }
+    }
     if (oneFinger) {
-      // A held handle supplies both axes. Only mazes auto-lift on release.
       final halfTilt = controlPosition * 70;
-      // The automatic climb only rises while there is road overhead, so a
-      // sideways leg holds its height until the ball reaches the next column.
-      final climbing =
-          !maze ||
-          mazeRun.corridor.canClimb(ballX, ballY, mazeClearance) ||
-          ballY <= mazeRun.route!.finishLineY + mazeClearance;
-      final lift = climbing ? 14 * dt : 0.0;
-      // Two lift models. Infinite reads the finger one-to-one. Levels and
-      // mazes read the pad as a stick, so a held deflection keeps climbing
-      // until the platform reaches the rail. Both keep the headroom the tilt
-      // needs, so the bar never hangs off the board.
       final push = stickLift ? _liftInput * liftMotor * dt : 0.0;
       final center =
           (controlHeld || _controlLift != 0
                   ? (left + right) / 2 + _controlLift + push
-                  : maze
-                  ? math.max(
-                      mazeRun.route!.finishLineY + ballRadius,
-                      (left + right) / 2 - lift,
-                    )
                   : (left + right) / 2)
               .clamp(minimum + halfTilt.abs(), maximum - halfTilt.abs());
       left = center - halfTilt;
@@ -973,7 +999,7 @@ class BalanceGame {
     }
     // A rolling sphere: 5/7 of gravity projected onto the bar, then onto x.
     final slope = (right - left) / 320;
-    velocity += (6 / 7) * 1300 * slope / (1 + slope * slope) * dt;
+    velocity += (6 / 7) * 1700 * slope / (1 + slope * slope) * dt;
     velocity *= math.exp(-.48 * dt);
     velocity = velocity.clamp(-265.0, 265.0);
     ballX += velocity * dt;
@@ -990,45 +1016,6 @@ class BalanceGame {
     if (infinite) {
       _updateClimb(dt);
       if (phase != GamePhase.playing) return;
-    }
-    if (maze) {
-      mazeRun.step(oldX, oldY, ballX, ballY, ballRadius);
-      if (mazeRun.ended) {
-        won = mazeRun.won;
-        phase = GamePhase.over;
-        if (!won) {
-          lives = 0;
-          misses++;
-        }
-        // Stop the whole platform at the contact, not at the end of a fast drag.
-        final t = mazeRun.contactFraction;
-        left = oldLeft + (left - oldLeft) * t;
-        right = oldRight + (right - oldRight) * t;
-        ballX = mazeRun.contactX;
-        final alignment = mazeRun.contactY - ballY;
-        left += alignment;
-        right += alignment;
-        captureX = mazeRun.contactX;
-        captureY = mazeRun.contactY;
-        message = won
-            ? 'Finish reached. Beautifully balanced.'
-            : 'You touched a red laser.';
-        event = won ? GameEvent.complete : GameEvent.miss;
-        velocity = 0;
-        clearInput();
-      }
-      // Height and camera follow the corrected position, so a swipe that ends
-      // on a beam cannot bank the height beyond it.
-      if (scrolling) {
-        if (screenY(ballY) < 360) cameraOffset = math.max(0, 360 - ballY);
-        if (screenY(ballY) > 440) cameraOffset = math.max(0, 440 - ballY);
-        cameraOffset = math.min(
-          cameraOffset,
-          LaserMazeCorridor.finishY - mazeRun.route!.finishLineY,
-        );
-      }
-      score = (mazeRun.progress * 100).floor();
-      return;
     }
     if (merging) {
       final collectedBefore = mergeRun.collected;

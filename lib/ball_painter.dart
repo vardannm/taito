@@ -46,7 +46,7 @@ void paintCosmetic(
         colors: ball == BallCosmetic.steel && steelPalette != null
             ? steelPalette
             : [
-                Colors.white,
+                Color.lerp(tint, Colors.white, .88)!,
                 tint,
                 Color.lerp(tint, const Color(0xFF182B37), .8)!,
               ],
@@ -55,20 +55,31 @@ void paintCosmetic(
   canvas.drawPath(
     shape,
     Paint()
-      ..color = const Color(0xFF233F43)
+      ..color = Color.lerp(tint, const Color(0xFF18283A), .78)!
       ..style = PaintingStyle.stroke
-      ..strokeWidth = radius / 10,
+      ..strokeWidth = radius * .065,
   );
   if (ball == BallCosmetic.circuit) {
     canvas.save();
     canvas.clipPath(shape);
-    for (final x in [-.6, -.1, .4]) {
-      canvas.drawLine(
-        center + Offset(x * radius, -radius),
-        center + Offset((x + .45) * radius, radius),
+    for (var i = 0; i < 3; i++) {
+      final x = (-.6 + i * .5) * radius;
+      final joint = center + Offset(x + radius * .2, radius * .1);
+      canvas.drawPath(
+        Path()
+          ..moveTo(center.dx + x, center.dy - radius)
+          ..lineTo(center.dx + x, center.dy - radius * .2)
+          ..lineTo(joint.dx, joint.dy)
+          ..lineTo(joint.dx, center.dy + radius),
         Paint()
-          ..color = const Color(0xFF225D59)
-          ..strokeWidth = radius / 5,
+          ..color = const Color(0xFF205A55)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = radius * .09,
+      );
+      canvas.drawCircle(
+        joint,
+        radius * .085,
+        Paint()..color = const Color(0xFFE7F4B1),
       );
     }
     canvas.restore();
@@ -119,7 +130,29 @@ void paintCosmetic(
     }
     canvas.restore();
   }
-  if (ball == BallCosmetic.reactor || ball == BallCosmetic.obsidian) {
+  if (ball == BallCosmetic.obsidian || ball == BallCosmetic.prism) {
+    canvas.save();
+    canvas.clipPath(shape);
+    final hub = center + Offset(-radius * .18, -radius * .15);
+    for (var i = 0; i < ball.sides; i++) {
+      final a = i * math.pi * 2 / ball.sides - math.pi / 2;
+      final b = a + math.pi * 2 / ball.sides;
+      final first = center + Offset(math.cos(a), math.sin(a)) * radius;
+      final second = center + Offset(math.cos(b), math.sin(b)) * radius;
+      canvas.drawPath(
+        Path()
+          ..moveTo(hub.dx, hub.dy)
+          ..lineTo(first.dx, first.dy)
+          ..lineTo(second.dx, second.dy)
+          ..close(),
+        Paint()
+          ..color = (i.isEven ? Colors.white : const Color(0xFF292347))
+              .withAlpha(i < 2 ? 90 : 65),
+      );
+    }
+    canvas.restore();
+  }
+  if (ball == BallCosmetic.reactor) {
     for (var i = 0; i < 6; i++) {
       final a = i * math.pi / 3 + (reducedMotion ? 0 : time * .8);
       final p = center + Offset(math.cos(a), math.sin(a)) * radius * .6;
@@ -166,6 +199,66 @@ void paintCosmetic(
           Paint()..color = flecks[i % 4].withAlpha(150),
         );
       }
+    } else if (ball == BallCosmetic.plasma) {
+      for (var i = 0; i < 3; i++) {
+        final x = center.dx + (i - 1) * radius * .55;
+        canvas.drawPath(
+          Path()
+            ..moveTo(x, center.dy - radius)
+            ..lineTo(x - radius * .25, center.dy - radius * .1)
+            ..lineTo(x + radius * .18, center.dy + radius * .1)
+            ..lineTo(x, center.dy + radius),
+          Paint()
+            ..color = const Color(0xFFF4DCFF)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = radius * .08,
+        );
+      }
+    } else if (ball == BallCosmetic.comet || ball == BallCosmetic.titanium) {
+      for (var i = 0; i < 3; i++) {
+        final y = center.dy - radius + i * radius * .7;
+        canvas.drawPath(
+          Path()
+            ..moveTo(center.dx - radius, y + radius * .4)
+            ..lineTo(center.dx + radius, y)
+            ..lineTo(center.dx + radius, y + radius * .26)
+            ..lineTo(center.dx - radius, y + radius * .66)
+            ..close(),
+          Paint()
+            ..color = (i.isEven ? Colors.white : const Color(0xFF20496A))
+                .withAlpha(95),
+        );
+      }
+    } else if (ball == BallCosmetic.quasar) {
+      final star = Path();
+      for (var i = 0; i < 8; i++) {
+        final a = i * math.pi / 4;
+        final p =
+            center +
+            Offset(math.cos(a), math.sin(a)) * radius * (i.isEven ? .9 : .2);
+        if (i == 0) {
+          star.moveTo(p.dx, p.dy);
+        } else {
+          star.lineTo(p.dx, p.dy);
+        }
+      }
+      star.close();
+      canvas.drawPath(star, Paint()..color = const Color(0xFFFFEBD3));
+    } else if (ball == BallCosmetic.pearl) {
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: center + Offset(radius * .25, radius * .42),
+          width: radius * 1.6,
+          height: radius * .75,
+        ),
+        Paint()
+          ..shader = LinearGradient(
+            colors: [
+              const Color(0xFFC295BD).withAlpha(0),
+              const Color(0xFFC295BD).withAlpha(125),
+            ],
+          ).createShader(Rect.fromCircle(center: center, radius: radius)),
+      );
     } else {
       for (var i = 0; i < 4; i++) {
         final paint = Paint()
@@ -190,7 +283,7 @@ void paintCosmetic(
       }
     }
     canvas.restore();
-    if (ball.premium) {
+    if (ball == BallCosmetic.quasar || ball == BallCosmetic.singularity) {
       final orbit = Rect.fromCenter(
         center: center,
         width: radius * 2.7,
@@ -217,6 +310,32 @@ void paintCosmetic(
         }
     }
   }
+  // A consistent small reflection gives enamel, metal and glass a polished
+  // surface while preserving their different internal patterns.
+  canvas.save();
+  canvas.clipPath(shape);
+  canvas.drawOval(
+    Rect.fromCenter(
+      center: center + Offset(-radius * .32, -radius * .48),
+      width: radius * .65,
+      height: radius * .27,
+    ),
+    Paint()
+      ..color = Colors.white.withAlpha(
+        ball == BallCosmetic.singularity ? 35 : 150,
+      ),
+  );
+  canvas.drawArc(
+    Rect.fromCircle(center: center, radius: radius * .91),
+    math.pi * 1.08,
+    math.pi * .5,
+    false,
+    Paint()
+      ..color = Colors.white.withAlpha(135)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = radius * .045,
+  );
+  canvas.restore();
 }
 
 void paintCosmeticTrail(

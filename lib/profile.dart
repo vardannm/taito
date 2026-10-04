@@ -9,7 +9,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'game.dart';
 import 'levels.dart';
 import 'rewards.dart';
-import 'laser_maze.dart';
 import 'onboarding.dart';
 import 'daily_prizes.dart';
 import 'achievements.dart';
@@ -49,8 +48,6 @@ class PlayerProfile {
       Achievement.stars30 ||
       Achievement.stars60 ||
       Achievement.stars120 => totalStars,
-      Achievement.mazeClear || Achievement.maze5 || Achievement.maze10 =>
-        mazeBestTimes.keys.map((key) => key.split(':').last).toSet().length,
       Achievement.merge128 ||
       Achievement.merge256 ||
       Achievement.merge512 ||
@@ -268,10 +265,6 @@ class PlayerProfile {
   Future<void> _tutorialWrites = Future<void>.value();
   ControlMode controlMode = ControlMode.oneFinger;
   int classicLevel = 1;
-  int mazeLevel = 1, mazeRuns = 0;
-  final mazeBestTimes = <String, double>{};
-  double? mazeBestTime(int route, [ControlMode? control]) =>
-      mazeBestTimes[recordKey(route, control ?? controlMode)];
   CabinetStyle cabinet = CabinetStyle.brass;
   final levelRecords = <String, LevelRecord>{};
   final dailyRecords = <String, LevelRecord>{};
@@ -343,17 +336,6 @@ class PlayerProfile {
 
   bool recordResult(BalanceGame game) {
     bankCoins(game);
-    if (game.maze) {
-      if (!game.finished || _recordedRuns[game] == game.runSerial) return false;
-      _recordedRuns[game] = game.runSerial;
-      mazeRuns++;
-      if (!game.won) return false;
-      final key = recordKey(game.level, game.controlMode);
-      final previous = mazeBestTimes[key];
-      final improved = previous == null || game.elapsed < previous;
-      if (improved) mazeBestTimes[key] = game.elapsed;
-      return improved;
-    }
     if (game.merging && game.finished) {
       final improved = game.score > mergeBest;
       if (improved) mergeBest = game.score;
@@ -411,11 +393,11 @@ class PlayerProfile {
         for (final entry in source.entries) {
           final validKey = pair.$1 == 'levels'
               ? RegExp(
-                      r'^(oneFinger|twoFinger|analog):[1-9]\d*$',
+                      r'^(oneFinger|twoFinger|analog|tiltLift|boardTilt):[1-9]\d*$',
                     ).hasMatch(entry.key) &&
                     int.parse(entry.key.split(':').last) <= ClassicLevels.count
               : RegExp(
-                  r'^(oneFinger|twoFinger|analog):\d{4}-\d{2}-\d{2}$',
+                  r'^(oneFinger|twoFinger|analog|tiltLift|boardTilt):\d{4}-\d{2}-\d{2}$',
                 ).hasMatch(entry.key);
           if (validKey && entry.value is Map<String, dynamic>) {
             pair.$2[entry.key] = LevelRecord.fromJson(entry.value);
@@ -431,31 +413,16 @@ class PlayerProfile {
     }
   }
 
-  void _loadMaze(String? raw) {
-    if (raw == null) return;
+  // Recognize returning players without loading retired route records.
+  static bool _hasLegacyMazeProgress(String? raw) {
+    if (raw == null) return false;
     try {
       final data = jsonDecode(raw);
-      if (data is! Map<String, dynamic>) return;
-      if (data['selected'] is int)
-        mazeLevel = (data['selected'] as int).clamp(1, LaserMazeRoute.count);
-      if (data['runs'] is int)
-        mazeRuns = (data['runs'] as int).clamp(0, 1 << 30);
-      final times = data['times'];
-      if (times is! Map<String, dynamic>) return;
-      for (final entry in times.entries) {
-        final match = RegExp(
-          r'^(oneFinger|twoFinger|analog):([1-9][0-9]*)$',
-        ).firstMatch(entry.key);
-        if (match == null ||
-            (int.tryParse(match.group(2)!) ?? (LaserMazeRoute.count + 1)) >
-                LaserMazeRoute.count)
-          continue;
-        final value = entry.value;
-        if (value is num && value.isFinite && value > 0)
-          mazeBestTimes[entry.key] = value.toDouble();
-      }
+      return data is Map &&
+          ((data['runs'] is num && data['runs'] > 0) ||
+              (data['times'] is Map && (data['times'] as Map).isNotEmpty));
     } catch (_) {
-      // Ignore a damaged route record without affecting the other modes.
+      return false;
     }
   }
 
@@ -493,7 +460,7 @@ class PlayerProfile {
       music = await storage.getBool('gilt.music') ?? sound;
       haptics = await storage.getBool('gilt.haptics') ?? true;
       _loadRecords(await storage.getString('gilt.mastery.v1'));
-      _loadMaze(await storage.getString('gilt.maze.v1'));
+      final legacyMaze = await storage.getString('gilt.maze.v1');
       _loadEconomy(await storage.getString(_economyKey));
       final savedTutorial = await storage.getString('gilt.tutorial.v2');
       if (savedTutorial != null) {
@@ -506,10 +473,10 @@ class PlayerProfile {
         }
         tutorialSeen = !tutorial.active;
       } else if (tutorialSeen ||
-          runs + infiniteRuns + mergeRuns + mazeRuns > 0 ||
+          runs + infiniteRuns + mergeRuns > 0 ||
           levelRecords.isNotEmpty ||
           dailyRecords.isNotEmpty ||
-          mazeBestTimes.isNotEmpty) {
+          _hasLegacyMazeProgress(legacyMaze)) {
         tutorial = TutorialProgress(step: TutorialStep.completed);
         tutorialSeen = true;
       }
@@ -521,14 +488,6 @@ class PlayerProfile {
   Future<void> save() async {
     await saveEconomy();
     try {
-      await storage.setString(
-        'gilt.maze.v1',
-        jsonEncode({
-          'selected': mazeLevel,
-          'runs': mazeRuns,
-          'times': mazeBestTimes,
-        }),
-      );
       await storage.setInt('gilt.merge.best', mergeBest);
       await storage.setInt('gilt.merge.highest', mergeHighest);
       await storage.setInt('gilt.merge.runs', mergeRuns);

@@ -1,5 +1,25 @@
 # Validation record
 
+## Ball and world art refresh — 2026-10-04
+
+- Replaced the nineteen pattern backgrounds with layered vector scenery: reef silhouettes, city skylines, faceted mountains, dunes, crystalline borders, foliage and architectural framing. Revised every base palette and retained Singularity's absence of a black-hole disk.
+- Added ball-specific faceting, circuitry, ice/metal bands, plasma lightning and a quasar core; refined outlines and shared surface reflections. Removed the shop preview's Gaussian shadow blur.
+- Scenery is recorded once per ball into a bounded set of nineteen immutable pictures, shared by shop, previews and gameplay. It has no per-frame geometry generation or animation ticker. Existing combo colors and animated ball effects remain.
+- Eighteen targeted checks passed, including the render fixture, world selection/persistence, large-text shop layout, all-world contrast, combo draw budgets and Infinite culling. Static analysis found no issues. Inspected the gallery and actual gameplay/shop renders. Xiaomi frame times remain unmeasured.
+
+## Infinite rendering optimizations — 2026-10-04
+
+- Skip off-screen holes, coins, spider territories/bodies and snakes before issuing drawing commands. Snake culling includes the tail. Remove the redundant combo background gradient pass.
+- Reuse board text layouts in a 128-entry cache with disposal on eviction. Precompute fixed snake radii, sample distances and wave amplitudes while preserving the existing body/collision geometry.
+- All 27 targeted rendering-budget, off-screen-culling, snake, contrast, ball-world and Board Tilt tests passed. Culling tests confirm that adding 100 off-screen holes adds no drawing commands and that visible snake tails remain drawn.
+- These checks demonstrate reduced work, not a measured FPS improvement. The reported Xiaomi device has not been profiled; no device-specific FPS claim or new APK is included.
+
+## Retire the standalone Maze mode — 2026-10-04
+
+- Removed the Maze carousel page, route picker/results, route engine, paintings, bundled previews, and three route achievements. The carousel now contains Infinite, Classic and 2048 Merge. Infinite's separate laser-wall obstacle sections remain.
+- Removed active Maze profile fields while retaining version 1 backup compatibility and onboarding recognition for returning Maze-only players. Remaining progress, wallet and equipment survive legacy backup restore.
+- Targeted navigation, controls, achievements, save migration, ball-world, Merge and Infinite laser-wall tests passed. Static analysis reported no issues. Rendered and inspected the three remaining worlds. No new APK was built for this change.
+
 ## Interactive onboarding, goals, friend codes and backups — 2026-09-16
 
 - Replaced the illustrated tutorial with three real touch exercises using the shared PivotBoard and AnalogControls: lift/release, tilt, and target capture. Each control mode is selectable. The simulation is isolated from profile rewards. Compact screens scroll outside the active controls; control gestures do not scroll the lesson.

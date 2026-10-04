@@ -27,17 +27,26 @@ class BoardSnake {
   double get vx => (fromLeft ? 1 : -1) * InfiniteTuning.snakeSideSpeed;
   double get vy => InfiniteTuning.snakeDownSpeed;
   bool get expired => age > 15;
-  double radiusAt(int i) => 1.2 + 7.3 * math.pow(1 - i / (samples - 1), .6);
+  static final _radii = List<double>.generate(
+    samples,
+    (i) => 1.2 + 7.3 * math.pow(1 - i / (samples - 1), .6),
+  );
+  static final _distances = List<double>.generate(
+    samples,
+    (i) => length * (i / (samples - 1)),
+  );
+  static final _waves = List<double>.generate(
+    samples,
+    (i) => 3 + 9 * math.sin(i / (samples - 1) * math.pi),
+  );
+  double radiusAt(int i) => _radii[i];
 
   List<SnakePoint> _body() {
     final speed = math.sqrt(vx * vx + vy * vy);
     final dx = vx / speed, dy = vy / speed;
     return List.generate(samples, (i) {
-      final u = i / (samples - 1);
-      final distance = length * u;
-      final wave =
-          math.sin(age * 5.5 - distance * .073 + phase) *
-          (3 + 9 * math.sin(u * math.pi));
+      final distance = _distances[i];
+      final wave = math.sin(age * 5.5 - distance * .073 + phase) * _waves[i];
       return (
         x: x - dx * distance - dy * wave,
         y: y - dy * distance + dx * wave,

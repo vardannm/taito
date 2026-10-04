@@ -26,7 +26,6 @@ enum Achievement {
   ),
   runs25('Back for more', 'Finish 25 Infinite runs.', 25, 150),
   stars12('Star collector', 'Earn 12 Classic stars.', 12, 150),
-  mazeClear('A way through', 'Complete a Laser Maze route.', 1, 75),
   merge128(
     'Power of two',
     'Make a 128 tile in Merge and finish the run.',
@@ -44,8 +43,6 @@ enum Achievement {
   stars30('Constellation', 'Earn 30 Classic stars.', 30, 200),
   stars60('Star atlas', 'Earn 60 Classic stars.', 60, 300),
   stars120('Galaxy maker', 'Earn 120 Classic stars.', 120, 500),
-  maze5('Route finder', 'Complete 5 different Laser Maze routes.', 5, 200),
-  maze10('Maze navigator', 'Complete 10 different Laser Maze routes.', 10, 350),
   merge256(
     'Growing stronger',
     'Make a 256 ball in Merge and finish the run.',

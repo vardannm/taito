@@ -45,6 +45,8 @@ class _ControlOptionsState extends State<ControlOptions>
         ControlMode.oneFinger,
         ControlMode.twoFinger,
         ControlMode.analog,
+        ControlMode.tiltLift,
+        ControlMode.boardTilt,
       ])
         Padding(
           padding: const EdgeInsets.only(bottom: 10),
@@ -75,6 +77,8 @@ class _ControlOptionsState extends State<ControlOptions>
                             ControlMode.twoFinger => Icons.touch_app,
                             ControlMode.oneFinger => Icons.pan_tool_alt,
                             ControlMode.analog => Icons.swap_vert,
+                            ControlMode.tiltLift => Icons.open_with,
+                            ControlMode.boardTilt => Icons.swipe,
                           },
                           size: 22,
                           color: ink,
@@ -86,6 +90,8 @@ class _ControlOptionsState extends State<ControlOptions>
                               ControlMode.twoFinger => 'Two-Finger Control',
                               ControlMode.oneFinger => 'One-Finger Control',
                               ControlMode.analog => 'Vertical Analog Control',
+                              ControlMode.tiltLift => 'Tilt Only',
+                              ControlMode.boardTilt => 'Board Tilt',
                             },
                             style: const TextStyle(
                               fontSize: 15,
@@ -117,6 +123,10 @@ class _ControlOptionsState extends State<ControlOptions>
                               'Use the thumb area below the board. Drag sideways to tilt, up or down to move.',
                             ControlMode.analog =>
                               'Slide the two bottom controls vertically. Release to hold position.',
+                            ControlMode.tiltLift =>
+                              'Drag sideways to tilt. Release to keep the angle. No manual lift in this test mode.',
+                            ControlMode.boardTilt =>
+                              'Tilt anywhere on the board. The guide appears under your finger, then hides on release. No lift or bottom slider.',
                           }, style: const TextStyle(fontSize: 12, height: 1.4)),
                         ),
                       ],
@@ -210,6 +220,25 @@ class _ControlDemo extends CustomPainter {
     if (mode == ControlMode.twoFinger) {
       finger(a);
       finger(b);
+    }
+    if (mode == ControlMode.tiltLift) {
+      final track = Paint()
+        ..color = brass.withAlpha(140)
+        ..strokeWidth = 3;
+      c.drawLine(const Offset(12, 65), const Offset(94, 65), track);
+
+      finger(Offset(53 + math.sin(t) * 25, 65));
+    }
+    if (mode == ControlMode.boardTilt) {
+      final p = Offset(53 + math.sin(t) * 20, 42);
+      c.drawLine(
+        p - const Offset(16, 0),
+        p + const Offset(16, 0),
+        Paint()
+          ..color = ink.withAlpha(60)
+          ..strokeWidth = 2,
+      );
+      finger(p);
     }
     if (mode == ControlMode.oneFinger) {
       final p = Offset(53 + math.sin(t) * 20, 65 + math.cos(t) * 3);

@@ -13,15 +13,6 @@ Future<void> openClassicLevels(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 400));
 }
 
-Future<void> openMazeRoutes(WidgetTester tester) async {
-  await tester.tap(find.byTooltip('Modes'));
-  await tester.pump();
-  await tester.pump(const Duration(milliseconds: 400));
-  await tester.tap(find.text('Maze routes'));
-  await tester.pump();
-  await tester.pump(const Duration(milliseconds: 400));
-}
-
 Future<void> selectWorld(WidgetTester tester, int index) async {
   await tester.tap(find.byKey(ValueKey('mode-$index')));
   await tester.pump();
@@ -32,7 +23,11 @@ Future<void> selectWorld(WidgetTester tester, int index) async {
 Future<void> startWorld(WidgetTester tester) async {
   final board = find.byType(PivotBoard);
   final game = tester.widget<PivotBoard>(board).game;
-  final point = game.analog
+  final point = game.boardTilt
+      ? tester.getCenter(board)
+      : game.tiltLift
+      ? tester.getCenter(find.byKey(const ValueKey('tilt-lift-tilt')))
+      : game.analog
       ? tester.getCenter(find.byKey(const ValueKey('analog-left')))
       : game.oneFinger
       ? tester.getCenter(find.byType(OneFingerControls))

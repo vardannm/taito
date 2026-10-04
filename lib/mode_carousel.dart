@@ -3,13 +3,8 @@ import 'package:flutter/material.dart';
 
 import 'game.dart';
 
-/// The four arcade worlds, in their permanent navigation order.
-const arcadeModes = [
-  GameMode.infinite,
-  GameMode.classic,
-  GameMode.laserMaze,
-  GameMode.merge2048,
-];
+/// The three arcade worlds, in their permanent navigation order.
+const arcadeModes = [GameMode.infinite, GameMode.classic, GameMode.merge2048];
 
 /// A page viewport with a screen-wide swipe surface. Its recognizer never
 /// enters the arena for a control touch, and is absent during gameplay.

@@ -1,4 +1,5 @@
 import 'ball_painter.dart';
+import 'ball_world.dart';
 import 'platform_painter.dart';
 import 'infinite_painter.dart';
 import 'merge_widgets.dart';
@@ -14,7 +15,6 @@ import 'spider_painter.dart';
 import 'porcupine_painter.dart';
 import 'snake_painter.dart';
 import 'cabinet.dart';
-import 'laser_maze_painter.dart';
 import 'heart_loss_effect.dart';
 import 'pickup_painter.dart';
 
@@ -86,14 +86,20 @@ class BoardViewport {
 }
 
 class BoardPainter extends CustomPainter {
+  // Shared across painter rebuilds, but bounded so a long Infinite run cannot
+  // retain every distance/score label. Evicted native paragraphs are disposed.
+  static final _labels =
+      <(String, double, Color, FontWeight, double), TextPainter>{};
   BoardPainter(
     this.game, {
     this.reducedMotion = false,
     this.fillWidth = 0,
     this.showHud = true,
     Listenable? repaint,
-  }) : super(repaint: repaint);
+  }) : world = BallWorld.of(game.cosmetic),
+       super(repaint: repaint);
   final BalanceGame game;
+  final BallWorld world;
   final bool reducedMotion;
   final double fillWidth;
   final bool showHud;
@@ -108,26 +114,34 @@ class BoardPainter extends CustomPainter {
     double spacing = 0,
     bool centered = true,
   }) {
-    final p = TextPainter(
-      text: TextSpan(
-        text: value,
-        style: TextStyle(
-          fontFamily: 'monospace',
-          fontSize: size,
-          color: color,
-          fontWeight: weight,
-          letterSpacing: spacing,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
+    final key = (value, size, color, weight, spacing);
+    final p =
+        _labels.remove(key) ??
+        (TextPainter(
+          text: TextSpan(
+            text: value,
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: size,
+              color: color,
+              fontWeight: weight,
+              letterSpacing: spacing,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout());
+    _labels[key] = p;
+    if (_labels.length > 128) {
+      _labels.remove(_labels.keys.first)!.dispose();
+    }
     p.paint(c, point - Offset(centered ? p.width / 2 : 0, p.height / 2));
   }
 
   @override
   void paint(Canvas canvas, Size size) {
     final palette = CabinetPalette.of(game.cabinet);
-    final ink = palette.frame, brass = palette.trim;
+    final ink = infiniteBoardInk(game, const Offset(180, 270)),
+        brass = palette.trim;
     canvas.save();
     canvas.clipRect(Offset.zero & size);
     final viewport = BoardViewport.forGame(size, game, fillWidth: fillWidth);
@@ -138,7 +152,7 @@ class BoardPainter extends CustomPainter {
       Rect.fromLTRB(0, top, 360, 560),
       const Radius.circular(22),
     );
-    canvas.drawRRect(outer, Paint()..color = ink);
+    canvas.drawRRect(outer, Paint()..color = palette.frame);
     canvas.drawRRect(
       outer.deflate(2),
       Paint()
@@ -156,34 +170,24 @@ class BoardPainter extends CustomPainter {
         ..shader = LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: palette.field,
+          colors: boardFieldColors(game),
         ).createShader(field.outerRect),
     );
     canvas.save();
     canvas.clipRRect(field);
     paintInfiniteAtmosphere(canvas, game, reducedMotion);
-    // Fine machined surface, concentric engraving, and calibrated side rails.
-    final grain = Paint()
-      ..color = const Color(0xFF533E20).withAlpha(13)
-      ..strokeWidth = .45;
-    for (double y = top + 12; y < 550; y += 4) {
-      canvas.drawLine(Offset(10, y), Offset(350, y), grain);
-    }
-    final ring = Paint()
-      ..color = ink.withAlpha(16)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-    for (double r = 80; r < 460; r += 28) {
-      canvas.drawCircle(const Offset(180, 270), r, ring);
-    }
-    text(
+    paintBallWorld(
       canvas,
-      'G',
-      const Offset(180, 270),
-      240,
-      ink.withAlpha(9),
-      weight: FontWeight.w900,
+      field.outerRect,
+      game.cosmetic,
+      background: false,
+      time: game.clock,
+      reducedMotion: reducedMotion,
+      energy: game.infinite ? game.survival.visualCombo : 0,
     );
+    final grain = Paint()
+      ..color = ink.withAlpha(50)
+      ..strokeWidth = .6;
     final railTop = game.infinite ? game.screenY(game.minPivot) : top + 26;
     for (final x in [20.0, 340.0]) {
       canvas.drawLine(
@@ -230,15 +234,6 @@ class BoardPainter extends CustomPainter {
         }
       }
     }
-    if (game.maze)
-      paintLaserMaze(
-        canvas,
-        game.mazeRun,
-        game.clock,
-        reducedMotion,
-        cameraOffset: game.scrolling ? game.cameraOffset : 0,
-        visibleTop: game.visibleTop,
-      );
     if (game.merging) {
       for (final orb in game.mergeRun.orbs) {
         paintNumberOrb(
@@ -277,7 +272,13 @@ class BoardPainter extends CustomPainter {
           ),
           Paint()..color = color,
         );
-        text(canvas, '> ${gate.requiredValue}', Offset(180, gate.y), 15, cream);
+        text(
+          canvas,
+          '> ${gate.requiredValue}',
+          Offset(180, gate.y),
+          15,
+          contrastInk(color),
+        );
       }
       if (game.mergeRun.flash > 0) {
         text(canvas, game.mergeRun.notice, const Offset(180, 28), 10, ink);
@@ -287,6 +288,7 @@ class BoardPainter extends CustomPainter {
     final visibleHoles = game.board;
     for (final hole in visibleHoles) {
       final p = Offset(hole.x, game.screenY(hole.y));
+      if (p.dy < top - 32 || p.dy > 592) continue;
       final active = !game.infinite && hole.target == game.target.clamp(1, 10);
       final done = hole.target > 0 && hole.target < game.target;
       if (active) {
@@ -358,7 +360,7 @@ class BoardPainter extends CustomPainter {
         );
     }
     // Keep the maker's mark on previews only.
-    if (!game.maze && showHud)
+    if (showHud)
       text(
         canvas,
         'PRECISION IS EVERYTHING',
@@ -426,6 +428,7 @@ class BoardPainter extends CustomPainter {
     }
     for (final coin in game.coins.where((c) => !c.collected)) {
       final p = Offset(coin.x, game.screenY(coin.y));
+      if (p.dy < top - 12 || p.dy > 572) continue;
       // Each coin turns from its own angle, so a row never flips in unison.
       paintBrassCoin(
         canvas,
@@ -610,7 +613,11 @@ class BoardPainter extends CustomPainter {
     paintGapWarning(canvas, game, reducedMotion);
     // Only two-finger play grabs the ends, so only it wears grab handles. The
     // other controls keep slim caps that never read as something to drag.
-    final grips = game.started && !game.oneFinger && !game.analog;
+    final grips =
+        game.started &&
+        !game.oneFinger &&
+        !game.bottomControls &&
+        !game.boardTilt;
     for (final p in [a, b]) {
       canvas.drawRRect(
         RRect.fromRectAndRadius(
@@ -742,6 +749,7 @@ class BoardPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant BoardPainter oldDelegate) =>
+      oldDelegate.world != world ||
       oldDelegate.game != game ||
       reducedMotion != oldDelegate.reducedMotion ||
       showHud != oldDelegate.showHud ||

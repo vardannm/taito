@@ -46,6 +46,9 @@ void paintSpiderBackdrop(Canvas c, BalanceGame game) {
   for (final s in game.spiders) {
     final radius = s.zoneRadius;
     final center = Offset(s.zoneX, game.screenY(s.zoneY));
+    if (center.dy + radius + 2 < game.visibleTop ||
+        center.dy - radius - 2 > 560)
+      continue;
     final webInk = game.infinite ? infiniteBoardInk(game, center) : null;
     thread.color =
         webInk?.withAlpha(180) ?? const Color(0xFF193C38).withAlpha(32);
@@ -89,6 +92,9 @@ void paintSpiderBackdrop(Canvas c, BalanceGame game) {
 
 void paintSpiders(Canvas c, BalanceGame game, bool reducedMotion) {
   for (final spider in game.spiders) {
+    final y = game.screenY(spider.y);
+    final extent = spider.bodyRadius * 3;
+    if (y + extent < game.visibleTop || y - extent > 560) continue;
     c.save();
     c.translate(spider.x, game.screenY(spider.y));
     c.rotate(spider.heading);

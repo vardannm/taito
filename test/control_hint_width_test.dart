@@ -21,11 +21,16 @@ void main() {
       '$control hint moves over its control and cannot consume the starting touch',
       (tester) async {
         final game = await launch(tester, control);
-        expect(find.byType(ControlHint), findsOneWidget);
-        final fingerIcon = find.byKey(const ValueKey('hint-finger-0'));
-        final initial = tester.getTopLeft(fingerIcon);
-        await tester.pump(const Duration(milliseconds: 550));
-        expect(tester.getTopLeft(fingerIcon).dy, lessThan(initial.dy - 10));
+        if (game.boardTilt) {
+          expect(find.byType(ControlHint), findsNothing);
+          expect(find.byKey(const ValueKey('board-tilt-cue')), findsNothing);
+        } else {
+          expect(find.byType(ControlHint), findsOneWidget);
+          final fingerIcon = find.byKey(const ValueKey('hint-finger-0'));
+          final initial = tester.getTopLeft(fingerIcon);
+          await tester.pump(const Duration(milliseconds: 550));
+          expect(tester.getTopLeft(fingerIcon).dy, lessThan(initial.dy - 10));
+        }
         expect(game.elapsed, 0);
         final finger = await tester.startGesture(contact(tester, game));
         await finger.moveBy(const Offset(0, -4));
@@ -42,7 +47,10 @@ void main() {
         expect(find.byType(ControlHint), findsNothing);
         await tester.pump(const Duration(milliseconds: 600));
         await tester.pump();
-        expect(find.byType(ControlHint), findsOneWidget);
+        expect(
+          find.byType(ControlHint),
+          game.boardTilt ? findsNothing : findsOneWidget,
+        );
         await tester.pumpWidget(const SizedBox());
         expect(tester.binding.transientCallbackCount, 0);
       },

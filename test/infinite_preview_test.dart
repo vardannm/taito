@@ -16,8 +16,7 @@ void main() {
     final direct = BalanceGame(seed: 42)..start(gameMode: GameMode.infinite);
     game.start(gameMode: GameMode.infinite, waitForInput: true);
     final preview = layout(game);
-    final baked = BalanceGame(seed: 711)
-      ..start(gameMode: GameMode.infinite);
+    final baked = BalanceGame(seed: 711)..start(gameMode: GameMode.infinite);
     expect(preview, layout(baked));
     for (var i = 0; i < 5; i++) {
       game.start(gameMode: GameMode.classic, waitForInput: true);
@@ -53,7 +52,7 @@ void main() {
         InMemorySharedPreferencesAsync.empty();
     final game = await launch(tester, ControlMode.oneFinger);
     final preview = layout(game);
-    for (final index in [1, 2, 3, 1]) {
+    for (final index in [1, 2, 1]) {
       await selectWorld(tester, index);
       await selectWorld(tester, 0);
       expect(game.waitingForInput, isTrue);

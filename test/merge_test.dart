@@ -344,32 +344,61 @@ void main() {
     expect(failed.failedGate, 64);
     expect(failed.collected, 0);
   });
-  test(
-    '400-point milestones queue exactly once with only one gate on screen',
-    () {
-      final run = emptyRun()..score = 399;
-      run.step(.01, 180, 500, 180, 500);
-      expect(run.gates, isEmpty);
-      run.score = 1200;
-      run.step(.01, 180, 500, 180, 500);
-      expect(run.gates.single.scoreAt, 400);
-      expect(run.gates.single.y, lessThan(0));
-      expect(run.pendingGates, 2);
-      run.segments[0] = 1024;
-      for (final scoreAt in [400, 800, 1200]) {
-        expect(run.gates.single.scoreAt, scoreAt);
-        run.gates.single.y = 500;
-        run.step(.01, 180, 500, 180, 500);
-        for (var i = 0; i < 13; i++) run.step(.1, 180, 500, 180, 500);
-      }
-      expect(run.gatesPassed, 3);
-      expect(run.gates, isEmpty);
-      expect(run.nextGateScore, 1600);
-      expect(MergeRun.gateValueAt(400), 128);
-      expect(MergeRun.gateValueAt(16400), 8192);
-      expect(MergeRun.gateValueAt(4398046511104), 2199023255552);
-    },
-  );
+  test('gates follow the current head and discard score backlogs', () {
+    final run = emptyRun()..score = 1199;
+    run.segments[0] = 8192;
+    run.step(.01, 180, 500, 180, 500);
+    expect(run.gates, isEmpty);
+    run.score = 50000; // A large chain crosses many old milestones.
+    run.step(.01, 180, 500, 180, 500);
+    expect(run.gates.single.requiredValue, 4096);
+    expect(run.gates.single.scoreAt, 50000);
+    run.score = 90000;
+    run.segments[0] = 16384;
+    run.step(.01, 180, 500, 180, 500);
+    expect(run.gates.single.requiredValue, 4096); // Fixed once visible.
+    run.gates.single.y = 500;
+    run.step(.01, 180, 500, 180, 500);
+    expect(run.gatesPassed, 1);
+    expect(run.nextGateScore, 90000 + 16384);
+    for (var i = 0; i < 50; i++) {
+      run.orbs.clear();
+      run.step(.1, 180, 500, 180, 500);
+    }
+    expect(run.gates, isEmpty); // No old gates to drain after cooldown.
+    run.score = run.nextGateScore;
+    run.step(.01, 180, 500, 180, 500);
+    expect(run.gates.single.requiredValue, 8192);
+  });
+  test('fresh score cannot bypass the four-second gate cooldown', () {
+    final run = emptyRun()..score = 1200;
+    run.segments[0] = 8192;
+    run.step(.01, 180, 500, 180, 500);
+    run.gates.single.y = 500;
+    run.step(.01, 180, 500, 180, 500);
+    run.score = run.nextGateScore;
+    for (var i = 0; i < 38; i++) {
+      run.orbs.clear();
+      run.step(.1, 180, 500, 180, 500);
+    }
+    expect(run.gates, isEmpty);
+    for (var i = 0; i < 3; i++) {
+      run.orbs.clear();
+      run.step(.1, 180, 500, 180, 500);
+    }
+    expect(run.gates.single.requiredValue, 8192);
+    expect(run.upcomingGateValue, 8192);
+  });
+  test('gate values catch up, double, and reset on a fresh run', () {
+    expect(MergeRun.gateValueForHead(8192), 4096);
+    expect(MergeRun.gateValueForHead(8192, previous: 4096), 8192);
+    expect(MergeRun.gateValueForHead(65536, previous: 512), 32768);
+    expect(MergeRun.gateValueForHead(2), 2);
+    final fresh = emptyRun();
+    expect(fresh.nextGateScore, 1200);
+    expect(fresh.lastGateValue, 0);
+    expect(fresh.gateCooldown, 0);
+  });
   test(
     '2048 and later merges keep simulation, input, and records in one run',
     () async {
@@ -500,7 +529,7 @@ void main() {
         ..controlMode = ControlMode.analog;
       await tester.pumpWidget(ArcadeApp(profile: p));
 
-      await selectWorld(tester, 3);
+      await selectWorld(tester, 2);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 600));
       await startWorld(tester);

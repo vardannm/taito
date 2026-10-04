@@ -58,7 +58,6 @@ void main() {
         bestTime: 80,
         attempts: 2,
       );
-      p.mazeBestTimes['oneFinger:2'] = 42.5;
       final restored = ProgressBackup.decode(
         ProgressBackup.encode(p),
         testEconomy: false,
@@ -66,7 +65,6 @@ void main() {
       expect(restored.wallet, 80);
       expect(restored.selectedBall, p.selectedBall);
       expect(restored.levelRecord(9).starMask, 7);
-      expect(restored.mazeBestTimes, p.mazeBestTimes);
       final target = PlayerProfile();
       await ProgressBackup.restore(target, restored);
       expect(target.mergeHighest, 4096);

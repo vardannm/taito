@@ -29,16 +29,16 @@ abstract final class MergeDifficulty {
   // A dangerous ball is randomly 2x or 4x the head when it spawns.
   static const dangerChance = 1.0;
 
-  // Score earned between gates (positive integer). Larger = fewer gates.
-  static const gateInterval = 400;
+  // Minimum fresh score between gates. Later gaps grow to the head value.
+  static const gateInterval = 1200;
   // Gate speed is falling speed + this nonnegative bonus.
   static const gateSpeedBonus = 12.0;
-  // Minimum seconds between clearing a gate and spawning a queued one (>= 0).
-  static const gateCooldownSeconds = 1.2;
+  // Minimum seconds after clearing a gate before another can spawn (>= 0).
+  static const gateCooldownSeconds = 4.0;
 
   // Integer power-of-two adjustment to gate requirements (-8..8).
-  // 0 = current curve, -1 = half the required value, +1 = double.
+  // 0 = half the head value, -1 = quarter, +1 = equal to the head.
   // Requirements never fall below 2. The head must be STRICTLY greater.
-  // With 0: score 400 -> gate 128; 800 -> 256; 1200 -> 512.
+  // Each gate also requires at least double the previous gate's value.
   static const gateValueOffset = 0;
 }

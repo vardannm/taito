@@ -6,7 +6,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/board_painter.dart';
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/levels.dart';
-import 'package:balance_arcade/laser_maze.dart';
 import 'package:balance_arcade/mode_previews.dart';
 
 void main() {
@@ -30,16 +29,11 @@ void main() {
     for (final mode in [
       GameMode.infinite,
       GameMode.classic,
-      GameMode.laserMaze,
       GameMode.merge2048,
     ]) {
       const onlyMode = String.fromEnvironment('PREVIEW_MODE');
       if (onlyMode.isNotEmpty && mode.name != onlyMode) continue;
-      final count = mode == GameMode.classic
-          ? ClassicLevels.count
-          : mode == GameMode.laserMaze
-          ? LaserMazeRoute.count
-          : 1;
+      final count = mode == GameMode.classic ? ClassicLevels.count : 1;
       for (var level = 1; level <= count; level++) {
         const onlyLevel = int.fromEnvironment('PREVIEW_LEVEL');
         if (onlyLevel > 0 && level != onlyLevel) continue;
