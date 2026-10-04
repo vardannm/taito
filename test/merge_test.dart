@@ -187,41 +187,81 @@ void main() {
       }
     }
   });
-  test('the full tail fits below the platform for every control mode', () {
-    for (final control in ControlMode.values) {
-      final g = BalanceGame()
-        ..preferredControlMode = control
-        ..start(gameMode: GameMode.merge2048);
-      clearStream(g);
-      g.mergeRun.segments
-        ..clear()
-        ..addAll(fullSnake());
-      g.step(1 / 120);
-      final run = g.mergeRun;
-      expect(
-        run.segmentY(g.ballY, run.segments.length - 1) +
-            run.segmentRadius(run.segments.length - 1),
-        lessThan(550),
-      );
-      for (final size in [const Size(320, 300), const Size(390, 580)]) {
-        final viewport = BoardViewport.forGame(size, g, fillWidth: 1);
-        final tailBottom = viewport.project(
-          Offset(
-            g.ballX,
-            g.ballY +
-                run.tailExtent +
-                run.segmentRadius(run.segments.length - 1),
-          ),
-        );
-        expect(tailBottom.dy, lessThan(size.height));
-        expect(
-          viewport.project(Offset(g.ballX, g.ballY - MergeRun.ballRadius)).dy,
-          greaterThan(0),
-        );
+  for (final control in ControlMode.values) {
+    test(
+      'growing and merging a tail never lifts the platform with $control',
+      () {
+        final g = BalanceGame()
+          ..setControlMode(control)
+          ..start(gameMode: GameMode.merge2048);
+        clearStream(g);
+        g.left = g.right = 526;
+        g.mergeRun.segments[0] = 32768;
+        final headY = g.ballY;
+        final serial = g.runSerial, epoch = g.inputEpoch;
+        for (var value = 16384; value >= 2; value ~/= 2) {
+          clearStream(g);
+          final count = g.mergeRun.segments.length;
+          g.mergeRun.orbs.add(NumberOrb(g.ballX, g.ballY, value));
+          g.step(1 / 120);
+          expect(g.mergeRun.segments, hasLength(count + 1));
+          expect(g.maxPivot, 526);
+          expect(g.left, 526);
+          expect(g.right, 526);
+          expect(g.ballY, headY);
+          expect(g.finished, isFalse);
+        }
+        expect(g.mergeRun.segments.length, greaterThan(MergeRun.maxSegments));
+        clearStream(g);
+        g.mergeRun.orbs.add(NumberOrb(g.ballX, g.ballY, 2));
+        g.step(1 / 120);
+        expect(g.mergeRun.segments, [65536]);
+        expect(g.left, 526);
+        expect(g.right, 526);
+        expect(g.ballY, headY);
+        expect(g.runSerial, serial);
+        expect(g.inputEpoch, epoch);
+        expect(g.canControl, isTrue);
+      },
+    );
+  }
+  test(
+    'offscreen tails do not shift the viewport or platform touch targets',
+    () {
+      for (final control in ControlMode.values) {
+        for (final size in [const Size(320, 300), const Size(390, 580)]) {
+          final g = BalanceGame()
+            ..setControlMode(control)
+            ..start(gameMode: GameMode.merge2048);
+          clearStream(g);
+          final before = BoardViewport.forGame(size, g, fillWidth: 1);
+          final leftGrip = before.project(Offset(20, g.left));
+          final rightGrip = before.project(Offset(340, g.right));
+          g.mergeRun.segments
+            ..clear()
+            ..addAll(fullSnake());
+          g.step(1 / 120);
+          final after = BoardViewport.forGame(size, g, fillWidth: 1);
+          expect(after.offset, before.offset);
+          expect(after.scale, before.scale);
+          expect(after.project(Offset(20, g.left)), leftGrip);
+          expect(after.project(Offset(340, g.right)), rightGrip);
+          final run = g.mergeRun;
+          final tailBottom = after.project(
+            Offset(
+              g.ballX,
+              run.segmentY(g.ballY, run.segments.length - 1) +
+                  run.segmentRadius(run.segments.length - 1),
+            ),
+          );
+          expect(tailBottom.dy, greaterThan(size.height));
+          final head = after.project(Offset(g.ballX, g.ballY));
+          expect(head.dy, inInclusiveRange(0, size.height));
+          expect(g.finished, isFalse);
+        }
       }
-      expect(g.finished, false);
-    }
-  });
+    },
+  );
   test('large number labels use binary thousands and millions', () {
     for (final entry in {
       2: '2',

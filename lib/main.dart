@@ -1,4 +1,5 @@
 import 'playtest_recorder.dart';
+import 'rewarded_revive_ads.dart';
 import 'app_analytics.dart';
 export 'pivot_board.dart';
 import 'pivot_board.dart';
@@ -54,13 +55,25 @@ Future<void> main() async {
   await profile.grantTemporaryNormalCoins();
   if (kDebugMode) await profile.grantBallTestCoins();
   final analytics = await AppAnalytics.initialize();
-  runApp(ArcadeApp(profile: profile, analytics: analytics));
+  runApp(
+    ArcadeApp(
+      profile: profile,
+      analytics: analytics,
+      reviveAds: GoogleTestReviveAds(),
+    ),
+  );
 }
 
 class ArcadeApp extends StatelessWidget {
-  const ArcadeApp({super.key, required this.profile, this.analytics});
+  const ArcadeApp({
+    super.key,
+    required this.profile,
+    this.analytics,
+    this.reviveAds,
+  });
   final PlayerProfile profile;
   final AppAnalytics? analytics;
+  final RewardedReviveAds? reviveAds;
   @override
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
@@ -75,14 +88,24 @@ class ArcadeApp extends StatelessWidget {
         displayColor: ink,
       ),
     ),
-    home: GameScreen(profile: profile, analytics: analytics),
+    home: GameScreen(
+      profile: profile,
+      analytics: analytics,
+      reviveAds: reviveAds,
+    ),
   );
 }
 
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key, required this.profile, this.analytics});
+  const GameScreen({
+    super.key,
+    required this.profile,
+    this.analytics,
+    this.reviveAds,
+  });
   final PlayerProfile profile;
   final AppAnalytics? analytics;
+  final RewardedReviveAds? reviveAds;
   @override
   State<GameScreen> createState() => _GameScreenState();
 }
@@ -96,6 +119,11 @@ class _GameScreenState extends State<GameScreen>
   final feedback = GameFeedback();
   final playtest = PlaytestRecorder();
   late final analytics = widget.analytics ?? AppAnalytics();
+  late final reviveAds = widget.reviveAds ?? const UnavailableReviveAds();
+  bool reviveDeclined = false, adBusy = false;
+  String? reviveError;
+  bool get offeringRevive =>
+      game.canReviveInfinite && reviveAds.supported && !reviveDeclined;
   final touch = [0.0, 0.0];
   final keyboard = [0.0, 0.0];
   late final Ticker ticker;
@@ -294,31 +322,7 @@ class _GameScreenState extends State<GameScreen>
 
       game.event = null;
     }
-    if (game.finished && !recorded) {
-      recorded = true;
-      analytics.finishRun(game);
-      playtest.record("run_finished", {
-        "mode": game.mode.name,
-        "won": game.won,
-        "score": game.score,
-        "activeSeconds": game.elapsed,
-      });
-      if (tutorialActive &&
-          tutorialStep == TutorialStep.classicPlay &&
-          game.mode == GameMode.classic &&
-          game.level == 1 &&
-          game.won) {
-        advanceTutorial(TutorialStep.dailyChallenge);
-      }
-      if (!game.practice) {
-        final locked = CabinetStyle.values
-            .where((c) => !profile.isUnlocked(c))
-            .toList();
-        newBest = profile.recordResult(game);
-        newUnlocks = locked.where(profile.isUnlocked).toList();
-        unawaited(profile.save());
-      }
-    }
+    if (!offeringRevive) recordFinalResult();
     // Rebuild HUD text only when its displayed values change, not every frame.
     hud.value = (
       game.score,
@@ -344,6 +348,82 @@ class _GameScreenState extends State<GameScreen>
     if (before !=
         '${game.phase}/${game.target}/${game.lives}/${game.inputEpoch}/$recorded')
       setState(() {});
+  }
+
+  void recordFinalResult() {
+    if (game.finished && !recorded) {
+      recorded = true;
+      analytics.finishRun(game);
+      playtest.record("run_finished", {
+        "mode": game.mode.name,
+        "won": game.won,
+        "score": game.score,
+        "activeSeconds": game.elapsed,
+      });
+      if (tutorialActive &&
+          tutorialStep == TutorialStep.classicPlay &&
+          game.mode == GameMode.classic &&
+          game.level == 1 &&
+          game.won) {
+        advanceTutorial(TutorialStep.dailyChallenge);
+      }
+      if (!game.practice) {
+        final locked = CabinetStyle.values
+            .where((c) => !profile.isUnlocked(c))
+            .toList();
+        newBest = profile.recordResult(game);
+        newUnlocks = locked.where(profile.isUnlocked).toList();
+        unawaited(profile.save());
+      }
+    }
+  }
+
+  void declineRevive() {
+    if (adBusy) return;
+    setState(() {
+      reviveDeclined = true;
+      reviveError = null;
+      recordFinalResult();
+    });
+  }
+
+  Future<void> watchReviveAd() async {
+    if (!offeringRevive || adBusy) return;
+    final serial = game.runSerial;
+    setState(() {
+      adBusy = true;
+      reviveError = null;
+    });
+    ticker.stop();
+    clearControls();
+    syncMusic();
+    ReviveAdResult result;
+    try {
+      result = await reviveAds.show();
+    } catch (_) {
+      result = ReviveAdResult.unavailable;
+    }
+    if (!mounted || game.runSerial != serial) return;
+    setState(() {
+      adBusy = false;
+      if (result == ReviveAdResult.earned && game.reviveInfinite()) {
+        reviveDeclined = true;
+        observedLives = game.lives;
+        heartEffects.clear();
+        final lifecycle = WidgetsBinding.instance.lifecycleState;
+        if (lifecycle != null && lifecycle != AppLifecycleState.resumed) {
+          game.setPaused(true);
+        } else {
+          runTicker();
+        }
+        frame.value++;
+      } else {
+        reviveError = result == ReviveAdResult.dismissed
+            ? 'Finish watching the ad to earn your extra heart.'
+            : 'No ad available right now. Try again or end the run.';
+      }
+    });
+    syncMusic();
   }
 
   void clearControls() {
@@ -405,6 +485,10 @@ class _GameScreenState extends State<GameScreen>
       mode == GameMode.classic ? ControlMode.tiltLift : profile.controlMode;
 
   void start(GameMode mode, {DateTime? challengeDate}) => setState(() {
+    if (adBusy) return;
+    if (game.finished) recordFinalResult();
+    reviveDeclined = false;
+    reviveError = null;
     if (mode == GameMode.infinite) {
       prepareInfinite(retry: game.infinite && game.finished);
       entrance.reverse();
@@ -699,6 +783,10 @@ class _GameScreenState extends State<GameScreen>
   };
 
   void prepareWorld(int index, {bool retry = false}) {
+    if (adBusy) return;
+    if (game.finished) recordFinalResult();
+    reviveDeclined = false;
+    reviveError = null;
     analytics.selectMode(arcadeModes[index]);
     ticker.stop();
     previous = null;
@@ -736,7 +824,8 @@ class _GameScreenState extends State<GameScreen>
   }
 
   Future<void> home() async {
-    if (returning) return;
+    if (returning || adBusy) return;
+    if (game.finished) recordFinalResult();
     profile.bankCoins(game);
     final index = arcadeModes.indexOf(game.mode);
     setState(() {
@@ -782,6 +871,8 @@ class _GameScreenState extends State<GameScreen>
   @override
   void dispose() {
     game.onInputStarted = null;
+    if (game.infinite && game.finished) recordFinalResult();
+    reviveAds.dispose();
     profile.bankCoins(game);
     unawaited(profile.saveTutorial());
     WidgetsBinding.instance.removeObserver(this);
@@ -1978,7 +2069,99 @@ class _GameScreenState extends State<GameScreen>
         ),
       );
 
-  Widget boardOverlay() => game.merging && game.finished
+  Widget reviveOffer() => PopScope(
+    canPop: !adBusy,
+    child: Container(
+      key: const ValueKey('revive-offer'),
+      decoration: BoxDecoration(
+        color: ink.withAlpha(245),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(25),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.favorite_rounded, color: orange, size: 52),
+              const SizedBox(height: 16),
+              const Text(
+                'One more chance?',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: cream,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '${game.score} points · ${game.metres}m',
+                style: label(brass),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Watch an ad to get 1 heart and continue this run.\nOne revive per run.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: cream, height: 1.5),
+              ),
+              if (reviveError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: Text(
+                    reviveError!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: brass, fontSize: 12),
+                  ),
+                ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  key: const ValueKey('watch-revive-ad'),
+                  onPressed: adBusy ? null : watchReviveAd,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: brass,
+                    foregroundColor: ink,
+                    disabledBackgroundColor: brass.withAlpha(120),
+                    disabledForegroundColor: cream,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 15,
+                      horizontal: 12,
+                    ),
+                  ),
+                  icon: adBusy
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: cream,
+                          ),
+                        )
+                      : const Icon(Icons.play_circle_outline),
+                  label: Text(adBusy ? 'Opening ad…' : 'Watch ad · +1 heart'),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextButton(
+                key: const ValueKey('decline-revive'),
+                onPressed: adBusy ? null : declineRevive,
+                child: const Text(
+                  'No thanks · End run',
+                  style: TextStyle(color: cream),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Widget boardOverlay() => offeringRevive
+      ? reviveOffer()
+      : game.merging && game.finished
       ? MergeResult(
           run: game.mergeRun,
           newBest: newBest,

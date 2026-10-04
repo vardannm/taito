@@ -117,14 +117,10 @@ class BalanceGame {
   /// Modes whose camera follows the climb instead of holding the whole board.
   bool get scrolling => infinite;
   // Infinite allows manual upward travel of 15% of the board from its start.
-  double get minPivot => infinite
-      ? infiniteStart - height * .25 - cameraOffset
-      : 30.0;
-  double get maxPivot => scrolling
-      ? 526 - cameraOffset
-      : merging
-      ? 526 - mergeRun.tailExtent
-      : 526.0;
+  double get minPivot =>
+      infinite ? infiniteStart - height * .25 - cameraOffset : 30.0;
+  // A growing Merge tail may leave the screen; it never lifts the platform.
+  double get maxPivot => scrolling ? 526 - cameraOffset : 526.0;
   bool get merging => mode == GameMode.merge2048;
   MergeRun? _mergeRun;
   MergeRun get mergeRun => _mergeRun ??= MergeRun();
@@ -585,6 +581,39 @@ class BalanceGame {
   int target = 1, lives = 3, score = 0, streak = 0, bestStreak = 0;
   int lastAward = 0, completed = 0, misses = 0, inputEpoch = 0;
   bool started = false, paused = false, won = false;
+  bool infiniteReviveUsed = false;
+  bool get canReviveInfinite =>
+      started &&
+      infinite &&
+      finished &&
+      lives <= 0 &&
+      !won &&
+      !infiniteReviveUsed;
+
+  /// Called only after a rewarded ad has earned its reward and closed.
+  /// Keep the same world, score, coin ledger and run identity.
+  bool reviveInfinite() {
+    if (!canReviveInfinite) return false;
+    infiniteReviveUsed = true;
+    lives = 1;
+    phase = GamePhase.playing;
+    phaseTime = 0;
+    paused = waitingForInput = false;
+    inputLocked = false;
+    clearInput();
+    velocity = leftSpeed = rightSpeed = 0;
+    ballTrail.clear();
+    motionSpeed = 0;
+    fellThroughGap = caughtBySpider = false;
+    stallTime = _steeringDistance = 0;
+    dangerY = math.max(dangerY, ballY + 140);
+    survival.recovery = 3;
+    survival.announce('BACK IN PLAY · 1 heart · 3 seconds of protection');
+    message = survival.notice;
+    event = null;
+    return true;
+  }
+
   bool waitingForInput = false;
   // Selection gestures block new control contacts synchronously, including a
   // second finger arriving before Flutter has rebuilt its IgnorePointer layer.
@@ -739,6 +768,7 @@ class BalanceGame {
     bool waitForInput = false,
   }) {
     runSerial++;
+    infiniteReviveUsed = false;
     tutorialCourse = false;
     mode = gameMode;
     // Every generated mode holds the baked carousel layout while it waits, so
@@ -1020,11 +1050,6 @@ class BalanceGame {
     if (merging) {
       final collectedBefore = mergeRun.collected;
       mergeRun.step(dt, oldX, oldY, ballX, ballY);
-      // Keep a growing downward tail inside the board. This repositioning is
-      // visual accommodation, not a swept pickup or gate collision.
-      ballX = ballX.clamp(mergeRun.minHeadX, mergeRun.maxHeadX);
-      left = math.min(left, maxPivot);
-      right = math.min(right, maxPivot);
       score = mergeRun.score;
       message = mergeRun.notice;
       if (mergeRun.collected != collectedBefore) event = GameEvent.merge;

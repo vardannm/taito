@@ -118,7 +118,7 @@ Native iOS compilation, signing, real-device haptics/audio, and frame-time profi
 
 ## Commercial status
 
-This is a playable, tested game build, not an App Store submission or a revenue guarantee. No ads, purchases, tracking SDKs, servers, or paid services are connected. See `PRODUCT.md` for the proposed release and monetization sequence. No Taito artwork, branding, recordings, or game code is used.
+This is a playable, tested game build, not an App Store submission or a revenue guarantee. Infinite offers one rewarded-ad revive per run on Android/iOS, using Google's sample app IDs and rewarded test units. Earning the reward and dismissing the ad continues the same run with one heart and three seconds of protection; the next game over has no ad offer. Skipped or unavailable ads give no heart. Desktop/web skip the offer. Ad units live in `lib/rewarded_revive_ads.dart`; native app IDs live in `android/app/src/main/AndroidManifest.xml` and `ios/Runner/Info.plist`. Replace test IDs and complete release setup before monetizing. See `PRODUCT.md` for the proposed release and monetization sequence. No Taito artwork, branding, recordings, or game code is used.
 
 ## Code map
 
@@ -146,7 +146,7 @@ Choose **2048 / MERGE** from the home screen. Steer the solid middle ball into d
 
 Matching values combine anywhere in the snake, including across opposite sides. Every intermediate merged value adds to score. Glowing rings mark numbers that match any current segment. The solid middle ball collects numbers; faint segments pass through numbers.
 
-The 320-unit platform still fits 12 balls at 26-unit spacing. The chain takes up space on both sides, reducing the middle ball's available travel range as it grows. A matching pickup can rescue a full snake; longer chains compress their spacing to stay on the platform. Length no longer ends a run. The next gate requirement and matching number stay above the uniformly fitted board.
+The snake trails downward from the main ball, which retains its full horizontal travel range. Growing or merging the tail never lifts the platform or shifts the camera; at the bottom of the board, the tail can extend off-screen. A matching pickup can collapse the chain into a larger number, and longer chains compress their spacing. Length does not end a run. The next gate requirement and matching number stay above the board.
 
 Each wave contains **two safe numbers and one larger number to dodge**, separated across the board with a reachable matching pickup. The solid middle ball can collect only values equal to or below its current value. Touching a larger value ends the run immediately; a red ring and an exclamation mark identify it. Ghost segments pass through pickups. Danger is evaluated at contact, so an earlier merge can make a later number safe.
 

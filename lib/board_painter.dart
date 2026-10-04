@@ -52,27 +52,11 @@ class BoardViewport {
     Size size,
     BalanceGame game, {
     double fillWidth = 0,
-  }) {
-    final viewport = BoardViewport(
-      size,
-      fillWidth: fillWidth,
-      focusY: game.screenY((game.left + game.right) / 2),
-    );
-    if (game.merging && game.mergeRun.segments.length > 1) {
-      // Short screens crop the board. Keep the last link above the controls,
-      // using the same transform for the platform and its touch targets.
-      final bottom =
-          game.screenY(game.ballY) +
-          game.mergeRun.tailExtent +
-          MergeRun.ballRadius +
-          8;
-      viewport.offset = Offset(
-        viewport.offset.dx,
-        math.min(viewport.offset.dy, size.height - bottom * viewport.scale),
-      );
-    }
-    return viewport;
-  }
+  }) => BoardViewport(
+    size,
+    fillWidth: fillWidth,
+    focusY: game.screenY((game.left + game.right) / 2),
+  );
   late final double scale;
   late final double topExtension;
   late Offset offset;
