@@ -58,6 +58,99 @@ extension InfiniteGameplay on BalanceGame {
     porcupines.removeWhere((p) => screenY(p.y) > 640);
   }
 
+  void _updateLateEnemies(double dt, double scrollDistance) {
+    if (!lateEnemiesEnabled ||
+        mazeSection ||
+        section == InfiniteSection.breath) {
+      if (lateEnemy != null) {
+        _nextLateEnemyTime = elapsed + InfiniteDifficulty.lateEnemyRestSeconds;
+      }
+      lateEnemy = null;
+      _nextLateEnemyTime = math.max(_nextLateEnemyTime, elapsed + 2);
+      return;
+    }
+    final active = lateEnemy;
+    if (active != null) {
+      active.step(dt, scrollDistance: scrollDistance);
+      // The exit lasts longer than one physics tick, so all live contacts have
+      // resolved before the visitor is discarded.
+      if (active.expired) {
+        lateEnemy = null;
+        _nextLateEnemyTime =
+            elapsed +
+            InfiniteDifficulty.lateEnemyRestSeconds +
+            _random.nextDouble() * 5;
+        _nextHazardTime = math.max(_nextHazardTime, elapsed + 1);
+        _nextWebTime = math.max(_nextWebTime, elapsed + 1);
+        _nextQuillTime = math.max(_nextQuillTime, elapsed + 1);
+        _nextSnakeTime = math.max(_nextSnakeTime, elapsed + 1);
+      }
+      return;
+    }
+    if (elapsed < _nextLateEnemyTime ||
+        survival.recovery > 0 ||
+        specialHazards.isNotEmpty ||
+        snakes.isNotEmpty ||
+        webShots.isNotEmpty ||
+        quills.isNotEmpty ||
+        porcupines.any((p) => p.charge != null))
+      return;
+    final unlocked = LateEnemyKind.values
+        .where((kind) => metres >= kind.unlockMetres)
+        .toList();
+    if (unlocked.isEmpty) return;
+    final fresh = unlocked.where(
+      (kind) => !_introducedLateEnemies.contains(kind),
+    );
+    final choices = unlocked.where((kind) => kind != _lastLateEnemy).toList();
+    final kind = fresh.isNotEmpty
+        ? fresh.first
+        : choices.isEmpty
+        ? unlocked.first
+        : choices[_random.nextInt(choices.length)];
+    if (kind == LateEnemyKind.beetle && !_hasBeetleEscape()) return;
+    final targetY = screenY(ballY).clamp(visibleTop + 160, 500.0);
+    // Enter on the farther rail, well above the ball. The moth uses the center
+    // so both curved streams have room to spread without crossing the rails.
+    final origin = (
+      x: kind == LateEnemyKind.moth
+          ? 180.0
+          : ballX < 180
+          ? 317.0
+          : 43.0,
+      y: (targetY - 220).clamp(visibleTop + 70, 210.0),
+    );
+    lateEnemy = LateEnemyEncounter(
+      kind: kind,
+      origin: origin,
+      target: (x: ballX.clamp(50.0, 310.0), y: targetY),
+    );
+    _lastLateEnemy = kind;
+    if (_introducedLateEnemies.add(kind)) {
+      survival.announce('${kind.name} · ${kind.hint}');
+    }
+  }
+
+  bool _hasBeetleEscape() {
+    // Check both simple side-step routes against the terrain that will reach
+    // the player before impact. Skip the attack if neither route is clear.
+    final turnY = ballY - ascentSpeed * .65;
+    final landingY =
+        ballY - ascentSpeed * (InfiniteTuning.lateEnemyWarning + .95);
+    for (final x in [ballX - 70, ballX + 70]) {
+      if (x < 40 || x > 320) continue;
+      bool blocks(double ox, double oy, double radius) =>
+          circleContact(ballX, ballY, x, turnY, ox, oy, radius) != null ||
+          circleContact(x, turnY, x, landingY, ox, oy, radius) != null;
+      if (board.any((h) => blocks(h.x, h.y, 24)) ||
+          porcupines.any((p) => blocks(p.x, p.y, 30)) ||
+          spiders.any((s) => blocks(s.zoneX, s.zoneY, s.zoneRadius + 20)))
+        continue;
+      return true;
+    }
+    return false;
+  }
+
   void _updateSnakes(double dt) {
     if (!snakeEncountersEnabled ||
         mazeSection ||
@@ -72,6 +165,7 @@ extension InfiniteGameplay on BalanceGame {
     if (metres < InfiniteTuning.snakeUnlockMetres ||
         section != InfiniteSection.encounter ||
         elapsed < _nextSnakeTime ||
+        lateEnemy != null ||
         snakes.isNotEmpty ||
         specialHazards.isNotEmpty ||
         webShots.isNotEmpty ||
@@ -160,6 +254,7 @@ extension InfiniteGameplay on BalanceGame {
       }
     }
     if (elapsed < _nextQuillTime ||
+        lateEnemy != null ||
         snakes.isNotEmpty ||
         quills.isNotEmpty ||
         webShots.isNotEmpty ||
@@ -250,6 +345,7 @@ extension InfiniteGameplay on BalanceGame {
       shot.step(dt);
     }
     if (elapsed < _nextWebTime ||
+        lateEnemy != null ||
         snakes.isNotEmpty ||
         quills.isNotEmpty ||
         porcupines.any((p) => p.charge != null) ||
@@ -444,9 +540,42 @@ extension InfiniteGameplay on BalanceGame {
             Hole? hole,
             SpiderWebShot? web,
             PorcupineQuill? quill,
+            LateEnemyShot? lateShot,
             String? reason,
           })
         >[];
+    final visitor = lateEnemy;
+    if (visitor != null) {
+      final t = visitor.bodyContact(oldX, oldScreenY, ballX, screenY(ballY));
+      if (t != null) {
+        events.add((
+          t: t,
+          item: null,
+          coin: null,
+          hole: null,
+          web: null,
+          quill: null,
+          lateShot: null,
+          reason:
+              'Touched the ${visitor.kind.name.toLowerCase()}. Keep clear of its body.',
+        ));
+      }
+      for (final shot in visitor.shots) {
+        final t = shot.contact(oldX, oldScreenY, ballX, screenY(ballY));
+        if (t != null) {
+          events.add((
+            t: t,
+            item: null,
+            coin: null,
+            hole: null,
+            web: null,
+            quill: null,
+            lateShot: shot,
+            reason: shot.reason,
+          ));
+        }
+      }
+    }
     for (final snake in snakes) {
       final t = snake.contact(oldX, oldY, ballX, ballY);
       if (t != null)
@@ -457,6 +586,7 @@ extension InfiniteGameplay on BalanceGame {
           hole: null,
           web: null,
           quill: null,
+          lateShot: null,
           reason: 'Hit a snake. Dodge its slithering body.',
         ));
     }
@@ -480,6 +610,7 @@ extension InfiniteGameplay on BalanceGame {
           hole: null,
           web: null,
           quill: null,
+          lateShot: null,
           reason: 'Caught by a spider. Stay outside its territory.',
         ));
     }
@@ -502,6 +633,7 @@ extension InfiniteGameplay on BalanceGame {
           hole: null,
           web: null,
           quill: null,
+          lateShot: null,
           reason: 'Touched a porcupine. Keep clear of its quills.',
         ));
     }
@@ -515,6 +647,7 @@ extension InfiniteGameplay on BalanceGame {
           hole: null,
           web: null,
           quill: q,
+          lateShot: null,
           reason: 'Hit by a porcupine quill. Dodge between the spikes.',
         ));
     }
@@ -529,6 +662,7 @@ extension InfiniteGameplay on BalanceGame {
           hole: null,
           web: web,
           quill: null,
+          lateShot: null,
           reason: 'Hit by a web. Dodge the aimed shot.',
         ));
     }
@@ -554,6 +688,7 @@ extension InfiniteGameplay on BalanceGame {
             hole: null,
             web: null,
             quill: null,
+            lateShot: null,
             reason: null,
           ));
       }
@@ -576,6 +711,7 @@ extension InfiniteGameplay on BalanceGame {
             hole: null,
             web: null,
             quill: null,
+            lateShot: null,
             reason: null,
           ));
       }
@@ -592,6 +728,7 @@ extension InfiniteGameplay on BalanceGame {
           hole: hole,
           web: null,
           quill: null,
+          lateShot: null,
           reason: 'Into a trap.',
         ));
     }
@@ -611,6 +748,7 @@ extension InfiniteGameplay on BalanceGame {
           hole: null,
           web: null,
           quill: null,
+          lateShot: null,
           reason: switch (hazard.kind) {
             HazardKind.laser => 'Laser hit. Move out of the blinking beam.',
             HazardKind.platformGap => 'The platform broke beneath you.',
@@ -635,6 +773,7 @@ extension InfiniteGameplay on BalanceGame {
           hole: null,
           web: null,
           quill: null,
+          lateShot: null,
           reason: 'Laser wall. Steer through the gap.',
         ));
     }
@@ -646,6 +785,7 @@ extension InfiniteGameplay on BalanceGame {
         hole: null,
         web: null,
         quill: null,
+        lateShot: null,
         reason: 'The red caught you. Keep steering.',
       ));
     }
@@ -665,6 +805,11 @@ extension InfiniteGameplay on BalanceGame {
       } else if (contact.coin != null) {
         _takeCoin(contact.coin!);
       } else {
+        final shot = contact.lateShot;
+        if (shot != null) {
+          if (shot.cancelled) continue;
+          if (!shot.persistent) shot.consumed = true;
+        }
         if (contact.web != null) contact.web!.consumed = true;
         if (contact.quill != null) contact.quill!.consumed = true;
         if (survival.protected) continue;

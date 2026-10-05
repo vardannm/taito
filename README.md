@@ -244,6 +244,23 @@ their stable names. Cabinet unlocks still use Classic stars.
 
 Infinite tuning: `lib/infinite_difficulty.dart` includes `spiderSpeed` (base chase speed) and `spiderBulletSpeed` (web flight speed), in world units per second. Magnet fields pull rewards toward the ball; their bonuses activate only on physical collection. The Infinite HUD centers the score and combo without a distance readout.
 
+Late Infinite enemies unlock by distance: Bombardier Beetle at 2,600m (marked
+acid lob), Ricochet Cricket at 3,100m (one wall rebound), Moth at 3,600m (paired
+curving dust streams), Scorpion at 4,100m (three needles, 0.2s apart), and Seed
+Spitter at 4,600m (a slow seed splits into three). Introductions wait for a clear
+attack slot; milestones do not spawn an enemy on top of an existing warning.
+Each visitor locks its aim and warns for 1.2s. Only one visitor is active, with
+at most six projectiles; other ranged attacks, snakes, and special hazards wait
+their turn. Breathing and laser-maze sections dismiss visitors immediately.
+Beetles require a clear side-step route through the existing terrain; their acid
+lasts 2s and scrolls with the floor. Flying shots and enemy perches stay in screen
+space. All attacks respect shields, recovery, pause, restart, and rewarded revive.
+Tune `lateEnemyMilestones` and `lateEnemyRestSeconds` in
+`lib/infinite_difficulty.dart`; projectile tuning is in `lib/infinite_progress.dart`.
+The simulation is in `lib/late_enemies.dart` and vector art in
+`lib/late_enemy_painter.dart`. Render the warning/attack gallery with
+`scripts/flutter.ps1 test tool/render_late_enemies.dart`.
+
 Debug launches apply a one-time +10,000 coin credit for testing ball purchases. The credit is saved with the wallet, so spending and restarting do not refill it. Release launches do not apply the credit.
 
 ### 2048 difficulty configuration

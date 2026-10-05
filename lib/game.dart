@@ -6,6 +6,7 @@ import 'spiders.dart';
 import 'spider_web.dart';
 import 'porcupines.dart';
 import 'snakes.dart';
+import 'late_enemies.dart';
 import 'rewards.dart';
 import 'merge.dart';
 import 'infinite_progress.dart';
@@ -263,6 +264,11 @@ class BalanceGame {
   final porcupines = <BoardPorcupine>[];
   final quills = <PorcupineQuill>[];
   final snakes = <BoardSnake>[];
+  LateEnemyEncounter? lateEnemy;
+  bool lateEnemiesEnabled = true;
+  final _introducedLateEnemies = <LateEnemyKind>{};
+  LateEnemyKind? _lastLateEnemy;
+  double _nextLateEnemyTime = 0;
   // Like mazeSectionsEnabled, lets callers isolate the ordinary hazard stream.
   bool snakeEncountersEnabled = true;
   // Only the guided opening replaces generation; contacts and controls remain real.
@@ -368,6 +374,8 @@ class BalanceGame {
       hazard.step(dt, ascentSpeed, cameraOffset: cameraOffset);
     }
     if (specialHazards.isNotEmpty ||
+        lateEnemy != null ||
+        webShots.isNotEmpty ||
         snakes.isNotEmpty ||
         quills.isNotEmpty ||
         porcupines.any((p) => p.charge != null) ||
@@ -608,6 +616,8 @@ class BalanceGame {
     stallTime = _steeringDistance = 0;
     dangerY = math.max(dangerY, ballY + 140);
     survival.recovery = 3;
+    lateEnemy = null;
+    _nextLateEnemyTime = elapsed + InfiniteDifficulty.lateEnemyRestSeconds;
     survival.announce('BACK IN PLAY · 1 heart · 3 seconds of protection');
     message = survival.notice;
     event = null;
@@ -803,6 +813,10 @@ class BalanceGame {
     porcupines.clear();
     quills.clear();
     snakes.clear();
+    lateEnemy = null;
+    _introducedLateEnemies.clear();
+    _lastLateEnemy = null;
+    _nextLateEnemyTime = 0;
     _nextSnakeTime = 0;
     _nextPorcupineY = -2700;
     _nextQuillTime = 0;
@@ -1065,6 +1079,7 @@ class BalanceGame {
     }
     if (infinite) {
       if (!tutorialCourse) {
+        _updateLateEnemies(dt, cameraOffset - (oldScreenY - oldY));
         _updateSnakes(dt);
         _updateSpecialHazards(dt);
       }

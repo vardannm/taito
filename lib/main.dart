@@ -2412,6 +2412,10 @@ class _GameScreenState extends State<GameScreen>
                 'Stay out of the web.',
                 'Classic levels 31–50 have slow patrolling spiders. Enter a marked territory and its spider chases you. Contact ends the run immediately. Each successful target resets the spiders. In Infinite, spiders move slowly and fire aimed webs: move away from the marked line before the slow shot arrives. Web hits cost a heart; shields block them.',
               ),
+              const Text(
+                'Deep in Infinite, five new visitors unlock: the beetle at 2,600m marks an acid landing; the cricket at 3,100m bounces one pellet off a wall; the moth at 3,600m fires curved dust streams; the scorpion at 4,100m fires three needles along a locked line; and the seed spitter at 4,600m splits a seed into three. Watch their aim markers before they fire. These attacks take turns, and stop during breathing stretches and laser mazes.',
+                style: TextStyle(fontSize: 12, height: 1.5),
+              ),
               const SizedBox(height: 20),
               guideRow(
                 '07',

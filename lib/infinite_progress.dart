@@ -46,6 +46,9 @@ abstract final class InfiniteTuning {
   static const quillInterval = 4.8, porcupineSpacing = 2200.0;
   static const snakeUnlockMetres = 1200.0, snakeInterval = 18.0;
   static const snakeSideSpeed = 65.0, snakeDownSpeed = 72.0;
+  static const lateEnemyWarning = 1.2;
+  static const acidRadius = 22.0, acidLifeSeconds = 2.0;
+  static const ricochetSpeed = 240.0, needleSpeed = 210.0;
   static const orbitRadius = 62.0, orbitPeriod = 5.5, orbitLifeSeconds = 6.0;
   static const metresPerPace = 600.0, comboPoints = 50;
   static const maxComboPickupPoints = 300;

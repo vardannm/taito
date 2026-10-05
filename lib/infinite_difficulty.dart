@@ -50,4 +50,10 @@ abstract final class InfiniteDifficulty {
 
   // Speed of the spider's web projectile. Default: 90.
   static const spiderBulletSpeed = 180.0;
+
+  // New enemy introductions are based on distance, never score or equipment.
+  // Beetle, cricket, moth, scorpion, seed spitter, respectively.
+  static const lateEnemyMilestones = [2600.0, 3100.0, 3600.0, 4100.0, 4600.0];
+  // Minimum quiet interval after a visitor leaves (plus up to 5s of variation).
+  static const lateEnemyRestSeconds = 14.0;
 }

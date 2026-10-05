@@ -14,6 +14,7 @@ import 'hazard_painter.dart';
 import 'spider_painter.dart';
 import 'porcupine_painter.dart';
 import 'snake_painter.dart';
+import 'late_enemy_painter.dart';
 import 'cabinet.dart';
 import 'heart_loss_effect.dart';
 import 'pickup_painter.dart';
@@ -447,6 +448,7 @@ class BoardPainter extends CustomPainter {
     paintSpiderWebShots(canvas, game, reducedMotion);
     paintPorcupines(canvas, game, reducedMotion);
     paintSnakes(canvas, game, reducedMotion);
+    paintLateEnemy(canvas, game, reducedMotion);
     if (game.infinite && showHud) {
       // Lives ride in the board's own top-left corner, just clear of the rail.
       canvas.save();

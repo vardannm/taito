@@ -1,5 +1,33 @@
 # Validation record
 
+## Late Infinite enemy roster — 2026-10-06
+
+- Added the Bombardier Beetle (2,600m), Ricochet Cricket (3,100m), Moth
+  (3,600m), Scorpion (4,100m), and Seed Spitter (4,600m). Their attacks use
+  fixed aim, a 1.2-second warning, and distinct vector silhouettes and markers.
+  Beetle acid scrolls with the terrain; flying projectiles remain in screen space.
+- One visitor at a time, at most six projectiles, and a 14-second minimum rest
+  after departure. Introductions take priority over repeats; other ranged
+  hazards and snakes wait. Breathing/maze sections clear visitors. Beetles wait
+  for a clear side-step route through existing terrain. Pause, shields, recovery,
+  lethal hits, restart, and rewarded revive retain their normal behavior.
+- All 62 focused checks passed, including 21 new enemy checks, existing hazard,
+  porcupine, snake and revive coverage, plus the render fixture. Three seeded
+  260-second simulations introduced every kind without overlapping attack
+  systems. Swept collision checks cover rebound corners, curved streams, delayed
+  needles, seed splitting/cancellation, and pickup-versus-damage ordering.
+- Inspected `artifacts/infinite-late-enemies.png`: warning, in-flight, and late
+  attack states for every enemy on light and dark combo boards. Release web build
+  succeeded, including the compiler's Wasm dry run. Static analysis was clean.
+- The full suite initially reported 421 passes and 19 failures. The ordinary
+  hazard scheduler fixture now disables late visitors, consistent with its
+  existing maze/snake isolation, and passes in the focused run. All other 18
+  failures were reproduced against an unchanged HEAD snapshot: existing speed,
+  shield/magnet duration, pickup frequency, web speed, menu/tutorial and viewport
+  expectations. Logs are in `artifacts/late-enemies-regression.log`,
+  `artifacts/late-enemies-baseline.log`, and `artifacts/late-enemies-baseline-ui.log`.
+  No physical-device playtest was performed.
+
 ## Ball and world art refresh — 2026-10-04
 
 - Replaced the nineteen pattern backgrounds with layered vector scenery: reef silhouettes, city skylines, faceted mountains, dunes, crystalline borders, foliage and architectural framing. Revised every base palette and retained Singularity's absence of a black-hole disk.
