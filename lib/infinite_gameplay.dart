@@ -59,9 +59,7 @@ extension InfiniteGameplay on BalanceGame {
   }
 
   void _updateLateEnemies(double dt, double scrollDistance) {
-    if (!lateEnemiesEnabled ||
-        mazeSection ||
-        section == InfiniteSection.breath) {
+    if (!lateEnemiesEnabled || mazeSection) {
       if (lateEnemy != null) {
         _nextLateEnemyTime = elapsed + InfiniteDifficulty.lateEnemyRestSeconds;
       }
@@ -85,6 +83,12 @@ extension InfiniteGameplay on BalanceGame {
         _nextQuillTime = math.max(_nextQuillTime, elapsed + 1);
         _nextSnakeTime = math.max(_nextSnakeTime, elapsed + 1);
       }
+      return;
+    }
+    // Recovery blocks new visitors, but never erases one that has already
+    // announced its attack. Finish its warning, projectiles, and normal exit.
+    if (section == InfiniteSection.breath) {
+      _nextLateEnemyTime = math.max(_nextLateEnemyTime, elapsed + 2);
       return;
     }
     if (elapsed < _nextLateEnemyTime ||
@@ -443,6 +447,9 @@ extension InfiniteGameplay on BalanceGame {
     final climbed = maxHeight / 10;
     if (!mazeSection) {
       if (!mazeSectionsEnabled || climbed < _nextMazeMetres) return;
+      // A maze clears ranged attacks. Wait for the current visitor to leave
+      // rather than cancelling its warning or deleting live projectiles.
+      if (lateEnemy != null) return;
       _mazeEndMetres = climbed + InfiniteTuning.mazeSectionMetres;
       _mazeSectionTime = 0;
       _lastGateY = 90;

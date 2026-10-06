@@ -251,7 +251,8 @@ Spitter at 4,600m (a slow seed splits into three). Introductions wait for a clea
 attack slot; milestones do not spawn an enemy on top of an existing warning.
 Each visitor locks its aim and warns for 1.2s. Only one visitor is active, with
 at most six projectiles; other ranged attacks, snakes, and special hazards wait
-their turn. Breathing and laser-maze sections dismiss visitors immediately.
+their turn. Breathing sections block new visitors while active attacks finish;
+laser-maze sections wait for the current visitor's attack and exit to complete.
 Beetles require a clear side-step route through the existing terrain; their acid
 lasts 2s and scrolls with the floor. Flying shots and enemy perches stay in screen
 space. All attacks respect shields, recovery, pause, restart, and rewarded revive.
@@ -260,6 +261,12 @@ Tune `lateEnemyMilestones` and `lateEnemyRestSeconds` in
 The simulation is in `lib/late_enemies.dart` and vector art in
 `lib/late_enemy_painter.dart`. Render the warning/attack gallery with
 `scripts/flutter.ps1 test tool/render_late_enemies.dart`.
+The beetle steps and opens its shell, the cricket crouches and kicks on firing,
+the moth beats its patterned wings, the scorpion curls its tail and claws, and
+the seed spitter sways its leaves and recoils. Poses follow the encounter clock,
+with fixed aim and collision geometry. Reduced motion keeps a steady pose.
+Warning dashes and insect legs use batched paths with no blur or extra layers.
+`tool/render_late_enemy_motion.dart` generates an enlarged animation preview.
 
 Debug launches apply a one-time +10,000 coin credit for testing ball purchases. The credit is saved with the wallet, so spending and restarting do not refill it. Release launches do not apply the credit.
 

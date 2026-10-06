@@ -221,9 +221,9 @@ void main() {
   });
 
   test(
-    'pause freezes warnings and projectiles; reset, breath, maze clear visitors',
+    'pause freezes warnings and projectiles; reset and disabling clear visitors',
     () {
-      for (final cleanup in ['reset', 'breath', 'maze', 'disabled']) {
+      for (final cleanup in ['reset', 'disabled']) {
         final g = run();
         final e = encounter(LateEnemyKind.cricket);
         g.lateEnemy = e;
@@ -238,11 +238,6 @@ void main() {
         switch (cleanup) {
           case 'reset':
             g.start(gameMode: GameMode.classic);
-          case 'breath':
-            g.maxHeight = 1800;
-          case 'maze':
-            g.mazeSectionsEnabled = true;
-            g.maxHeight = 8000;
           case 'disabled':
             g.lateEnemiesEnabled = false;
         }
@@ -251,6 +246,46 @@ void main() {
       }
     },
   );
+
+  test('every enemy finishes its full attack across a recovery boundary', () {
+    for (final kind in LateEnemyKind.values) {
+      final g = run()..survival.shield = 100;
+      final e = encounter(kind);
+      g.lateEnemy = e;
+      advance(g, .2);
+      // Enter the recovery stretch while the warning is still visible.
+      g.maxHeight = 1800;
+      var fired = false;
+      while (!e.expired) {
+        expect(g.lateEnemy, same(e), reason: kind.name);
+        fired |= e.shots.any((s) => s.visible);
+        advance(g, 1 / 120);
+      }
+      expect(fired, isTrue, reason: kind.name);
+      expect(g.lateEnemy, isNull);
+      advance(g, 1);
+      expect(g.lateEnemy, isNull);
+    }
+  });
+
+  test('an approaching laser maze waits for the enemy attack and exit', () {
+    for (final kind in LateEnemyKind.values) {
+      final g = run()..survival.shield = 100;
+      final e = encounter(kind);
+      g.lateEnemy = e;
+      advance(g, .2);
+      g.mazeSectionsEnabled = true;
+      g.maxHeight = 8000;
+      while (!e.expired) {
+        expect(g.lateEnemy, same(e), reason: kind.name);
+        expect(g.mazeSection, isFalse, reason: kind.name);
+        advance(g, 1 / 120);
+      }
+      advance(g, 1 / 120);
+      expect(g.mazeSection, isTrue, reason: kind.name);
+      expect(g.lateEnemy, isNull);
+    }
+  });
 
   for (final kind in LateShotKind.values.where((k) => k != LateShotKind.bomb)) {
     test('$kind respects hearts, shields, recovery and lethal damage', () {
@@ -341,9 +376,15 @@ void main() {
         double endedAt = -100;
         for (var i = 0; i < 120 * 260; i++) {
           g.stallTime = 0;
+          // Pickups replace shield duration; keep this scheduler-only run
+          // protected even after it collects a normal eight-second shield.
+          g.survival.shield = 2000;
           g.step(1 / 120);
           final e = g.lateEnemy;
-          if (previous != null && e == null) endedAt = g.elapsed;
+          if (previous != null && e == null) {
+            expect(previous.expired, isTrue, reason: previous.kind.name);
+            endedAt = g.elapsed;
+          }
           if (e != null) {
             if (e != previous) {
               expect(g.metres, greaterThanOrEqualTo(e.kind.unlockMetres));

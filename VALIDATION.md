@@ -1,5 +1,62 @@
 # Validation record
 
+## Animated late enemy artwork — 2026-10-06
+
+- Added stepping legs, antenna sway, breathing, and shell opening to the
+  beetle; crouch/kick anticipation to the cricket; stronger patterned wingbeats
+  and hover to the moth; leg steps, curling tail, and claw movement to the
+  scorpion; leaf sway and spit recoil to the seed spitter. Firing recoil follows
+  actual projectile delays. Snake, spider, and porcupine artwork is unchanged.
+- Movement uses the existing encounter age, small vector transforms, and
+  batched paths, with reused body paints. No new ticker, simulation state,
+  blur, or offscreen layer. Aim and hitboxes stay fixed. Reduced-motion raster
+  checks confirm steady character poses while the normal poses visibly change.
+- All 34 enemy/render/gallery checks passed. Static analysis of the changed
+  renderer, render tests, and preview tool found no issues. Inspected full-board
+  renders on light/dark worlds and enlarged anticipation/firing poses.
+- Identical 72-frame draw-call samples: beetle 51→36, cricket 60→27, moth
+  103→52, scorpion 74→37, seed spitter 73→31. These include warnings and shots;
+  each sample has zero blur/layer passes. Hardware FPS is not measured because
+  the Xiaomi is disconnected.
+- Preview: `artifacts/infinite-enemy-motion.gif`. Logs:
+  `artifacts/android-crash/enemy-animation-tests.txt`,
+  `enemy-animation-preview.txt`, and `enemy-original-draw-budget.txt`.
+- ARM64 release APK built successfully with both earlier fixes included.
+  Installation of this animation update awaits reconnection of the phone.
+
+## Late enemies finish their attacks — 2026-10-06
+
+- Recovery-section transitions previously discarded active visitors during
+  their warning or attack. Pending laser mazes could interrupt them too.
+  Active visitors now finish their warning, projectiles, and normal exit;
+  recovery blocks new visitors and an approaching maze waits for completion.
+- Reproduced the recovery interruption with a failing regression check before
+  the fix. All 67 focused enemy, maze, snake, hazard, porcupine, and revive
+  checks pass afterward. Boundary checks cover all five enemies; three seeded
+  260-second runs require every departing encounter to have fully expired.
+- The long-run fixture refreshes its test shield each tick because collecting
+  a normal shield replaces its artificial duration. This keeps scheduler
+  verification independent of pickup placement and survivability.
+- Test log: `artifacts/android-crash/enemy-regression-tests.txt`.
+- Static analysis found no issues. The ARM64 release APK rebuilt successfully
+  with the startup keep rule included. The phone disconnected before this
+  update could be installed, so physical gameplay verification remains pending.
+
+## Android release startup crash — 2026-10-06
+
+- Reproduced the immediate startup crash on a USB-connected Redmi Note 8 Pro
+  running Android 11. AndroidX Startup failed to initialize WorkManager with
+  `Failed to create an instance of androidx.work.impl.WorkDatabase`.
+- The original R8 usage report listed `WorkDatabase_Impl`'s public no-argument
+  constructor as removed. Added a targeted keep rule in
+  `android/app/proguard-rules.pro`, which Flutter includes in release builds.
+- Built the ARM64 release APK with shrinking enabled, confirmed its mapping
+  retains the constructor, and installed it with `adb install -r` without
+  clearing app data. Launch succeeded; a second force-stop/relaunch also
+  remained running with no crash entries for either new process.
+- Device logs are saved in `artifacts/android-crash/`. This verifies startup;
+  extended gameplay and frame-rate testing were not performed.
+
 ## Late Infinite enemy roster — 2026-10-06
 
 - Added the Bombardier Beetle (2,600m), Ricochet Cricket (3,100m), Moth

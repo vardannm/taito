@@ -38,11 +38,14 @@ void paintLateEnemy(Canvas canvas, BalanceGame game, bool reducedMotion) {
   canvas.clipRect(Rect.fromLTRB(24, game.visibleTop + 42, 336, 537));
 
   void dottedPath(LateEnemyShot shot, double from, double until, Color color) {
+    final path = Path();
     for (var t = from; t < until; t += .075) {
       final a = _offset(shot.positionAt(t));
       final b = _offset(shot.positionAt(math.min(t + .03, until)));
-      canvas.drawLine(a, b, _stroke(color, 1.25));
+      path.moveTo(a.dx, a.dy);
+      path.lineTo(b.dx, b.dy);
     }
+    canvas.drawPath(path, _stroke(color, 1.25));
   }
 
   if (enemy.warning) {
@@ -196,12 +199,13 @@ void paintLateEnemy(Canvas canvas, BalanceGame game, bool reducedMotion) {
   }
   canvas.restore();
 
-  // Readable silhouettes with a contrasting keyline, including bright combo
-  // worlds. Only the entrance/wing flutter animates; hitboxes never pulse.
+  // Pose is derived from the encounter clock: no extra tickers, particles,
+  // simulation objects, blur, or offscreen layers. Motion stays near the fixed
+  // perch; all aim, warnings, projectile paths, and collision geometry stay put.
   canvas.save();
   canvas.translate(origin.dx, origin.dy);
   canvas.scale(.7 + .3 * enemy.presence);
-  final dark = const Color(0xFF20282A);
+  const dark = Color(0xFF20282A);
   final shell = switch (enemy.kind) {
     LateEnemyKind.beetle => const Color(0xFF688B24),
     LateEnemyKind.cricket => const Color(0xFFC08A3B),
@@ -220,108 +224,184 @@ void paintLateEnemy(Canvas canvas, BalanceGame game, bool reducedMotion) {
       _stroke(accent, 2),
     );
   }
+  // Reuse paints throughout this single visitor instead of allocating a paint
+  // per leg, wing marking, or shell detail.
+  final fill = Paint();
+  final keyline = _stroke(ink, 2.6);
+  final detail = _stroke(dark, 1);
+  final limbOutline = _stroke(ink, 1);
+  final limbFill = _stroke(shell, 1);
   void outlined(Path p, Color color) {
-    canvas.drawPath(p, _stroke(ink, 2.6));
-    canvas.drawPath(p, Paint()..color = color);
-    canvas.drawPath(p, _stroke(dark, 1));
+    canvas.drawPath(p, keyline);
+    canvas.drawPath(p, fill..color = color);
+    canvas.drawPath(p, detail);
   }
 
   void oval(Rect r, Color color) => outlined(Path()..addOval(r), color);
   void limb(List<Offset> points, double width, Color color) {
     final p = Path()..addPolygon(points, false);
-    canvas.drawPath(p, _stroke(ink, width + 1.8));
-    canvas.drawPath(p, _stroke(color, width));
+    canvas.drawPath(p, limbOutline..strokeWidth = width + 1.8);
+    canvas.drawPath(
+      p,
+      limbFill
+        ..color = color
+        ..strokeWidth = width,
+    );
   }
+
+  void legs(Path path, double width, Color color) {
+    canvas.drawPath(path, limbOutline..strokeWidth = width + 1.8);
+    canvas.drawPath(
+      path,
+      limbFill
+        ..color = color
+        ..strokeWidth = width,
+    );
+  }
+
+  final time = enemy.age;
+  final motion = reducedMotion ? 0.0 : 1.0;
+  final breathe = math.sin(time * 3.4) * motion;
+  final sway = math.sin(time * 5.2) * motion;
+  final charge = enemy.warning ? enemy.warningProgress * motion : 0.0;
+  // One short recoil per actual shot, including the scorpion's staggered burst.
+  var recoil = 0.0;
+  if (!reducedMotion) {
+    for (final shot in enemy.shots) {
+      if (shot.kind == LateShotKind.acid || shot.parent != null) continue;
+      final since = time - shot.delay;
+      if (since >= 0 && since < .32) {
+        recoil = math.max(recoil, math.sin(since / .32 * math.pi));
+      }
+    }
+  }
+  final facing =
+      (math.atan2(target.dy - origin.dy, target.dx - origin.dx) - math.pi / 2)
+          .clamp(-.7, .7);
+  canvas.rotate(facing * .35 + sway * .025);
+  canvas.translate(0, -recoil * 2 + breathe * .7);
 
   switch (enemy.kind) {
     case LateEnemyKind.beetle:
+      final feet = Path();
       for (final side in [-1.0, 1.0]) {
         for (var i = 0; i < 3; i++) {
-          limb(
-            [
-              Offset(side * 8, -6 + i * 7.0),
-              Offset(side * 17, -9 + i * 9.0),
-              Offset(side * 21, -4 + i * 8.0),
-            ],
-            2,
-            dark,
-          );
+          final stride = math.sin(time * 10 + i * 2.1 + side * 1.6) * motion;
+          feet.moveTo(side * 8, -6 + i * 7.0);
+          feet.lineTo(side * (17 + stride), -9 + i * 9.0 + stride * 2);
+          feet.lineTo(side * (21 - stride), -4 + i * 8.0 + stride * 3);
         }
-      }
-      oval(const Rect.fromLTWH(-12, -13, 24, 30), shell);
-      canvas.drawLine(
-        const Offset(0, -10),
-        const Offset(0, 14),
-        _stroke(dark, 1.5),
-      );
-      oval(const Rect.fromLTWH(-8, 8, 16, 12), dark);
-      for (final side in [-1.0, 1.0]) {
-        oval(
-          Rect.fromCenter(center: Offset(side * 6, -2), width: 5, height: 15),
-          enemy.warning ? accent : const Color(0xFF9DC445),
-        );
-      }
-    case LateEnemyKind.cricket:
-      for (final side in [-1.0, 1.0]) {
         limb(
           [
-            Offset(side * 7, 3),
-            Offset(side * 20, -16),
-            Offset(side * 24, 14),
-            Offset(side * 15, 19),
+            Offset(side * 4, 15),
+            Offset(side * (10 + sway), 23),
+            Offset(side * (15 + sway * 2), 22 + breathe),
           ],
-          3,
-          shell,
+          1,
+          dark,
         );
+      }
+      legs(feet, 2, dark);
+      canvas.scale(1 + breathe * .025, 1 + charge * .04 - recoil * .05);
+      oval(const Rect.fromLTWH(-12, -13, 24, 30), shell);
+      oval(const Rect.fromLTWH(-8, 8, 16, 12), dark);
+      for (final side in [-1.0, 1.0]) {
+        canvas.save();
+        canvas.translate(side * charge * 1.5, 0);
+        canvas.rotate(side * (.04 * breathe + .06 * charge));
+        oval(
+          Rect.fromCenter(center: Offset(side * 6, -2), width: 9, height: 23),
+          enemy.warning ? accent : const Color(0xFF9DC445),
+        );
+        canvas.drawArc(
+          Rect.fromLTWH(side * 6 - 3, -10, 6, 14),
+          -2.4,
+          1.8,
+          false,
+          _stroke(Colors.white.withAlpha(170), 1.2),
+        );
+        canvas.restore();
+      }
+    case LateEnemyKind.cricket:
+      final crouch = charge * 2.5 - recoil * 3;
+      final feet = Path();
+      for (final side in [-1.0, 1.0]) {
+        final flex = sway * side + charge * 2 - recoil * 4;
+        feet.moveTo(side * 7, 3);
+        feet.lineTo(side * (20 - flex), -16 + crouch);
+        feet.lineTo(side * (24 + flex), 14);
+        feet.lineTo(side * (15 + flex), 19 - recoil * 2);
         limb(
-          [Offset(side * 5, 12), Offset(side * 11, 24), Offset(side * 16, 26)],
+          [
+            Offset(side * 5, 12),
+            Offset(side * 11, 24 + sway * side),
+            Offset(side * 16, 26 + sway * side),
+          ],
           1.2,
           dark,
         );
         limb(
           [
             Offset(side * 4, -11),
-            Offset(side * 9, -24),
-            Offset(side * 16, -29),
+            Offset(side * (9 + sway), -24),
+            Offset(side * (16 + sway * 3), -29 + breathe),
           ],
           1,
           shell,
         );
       }
+      legs(feet, 3, shell);
+      canvas.translate(0, crouch * .45);
       oval(const Rect.fromLTWH(-7, -15, 14, 32), shell);
       canvas.drawLine(
         const Offset(0, -9),
         const Offset(0, 12),
         _stroke(dark, 1),
       );
+      canvas.drawArc(
+        const Rect.fromLTWH(-5, -12, 10, 24),
+        -2.4,
+        1.7,
+        false,
+        _stroke(const Color(0xFFF2DCA3), 1.5),
+      );
       oval(const Rect.fromLTWH(-8, 5, 16, 12), const Color(0xFFDEBA72));
     case LateEnemyKind.moth:
-      final flutter = reducedMotion ? 1.0 : 1 + .06 * math.sin(enemy.age * 9);
+      final flutter = reducedMotion ? 1.0 : .72 + .28 * math.cos(time * 14);
+      canvas.translate(0, math.sin(time * 4.2) * 2.5 * motion);
       for (final side in [-1.0, 1.0]) {
+        canvas.save();
+        canvas.scale(flutter, 1);
+        canvas.rotate(side * sway * .035);
         final wing = Path()
           ..moveTo(0, -6)
-          ..cubicTo(side * 34 * flutter, -33, side * 35, 6, side * 12, 9)
+          ..cubicTo(side * 34, -33, side * 35, 6, side * 12, 9)
           ..cubicTo(side * 28, 22, side * 4, 27, 0, 10)
           ..close();
         outlined(wing, shell);
+        final veins = Path()
+          ..moveTo(side * 3, -5)
+          ..quadraticBezierTo(side * 12, -18, side * 25, -16)
+          ..moveTo(side * 3, 7)
+          ..quadraticBezierTo(side * 12, 12, side * 17, 17);
+        canvas.drawPath(veins, _stroke(const Color(0xFFDEC3EB), 1.3));
         oval(Rect.fromCircle(center: Offset(side * 16, -3), radius: 5), dark);
         canvas.drawCircle(Offset(side * 16, -3), 2.3, Paint()..color = accent);
-        limb([Offset(side * 2, -10), Offset(side * 8, -21)], 1, shell);
+        canvas.restore();
+        limb([Offset(side * 2, -10), Offset(side * (8 + sway), -21)], 1, shell);
       }
       oval(const Rect.fromLTWH(-4, -13, 8, 32), const Color(0xFFE8CEEF));
     case LateEnemyKind.scorpion:
+      final feet = Path();
       for (final side in [-1.0, 1.0]) {
         for (var i = 0; i < 3; i++) {
-          limb(
-            [
-              Offset(side * 6, -4 + i * 5.0),
-              Offset(side * 15, -8 + i * 8.0),
-              Offset(side * 19, -5 + i * 8.0),
-            ],
-            1.5,
-            shell,
-          );
+          final stride = math.sin(time * 8 + i * 2 + side * 1.6) * motion;
+          feet.moveTo(side * 6, -4 + i * 5.0);
+          feet.lineTo(side * 15, -8 + i * 8.0 + stride * 1.5);
+          feet.lineTo(side * (19 + stride), -5 + i * 8.0 + stride * 2);
         }
+        canvas.save();
+        canvas.rotate(side * (.06 * sway + .12 * charge - .16 * recoil));
         limb(
           [Offset(side * 6, 5), Offset(side * 19, 13), Offset(side * 17, 24)],
           3,
@@ -335,7 +415,13 @@ void paintLateEnemy(Canvas canvas, BalanceGame game, bool reducedMotion) {
           ..lineTo(side * 12, 19)
           ..close();
         outlined(claw, shell);
+        canvas.restore();
       }
+      legs(feet, 1.5, shell);
+      canvas.save();
+      canvas.translate(0, -4);
+      canvas.rotate(.14 * sway + .2 * charge - .28 * recoil);
+      canvas.translate(0, 4);
       final tail = Path()
         ..moveTo(0, -4)
         ..cubicTo(-20, -19, 10, -36, 14, -18);
@@ -349,6 +435,7 @@ void paintLateEnemy(Canvas canvas, BalanceGame game, bool reducedMotion) {
           ..close(),
         enemy.warning ? accent : shell,
       );
+      canvas.restore();
       oval(const Rect.fromLTWH(-8, -10, 16, 28), shell);
       for (var i = 0; i < 3; i++) {
         canvas.drawLine(
@@ -359,6 +446,10 @@ void paintLateEnemy(Canvas canvas, BalanceGame game, bool reducedMotion) {
       }
     case LateEnemyKind.seedSpitter:
       for (final side in [-1.0, 1.0]) {
+        canvas.save();
+        canvas.translate(0, 10);
+        canvas.rotate(side * (.09 * sway + .12 * charge - .1 * recoil));
+        canvas.translate(0, -10);
         outlined(
           Path()
             ..moveTo(0, 10)
@@ -368,7 +459,12 @@ void paintLateEnemy(Canvas canvas, BalanceGame game, bool reducedMotion) {
           shell,
         );
         limb([Offset.zero, Offset(side * 14, 15)], 1, dark);
+        canvas.restore();
       }
+      canvas.scale(
+        1 + breathe * .025 + charge * .07 - recoil * .06,
+        1 - charge * .035 + recoil * .09,
+      );
       oval(const Rect.fromLTWH(-12, -18, 24, 30), shell);
       for (final side in [-1.0, 1.0]) {
         canvas.drawArc(
@@ -380,7 +476,10 @@ void paintLateEnemy(Canvas canvas, BalanceGame game, bool reducedMotion) {
         );
       }
       oval(const Rect.fromLTWH(-8, 0, 16, 18), const Color(0xFF82C398));
-      oval(const Rect.fromLTWH(-5, 7, 10, 8), dark);
+      oval(
+        Rect.fromLTWH(-5 - charge, 7, 10 + charge * 2, 8 + charge * 2),
+        dark,
+      );
   }
   if (enemy.kind != LateEnemyKind.seedSpitter) {
     for (final side in [-1.0, 1.0]) {
