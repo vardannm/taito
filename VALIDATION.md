@@ -1,5 +1,22 @@
 # Validation record
 
+## Scorpion laser attack — 2026-10-07
+
+- Replaced the three-needle burst with one fixed laser: a dashed 1.2-second
+  warning followed by a continuous 1.5-second beam to the board edge. The
+  renderer and collision use the same finite segment; camera scrolling and
+  player movement do not retarget it. Hint and guide text describe the laser.
+- Swept capsule contact handles fast crossings, round end caps, and partial
+  activation/expiration ticks. Laser contact does not consume the beam; shields
+  and recovery protect the player while the beam remains visible. Acid alone
+  remains attached to scrolling terrain.
+- All 56 focused laser, late enemy, rendering, director, maze, and revive
+  checks passed. Rendering remains within the existing 65-call budget with
+  zero blur/offscreen layers. Inspected `artifacts/scorpion-laser-preview.png`.
+- ARM64 release APK built successfully. Physical playtesting is pending because
+  the phone is disconnected. Test log:
+  `artifacts/android-crash/scorpion-laser-tests.txt`.
+
 ## Animated late enemy artwork — 2026-10-06
 
 - Added stepping legs, antenna sway, breathing, and shell opening to the

@@ -59,13 +59,17 @@ extension InfiniteGameplay on BalanceGame {
   }
 
   void _updateLateEnemies(double dt, double scrollDistance) {
-    if (!lateEnemiesEnabled || mazeSection) {
+    if (mazeSection || (!lateEnemiesEnabled && !snakeEncountersEnabled)) {
       if (lateEnemy != null) {
-        _nextLateEnemyTime = elapsed + InfiniteDifficulty.lateEnemyRestSeconds;
+        enemyDirector.rest(elapsed, metres.toDouble());
       }
       lateEnemy = null;
-      _nextLateEnemyTime = math.max(_nextLateEnemyTime, elapsed + 2);
+      enemyDirector.deferUntil(elapsed + 2);
       return;
+    }
+    if (!lateEnemiesEnabled && lateEnemy != null) {
+      lateEnemy = null;
+      enemyDirector.rest(elapsed, metres.toDouble());
     }
     final active = lateEnemy;
     if (active != null) {
@@ -74,24 +78,20 @@ extension InfiniteGameplay on BalanceGame {
       // resolved before the visitor is discarded.
       if (active.expired) {
         lateEnemy = null;
-        _nextLateEnemyTime =
-            elapsed +
-            InfiniteDifficulty.lateEnemyRestSeconds +
-            _random.nextDouble() * 5;
+        enemyDirector.rest(elapsed, metres.toDouble());
         _nextHazardTime = math.max(_nextHazardTime, elapsed + 1);
         _nextWebTime = math.max(_nextWebTime, elapsed + 1);
         _nextQuillTime = math.max(_nextQuillTime, elapsed + 1);
-        _nextSnakeTime = math.max(_nextSnakeTime, elapsed + 1);
       }
       return;
     }
     // Recovery blocks new visitors, but never erases one that has already
     // announced its attack. Finish its warning, projectiles, and normal exit.
     if (section == InfiniteSection.breath) {
-      _nextLateEnemyTime = math.max(_nextLateEnemyTime, elapsed + 2);
+      enemyDirector.deferUntil(elapsed + 2);
       return;
     }
-    if (elapsed < _nextLateEnemyTime ||
+    if (elapsed < enemyDirector.nextEncounterAt ||
         survival.recovery > 0 ||
         specialHazards.isNotEmpty ||
         snakes.isNotEmpty ||
@@ -99,20 +99,29 @@ extension InfiniteGameplay on BalanceGame {
         quills.isNotEmpty ||
         porcupines.any((p) => p.charge != null))
       return;
-    final unlocked = LateEnemyKind.values
-        .where((kind) => metres >= kind.unlockMetres)
-        .toList();
-    if (unlocked.isEmpty) return;
-    final fresh = unlocked.where(
-      (kind) => !_introducedLateEnemies.contains(kind),
+    final candidates = <EncounterEnemy>[
+      if (snakeEncountersEnabled) EncounterEnemy.snake,
+      if (lateEnemiesEnabled)
+        for (final kind in LateEnemyKind.values)
+          if (kind != LateEnemyKind.beetle ||
+              (metres >= enemyDirector.unlockMetres(kind.encounterKind) &&
+                  _hasBeetleEscape()))
+            kind.encounterKind,
+    ];
+    final selected = enemyDirector.choose(
+      metres: metres.toDouble(),
+      elapsed: elapsed,
+      candidates: candidates,
     );
-    final choices = unlocked.where((kind) => kind != _lastLateEnemy).toList();
-    final kind = fresh.isNotEmpty
-        ? fresh.first
-        : choices.isEmpty
-        ? unlocked.first
-        : choices[_random.nextInt(choices.length)];
-    if (kind == LateEnemyKind.beetle && !_hasBeetleEscape()) return;
+    if (selected == null) return;
+    if (selected == EncounterEnemy.snake) {
+      _spawnSnakeEncounter();
+      if (enemyDirector.spawned(selected, elapsed)) {
+        survival.announce('SNAKE · Dodge its slithering body');
+      }
+      return;
+    }
+    final kind = LateEnemyKind.values[selected.index - 1];
     final targetY = screenY(ballY).clamp(visibleTop + 160, 500.0);
     // Enter on the farther rail, well above the ball. The moth uses the center
     // so both curved streams have room to spread without crossing the rails.
@@ -129,8 +138,7 @@ extension InfiniteGameplay on BalanceGame {
       origin: origin,
       target: (x: ballX.clamp(50.0, 310.0), y: targetY),
     );
-    _lastLateEnemy = kind;
-    if (_introducedLateEnemies.add(kind)) {
+    if (enemyDirector.spawned(selected, elapsed)) {
       survival.announce('${kind.name} · ${kind.hint}');
     }
   }
@@ -159,23 +167,17 @@ extension InfiniteGameplay on BalanceGame {
     if (!snakeEncountersEnabled ||
         mazeSection ||
         section == InfiniteSection.breath) {
+      if (snakes.isNotEmpty) enemyDirector.rest(elapsed, metres.toDouble());
       snakes.clear();
-      _nextSnakeTime = math.max(_nextSnakeTime, elapsed + 2);
+      enemyDirector.deferUntil(elapsed + 2);
       return;
     }
     for (final snake in snakes) {
       snake.step(dt);
     }
-    if (metres < InfiniteTuning.snakeUnlockMetres ||
-        section != InfiniteSection.encounter ||
-        elapsed < _nextSnakeTime ||
-        lateEnemy != null ||
-        snakes.isNotEmpty ||
-        specialHazards.isNotEmpty ||
-        webShots.isNotEmpty ||
-        quills.isNotEmpty ||
-        porcupines.any((p) => p.charge != null))
-      return;
+  }
+
+  void _spawnSnakeEncounter() {
     final fromLeft = _random.nextBool();
     snakes.add(
       BoardSnake(
@@ -188,8 +190,6 @@ extension InfiniteGameplay on BalanceGame {
         variant: _random.nextInt(3),
       ),
     );
-    _nextSnakeTime =
-        elapsed + InfiniteTuning.snakeInterval + _random.nextDouble() * 5;
   }
 
   void _spawnInfinitePorcupine(
@@ -423,7 +423,7 @@ extension InfiniteGameplay on BalanceGame {
       survival.nextShieldY -= InfiniteTuning.shieldSpacing;
     }
     while (survival.nextHeartY >= ahead) {
-      if (lives < InfiniteTuning.maxLives)
+      if (lives < infiniteMaxLives)
         spawn(InfiniteItemKind.heart, survival.nextHeartY);
       survival.nextHeartY -=
           InfiniteTuning.heartSpacing +
@@ -507,17 +507,17 @@ extension InfiniteGameplay on BalanceGame {
           capped ? 'MAX COMBO  +$points' : 'COMBO x${survival.combo}  +$points',
         );
       case InfiniteItemKind.shield:
-        survival.shield = InfiniteTuning.shieldSeconds;
+        survival.shield = shieldDuration;
         survival.announce(
-          'SHIELD · ${InfiniteTuning.shieldSeconds} seconds of invincibility',
+          'SHIELD · ${shieldDuration} seconds of invincibility',
         );
       case InfiniteItemKind.magnet:
-        survival.magnet = InfiniteTuning.magnetSeconds;
+        survival.magnet = magnetDuration;
         survival.announce(
-          'MAGNET · ${InfiniteTuning.magnetSeconds} seconds of nearby rewards',
+          'MAGNET · ${magnetDuration} seconds of nearby rewards',
         );
       case InfiniteItemKind.heart:
-        if (lives < InfiniteTuning.maxLives) {
+        if (lives < infiniteMaxLives) {
           lives++;
           survival.announce('HEART RESTORED');
         } else {

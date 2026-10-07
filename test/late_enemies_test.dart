@@ -6,6 +6,7 @@ import 'package:balance_arcade/infinite_progress.dart';
 import 'package:balance_arcade/late_enemies.dart';
 import 'package:balance_arcade/porcupines.dart';
 import 'package:balance_arcade/spider_web.dart';
+import 'package:balance_arcade/encounter_director.dart';
 
 LateEnemyEncounter encounter(LateEnemyKind kind) => LateEnemyEncounter(
   kind: kind,
@@ -37,27 +38,34 @@ LateEnemyShot stationary(LateShotKind kind, double x, double y) =>
     );
 
 void main() {
-  test('milestones introduce all five after the existing late hazards', () {
-    expect(LateEnemyKind.values.map((k) => k.unlockMetres), [
-      2600,
-      3100,
-      3600,
-      4100,
-      4600,
-    ]);
-    final game = run()..maxHeight = 24000;
+  test('points cannot introduce enemies before the first distance slot', () {
+    final game = run()..maxHeight = 7000;
     game.survival.points = 10000000;
     advance(game, .3);
     expect(game.lateEnemy, isNull);
   });
 
   test('beetle waits when terrain blocks both marked-circle escape routes', () {
-    final blocked = run()..maxHeight = 27800;
+    BalanceGame beetleFirst() {
+      for (var seed = 0; seed < 100; seed++) {
+        final g = BalanceGame(seed: seed)..start(gameMode: GameMode.infinite);
+        if (g.enemyDirector.unlockMetres(EncounterEnemy.beetle) < 1000) {
+          return g
+            ..mazeSectionsEnabled = false
+            ..snakeEncountersEnabled = false
+            ..maxHeight = 10800
+            ..board.clear();
+        }
+      }
+      throw StateError('No beetle-first fixture');
+    }
+
+    final blocked = beetleFirst();
     final turnY = blocked.ballY - blocked.ascentSpeed * .65;
     blocked.board.addAll([Hole(110, turnY), Hole(250, turnY)]);
     blocked.step(1 / 120);
     expect(blocked.lateEnemy, isNull);
-    final clear = run()..maxHeight = 27800;
+    final clear = beetleFirst();
     clear.step(1 / 120);
     expect(clear.lateEnemy?.kind, LateEnemyKind.beetle);
   });
@@ -163,19 +171,29 @@ void main() {
   });
 
   test(
-    'scorpion needles fire 0.2s apart along exactly the same locked line',
+    'scorpion warns then fires one fixed continuous laser to the board edge',
     () {
       final e = encounter(LateEnemyKind.scorpion);
-      expect(e.shots.length, 3);
-      expect(e.shots[1].delay - e.shots[0].delay, closeTo(.2, 1e-8));
-      expect(e.shots[2].delay - e.shots[1].delay, closeTo(.2, 1e-8));
-      e.step(InfiniteTuning.lateEnemyWarning + .1);
-      expect(e.shots.where((s) => s.visible).length, 1);
-      e.step(.2);
-      expect(e.shots.where((s) => s.visible).length, 2);
-      e.step(.2);
-      expect(e.shots.where((s) => s.visible).length, 3);
-      expect(e.shots.map((s) => s.velocity).toSet().length, 1);
+      final beam = e.shots.single;
+      expect(beam.kind, LateShotKind.laser);
+      expect(beam.persistent, isTrue);
+      expect(beam.life, InfiniteTuning.scorpionLaserSeconds);
+      e.step(InfiniteTuning.lateEnemyWarning - .01);
+      expect(beam.visible, isFalse);
+      expect(beam.contact(180, 420, 180, 420), isNull);
+      final endpoint = beam.beamEnd!;
+      expect(endpoint.y, 537);
+      e.step(.02, scrollDistance: 100);
+      expect(beam.visible, isTrue);
+      expect(beam.contact(180, 420, 180, 420), closeTo(.5, 1e-8));
+      e.step(.2, scrollDistance: 100);
+      expect(beam.beamEnd, endpoint);
+      expect(beam.position, e.origin);
+      expect(beam.contact(180, 420, 180, 420), 0);
+      e.step(beam.life);
+      expect(beam.visible, isFalse);
+      e.step(.01);
+      expect(beam.contact(180, 420, 180, 420), isNull);
     },
   );
 
@@ -202,7 +220,7 @@ void main() {
 
   test('activation and expiry fractions cannot cause retroactive damage', () {
     final shot = LateEnemyShot(
-      kind: LateShotKind.needle,
+      kind: LateShotKind.shard,
       origin: (x: 100, y: 100),
       velocity: (x: 100, y: 0),
       delay: 1,
@@ -320,7 +338,7 @@ void main() {
         final e = encounter(LateEnemyKind.scorpion);
         e.shots
           ..clear()
-          ..add(stationary(LateShotKind.needle, 180, 350));
+          ..add(stationary(LateShotKind.shard, 180, 350));
         g.lateEnemy = e;
         g.survival.items.add(
           InfiniteItem(InfiniteItemKind.shield, 180, shieldFirst ? 400 : 300),
@@ -387,7 +405,12 @@ void main() {
           }
           if (e != null) {
             if (e != previous) {
-              expect(g.metres, greaterThanOrEqualTo(e.kind.unlockMetres));
+              expect(
+                g.metres,
+                greaterThanOrEqualTo(
+                  g.enemyDirector.unlockMetres(e.kind.encounterKind),
+                ),
+              );
               expect(g.elapsed - endedAt, greaterThanOrEqualTo(1.9));
               seen.add(e.kind);
             }

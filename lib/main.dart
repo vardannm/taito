@@ -480,9 +480,7 @@ class _GameScreenState extends State<GameScreen>
     return true;
   }
 
-  // Temporary level-control trial; preserve the preference for other modes.
-  ControlMode controlForMode(GameMode mode) =>
-      mode == GameMode.classic ? ControlMode.tiltLift : profile.controlMode;
+  ControlMode controlForMode(GameMode mode) => profile.controlMode;
 
   void start(GameMode mode, {DateTime? challengeDate}) => setState(() {
     if (adBusy) return;
@@ -521,6 +519,7 @@ class _GameScreenState extends State<GameScreen>
     recorded = newBest = false;
     game.setControlMode(controlForMode(mode));
     game.cabinet = profile.cabinet;
+    profile.applySurvivalUpgrades(game);
     game.cosmetic = profile.selectedBall;
     game.platformStyle = profile.selectedPlatform;
     game.cabinet = profile.cabinet;
@@ -571,6 +570,17 @@ class _GameScreenState extends State<GameScreen>
             onSkipTutorial: skipTutorial,
             selected: profile.classicLevel,
             totalStars: profile.totalStars,
+            allLevelsUnlocked: profile.temporaryLevelAccess,
+            controlMode: profile.controlMode,
+            recordForControl: (number, mode) =>
+                profile.levelRecord(number, mode),
+            onControlChanged: (mode) {
+              setState(() {
+                profile.controlMode = mode;
+                game.setControlMode(mode);
+              });
+              unawaited(profile.save());
+            },
             records: {
               for (var i = 1; i <= ClassicLevels.count; i++)
                 i: profile.levelRecord(i, controlForMode(GameMode.classic)),
@@ -727,6 +737,7 @@ class _GameScreenState extends State<GameScreen>
         tutorialSheetOpen = false;
         if (tutorialActive && tutorialStep == TutorialStep.shopBrowse)
           advanceTutorial(TutorialStep.levels);
+        profile.applySurvivalUpgrades(game);
         game.cosmetic = profile.selectedBall;
         game.platformStyle = profile.selectedPlatform;
         game.cabinet = profile.cabinet;
@@ -801,6 +812,7 @@ class _GameScreenState extends State<GameScreen>
     newUnlocks = [];
     game.setControlMode(controlForMode(arcadeModes[index]));
     game.cabinet = profile.cabinet;
+    profile.applySurvivalUpgrades(game);
     game.cosmetic = profile.selectedBall;
     game.platformStyle = profile.selectedPlatform;
     game.cabinet = profile.cabinet;
@@ -1178,7 +1190,8 @@ class _GameScreenState extends State<GameScreen>
                           padding: const EdgeInsets.only(top: 10),
                           child: Semantics(
                             key: const ValueKey('board-hearts'),
-                            label: '${game.lives} of 3 hearts remaining',
+                            label:
+                                '${game.lives} of ${game.heartCapacity} hearts remaining',
                             excludeSemantics: true,
                             child: FittedBox(
                               fit: BoxFit.scaleDown,
@@ -1186,7 +1199,7 @@ class _GameScreenState extends State<GameScreen>
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  for (var i = 0; i < 3; i++)
+                                  for (var i = 0; i < game.heartCapacity; i++)
                                     Icon(
                                       i < game.lives
                                           ? Icons.favorite_rounded
@@ -1370,7 +1383,7 @@ class _GameScreenState extends State<GameScreen>
                               child: Semantics(
                                 key: const ValueKey('board-hearts'),
                                 label:
-                                    '${game.lives} of ${game.merging ? 1 : 3} hearts remaining',
+                                    '${game.lives} of ${game.heartCapacity} hearts remaining',
                                 excludeSemantics: true,
                                 child: FittedBox(
                                   fit: BoxFit.scaleDown,
@@ -1380,7 +1393,7 @@ class _GameScreenState extends State<GameScreen>
                                     children: [
                                       for (
                                         var i = 0;
-                                        i < (game.merging ? 1 : 3);
+                                        i < game.heartCapacity;
                                         i++
                                       )
                                         Padding(
@@ -2396,7 +2409,7 @@ class _GameScreenState extends State<GameScreen>
               guideRow(
                 '04',
                 'Go beyond ten.',
-                'Infinite begins with three hearts. Laser-wall sections arrive from time to time: the traps stop and wide laser walls come down instead, so steer through their openings. A hit costs a heart and resets your combo; the ball and platform blink for 2.5 seconds of protection while you keep steering from the same position. Gold crystals build combos up to x10; violet and midnight tiers build toward electric cyan at x9 and a golden maximum at x10. Blue shields protect for ${InfiniteTuning.shieldSeconds} seconds. Red-and-blue magnets collect nearby coins, combo crystals, shields and hearts for ${InfiniteTuning.magnetSeconds} seconds. Rare hearts restore a life. Keep steering to escape the rising red floor.',
+                'Infinite begins with ${profile.startingHearts} hearts. Upgrade starting hearts and pickup durations in the Gear Shop. Laser-wall sections arrive from time to time: the traps stop and wide laser walls come down instead, so steer through their openings. A hit costs a heart and resets your combo; the ball and platform blink for 2.5 seconds of protection while you keep steering from the same position. Gold crystals build combos up to x10; violet and midnight tiers build toward electric cyan at x9 and a golden maximum at x10. Blue shields protect for ${profile.shieldDuration} seconds. Red-and-blue magnets collect nearby coins, combo crystals, shields and hearts for ${profile.magnetDuration} seconds. Rare hearts restore a life. Keep steering to escape the rising red floor.',
               ),
               const Text(
                 'Desktop: W / S = left end. ↑ / ↓ = right end. Esc = pause.',
@@ -2413,7 +2426,7 @@ class _GameScreenState extends State<GameScreen>
                 'Classic levels 31–50 have slow patrolling spiders. Enter a marked territory and its spider chases you. Contact ends the run immediately. Each successful target resets the spiders. In Infinite, spiders move slowly and fire aimed webs: move away from the marked line before the slow shot arrives. Web hits cost a heart; shields block them.',
               ),
               const Text(
-                'Deep in Infinite, five new visitors unlock: the beetle at 2,600m marks an acid landing; the cricket at 3,100m bounces one pellet off a wall; the moth at 3,600m fires curved dust streams; the scorpion at 4,100m fires three needles along a locked line; and the seed spitter at 4,600m splits a seed into three. Watch their aim markers before they fire. These attacks take turns, and stop during breathing stretches and laser mazes.',
+                'Deep in Infinite, five new visitors unlock: the beetle at 2,600m marks an acid landing; the cricket at 3,100m bounces one pellet off a wall; the moth at 3,600m fires curved dust streams; the scorpion at 4,100m charges a laser along a locked aim line, then holds the beam for 1.5 seconds; and the seed spitter at 4,600m splits a seed into three. Watch their aim markers before they fire. These attacks take turns, and stop during breathing stretches and laser mazes.',
                 style: TextStyle(fontSize: 12, height: 1.5),
               ),
               const SizedBox(height: 20),

@@ -4,6 +4,7 @@ import 'board_painter.dart';
 import 'levels.dart';
 import 'rewards.dart';
 import 'mastery_widgets.dart';
+import 'game.dart';
 
 class LevelPicker extends StatefulWidget {
   const LevelPicker({
@@ -15,8 +16,16 @@ class LevelPicker extends StatefulWidget {
     this.controlLabel = 'One-finger',
     this.tutorial = false,
     this.onSkipTutorial,
+    this.allLevelsUnlocked = false,
+    this.controlMode,
+    this.onControlChanged,
+    this.recordForControl,
   });
   final bool tutorial;
+  final bool allLevelsUnlocked;
+  final ControlMode? controlMode;
+  final ValueChanged<ControlMode>? onControlChanged;
+  final LevelRecord Function(int, ControlMode)? recordForControl;
   final VoidCallback? onSkipTutorial;
   final int selected, totalStars;
   final Map<int, LevelRecord> records;
@@ -29,10 +38,13 @@ class LevelPicker extends StatefulWidget {
 class _LevelPickerState extends State<LevelPicker> {
   final firstLevelKey = GlobalKey();
   bool skipped = false;
+  late ControlMode? control = widget.controlMode;
   int get selected => widget.selected;
   int get totalStars => widget.totalStars;
   Map<int, LevelRecord> get records => widget.records;
-  String get controlLabel => widget.controlLabel;
+  String get controlLabel => control?.label ?? widget.controlLabel;
+  bool unlocked(int number) =>
+      widget.allLevelsUnlocked || ClassicLevels.isUnlocked(number, totalStars);
   ValueChanged<int> get onSelected => widget.onSelected;
   @override
   Widget build(BuildContext context) => Stack(
@@ -80,13 +92,14 @@ class _LevelPickerState extends State<LevelPicker> {
               ),
               delegate: SliverChildBuilderDelegate((context, index) {
                 final number = first + index,
-                    active =
-                        number == selected &&
-                        ClassicLevels.isUnlocked(number, totalStars),
+                    active = number == selected && this.unlocked(number),
                     spider = number >= 31;
-                final unlocked = ClassicLevels.isUnlocked(number, totalStars);
+                final unlocked = this.unlocked(number);
                 final required = ClassicLevels.requiredStars(number);
-                final record = records[number] ?? const LevelRecord();
+                final record =
+                    control != null && widget.recordForControl != null
+                    ? widget.recordForControl!(number, control!)
+                    : records[number] ?? const LevelRecord();
                 return Semantics(
                   button: true,
                   enabled: unlocked,
@@ -196,8 +209,32 @@ class _LevelPickerState extends State<LevelPicker> {
                 'Choose your challenge.',
                 widget.tutorial && !skipped
                     ? ''
+                    : widget.allLevelsUnlocked
+                    ? 'All ${ClassicLevels.count} levels temporarily unlocked. $controlLabel records.'
                     : '$totalStars Classic stars · 2 more stars unlock each level. Stars are shared across controls and are not spent. $controlLabel records.',
               ),
+              if (control != null)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final mode in ControlMode.values)
+                          ChoiceChip(
+                            key: ValueKey('level-control-${mode.name}'),
+                            label: Text(mode.label),
+                            selected: control == mode,
+                            onSelected: (_) {
+                              setState(() => control = mode);
+                              widget.onControlChanged?.call(mode);
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
               grid(1, 30),
               heading(
                 'The web · 31–50',

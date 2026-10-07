@@ -33,7 +33,7 @@ void main() {
   test(
     'unlocks use unique Classic stars across controls, persist and cost nothing',
     () async {
-      final p = PlayerProfile();
+      final p = PlayerProfile(temporaryLevelAccess: false);
       p.levelRecords['twoFinger:1'] = const LevelRecord(starMask: 1);
       p.levelRecords['analog:1'] = const LevelRecord(starMask: 1);
       p.dailyRecords['twoFinger:2026-09-16'] = const LevelRecord(starMask: 7);
@@ -44,7 +44,7 @@ void main() {
       expect(p.selectClassicLevel(2), isTrue);
       expect(p.totalStars, 2);
       await p.save();
-      final restored = PlayerProfile();
+      final restored = PlayerProfile(temporaryLevelAccess: false);
       await restored.load();
       expect(restored.isClassicLevelUnlocked(2), isTrue);
       expect(restored.classicLevel, 2);
@@ -55,7 +55,7 @@ void main() {
   );
 
   test('goals recommend earning a missing star instead of a locked level', () {
-    final p = PlayerProfile()
+    final p = PlayerProfile(temporaryLevelAccess: false)
       ..controlMode = ControlMode.twoFinger
       ..classicLevel = 50;
     expect(NextGoal.forProfile(p).level, 1);
@@ -115,7 +115,7 @@ void main() {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    final p = PlayerProfile()
+    final p = PlayerProfile(temporaryLevelAccess: false)
       ..tutorialSeen = true
       ..sound = false
       ..haptics = false;
@@ -164,7 +164,7 @@ void main() {
   testWidgets(
     'stale selections cannot bypass the central Classic launch gate',
     (tester) async {
-      final p = PlayerProfile()
+      final p = PlayerProfile(temporaryLevelAccess: false)
         ..classicLevel = 50
         ..sound = false
         ..haptics = false;

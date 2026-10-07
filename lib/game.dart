@@ -7,6 +7,7 @@ import 'spider_web.dart';
 import 'porcupines.dart';
 import 'snakes.dart';
 import 'late_enemies.dart';
+import 'encounter_director.dart';
 import 'rewards.dart';
 import 'merge.dart';
 import 'infinite_progress.dart';
@@ -47,6 +48,9 @@ class BalanceGame {
   math.Random get _random => _previewRandom ?? _runRandom;
   InfiniteProgress survival = InfiniteProgress();
   int infiniteStartingPace = 1;
+  int infiniteMaxLives = InfiniteTuning.maxLives;
+  double shieldDuration = InfiniteTuning.shieldSeconds;
+  double magnetDuration = InfiniteTuning.magnetSeconds;
   BallCosmetic cosmetic = BallCosmetic.steel;
   PlatformStyle platformStyle = PlatformStyle.classic;
   double analogSensitivity = 1, twoFingerSensitivity = 1;
@@ -266,9 +270,7 @@ class BalanceGame {
   final snakes = <BoardSnake>[];
   LateEnemyEncounter? lateEnemy;
   bool lateEnemiesEnabled = true;
-  final _introducedLateEnemies = <LateEnemyKind>{};
-  LateEnemyKind? _lastLateEnemy;
-  double _nextLateEnemyTime = 0;
+  EncounterDirector enemyDirector = EncounterDirector(0);
   // Like mazeSectionsEnabled, lets callers isolate the ordinary hazard stream.
   bool snakeEncountersEnabled = true;
   // Only the guided opening replaces generation; contacts and controls remain real.
@@ -288,7 +290,6 @@ class BalanceGame {
     dangerY = math.max(dangerY, ballY + 120);
   }
 
-  double _nextSnakeTime = 0;
   double _nextPorcupineY = -2700, _nextQuillTime = 0;
   double cameraOffset = 0, maxHeight = 0, stallTime = 0, dangerY = 580;
   double _steeringDistance = 0;
@@ -461,7 +462,7 @@ class BalanceGame {
       : _classicBoard;
   int get roundCompleted => completed;
   double screenY(double worldY) => worldY + (scrolling ? cameraOffset : 0);
-  bool get dangerActive => infinite && !tutorialCourse && stallTime >= 3;
+  bool get dangerActive => infinite && !tutorialCourse && stallTime >= 10;
   double get dangerDistance => dangerY - ballY;
 
   void ensureInfiniteBoard({bool retainForSweep = false}) {
@@ -580,6 +581,7 @@ class BalanceGame {
   }
 
   double left = 526, right = 526, ballX = 180, velocity = 0;
+  double ballRotation = 0;
   final ballTrail = <({double x, double y, double time})>[];
   double motionSpeed = 0;
   double leftSpeed = 0, rightSpeed = 0;
@@ -587,6 +589,11 @@ class BalanceGame {
   double clock = 0, legTime = 0, elapsed = 0, phaseTime = 0;
   double captureX = 180, captureY = 519, returnLeft = 526, returnRight = 526;
   int target = 1, lives = 3, score = 0, streak = 0, bestStreak = 0;
+  int get heartCapacity => merging
+      ? 1
+      : infinite
+      ? infiniteMaxLives
+      : InfiniteTuning.maxLives;
   int lastAward = 0, completed = 0, misses = 0, inputEpoch = 0;
   bool started = false, paused = false, won = false;
   bool infiniteReviveUsed = false;
@@ -617,7 +624,8 @@ class BalanceGame {
     dangerY = math.max(dangerY, ballY + 140);
     survival.recovery = 3;
     lateEnemy = null;
-    _nextLateEnemyTime = elapsed + InfiniteDifficulty.lateEnemyRestSeconds;
+    snakes.clear();
+    enemyDirector.rest(elapsed, metres.toDouble());
     survival.announce('BACK IN PLAY · 1 heart · 3 seconds of protection');
     message = survival.notice;
     event = null;
@@ -765,6 +773,7 @@ class BalanceGame {
         ? 500
         : 526;
     ballX = 180;
+    ballRotation = 0;
     velocity = leftSpeed = rightSpeed = 0;
     legTime = 0;
     controlPosition = 0;
@@ -814,10 +823,8 @@ class BalanceGame {
     quills.clear();
     snakes.clear();
     lateEnemy = null;
-    _introducedLateEnemies.clear();
-    _lastLateEnemy = null;
-    _nextLateEnemyTime = 0;
-    _nextSnakeTime = 0;
+    if (infinite)
+      enemyDirector = EncounterDirector(_runRandom.nextInt(1 << 30));
     _nextPorcupineY = -2700;
     _nextQuillTime = 0;
     if (spiderLevel)
@@ -866,7 +873,11 @@ class BalanceGame {
     _nextCoinY = 380;
     ensureEndlessExtras();
     target = 1;
-    lives = merging ? 1 : InfiniteTuning.maxLives;
+    lives = merging
+        ? 1
+        : infinite
+        ? infiniteMaxLives
+        : InfiniteTuning.maxLives;
     score = streak = bestStreak = completed = misses = 0;
     elapsed = phaseTime = 0;
     won = paused = false;
@@ -1057,6 +1068,12 @@ class BalanceGame {
       ballX = maximumX;
       velocity = -velocity.abs() * .22;
     }
+    // Rolling relative to the bar, excluding its lift and the camera scroll.
+    // Signed distance reverses the artwork when the ball rolls back.
+    if (!merging) {
+      final rolled = (ballX - oldX) * math.sqrt(1 + slope * slope);
+      ballRotation = (ballRotation + rolled / ballRadius) % (math.pi * 2);
+    }
     if (infinite) {
       _updateClimb(dt);
       if (phase != GamePhase.playing) return;
@@ -1091,11 +1108,14 @@ class BalanceGame {
       survival.items.removeWhere((item) => screenY(item.y) > 610);
       _pruneInfiniteSpiders();
       _pruneInfinitePorcupines();
+      final hadSnake = snakes.isNotEmpty;
       snakes.removeWhere(
         (s) =>
             s.expired ||
             s.points.every((p) => screenY(p.y) > 640 || p.x < -24 || p.x > 384),
       );
+      if (hadSnake && snakes.isEmpty)
+        enemyDirector.rest(elapsed, metres.toDouble());
       quills.removeWhere(
         (q) =>
             q.expired ||

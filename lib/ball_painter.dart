@@ -8,6 +8,7 @@ void paintCosmetic(
   double radius,
   BallCosmetic ball, {
   double time = 0,
+  double rotation = 0,
   bool reducedMotion = false,
   List<Color>? steelPalette,
 }) {
@@ -22,6 +23,11 @@ void paintCosmetic(
         ).createShader(Rect.fromCircle(center: center, radius: radius * 1.9)),
     );
   }
+  // Only the solid body rolls; glow and orbital effects stay in world axes.
+  canvas.save();
+  canvas.translate(center.dx, center.dy);
+  canvas.rotate(rotation);
+  canvas.translate(-center.dx, -center.dy);
   final shape = Path();
   if (ball.sides == 0) {
     shape.addOval(Rect.fromCircle(center: center, radius: radius));
@@ -283,32 +289,6 @@ void paintCosmetic(
       }
     }
     canvas.restore();
-    if (ball == BallCosmetic.quasar || ball == BallCosmetic.singularity) {
-      final orbit = Rect.fromCenter(
-        center: center,
-        width: radius * 2.7,
-        height: radius * 1.3,
-      );
-      canvas.drawArc(
-        orbit,
-        phase,
-        math.pi * 1.45,
-        false,
-        Paint()
-          ..color = tint.withAlpha(160)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = radius * .09,
-      );
-      if (!reducedMotion)
-        for (var i = 0; i < 3; i++) {
-          final a = phase * 2 + i * math.pi * 2 / 3;
-          canvas.drawCircle(
-            center + Offset(math.cos(a), math.sin(a)) * radius * 1.45,
-            radius * .09,
-            Paint()..color = tint.withAlpha(190),
-          );
-        }
-    }
   }
   // A consistent small reflection gives enamel, metal and glass a polished
   // surface while preserving their different internal patterns.
@@ -336,6 +316,34 @@ void paintCosmetic(
       ..strokeWidth = radius * .045,
   );
   canvas.restore();
+  canvas.restore();
+  final phase = reducedMotion ? 0.0 : time * .7;
+  if (ball == BallCosmetic.quasar || ball == BallCosmetic.singularity) {
+    final orbit = Rect.fromCenter(
+      center: center,
+      width: radius * 2.7,
+      height: radius * 1.3,
+    );
+    canvas.drawArc(
+      orbit,
+      phase,
+      math.pi * 1.45,
+      false,
+      Paint()
+        ..color = tint.withAlpha(160)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = radius * .09,
+    );
+    if (!reducedMotion)
+      for (var i = 0; i < 3; i++) {
+        final a = phase * 2 + i * math.pi * 2 / 3;
+        canvas.drawCircle(
+          center + Offset(math.cos(a), math.sin(a)) * radius * 1.45,
+          radius * .09,
+          Paint()..color = tint.withAlpha(190),
+        );
+      }
+  }
 }
 
 void paintCosmeticTrail(

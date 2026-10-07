@@ -683,6 +683,7 @@ class BoardPainter extends CustomPainter {
         7 * game.ballScale,
         game.cosmetic,
         time: game.clock,
+        rotation: game.ballRotation,
         reducedMotion: reducedMotion,
         steelPalette: palette.ball,
       );

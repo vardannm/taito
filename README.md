@@ -246,7 +246,7 @@ Infinite tuning: `lib/infinite_difficulty.dart` includes `spiderSpeed` (base cha
 
 Late Infinite enemies unlock by distance: Bombardier Beetle at 2,600m (marked
 acid lob), Ricochet Cricket at 3,100m (one wall rebound), Moth at 3,600m (paired
-curving dust streams), Scorpion at 4,100m (three needles, 0.2s apart), and Seed
+curving dust streams), Scorpion at 4,100m (a charged continuous laser), and Seed
 Spitter at 4,600m (a slow seed splits into three). Introductions wait for a clear
 attack slot; milestones do not spawn an enemy on top of an existing warning.
 Each visitor locks its aim and warns for 1.2s. Only one visitor is active, with

@@ -12,13 +12,21 @@ import 'rewards.dart';
 import 'onboarding.dart';
 import 'daily_prizes.dart';
 import 'achievements.dart';
+import 'survival_upgrades.dart';
 
 class PlayerProfile {
   PlayerProfile({
     this.unlimitedCoins = const bool.fromEnvironment('GILT_UNLIMITED_COINS'),
+    this.temporaryLevelAccess = const bool.fromEnvironment(
+      'GILT_UNLOCK_ALL_LEVELS',
+      defaultValue: true,
+    ),
   });
 
   final bool unlimitedCoins;
+  // Temporary playtest access. Disable with GILT_UNLOCK_ALL_LEVELS=false.
+  // Never persisted as stars or completion records.
+  final bool temporaryLevelAccess;
   String get _economyKey =>
       unlimitedCoins ? 'gilt.economy.coinsTest.v1' : 'gilt.economy.v1';
   bool canAfford(int cost) => unlimitedCoins || wallet >= cost;
@@ -27,6 +35,32 @@ class PlayerProfile {
   int best = 0, runs = 0;
   int infiniteBest = 0, infiniteRuns = 0, infiniteBestScore = 0;
   int wallet = 0;
+  final survivalUpgrades = <SurvivalUpgrade, int>{};
+  int upgradeLevel(SurvivalUpgrade upgrade) => survivalUpgrades[upgrade] ?? 0;
+  double get magnetDuration =>
+      SurvivalUpgrade.magnet.valueAt(upgradeLevel(SurvivalUpgrade.magnet));
+  double get shieldDuration =>
+      SurvivalUpgrade.shield.valueAt(upgradeLevel(SurvivalUpgrade.shield));
+  int get startingHearts => SurvivalUpgrade.hearts
+      .valueAt(upgradeLevel(SurvivalUpgrade.hearts))
+      .toInt();
+
+  bool buySurvivalUpgrade(SurvivalUpgrade upgrade) {
+    final level = upgradeLevel(upgrade);
+    if (level >= upgrade.maxLevel || !canAfford(upgrade.costAt(level)))
+      return false;
+    if (!unlimitedCoins) wallet -= upgrade.costAt(level);
+    survivalUpgrades[upgrade] = level + 1;
+    unawaited(saveEconomy());
+    return true;
+  }
+
+  void applySurvivalUpgrades(BalanceGame game) {
+    game.infiniteMaxLives = startingHearts;
+    game.shieldDuration = shieldDuration;
+    game.magnetDuration = magnetDuration;
+  }
+
   DailyPrizes dailyPrizes = DailyPrizes();
   final _claimedAchievements = <Achievement>{};
 
@@ -197,6 +231,9 @@ class PlayerProfile {
     // Snapshot and serialize wallet transactions; an older save cannot undo a purchase.
     final data = jsonEncode({
       'wallet': wallet,
+      'survivalUpgrades': survivalUpgrades.map(
+        (upgrade, level) => MapEntry(upgrade.name, level),
+      ),
       'dailyPrizes': dailyPrizes.toJson(),
       'claimedAchievements': _claimedAchievements.map((a) => a.name).toList(),
       'ballTestCreditApplied': _ballTestCreditApplied,
@@ -222,6 +259,14 @@ class PlayerProfile {
     try {
       final data = jsonDecode(raw);
       if (data is! Map<String, dynamic>) return;
+      final upgrades = data['survivalUpgrades'];
+      if (upgrades is Map) {
+        for (final upgrade in SurvivalUpgrade.values) {
+          final level = upgrades[upgrade.name];
+          if (level is int)
+            survivalUpgrades[upgrade] = level.clamp(0, upgrade.maxLevel);
+        }
+      }
       dailyPrizes = DailyPrizes.fromJson(data['dailyPrizes']);
       final claimed = data['claimedAchievements'];
       if (claimed is List) {
@@ -290,7 +335,9 @@ class PlayerProfile {
   }
 
   bool isClassicLevelUnlocked(int level) =>
-      ClassicLevels.isUnlocked(level, totalStars);
+      level >= 1 &&
+      level <= ClassicLevels.count &&
+      (temporaryLevelAccess || ClassicLevels.isUnlocked(level, totalStars));
 
   bool selectClassicLevel(int level) {
     if (!isClassicLevelUnlocked(level)) return false;

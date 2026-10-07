@@ -25,7 +25,7 @@ abstract final class InfiniteDifficulty {
   static const heartSpacingJitterMetres = 180.0;
 
   // More holes and shorter row spacing as score and distance increase.
-  static const obstacleDensity = 1.2;
+  static const obstacleDensity = 0.6;
 
   // Shrinks the reserved path half-width from 46 toward 34 world units.
   static const pathNarrowing = 1.0;
@@ -51,9 +51,16 @@ abstract final class InfiniteDifficulty {
   // Speed of the spider's web projectile. Default: 90.
   static const spiderBulletSpeed = 180.0;
 
-  // New enemy introductions are based on distance, never score or equipment.
-  // Beetle, cricket, moth, scorpion, seed spitter, respectively.
-  static const lateEnemyMilestones = [2600.0, 3100.0, 3600.0, 4100.0, 4600.0];
+  // Each run shuffles snakes and the five visitors into these distance slots.
+  // No enemy owns a fixed milestone. First unlock: 800–1,000m; later gaps:
+  // 400–650m. Unlocks permit a spawn; safety, sections and cooldowns may defer it.
+  static const enemyFirstUnlockMetres = 800.0;
+  static const enemyFirstUnlockJitter = 200.0;
+  static const enemyUnlockGapMetres = 400.0;
+  static const enemyUnlockGapJitter = 250.0;
+  static const enemyRepeatCooldownSeconds = 28.0;
+  // Extra rest early in the run, fading away by 2,400m.
+  static const enemyOpeningRestBonus = 6.0;
   // Minimum quiet interval after a visitor leaves (plus up to 5s of variation).
   static const lateEnemyRestSeconds = 14.0;
 }

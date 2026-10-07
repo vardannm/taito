@@ -9,6 +9,7 @@ import 'platform_painter.dart';
 import 'board_painter.dart';
 import 'profile.dart';
 import 'mastery_widgets.dart';
+import 'survival_upgrades.dart';
 
 class BallShop extends StatefulWidget {
   const BallShop({
@@ -308,6 +309,7 @@ class _BallShopState extends State<BallShop>
                     'Balls',
                     'Platforms',
                     'Cabinet Styles',
+                    'Upgrades',
                   ].asMap().entries)
                     ChoiceChip(
                       label: Text(entry.value),
@@ -319,6 +321,15 @@ class _BallShopState extends State<BallShop>
                 ],
               ),
               const SizedBox(height: 16),
+              if (!guiding && category == 3) ...[
+                const Text(
+                  'Permanent Infinite upgrades. Extra hearts apply to your next run; duration upgrades apply to pickups you collect.',
+                  style: TextStyle(fontSize: 12, height: 1.4),
+                ),
+                const SizedBox(height: 12),
+                for (final upgrade in SurvivalUpgrade.values)
+                  upgradeCard(upgrade),
+              ],
               if (!guiding && category == 0)
                 for (final b in BallCosmetic.values)
                   item(
@@ -377,6 +388,65 @@ class _BallShopState extends State<BallShop>
             },
           ),
       ],
+    );
+  }
+
+  Widget upgradeCard(SurvivalUpgrade upgrade) {
+    final p = widget.profile;
+    final level = p.upgradeLevel(upgrade);
+    final maxed = level >= upgrade.maxLevel;
+    final cost = upgrade.costAt(level);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(switch (upgrade) {
+                  SurvivalUpgrade.magnet => Icons.attractions,
+                  SurvivalUpgrade.shield => Icons.shield_outlined,
+                  SurvivalUpgrade.hearts => Icons.favorite,
+                }, color: orange),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    upgrade.label,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text('Current: ${upgrade.valueLabel(level)}'),
+            Text('Maximum: ${upgrade.valueLabel(upgrade.maxLevel)}'),
+            const SizedBox(height: 10),
+            FilledButton(
+              key: ValueKey('upgrade-${upgrade.name}'),
+              onPressed: maxed || !p.canAfford(cost)
+                  ? null
+                  : () {
+                      setState(() => p.buySurvivalUpgrade(upgrade));
+                    },
+              child: Text(
+                maxed
+                    ? 'Fully upgraded'
+                    : 'Upgrade to ${upgrade.valueLabel(level + 1)} · $cost coins',
+              ),
+            ),
+            if (!maxed && !p.canAfford(cost))
+              Text(
+                'Need ${cost - p.wallet} more coins',
+                style: const TextStyle(fontSize: 11),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

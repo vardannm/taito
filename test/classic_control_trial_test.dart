@@ -13,7 +13,7 @@ void main() {
         InMemorySharedPreferencesAsync.empty(),
   );
   testWidgets(
-    'Classic forces fourth control while other modes retain preference',
+    'Classic uses the selected control through settings and retries',
     (tester) async {
       final profile = PlayerProfile()
         ..tutorialSeen = true
@@ -24,8 +24,8 @@ void main() {
       final game = tester.widget<PivotBoard>(find.byType(PivotBoard)).game;
       final dynamic state = tester.state(find.byType(GameScreen));
       await selectWorld(tester, 1);
-      expect(game.controlMode, ControlMode.tiltLift);
-      expect(find.byKey(const ValueKey('tilt-lift-tilt')), findsOneWidget);
+      expect(game.controlMode, ControlMode.boardTilt);
+      expect(find.byKey(const ValueKey('tilt-lift-tilt')), findsNothing);
       expect(profile.controlMode, ControlMode.boardTilt);
       await tester.tap(find.byTooltip('Settings'));
       await tester.pump();
@@ -34,7 +34,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('control-analog')));
       await tester.pump();
       expect(profile.controlMode, ControlMode.analog);
-      expect(game.controlMode, ControlMode.tiltLift);
+      expect(game.controlMode, ControlMode.analog);
       Navigator.of(
         tester.element(find.byKey(const ValueKey('control-analog'))),
       ).pop();
@@ -42,10 +42,10 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       state.start(GameMode.classic);
       await tester.pump();
-      expect(game.controlMode, ControlMode.tiltLift);
+      expect(game.controlMode, ControlMode.analog);
       state.start(GameMode.classic); // Retry / next-level launch path.
       await tester.pump();
-      expect(game.controlMode, ControlMode.tiltLift);
+      expect(game.controlMode, ControlMode.analog);
       state.start(GameMode.merge2048);
       await tester.pump();
       expect(game.controlMode, ControlMode.analog);

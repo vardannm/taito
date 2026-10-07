@@ -7,6 +7,7 @@ import 'levels.dart';
 import 'ball_cosmetics.dart';
 import 'platforms.dart';
 import 'rewards.dart';
+import 'survival_upgrades.dart';
 
 /// Portable, versioned profile data. No credentials or device identifiers.
 class ProgressBackup {
@@ -50,6 +51,9 @@ class ProgressBackup {
     'ball': p.selectedBall.name,
     'platforms': p.ownedPlatforms.map((e) => e.name).toList(),
     'platform': p.selectedPlatform.name,
+    'survivalUpgrades': p.survivalUpgrades.map(
+      (upgrade, level) => MapEntry(upgrade.name, level),
+    ),
     'levels': p.levelRecords.map((k, v) => MapEntry(k, v.toJson())),
     'daily': p.dailyRecords.map((k, v) => MapEntry(k, v.toJson())),
     'times': <String, double>{}, // Retired route records.
@@ -108,6 +112,16 @@ class ProgressBackup {
       ..sound = flag('sound')
       ..haptics = flag('haptics')
       ..tutorialSeen = flag('tutorial');
+    final upgrades = d['survivalUpgrades'];
+    if (upgrades != null) {
+      if (upgrades is! Map) invalid();
+      for (final upgrade in SurvivalUpgrade.values) {
+        p.survivalUpgrades[upgrade] = integer(
+          upgrades[upgrade.name] ?? 0,
+          upgrade.maxLevel,
+        );
+      }
+    }
     p.dailyPrizes = DailyPrizes.fromJson(d['dailyPrizes']);
     p.tutorial = d['onboarding'] is Map<String, dynamic>
         ? TutorialProgress.fromJson(d['onboarding'] as Map<String, dynamic>)
@@ -209,6 +223,9 @@ class ProgressBackup {
       ..cabinet = source.cabinet
       ..selectedBall = source.selectedBall
       ..selectedPlatform = source.selectedPlatform;
+    target.survivalUpgrades
+      ..clear()
+      ..addAll(source.survivalUpgrades);
     target.levelRecords
       ..clear()
       ..addAll(source.levelRecords);

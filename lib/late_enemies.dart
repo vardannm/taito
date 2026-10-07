@@ -1,12 +1,13 @@
 import 'dart:math' as math;
 import 'infinite_progress.dart';
+import 'encounter_director.dart';
 
 typedef EnemyPoint = ({double x, double y});
 
 enum LateEnemyKind { beetle, cricket, moth, scorpion, seedSpitter }
 
 extension LateEnemyDetails on LateEnemyKind {
-  double get unlockMetres => InfiniteDifficulty.lateEnemyMilestones[index];
+  EncounterEnemy get encounterKind => EncounterEnemy.values[index + 1];
   String get name => switch (this) {
     LateEnemyKind.beetle => 'BOMBARDIER BEETLE',
     LateEnemyKind.cricket => 'RICOCHET CRICKET',
@@ -18,12 +19,12 @@ extension LateEnemyDetails on LateEnemyKind {
     LateEnemyKind.beetle => 'Leave the landing circle',
     LateEnemyKind.cricket => 'Watch the wall rebound',
     LateEnemyKind.moth => 'Slip between the curved streams',
-    LateEnemyKind.scorpion => 'Dodge the three-needle burst',
+    LateEnemyKind.scorpion => 'Step away from the laser aim line',
     LateEnemyKind.seedSpitter => 'Watch the seed split into three',
   };
 }
 
-enum LateShotKind { bomb, acid, ricochet, moth, needle, seed, shard }
+enum LateShotKind { bomb, acid, ricochet, moth, laser, seed, shard }
 
 /// These visitors perch on the rails (the moth hovers above the play area).
 /// Warnings and flying shots use board/screen coordinates, independent of the
@@ -114,14 +115,33 @@ class LateEnemyEncounter {
           }
         }
       case LateEnemyKind.scorpion:
-        for (var i = 0; i < 3; i++) {
-          straight(
-            LateShotKind.needle,
-            InfiniteTuning.needleSpeed,
-            warning + i * .2,
-            2.4,
-          );
+        // The full ray is fixed before the warning starts. Stop at the board
+        // edge, using the same finite segment for drawing and swept contact.
+        final rayX = direction.x;
+        final rayY = dx == 0 && dy == 0 ? 1.0 : direction.y;
+        var rayLength = rayY > 0
+            ? (537 - origin.y) / rayY
+            : rayY < 0
+            ? (42 - origin.y) / rayY
+            : double.infinity;
+        if (rayX.abs() > 1e-9) {
+          final edge = rayX > 0 ? 336.0 : 24.0;
+          rayLength = math.min(rayLength, (edge - origin.x) / rayX);
         }
+        rayLength = math.max(0.0, rayLength);
+        shots.add(
+          LateEnemyShot(
+            kind: LateShotKind.laser,
+            origin: origin,
+            velocity: (x: 0, y: 0),
+            delay: warning,
+            life: InfiniteTuning.scorpionLaserSeconds,
+            beamEnd: (
+              x: origin.x + rayX * rayLength,
+              y: origin.y + rayY * rayLength,
+            ),
+          ),
+        );
       case LateEnemyKind.seedSpitter:
         const splitTime = .9, seedSpeed = 95.0;
         straight(LateShotKind.seed, seedSpeed, warning, splitTime);
@@ -201,6 +221,7 @@ class LateEnemyShot {
     this.bounceTime = double.infinity,
     this.curve = 0,
     this.parent,
+    this.beamEnd,
   }) : age = -delay,
        _previousAge = -delay;
 
@@ -208,15 +229,18 @@ class LateEnemyShot {
   final EnemyPoint origin, velocity;
   final double delay, life, bounceTime, curve;
   final LateEnemyShot? parent;
+  final EnemyPoint? beamEnd;
   double age, _previousAge, _dt = 0, _groundShift = 0, _previousGroundShift = 0;
   bool consumed = false;
   bool get cancelled => consumed || (parent?.consumed ?? false);
   bool get visible => !cancelled && age >= 0 && age < life;
-  bool get persistent => kind == LateShotKind.acid;
+  bool get persistent =>
+      kind == LateShotKind.acid || kind == LateShotKind.laser;
   double get radius => switch (kind) {
     LateShotKind.acid => InfiniteTuning.acidRadius,
     LateShotKind.seed => 5.0,
     LateShotKind.ricochet => 4.0,
+    LateShotKind.laser => InfiniteTuning.scorpionLaserRadius,
     _ => 3.0,
   };
   String get reason => switch (kind) {
@@ -224,7 +248,7 @@ class LateEnemyShot {
     LateShotKind.acid => 'Acid hit. Leave the beetle landing circle.',
     LateShotKind.ricochet => 'Cricket pellet. Watch the wall rebound.',
     LateShotKind.moth => 'Moth dust. Slip between the curved streams.',
-    LateShotKind.needle => 'Scorpion needle. Wait for all three shots to pass.',
+    LateShotKind.laser => 'Scorpion laser. Step away from its aim line.',
     LateShotKind.seed ||
     LateShotKind.shard => 'Seed hit. Watch the three-way split.',
   };
@@ -258,7 +282,7 @@ class LateEnemyShot {
     _previousGroundShift = _groundShift;
     _dt = dt;
     age += dt;
-    if (persistent) {
+    if (kind == LateShotKind.acid) {
       final activeDt = age.clamp(0.0, life) - _previousAge.clamp(0.0, life);
       _groundShift += scrollDistance * activeDt / dt;
     }
@@ -268,6 +292,17 @@ class LateEnemyShot {
     if (cancelled || kind == LateShotKind.bomb || _dt <= 0) return null;
     final start = math.max(0.0, _previousAge), end = math.min(life, age);
     if (end <= start) return null;
+    if (kind == LateShotKind.laser) {
+      final from = (start - _previousAge) / _dt;
+      final until = (end - _previousAge) / _dt;
+      final t = _beamContact(
+        ax + (bx - ax) * from,
+        ay + (by - ay) * from,
+        ax + (bx - ax) * until,
+        ay + (by - ay) * until,
+      );
+      return t == null ? null : from + t * (until - from);
+    }
     final cuts = <double>[start];
     if (bounceTime > start && bounceTime < end) cuts.add(bounceTime);
     if (curve != 0) {
@@ -302,5 +337,50 @@ class LateEnemyShot {
       if (t != null) return from + t * (until - from);
     }
     return null;
+  }
+
+  // Sweep the ball through a finite capsule: a rectangle in beam coordinates
+  // plus circular end caps. This catches fast crossings without sampling.
+  double? _beamContact(double ax, double ay, double bx, double by) {
+    final tip = beamEnd ?? origin;
+    final dx = tip.x - origin.x, dy = tip.y - origin.y;
+    final length = math.sqrt(dx * dx + dy * dy);
+    final contactRadius = 7 + radius;
+    final near = circleContact(
+      ax,
+      ay,
+      bx,
+      by,
+      origin.x,
+      origin.y,
+      contactRadius,
+    );
+    if (length < 1e-9) return near;
+    final far = circleContact(ax, ay, bx, by, tip.x, tip.y, contactRadius);
+    final ux = dx / length, uy = dy / length;
+    double along(double x, double y) =>
+        (x - origin.x) * ux + (y - origin.y) * uy;
+    double across(double x, double y) =>
+        -(x - origin.x) * uy + (y - origin.y) * ux;
+    var lo = 0.0, hi = 1.0;
+    for (final axis in [
+      (along(ax, ay), along(bx, by), 0.0, length),
+      (across(ax, ay), across(bx, by), -contactRadius, contactRadius),
+    ]) {
+      final delta = axis.$2 - axis.$1;
+      if (delta.abs() < 1e-9) {
+        if (axis.$1 < axis.$3 || axis.$1 > axis.$4) hi = -1;
+      } else {
+        final a = (axis.$3 - axis.$1) / delta;
+        final b = (axis.$4 - axis.$1) / delta;
+        lo = math.max(lo, math.min(a, b));
+        hi = math.min(hi, math.max(a, b));
+      }
+    }
+    double? result = lo <= hi ? lo : null;
+    for (final cap in [near, far]) {
+      if (cap != null) result = result == null ? cap : math.min(result, cap);
+    }
+    return result;
   }
 }

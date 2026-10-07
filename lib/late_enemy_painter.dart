@@ -63,14 +63,19 @@ void paintLateEnemy(Canvas canvas, BalanceGame game, bool reducedMotion) {
           dottedPath(shot, 0, shot.life, accent.withAlpha(135));
         }
       case LateEnemyKind.scorpion:
-        dottedPath(enemy.shots.first, 0, 2.4, accent.withAlpha(155));
-        for (var i = 0; i < 3; i++) {
-          canvas.drawCircle(
-            origin + Offset((i - 1) * 7, 32),
-            2,
-            Paint()..color = accent,
-          );
+        final end = _offset(enemy.shots.first.beamEnd!);
+        final delta = end - origin;
+        final dashes = Path();
+        for (var d = 0.0; d < delta.distance; d += 12) {
+          final a = origin + delta * (d / delta.distance);
+          final b =
+              origin +
+              delta * (math.min(d + 5, delta.distance) / delta.distance);
+          dashes.moveTo(a.dx, a.dy);
+          dashes.lineTo(b.dx, b.dy);
         }
+        canvas.drawPath(dashes, _stroke(accent.withAlpha(170), 1.5));
+        canvas.drawCircle(end, 5, _stroke(accent, 1.5));
       case LateEnemyKind.seedSpitter:
         dottedPath(enemy.shots.first, 0, .9, accent.withAlpha(140));
         for (final shot in enemy.shots.skip(1)) {
@@ -119,6 +124,19 @@ void paintLateEnemy(Canvas canvas, BalanceGame game, bool reducedMotion) {
 
   for (final shot in enemy.shots) {
     if (!shot.visible) continue;
+    if (shot.kind == LateShotKind.laser) {
+      final end = _offset(shot.beamEnd ?? shot.origin);
+      final start = _offset(shot.origin);
+      final beamInk = infiniteBoardInk(game, (start + end) / 2);
+      final color = _enemyAccent(enemy.kind, beamInk == Colors.white);
+      // Three flat strokes create a luminous beam without blur or saveLayer.
+      canvas.drawLine(start, end, _stroke(color.withAlpha(65), 13));
+      canvas.drawLine(start, end, _stroke(color, shot.radius * 2));
+      canvas.drawLine(start, end, _stroke(const Color(0xFFFFF3D8), 2));
+      canvas.drawCircle(start, 6, Paint()..color = color);
+      canvas.drawCircle(end, 3, Paint()..color = const Color(0xFFFFF3D8));
+      continue;
+    }
     final p = _offset(shot.position);
     if (p.dx < 12 || p.dx > 348 || p.dy < game.visibleTop - 30 || p.dy > 575)
       continue;
@@ -159,7 +177,7 @@ void paintLateEnemy(Canvas canvas, BalanceGame game, bool reducedMotion) {
     canvas.translate(p.dx, p.dy);
     final ahead = shot.positionAt(math.min(shot.age + .01, shot.life));
     canvas.rotate(math.atan2(ahead.y - p.dy, ahead.x - p.dx));
-    if (shot.kind == LateShotKind.needle || shot.kind == LateShotKind.shard) {
+    if (shot.kind == LateShotKind.shard) {
       final shape = Path()
         ..moveTo(8, 0)
         ..lineTo(-5, -2.8)
@@ -264,7 +282,7 @@ void paintLateEnemy(Canvas canvas, BalanceGame game, bool reducedMotion) {
   final breathe = math.sin(time * 3.4) * motion;
   final sway = math.sin(time * 5.2) * motion;
   final charge = enemy.warning ? enemy.warningProgress * motion : 0.0;
-  // One short recoil per actual shot, including the scorpion's staggered burst.
+  // One short recoil per actual shot or beam activation.
   var recoil = 0.0;
   if (!reducedMotion) {
     for (final shot in enemy.shots) {
