@@ -1,3 +1,4 @@
+import 'menu_design.dart';
 import 'package:flutter/material.dart';
 import 'board_painter.dart';
 import 'game.dart';
@@ -131,56 +132,57 @@ class DailyCard extends StatelessWidget {
       ..setControlMode(profile.controlMode)
       ..start(gameMode: GameMode.daily, challengeDate: date)
       ..cabinet = profile.cabinet;
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'A fresh board. One day.',
-              style: TextStyle(
-                fontSize: 27,
-                fontWeight: FontWeight.w800,
-                color: ink,
+    return MenuSurface(
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const MenuHeading(
+                'A fresh board. One day.',
+                eyebrow: 'DAILY CHALLENGE',
               ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '${DailyChallenge.key(date)} · UTC',
-              style: const TextStyle(color: ink, fontFamily: 'monospace'),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 180,
-              child: CustomPaint(
-                painter: BoardPainter(preview, reducedMotion: true),
+              const SizedBox(height: 6),
+              Text(
+                '${DailyChallenge.key(date)} · UTC',
+                style: const TextStyle(
+                  color: menuText,
+                  fontFamily: 'monospace',
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Ten targets. Three balls. Same layout on every retry. A new board arrives at midnight UTC.',
-              style: TextStyle(color: ink.withAlpha(190), height: 1.5),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Time star: ${formatRunTime(preview.targetTime)} active time',
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 12),
-            StarRow(record.starMask),
-            Text(
-              'Your best: ${record.bestScore} · ${record.attempts} attempts',
-              style: const TextStyle(fontSize: 13),
-            ),
-            Text(
-              '${profile.controlMode.label} records on this device',
-              style: TextStyle(fontSize: 11, color: ink.withAlpha(170)),
-            ),
-            const SizedBox(height: 18),
-            FilledButton(onPressed: onPlay, child: const Text('PLAY DAILY')),
-          ],
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 180,
+                child: CustomPaint(
+                  painter: BoardPainter(preview, reducedMotion: true),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Ten targets. Three balls. Same layout on every retry. A new board arrives at midnight UTC.',
+                style: TextStyle(color: menuMuted, height: 1.5),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Time star: ${formatRunTime(preview.targetTime)} active time',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 12),
+              StarRow(record.starMask, dark: true),
+              Text(
+                'Your best: ${record.bestScore} · ${record.attempts} attempts',
+                style: const TextStyle(fontSize: 13),
+              ),
+              Text(
+                '${profile.controlMode.label} records on this device',
+                style: TextStyle(fontSize: 11, color: menuMuted),
+              ),
+              const SizedBox(height: 18),
+              FilledButton(onPressed: onPlay, child: const Text('PLAY DAILY')),
+            ],
+          ),
         ),
       ),
     );
@@ -203,25 +205,22 @@ class CabinetPicker extends StatelessWidget {
     physics: embedded ? const NeverScrollableScrollPhysics() : null,
     padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
     children: [
-      const Text(
-        'Make it yours.',
-        style: TextStyle(fontSize: 27, fontWeight: FontWeight.w800, color: ink),
-      ),
+      const MenuHeading('Make it yours.', eyebrow: 'CABINET STYLES'),
       const SizedBox(height: 6),
       Text(
         '${profile.totalStars} / ${ClassicLevels.count * 3} Classic stars · identical handling in every style',
-        style: TextStyle(fontSize: 12, color: ink.withAlpha(180)),
+        style: TextStyle(fontSize: 12, color: menuMuted),
       ),
       const SizedBox(height: 16),
       for (final style in CabinetStyle.values)
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Material(
-            color: const Color(0xFFFFFAEE),
+            color: menuPanel,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
               side: BorderSide(
-                color: profile.cabinet == style ? ink : ink.withAlpha(40),
+                color: profile.cabinet == style ? menuGold : menuLine,
                 width: profile.cabinet == style ? 2 : 1,
               ),
             ),
@@ -262,10 +261,7 @@ class CabinetPicker extends StatelessWidget {
                                       ? 'Equipped'
                                       : 'Tap to equip')
                                 : 'Earn ${style.requiredStars} Classic stars',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: ink.withAlpha(180),
-                            ),
+                            style: TextStyle(fontSize: 12, color: menuMuted),
                           ),
                         ],
                       ),
@@ -277,7 +273,7 @@ class CabinetPicker extends StatelessWidget {
                           ? Icons.arrow_forward_rounded
                           : Icons.lock_outline_rounded,
                       size: 21,
-                      color: ink,
+                      color: menuText,
                     ),
                   ],
                 ),
@@ -295,7 +291,7 @@ class FinaleBriefing extends StatelessWidget {
   final VoidCallback onPlay;
   @override
   Widget build(BuildContext context) => ColoredBox(
-    color: ink.withAlpha(242),
+    color: menuBackground.withAlpha(245),
     child: Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(28),
@@ -342,8 +338,8 @@ class FinaleBriefing extends StatelessWidget {
               const SizedBox(height: 22),
               FilledButton(
                 style: FilledButton.styleFrom(
-                  backgroundColor: brass,
-                  foregroundColor: ink,
+                  backgroundColor: menuGold,
+                  foregroundColor: menuBackground,
                 ),
                 onPressed: onPlay,
                 child: const Text('START FINALE'),

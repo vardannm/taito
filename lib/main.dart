@@ -21,6 +21,9 @@ import 'package:flutter/services.dart';
 
 import 'board_painter.dart';
 import 'game.dart';
+import 'menu_design.dart';
+import 'premium_menu.dart';
+import 'shop_design.dart';
 import 'enemy_sounds.dart';
 import 'levels.dart';
 import 'level_picker.dart';
@@ -45,9 +48,9 @@ Future<void> main() async {
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-      systemNavigationBarColor: cream,
-      systemNavigationBarIconBrightness: Brightness.dark,
+      statusBarIconBrightness: Brightness.light,
+      systemNavigationBarColor: menuBackground,
+      systemNavigationBarIconBrightness: Brightness.light,
     ),
   );
   final profile = PlayerProfile();
@@ -79,16 +82,7 @@ class ArcadeApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
     title: 'GILT • Precision Arcade',
-    theme: ThemeData(
-      useMaterial3: true,
-      scaffoldBackgroundColor: cream,
-      colorScheme: ColorScheme.fromSeed(seedColor: ink, surface: cream),
-      fontFamily: 'sans-serif',
-      textTheme: ThemeData.light().textTheme.apply(
-        bodyColor: ink,
-        displayColor: ink,
-      ),
-    ),
+    theme: arcadeMenuTheme(),
     home: GameScreen(
       profile: profile,
       analytics: analytics,
@@ -138,6 +132,7 @@ class _GameScreenState extends State<GameScreen>
   TutorialRun? tutorialRun;
   bool tutorialSheetOpen = false;
   final tutorialShopKey = GlobalKey();
+  final shopOriginKey = GlobalKey();
   final tutorialLevelsKey = GlobalKey();
   final tutorialDailyKey = GlobalKey();
   final tutorialHeartsKey = GlobalKey();
@@ -453,7 +448,8 @@ class _GameScreenState extends State<GameScreen>
   }
 
   bool onKey(KeyEvent event) {
-    if ((tutorialActive &&
+    if ((!tutorialActive && !playArmed && game.waitingForInput) ||
+        (tutorialActive &&
             game.waitingForInput &&
             !tutorialStep.inInfinite &&
             tutorialStep != TutorialStep.classicPlay) ||
@@ -563,7 +559,7 @@ class _GameScreenState extends State<GameScreen>
       advanceTutorial(TutorialStep.level1);
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: cream,
+      backgroundColor: menuBackground,
       showDragHandle: true,
       isScrollControlled: true,
       builder: (context) => SizedBox(
@@ -618,7 +614,7 @@ class _GameScreenState extends State<GameScreen>
 
   Future<void> showMerge() => showModalBottomSheet<void>(
     context: context,
-    backgroundColor: cream,
+    backgroundColor: menuBackground,
     showDragHandle: true,
     isScrollControlled: true,
     useSafeArea: true,
@@ -650,7 +646,7 @@ class _GameScreenState extends State<GameScreen>
                       const SizedBox(height: 16),
                       Text(
                         'BEST ${profile.mergeBest}  ·  HIGHEST ${formatMergeNumber(profile.mergeHighest)}',
-                        style: label(),
+                        style: label(menuGold),
                       ),
                     ],
                   ),
@@ -678,7 +674,7 @@ class _GameScreenState extends State<GameScreen>
     final date = DailyChallenge.day(DateTime.now());
     return showModalBottomSheet<void>(
       context: context,
-      backgroundColor: cream,
+      backgroundColor: menuBackground,
       showDragHandle: true,
       isScrollControlled: true,
       builder: (context) => SafeArea(
@@ -700,7 +696,7 @@ class _GameScreenState extends State<GameScreen>
   Future<void> showAchievements() async {
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: cream,
+      backgroundColor: menuBackground,
       showDragHandle: true,
       isScrollControlled: true,
       builder: (_) => FractionallySizedBox(
@@ -714,7 +710,7 @@ class _GameScreenState extends State<GameScreen>
   Future<void> showDailyPrizes() async {
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: cream,
+      backgroundColor: menuBackground,
       showDragHandle: true,
       isScrollControlled: true,
       builder: (_) => DailyPrizeSheet(profile: profile),
@@ -727,14 +723,23 @@ class _GameScreenState extends State<GameScreen>
     if (tutorialActive && tutorialStep == TutorialStep.shop)
       advanceTutorial(TutorialStep.shopBall);
     analytics.openShop(game.mode);
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      backgroundColor: cream,
-      builder: (_) => FractionallySizedBox(
-        heightFactor: .85,
-        child: BallShop(
+    final originBox =
+        (shopOriginKey.currentContext ?? tutorialShopKey.currentContext)
+                ?.findRenderObject()
+            as RenderBox?;
+    final viewport = MediaQuery.sizeOf(context);
+    final origin = originBox != null && originBox.hasSize
+        ? originBox.localToGlobal(Offset.zero) & originBox.size
+        : Rect.fromCenter(
+            center: Offset(48, viewport.height - 48),
+            width: 48,
+            height: 48,
+          );
+    await Navigator.of(context).push<void>(
+      ShopRevealRoute(
+        origin: origin,
+        reducedMotion: MediaQuery.disableAnimationsOf(context),
+        builder: (_) => BallShop(
           profile: profile,
           onTutorialChanged: tutorialChanged,
           onSkipTutorial: skipTutorial,
@@ -852,6 +857,7 @@ class _GameScreenState extends State<GameScreen>
     carouselMoving = false;
     selectedMode = index;
     readyRetry = retry;
+    playArmed = false;
     clearControls();
     recorded = newBest = briefing = false;
     newUnlocks = [];
@@ -871,6 +877,7 @@ class _GameScreenState extends State<GameScreen>
       levelNumber: worldLevel(index),
       waitForInput: true,
     );
+    game.inputLocked = !tutorialActive;
     tutorialRun = tutorialActive && tutorialStep.inInfinite && game.infinite
         ? TutorialRun(game, profile.tutorial, tutorialChanged)
         : null;
@@ -1011,7 +1018,9 @@ class _GameScreenState extends State<GameScreen>
       onSkip: skipTutorial,
       listenable: frame,
       blockOutside: menu && !objective,
-      bottomInset: guidedPlay || objective ? OneFingerControls.height + 12 : 16,
+      bottomInset: guidedPlay || objective
+          ? OneFingerControls.height + 12
+          : 100,
       messageTop: guidedPlay || objective
           ? MediaQuery.paddingOf(context).top + 118
           : null,
@@ -1114,48 +1123,89 @@ class _GameScreenState extends State<GameScreen>
 
   Future<void> showModes() => showModalBottomSheet<void>(
     context: context,
-    backgroundColor: cream,
+    backgroundColor: menuBackground,
     showDragHandle: true,
     isScrollControlled: true,
+    constraints: BoxConstraints(
+      maxHeight: MediaQuery.sizeOf(context).height * .9,
+    ),
     builder: (sheetContext) {
-      Widget choice(String title, IconData icon, VoidCallback action) =>
-          ListTile(
-            leading: Icon(icon),
-            title: Text(title),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.pop(sheetContext);
-              action();
-            },
-          );
-      return SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const ListTile(title: Text('Your arcade')),
-              choice('Classic levels', Icons.adjust, selectLevel),
-              choice('DAILY', Icons.today_outlined, showDaily),
-              choice(
-                'PRACTICE',
-                Icons.touch_app,
-                () => start(GameMode.practice),
-              ),
-              choice('GEAR SHOP', Icons.palette_outlined, showBallShop),
-              choice(
-                profile.achievementsReady > 0
-                    ? 'ACHIEVEMENTS (${profile.achievementsReady} ready)'
-                    : 'ACHIEVEMENTS',
-                Icons.workspace_premium_outlined,
-                showAchievements,
-              ),
-              choice(
-                'Goals, friends & backup',
-                Icons.emoji_events_outlined,
-                showClub,
-              ),
-              choice('HOW TO PLAY', Icons.help_outline, showGuide),
-            ],
+      Widget choice(
+        String title,
+        String subtitle,
+        IconData icon,
+        VoidCallback action,
+      ) => MenuAction(
+        title: title,
+        subtitle: subtitle,
+        icon: icon,
+        onTap: () {
+          Navigator.pop(sheetContext);
+          action();
+        },
+      );
+      return MenuSurface(
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(22, 0, 22, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const MenuHeading(
+                  'Your arcade',
+                  eyebrow: 'EXPLORE GILT',
+                  subtitle: 'A new challenge. Your next personal best.',
+                ),
+                choice(
+                  'Classic levels',
+                  'Master every board and collect stars',
+                  Icons.grid_view_rounded,
+                  selectLevel,
+                ),
+                choice(
+                  'DAILY',
+                  'A fresh board, every day',
+                  Icons.today_outlined,
+                  showDaily,
+                ),
+                choice(
+                  'PRACTICE',
+                  'Find your balance at your own pace',
+                  Icons.touch_app,
+                  () => start(GameMode.practice),
+                ),
+                const SizedBox(height: 12),
+                const MenuSection('MAKE IT YOURS'),
+                const SizedBox(height: 12),
+                choice(
+                  'GEAR SHOP',
+                  'Balls, worlds, platforms and upgrades',
+                  Icons.palette_outlined,
+                  showBallShop,
+                ),
+                choice(
+                  profile.achievementsReady > 0
+                      ? 'ACHIEVEMENTS (${profile.achievementsReady} ready)'
+                      : 'ACHIEVEMENTS',
+                  'Milestones worth celebrating',
+                  Icons.workspace_premium_outlined,
+                  showAchievements,
+                ),
+                choice(
+                  'Goals, friends & backup',
+                  'Your progress, connected',
+                  Icons.emoji_events_outlined,
+                  showClub,
+                ),
+                choice(
+                  'HOW TO PLAY',
+                  'Learn the art of balance',
+                  Icons.help_outline,
+                  showGuide,
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -1163,6 +1213,38 @@ class _GameScreenState extends State<GameScreen>
   );
 
   Widget boardChrome() {
+    if (!tutorialActive && game.waitingForInput) {
+      if (!playArmed) return const SizedBox();
+      return Center(
+        child: IgnorePointer(
+          child: MenuPanel(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.touch_app_rounded, color: menuGold, size: 32),
+                const SizedBox(height: 12),
+                Text(
+                  startInstruction,
+                  key: const ValueKey('start-control-prompt'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    color: menuText,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Your run starts when you move.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: menuMuted),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     if (tutorialActive &&
         tutorialStep == TutorialStep.classicPlay &&
         game.waitingForInput)
@@ -1193,7 +1275,7 @@ class _GameScreenState extends State<GameScreen>
                         vertical: 7,
                       ),
                       decoration: BoxDecoration(
-                        color: cream.withAlpha(220),
+                        color: menuPanel.withAlpha(235),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -1203,7 +1285,7 @@ class _GameScreenState extends State<GameScreen>
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: ink,
+                          color: menuText,
                         ),
                       ),
                     ),
@@ -1529,6 +1611,8 @@ class _GameScreenState extends State<GameScreen>
     ControlMode.twoFinger => 'Move a platform end to play',
   };
 
+  bool playArmed = false;
+
   bool acceptsWorldSwipe(Offset global) {
     if (tutorialActive ||
         !game.waitingForInput ||
@@ -1537,6 +1621,7 @@ class _GameScreenState extends State<GameScreen>
         carouselMoving ||
         ModalRoute.of(context)?.isCurrent != true)
       return false;
+    if (!tutorialActive && !playArmed) return true;
     final analog = analogKey.currentContext?.findRenderObject() as RenderBox?;
     if (game.bottomControls && analog != null) {
       final point = analog.globalToLocal(global);
@@ -1593,90 +1678,137 @@ class _GameScreenState extends State<GameScreen>
       );
   }
 
-  Widget world(BuildContext context, int index) {
+  Widget world(BuildContext context, int index, Animation<double> drift) {
     final active = index == selectedMode;
-    return AnimatedContainer(
-      duration: Duration(
-        milliseconds: MediaQuery.disableAnimationsOf(context) ? 0 : 220,
-      ),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            worldColors[index].withAlpha(0),
-            game.waitingForInput
-                ? worldColors[index]
-                : worldColors[index].withAlpha(0),
-          ],
-        ),
-      ),
-      child: active
-          ? IgnorePointer(
-              ignoring: carouselMoving,
-              child: PivotBoard(
-                key: boardKey,
-                game: game,
-                frame: frame,
-                fillWidth: expansion,
-                overlay: boardChrome(),
-                showHint:
-                    game.waitingForInput &&
-                    !carouselMoving &&
-                    !returning &&
-                    entrance.isDismissed,
-              ),
-            )
-          : Opacity(
-              opacity: 1 - expansion,
-              child: IgnorePointer(
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: RepaintBoundary(
-                        child: CustomPaint(
-                          key: ValueKey('mode-preview-$index'),
-                          painter: ModeWorldPreview(themedPreview(index)),
-                          child: const SizedBox.expand(),
-                        ),
+    final visibility =
+        1 -
+        ((carouselKey.currentState?.page ?? selectedMode.toDouble()) - index)
+            .abs()
+            .clamp(0.0, 1.0);
+    final board = active
+        ? IgnorePointer(
+            ignoring:
+                carouselMoving ||
+                (!tutorialActive && !playArmed && game.waitingForInput),
+            child: PivotBoard(
+              key: boardKey,
+              game: game,
+              frame: frame,
+              fillWidth: expansion,
+              overlay: boardChrome(),
+              showHint:
+                  (tutorialActive || playArmed) &&
+                  game.waitingForInput &&
+                  !carouselMoving &&
+                  !returning &&
+                  (playArmed || entrance.isDismissed),
+            ),
+          )
+        : Opacity(
+            opacity: 1 - expansion,
+            child: IgnorePointer(
+              child: Column(
+                children: [
+                  Expanded(
+                    child: RepaintBoundary(
+                      child: CustomPaint(
+                        key: ValueKey('mode-preview-$index'),
+                        painter: ModeWorldPreview(themedPreview(index)),
+                        child: const SizedBox.expand(),
                       ),
                     ),
-                    if (game.oneFinger)
-                      const SizedBox(height: OneFingerControls.height),
-                  ],
+                  ),
+                  if (game.oneFinger)
+                    const SizedBox(height: OneFingerControls.height),
+                ],
+              ),
+            ),
+          );
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Opacity(opacity: tutorialActive ? 1 : 1 - chromeOpacity, child: board),
+        if (!tutorialActive && chromeOpacity > 0)
+          IgnorePointer(
+            child: ExcludeSemantics(
+              child: Opacity(
+                opacity: chromeOpacity * visibility,
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    painter: MenuBallStage(
+                      profile.selectedBall,
+                      drift,
+                      reducedMotion: MediaQuery.disableAnimationsOf(context),
+                    ),
+                  ),
                 ),
               ),
             ),
+          ),
+      ],
     );
   }
 
-  /// Fixed header shortcut into the gear shop while selecting a mode.
-  Widget shopButton() => Semantics(
-    button: true,
-    label: 'Gear shop',
+  /// Selection shortcuts share a dock below the unchanged world carousel.
+  Widget menuDock(
+    String title,
+    IconData icon,
+    String tooltip,
+    VoidCallback action, {
+    Key? targetKey,
+    Key? tapKey,
+  }) => Expanded(
     child: Tooltip(
-      message: 'Gear shop',
+      message: tooltip,
       child: Material(
-        key: tutorialShopKey,
-        color: cream,
-        shape: CircleBorder(side: BorderSide(color: ink.withAlpha(40))),
-        elevation: 3,
-        shadowColor: ink.withAlpha(90),
+        key: targetKey,
+        color: menuPanel,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: menuLine),
+        ),
+        clipBehavior: Clip.antiAlias,
         child: InkWell(
-          key: const ValueKey('board-shop'),
-          customBorder: const CircleBorder(),
-          onTap: carouselMoving ? null : showBallShop,
-          child: const SizedBox(
-            width: 42,
-            height: 42,
-            child: Icon(Icons.storefront_rounded, size: 22, color: ink),
+          key: tapKey,
+          onTap: carouselMoving ? null : action,
+          child: SizedBox(
+            height: 44,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 17, color: menuGold),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        color: menuText,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     ),
   );
 
-  Widget selectionHeader(double page) {
+  Widget shopButton() => menuDock(
+    'Shop',
+    Icons.storefront_rounded,
+    'Gear shop',
+    showBallShop,
+    targetKey: tutorialShopKey,
+    tapKey: game.waitingForInput ? const ValueKey('board-shop') : null,
+  );
+
+  Widget tutorialSelectionHeader(double page) {
     final index = page.round().clamp(0, arcadeModes.length - 1);
     final distance = page - index;
     final reduced = MediaQuery.disableAnimationsOf(context);
@@ -1685,23 +1817,49 @@ class _GameScreenState extends State<GameScreen>
       children: [
         Row(
           children: [
-            Expanded(
+            const Expanded(
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
-                child: Text(
-                  'GILT',
-                  style: label().copyWith(letterSpacing: 5, fontSize: 13),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'GILT',
+                      style: TextStyle(
+                        color: menuText,
+                        fontSize: 23,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 4,
+                      ),
+                    ),
+                    Text(
+                      'PRECISION ARCADE',
+                      style: TextStyle(
+                        color: menuMuted,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-            IconButton.filledTonal(
-              tooltip: 'Daily prizes',
-              onPressed: carouselMoving ? null : showDailyPrizes,
-              icon: Badge(
-                isLabelVisible: profile.dailyPrizes.canClaim(DateTime.now()),
-                child: const Icon(Icons.redeem_rounded),
+            if (!tutorialActive)
+              Flexible(
+                child: MenuPill(
+                  profile.unlimitedCoins ? '∞' : '${profile.wallet}',
+                  icon: Icons.toll_rounded,
+                ),
               ),
+            const SizedBox(width: 10),
+            MenuIconButton(
+              icon: Icons.redeem_rounded,
+              tooltip: 'Daily prizes',
+              badge: profile.dailyPrizes.canClaim(DateTime.now()),
+              onPressed: carouselMoving ? null : showDailyPrizes,
             ),
             if (tutorialActive &&
                 game.waitingForInput &&
@@ -1711,39 +1869,25 @@ class _GameScreenState extends State<GameScreen>
                   TutorialStep.level1,
                   TutorialStep.classicPlay,
                 ].contains(tutorialStep))
-              IconButton.filledTonal(
+              MenuIconButton(
                 key: tutorialLevelsKey,
+                icon: Icons.grid_view_rounded,
                 tooltip: 'Classic levels',
                 onPressed: selectLevel,
-                icon: const Icon(Icons.grid_view_rounded),
               ),
             if (tutorialActive &&
                 game.waitingForInput &&
                 !returning &&
                 tutorialStep == TutorialStep.dailyChallenge)
-              IconButton.filledTonal(
+              MenuIconButton(
                 key: tutorialDailyKey,
+                icon: Icons.today_outlined,
                 tooltip: 'Daily Challenge',
                 onPressed: () {
                   skipTutorial();
                   showDaily();
                 },
-                icon: const Icon(Icons.today_outlined),
               ),
-            if (game.waitingForInput && !returning) ...[
-              shopButton(),
-              const SizedBox(width: 8),
-            ],
-            IconButton(
-              tooltip: 'Modes',
-              onPressed: carouselMoving ? null : showModes,
-              icon: const Icon(Icons.apps_rounded, size: 21),
-            ),
-            IconButton(
-              tooltip: 'Settings',
-              onPressed: carouselMoving ? null : showSettings,
-              icon: const Icon(Icons.tune_rounded, size: 21),
-            ),
           ],
         ),
         Expanded(
@@ -1751,32 +1895,65 @@ class _GameScreenState extends State<GameScreen>
             offset: Offset(reduced ? 0 : distance * -28, 0),
             child: Opacity(
               opacity: reduced ? 1 : 1 - distance.abs() * .8,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Text(
-                    worldTitle(index),
-                    key: const ValueKey('selected-mode-title'),
-                    maxLines: 1,
-                    style: TextStyle(
-                      fontSize: MediaQuery.sizeOf(context).height < 650
-                          ? 28
-                          : 34,
-                      height: 1.05,
-                      letterSpacing: -1.4,
-                      fontWeight: FontWeight.w900,
+                  Expanded(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            worldTitle(index),
+                            key: const ValueKey('selected-mode-title'),
+                            style: TextStyle(
+                              color: menuText,
+                              fontSize: MediaQuery.sizeOf(context).height < 650
+                                  ? 29
+                                  : 38,
+                              height: 1.05,
+                              letterSpacing: -1.3,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            worldSubtitle(index),
+                            key: const ValueKey('selected-mode-subtitle'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: menuMuted,
+                              fontSize: 9,
+                              letterSpacing: 1,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    worldSubtitle(index),
-                    key: const ValueKey('selected-mode-subtitle'),
-                    maxLines: 1,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      letterSpacing: 1.25,
-                      fontWeight: FontWeight.w600,
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: menuGold.withAlpha(70)),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '0${index + 1}',
+                        style: const TextStyle(
+                          color: menuGold,
+                          fontSize: 11,
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -1788,325 +1965,728 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  Widget carouselFooter(double page) => Row(
-    mainAxisAlignment: MainAxisAlignment.center,
-    children: [
-      IconButton(
-        tooltip: 'Previous mode',
-        visualDensity: VisualDensity.compact,
-        onPressed: selectedMode > 0 && !carouselMoving
-            ? () => carouselKey.currentState?.select(selectedMode - 1)
-            : null,
-        icon: const Icon(Icons.chevron_left_rounded, size: 18),
-      ),
-      for (var index = 0; index < arcadeModes.length; index++)
-        Semantics(
-          label: '${worldTitle(index)}, ${index + 1} of ${arcadeModes.length}',
-          selected: selectedMode == index,
-          button: true,
-          child: GestureDetector(
-            key: ValueKey('mode-$index'),
-            behavior: HitTestBehavior.opaque,
-            onTap: carouselMoving
-                ? null
-                : () => carouselKey.currentState?.select(index),
-            child: SizedBox(
-              width: 24,
-              height: 30,
-              child: Center(
-                child: Container(
-                  width: 6 + 12 * (1 - (page - index).abs().clamp(0.0, 1.0)),
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: Color.lerp(
-                      ink.withAlpha(50),
-                      ink,
-                      1 - (page - index).abs().clamp(0.0, 1.0),
-                    ),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
+  Widget tutorialCarouselFooter(double page) => Padding(
+    padding: const EdgeInsets.fromLTRB(18, 0, 18, 4),
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        SizedBox(
+          height: 32,
+          child: Row(
+            children: [
+              IconButton(
+                tooltip: 'Previous mode',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 28,
+                  height: 30,
+                ),
+                onPressed: selectedMode > 0 && !carouselMoving
+                    ? () => carouselKey.currentState?.select(selectedMode - 1)
+                    : null,
+                icon: Icon(
+                  Icons.chevron_left_rounded,
+                  color: selectedMode > 0 ? menuMuted : menuLine,
+                  size: 20,
                 ),
               ),
-            ),
-          ),
-        ),
-      IconButton(
-        tooltip: 'Next mode',
-        visualDensity: VisualDensity.compact,
-        onPressed: selectedMode < arcadeModes.length - 1 && !carouselMoving
-            ? () => carouselKey.currentState?.select(selectedMode + 1)
-            : null,
-        icon: const Icon(Icons.chevron_right_rounded, size: 18),
-      ),
-    ],
-  );
-
-  Widget playScreen(BuildContext context) => Scaffold(
-    body: ModeCarousel(
-      key: carouselKey,
-      selected: selectedMode,
-      locked:
-          tutorialActive ||
-          !game.waitingForInput ||
-          returning ||
-          !entrance.isDismissed,
-      expansion: expansion,
-      controlInset: game.oneFinger ? OneFingerControls.height : 0,
-      acceptSwipe: acceptsWorldSwipe,
-      onMoving: (moving) => setState(() {
-        carouselMoving = moving;
-        game.inputLocked = moving;
-      }),
-      onSelected: (index) => setState(() {
-        if (index != selectedMode) prepareWorld(index);
-      }),
-      worldBuilder: world,
-      builder: (context, worlds, page) {
-        final low = page.floor().clamp(0, arcadeModes.length - 1),
-            high = page.ceil().clamp(0, arcadeModes.length - 1);
-        final background = Color.lerp(
-          Color.lerp(
-            worldColors[low],
-            BallWorld.of(game.cosmetic).surround,
-            .85,
-          ),
-          Color.lerp(
-            worldColors[high],
-            BallWorld.of(game.cosmetic).surround,
-            .85,
-          ),
-          page - page.floor(),
-        )!;
-        final ready =
-            game.waitingForInput && !returning && entrance.isDismissed;
-        final menuHeaderHeight =
-            MediaQuery.sizeOf(context).height < 650 &&
-                MediaQuery.textScalerOf(context).scale(10) <= 10
-            ? 104.0
-            : 144.0;
-        final headerHeight = menuHeaderHeight * (1 - expansion);
-        return ColoredBox(
-          color: background,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              if (game.infinite)
-                Opacity(
-                  opacity: 1 - chromeOpacity,
-
-                  child: RepaintBoundary(
-                    child: CustomPaint(
-                      painter: InfiniteBackdropPainter(
-                        game,
-                        reducedMotion: MediaQuery.disableAnimationsOf(context),
-                        repaint: backdrop,
-                      ),
-                    ),
-                  ),
-                ),
-              SafeArea(
-                key: const ValueKey('arcade-stage'),
-                child: Column(
-                  children: [
-                    if (headerHeight > .1)
-                      SizedBox(
-                        height: headerHeight,
-                        child: ClipRect(
-                          child: OverflowBox(
-                            alignment: Alignment.topCenter,
-                            minHeight: menuHeaderHeight,
-                            maxHeight: menuHeaderHeight,
-                            child: IgnorePointer(
-                              ignoring: !ready,
-                              child: ExcludeSemantics(
-                                excluding: !ready,
-                                child: Opacity(
-                                  opacity: chromeOpacity,
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 20,
-                                      vertical: 4,
-                                    ),
-                                    child: selectionHeader(page),
-                                  ),
+              for (var index = 0; index < arcadeModes.length; index++)
+                Expanded(
+                  child: Semantics(
+                    label:
+                        '${worldTitle(index)}, ${index + 1} of ${arcadeModes.length}',
+                    selected: selectedMode == index,
+                    button: true,
+                    child: GestureDetector(
+                      key: ValueKey('mode-$index'),
+                      behavior: HitTestBehavior.opaque,
+                      onTap: carouselMoving
+                          ? null
+                          : () => carouselKey.currentState?.select(index),
+                      child: Container(
+                        height: 30,
+                        margin: const EdgeInsets.symmetric(horizontal: 3),
+                        decoration: BoxDecoration(
+                          color: Color.lerp(
+                            Colors.transparent,
+                            menuGold.withAlpha(22),
+                            1 - (page - index).abs().clamp(0.0, 1.0),
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 5),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                ['Infinite', 'Classic', '2048'][index],
+                                style: TextStyle(
+                                  color: selectedMode == index
+                                      ? menuGold
+                                      : menuMuted,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ),
                           ),
                         ),
                       ),
-                    Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(
-                          vertical: 12 * (1 - expansion),
-                        ),
-                        child: worlds,
-                      ),
                     ),
-                    SizedBox(
-                      height: 34 * (1 - expansion),
-                      child: OverflowBox(
-                        minHeight: 34,
-                        maxHeight: 34,
-                        alignment: Alignment.bottomCenter,
-                        child: IgnorePointer(
-                          ignoring: !ready,
-                          child: ExcludeSemantics(
-                            excluding: !ready,
-                            child: Opacity(
-                              opacity: chromeOpacity,
-
-                              child: carouselFooter(page),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (game.bottomControls)
-                      SizedBox(
-                        key: analogKey,
-                        height: (MediaQuery.sizeOf(context).height * .19).clamp(
-                          104.0,
-                          140.0,
-                        ),
-                        child: IgnorePointer(
-                          ignoring: carouselMoving,
-                          child: LayoutBuilder(
-                            builder: (context, bounds) => Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                if (game.tiltLift)
-                                  TiltLiftControls(game: game, frame: frame)
-                                else
-                                  AnalogControls(game: game, frame: frame),
-                                if (ready && !carouselMoving)
-                                  ControlHint(
-                                    sideways: game.tiltLift,
-                                    anchors: [
-                                      if (game.tiltLift)
-                                        Offset(
-                                          bounds.maxWidth / 2,
-                                          bounds.maxHeight / 2,
-                                        )
-                                      else ...[
-                                        Offset(62, bounds.maxHeight / 2),
-                                        Offset(
-                                          bounds.maxWidth - 62,
-                                          bounds.maxHeight / 2,
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              if (!returning &&
-                  resumeSeconds == 0 &&
-                  (game.paused || game.finished))
-                SafeArea(
-                  key: const ValueKey('run-overlay'),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: boardOverlay(),
                   ),
                 ),
-              if (resumeSeconds > 0)
-                Positioned.fill(
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      ModalBarrier(
-                        color: ink.withAlpha(160),
-                        dismissible: false,
-                      ),
-                      Center(
-                        child: Semantics(
-                          liveRegion: true,
-                          label: 'Resuming in $resumeSeconds',
-                          child: Text(
-                            '$resumeSeconds',
-                            key: const ValueKey('resume-countdown'),
-                            style: const TextStyle(
-                              color: cream,
-                              fontSize: 96,
-                              fontWeight: FontWeight.w800,
+              IconButton(
+                tooltip: 'Next mode',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 28,
+                  height: 30,
+                ),
+                onPressed:
+                    selectedMode < arcadeModes.length - 1 && !carouselMoving
+                    ? () => carouselKey.currentState?.select(selectedMode + 1)
+                    : null,
+                icon: Icon(
+                  Icons.chevron_right_rounded,
+                  color: selectedMode < 2 ? menuMuted : menuLine,
+                  size: 20,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            shopButton(),
+            const SizedBox(width: 8),
+            menuDock('Arcade', Icons.apps_rounded, 'Modes', showModes),
+            const SizedBox(width: 8),
+            menuDock('Options', Icons.tune_rounded, 'Settings', showSettings),
+          ],
+        ),
+      ],
+    ),
+  );
+
+  Widget bottomInput(bool ready, double controlHeight) => SizedBox(
+    key: analogKey,
+    height: controlHeight,
+    child: IgnorePointer(
+      ignoring:
+          carouselMoving ||
+          (!tutorialActive && !playArmed && game.waitingForInput),
+      child: Opacity(
+        opacity: tutorialActive ? 1 : 1 - chromeOpacity,
+        child: LayoutBuilder(
+          builder: (context, bounds) => Stack(
+            fit: StackFit.expand,
+            children: [
+              if (game.tiltLift)
+                TiltLiftControls(game: game, frame: frame)
+              else
+                AnalogControls(game: game, frame: frame),
+              if ((tutorialActive && ready ||
+                      playArmed && game.waitingForInput) &&
+                  !carouselMoving)
+                ControlHint(
+                  sideways: game.tiltLift,
+                  anchors: [
+                    if (game.tiltLift)
+                      Offset(bounds.maxWidth / 2, bounds.maxHeight / 2)
+                    else ...[
+                      Offset(62, bounds.maxHeight / 2),
+                      Offset(bounds.maxWidth - 62, bounds.maxHeight / 2),
+                    ],
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
+  void playSelectedWorld() {
+    if (carouselMoving ||
+        returning ||
+        !game.waitingForInput ||
+        ModalRoute.of(context)?.isCurrent != true)
+      return;
+    setState(() {
+      playArmed = true;
+      game.inputLocked = false;
+    });
+    // Reveal the prepared board; simulation starts on the first control input.
+    if (MediaQuery.disableAnimationsOf(context)) {
+      entrance.value = 1;
+    } else {
+      entrance.forward();
+    }
+  }
+
+  int savedWorldScore(int index) => switch (arcadeModes[index]) {
+    GameMode.infinite => profile.infiniteBestScore,
+    GameMode.merge2048 => profile.mergeBest,
+    _ => profile.levelRecord(worldLevel(index), profile.controlMode).bestScore,
+  };
+
+  bool get compactMenu =>
+      MediaQuery.sizeOf(context).height -
+          MediaQuery.paddingOf(context).vertical <
+      560;
+
+  Widget selectionHeader(double page) {
+    if (tutorialActive) return tutorialSelectionHeader(page);
+    return Row(
+      children: [
+        MenuQuietButton(
+          icon: Icons.redeem_outlined,
+          tooltip: 'Daily prizes',
+          badge: profile.dailyPrizes.canClaim(DateTime.now()),
+          onPressed: carouselMoving ? null : showDailyPrizes,
+        ),
+        const Expanded(
+          child: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'GILT',
+                    style: TextStyle(
+                      fontFamily: 'sans-serif',
+                      color: menuText,
+                      fontSize: 37,
+                      letterSpacing: 9,
+                      fontWeight: FontWeight.w300,
+                      height: 1.15,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'THE ART OF BALANCE',
+                    style: TextStyle(
+                      color: menuMuted,
+                      fontSize: 8,
+                      letterSpacing: 2,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        MenuQuietButton(
+          icon: Icons.tune_rounded,
+          tooltip: 'Settings',
+          onPressed: carouselMoving ? null : showSettings,
+        ),
+      ],
+    );
+  }
+
+  Widget carouselFooter(double page) {
+    if (tutorialActive) return tutorialCarouselFooter(page);
+    final index = page.round().clamp(0, arcadeModes.length - 1);
+    final classic = index == 1;
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 460),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              SizedBox(
+                height: compactMenu ? 26 : 34,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    worldTitle(index),
+                    key: const ValueKey('selected-mode-title'),
+                    style: const TextStyle(
+                      color: menuText,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: -.4,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(
+                height: compactMenu ? 14 : 18,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    worldSubtitle(index),
+                    key: const ValueKey('selected-mode-subtitle'),
+                    style: const TextStyle(
+                      color: menuMuted,
+                      fontSize: 9,
+                      letterSpacing: 1,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(
+                height: 48,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: MenuBestScore(score: savedWorldScore(index)),
+                    ),
+                    if (classic) ...[
+                      const SizedBox(width: 12),
+                      Flexible(
+                        child: Tooltip(
+                          message: ClassicLevels.definition(
+                            worldLevel(index),
+                          ).name,
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              key: const ValueKey('choose-level'),
+                              onTap: carouselMoving ? null : selectLevel,
+                              borderRadius: BorderRadius.circular(12),
+                              child: SizedBox(
+                                height: 48,
+                                child: Center(
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: const Text(
+                                      'Choose Level',
+                                      style: TextStyle(
+                                        color: menuGold,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ],
-                  ),
+                  ],
                 ),
-              if (game.infinite && !game.waitingForInput ||
-                  tutorialActive && tutorialStep.inInfinite)
-                Positioned(
-                  top: MediaQuery.paddingOf(context).top + 70,
-                  right: 24,
-                  child: IgnorePointer(
-                    child: AnimatedBuilder(
-                      animation: hud,
-                      builder: (context, _) => Container(
-                        key: tutorialCoinsKey,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: cream.withAlpha(220),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.toll, size: 15, color: orange),
-                            const SizedBox(width: 4),
-                            AnimatedSwitcher(
-                              key: const ValueKey('run-coins'),
-                              duration: MediaQuery.disableAnimationsOf(context)
-                                  ? Duration.zero
-                                  : const Duration(milliseconds: 260),
-                              transitionBuilder: (child, animation) =>
-                                  ScaleTransition(
-                                    scale: animation,
-                                    child: child,
+              ),
+              PremiumPlayButton(
+                height: compactMenu ? 56 : 64,
+                key: game.waitingForInput ? const ValueKey('menu-play') : null,
+                onPressed: carouselMoving || !game.waitingForInput || returning
+                    ? null
+                    : playSelectedWorld,
+              ),
+              SizedBox(height: compactMenu ? 8 : 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  KeyedSubtree(
+                    key: shopOriginKey,
+                    child: MenuQuietButton(
+                      key: game.waitingForInput
+                          ? const ValueKey('board-shop')
+                          : null,
+                      label: 'Shop',
+                      icon: Icons.storefront_outlined,
+                      tooltip: 'Gear shop',
+                      onPressed: carouselMoving ? null : showBallShop,
+                    ),
+                  ),
+                  Flexible(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (var mode = 0; mode < arcadeModes.length; mode++)
+                          Flexible(
+                            child: Tooltip(
+                              message: worldTitle(mode),
+                              child: Semantics(
+                                label: '${worldTitle(mode)}, ${mode + 1} of 3',
+                                selected: selectedMode == mode,
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    key: ValueKey('mode-$mode'),
+                                    onTap: carouselMoving
+                                        ? null
+                                        : () => carouselKey.currentState
+                                              ?.select(mode),
+                                    borderRadius: BorderRadius.circular(18),
+                                    child: SizedBox(
+                                      width: 48,
+                                      height: 48,
+                                      child: Center(
+                                        child: Container(
+                                          width:
+                                              7 +
+                                              15 *
+                                                  (1 -
+                                                      (page - mode).abs().clamp(
+                                                        0.0,
+                                                        1.0,
+                                                      )),
+                                          height: 5,
+                                          decoration: BoxDecoration(
+                                            color: selectedMode == mode
+                                                ? menuGold
+                                                : menuMuted.withAlpha(80),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                              child: Text(
-                                '${profile.wallet}',
-                                key: ValueKey(profile.wallet),
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: ink,
                                 ),
                               ),
                             ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  MenuQuietButton(
+                    label: 'Arcade',
+                    icon: Icons.grid_view_rounded,
+                    tooltip: 'Modes',
+                    onPressed: carouselMoving ? null : showModes,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget playScreen(BuildContext context) => Scaffold(
+    body: MenuMotion(
+      enabled:
+          !tutorialActive && !playArmed && game.waitingForInput && !returning,
+      builder: (context, drift, reveal) => ModeCarousel(
+        key: carouselKey,
+        selected: selectedMode,
+        locked:
+            tutorialActive ||
+            playArmed ||
+            !game.waitingForInput ||
+            returning ||
+            !entrance.isDismissed,
+        expansion: expansion,
+        controlInset: game.oneFinger ? OneFingerControls.height : 0,
+        acceptSwipe: acceptsWorldSwipe,
+        onMoving: (moving) => setState(() {
+          carouselMoving = moving;
+          game.inputLocked = moving || (!tutorialActive && !playArmed);
+        }),
+        onSelected: (index) => setState(() {
+          if (index != selectedMode) prepareWorld(index);
+        }),
+        worldBuilder: (context, index) => world(context, index, drift),
+        builder: (context, worlds, page) {
+          final low = page.floor().clamp(0, arcadeModes.length - 1),
+              high = page.ceil().clamp(0, arcadeModes.length - 1);
+          final background = Color.lerp(
+            Color.lerp(
+              worldColors[low],
+              BallWorld.of(game.cosmetic).surround,
+              .85,
+            ),
+            Color.lerp(
+              worldColors[high],
+              BallWorld.of(game.cosmetic).surround,
+              .85,
+            ),
+            page - page.floor(),
+          )!;
+          final ready =
+              game.waitingForInput && !returning && entrance.isDismissed;
+          final menuHeaderHeight = !tutorialActive
+              ? compactMenu
+                    ? 64.0
+                    : 88.0
+              : MediaQuery.sizeOf(context).height < 650 &&
+                    MediaQuery.textScalerOf(context).scale(10) <= 10
+              ? 104.0
+              : 144.0;
+          final headerHeight = menuHeaderHeight * (1 - expansion);
+          final menuFooterHeight = tutorialActive
+              ? 84.0
+              : compactMenu
+              ? 208.0
+              : 234.0;
+          final menuGap = !tutorialActive && compactMenu ? 4.0 : 12.0;
+          final controlHeight = game.bottomControls
+              ? (MediaQuery.sizeOf(context).height * .19).clamp(104.0, 140.0)
+              : 0.0;
+          final stageBackground = Color.lerp(
+            background,
+            menuBackground,
+            chromeOpacity,
+          )!;
+          final stageBrightness = ThemeData.estimateBrightnessForColor(
+            stageBackground,
+          );
+          return AnnotatedRegion<SystemUiOverlayStyle>(
+            value: SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarBrightness: stageBrightness,
+              statusBarIconBrightness: stageBrightness == Brightness.dark
+                  ? Brightness.light
+                  : Brightness.dark,
+            ),
+            child: ColoredBox(
+              color: stageBackground,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (chromeOpacity > 0)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: Opacity(
+                          opacity: chromeOpacity,
+                          child: RepaintBoundary(
+                            child: CustomPaint(
+                              painter: tutorialActive
+                                  ? MenuBackdrop()
+                                  : PremiumMenuBackdrop(
+                                      profile.selectedBall,
+                                      drift,
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (game.infinite)
+                    Opacity(
+                      opacity: 1 - chromeOpacity,
+
+                      child: RepaintBoundary(
+                        child: CustomPaint(
+                          painter: InfiniteBackdropPainter(
+                            game,
+                            reducedMotion: MediaQuery.disableAnimationsOf(
+                              context,
+                            ),
+                            repaint: backdrop,
+                          ),
+                        ),
+                      ),
+                    ),
+                  SafeArea(
+                    key: const ValueKey('arcade-stage'),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Column(
+                          children: [
+                            if (headerHeight > .1)
+                              SizedBox(
+                                height: headerHeight,
+                                child: ClipRect(
+                                  child: OverflowBox(
+                                    alignment: Alignment.topCenter,
+                                    minHeight: menuHeaderHeight,
+                                    maxHeight: menuHeaderHeight,
+                                    child: IgnorePointer(
+                                      ignoring: !ready,
+                                      child: ExcludeSemantics(
+                                        excluding: !ready,
+                                        child: Opacity(
+                                          opacity: chromeOpacity,
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 20,
+                                              vertical: 4,
+                                            ),
+                                            child: MenuReveal(
+                                              animation: tutorialActive
+                                                  ? const AlwaysStoppedAnimation(
+                                                      1.0,
+                                                    )
+                                                  : reveal,
+                                              child: selectionHeader(page),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            Expanded(
+                              child: Padding(
+                                padding: EdgeInsets.only(
+                                  top: menuGap * (1 - expansion),
+                                  bottom:
+                                      menuGap * (1 - expansion) +
+                                      (tutorialActive
+                                          ? 0
+                                          : controlHeight * expansion),
+                                ),
+                                child: worlds,
+                              ),
+                            ),
+                            SizedBox(
+                              height: menuFooterHeight * (1 - expansion),
+                              child: OverflowBox(
+                                minHeight: menuFooterHeight,
+                                maxHeight: menuFooterHeight,
+                                alignment: Alignment.bottomCenter,
+                                child: IgnorePointer(
+                                  ignoring: !ready,
+                                  child: ExcludeSemantics(
+                                    excluding: !ready,
+                                    child: Opacity(
+                                      opacity: chromeOpacity,
+
+                                      child: MenuReveal(
+                                        animation: tutorialActive
+                                            ? const AlwaysStoppedAnimation(1.0)
+                                            : reveal,
+                                        child: carouselFooter(page),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (tutorialActive && game.bottomControls)
+                              SizedBox(height: controlHeight),
                           ],
+                        ),
+                        if (game.bottomControls)
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: tutorialActive
+                                ? 0
+                                : menuFooterHeight * (1 - expansion),
+                            child: bottomInput(ready, controlHeight),
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (!returning &&
+                      resumeSeconds == 0 &&
+                      (game.paused || game.finished))
+                    SafeArea(
+                      key: const ValueKey('run-overlay'),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: boardOverlay(),
+                      ),
+                    ),
+                  if (resumeSeconds > 0)
+                    Positioned.fill(
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          ModalBarrier(
+                            color: ink.withAlpha(160),
+                            dismissible: false,
+                          ),
+                          Center(
+                            child: Semantics(
+                              liveRegion: true,
+                              label: 'Resuming in $resumeSeconds',
+                              child: Text(
+                                '$resumeSeconds',
+                                key: const ValueKey('resume-countdown'),
+                                style: const TextStyle(
+                                  color: cream,
+                                  fontSize: 96,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (game.infinite && !game.waitingForInput ||
+                      tutorialActive && tutorialStep.inInfinite)
+                    Positioned(
+                      top: MediaQuery.paddingOf(context).top + 70,
+                      right: 24,
+                      child: IgnorePointer(
+                        child: AnimatedBuilder(
+                          animation: hud,
+                          builder: (context, _) => Container(
+                            key: tutorialCoinsKey,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: cream.withAlpha(220),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.toll, size: 15, color: orange),
+                                const SizedBox(width: 4),
+                                AnimatedSwitcher(
+                                  key: const ValueKey('run-coins'),
+                                  duration:
+                                      MediaQuery.disableAnimationsOf(context)
+                                      ? Duration.zero
+                                      : const Duration(milliseconds: 260),
+                                  transitionBuilder: (child, animation) =>
+                                      ScaleTransition(
+                                        scale: animation,
+                                        child: child,
+                                      ),
+                                  child: Text(
+                                    '${profile.wallet}',
+                                    key: ValueKey(profile.wallet),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: ink,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  IgnorePointer(
+                    child: RepaintBoundary(
+                      key: effectsKey,
+                      child: CustomPaint(
+                        painter: HeartLossPainter(
+                          heartEffects,
+                          reducedMotion: MediaQuery.disableAnimationsOf(
+                            context,
+                          ),
+                          repaint: frame,
                         ),
                       ),
                     ),
                   ),
-                ),
-              IgnorePointer(
-                child: RepaintBoundary(
-                  key: effectsKey,
-                  child: CustomPaint(
-                    painter: HeartLossPainter(
-                      heartEffects,
-                      reducedMotion: MediaQuery.disableAnimationsOf(context),
-                      repaint: frame,
-                    ),
-                  ),
-                ),
+                  if (tutorialOverlay() case final overlay?) overlay,
+                ],
               ),
-              if (tutorialOverlay() case final overlay?) overlay,
-            ],
-          ),
-        );
-      },
+            ),
+          );
+        },
+      ),
     ),
   );
   Widget status() => SizedBox(
@@ -2134,8 +2714,8 @@ class _GameScreenState extends State<GameScreen>
         child: FilledButton(
           onPressed: action,
           style: FilledButton.styleFrom(
-            backgroundColor: ink,
-            foregroundColor: cream,
+            backgroundColor: menuGold,
+            foregroundColor: menuBackground,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -2148,12 +2728,12 @@ class _GameScreenState extends State<GameScreen>
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
-                  child: Text(text, style: label(cream)),
+                  child: Text(text, style: label(menuBackground)),
                 ),
               ),
               const SizedBox(width: 8),
               trailing != null
-                  ? Text(trailing, style: label(brass))
+                  ? Text(trailing, style: label(menuBackground))
                   : const Icon(Icons.arrow_forward_rounded, size: 20),
             ],
           ),
@@ -2165,8 +2745,9 @@ class _GameScreenState extends State<GameScreen>
     child: Container(
       key: const ValueKey('revive-offer'),
       decoration: BoxDecoration(
-        color: ink.withAlpha(245),
-        borderRadius: BorderRadius.circular(20),
+        color: menuBackground.withAlpha(245),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: menuLine),
       ),
       child: Center(
         child: SingleChildScrollView(
@@ -2263,8 +2844,8 @@ class _GameScreenState extends State<GameScreen>
       ? FinaleBriefing(game: game, onPlay: pause)
       : Container(
           decoration: BoxDecoration(
-            color: ink.withAlpha(235),
-            borderRadius: BorderRadius.circular(20),
+            color: menuBackground.withAlpha(245),
+            borderRadius: BorderRadius.circular(28),
           ),
           child: Center(
             child: SingleChildScrollView(
@@ -2279,8 +2860,8 @@ class _GameScreenState extends State<GameScreen>
                           : game.won
                           ? Icons.workspace_premium_outlined
                           : Icons.refresh_rounded,
-                      size: 43,
-                      color: brass,
+                      size: 48,
+                      color: menuGold,
                     ),
                     const SizedBox(height: 14),
                     Text(
@@ -2327,10 +2908,7 @@ class _GameScreenState extends State<GameScreen>
                                   ? '${game.metres}m · Best combo x${game.survival.bestCombo}\n${game.message}  ${game.coinsCollected} coins saved.'
                                   : game.message)
                             : '${game.completed}/10 holes  •  ${game.bestStreak} best streak',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFFB5C5BB),
-                        ),
+                        style: const TextStyle(fontSize: 12, color: menuMuted),
                       ),
                       if (profile.achievementsReady > 0)
                         TextButton.icon(
@@ -2359,19 +2937,16 @@ class _GameScreenState extends State<GameScreen>
                       const Text(
                         'Your run is right where you left it.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Color(0xFFB5C5BB),
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: menuMuted, fontSize: 12),
                       ),
                     const SizedBox(height: 22),
                     SizedBox(
                       width: double.infinity,
-                      height: 48,
+                      height: 60,
                       child: FilledButton(
                         style: FilledButton.styleFrom(
-                          backgroundColor: brass,
-                          foregroundColor: ink,
+                          backgroundColor: menuGold,
+                          foregroundColor: menuBackground,
                         ),
                         onPressed: game.paused
                             ? pause
@@ -2399,7 +2974,10 @@ class _GameScreenState extends State<GameScreen>
                                     ? 'NEXT LEVEL'
                                     : 'EARN MORE STARS'
                               : 'ONE MORE RUN',
-                          style: label(),
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
@@ -2416,30 +2994,24 @@ class _GameScreenState extends State<GameScreen>
                         ),
                       ),
                     if (game.won && !game.practice)
-                      TextButton(
-                        onPressed: () =>
-                            start(game.mode, challengeDate: game.dailyDate),
-                        child: Text('RETRY THIS BOARD', style: label(brass)),
+                      pauseAction(
+                        'RETRY THIS BOARD',
+                        Icons.refresh_rounded,
+                        () => start(game.mode, challengeDate: game.dailyDate),
                       ),
                     // A paused run can be dropped for a fresh one in any mode.
                     if (game.paused)
-                      TextButton(
-                        onPressed: () =>
-                            start(game.mode, challengeDate: game.dailyDate),
-                        child: Text('RESTART RUN', style: label(brass)),
+                      pauseAction(
+                        'RESTART RUN',
+                        Icons.restart_alt_rounded,
+                        () => start(game.mode, challengeDate: game.dailyDate),
                       ),
                     if (tutorialActive)
                       TextButton(
                         onPressed: skipTutorial,
                         child: const Text('Skip Tutorial'),
                       ),
-                    TextButton(
-                      onPressed: home,
-                      child: Text(
-                        'BACK TO CLUB',
-                        style: label(cream.withAlpha(180)),
-                      ),
-                    ),
+                    pauseAction('BACK TO MENU', Icons.home_outlined, home),
                   ],
                 ),
               ),
@@ -2447,9 +3019,35 @@ class _GameScreenState extends State<GameScreen>
           ),
         );
 
+  Widget pauseAction(String text, IconData icon, VoidCallback onPressed) =>
+      Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 58),
+              backgroundColor: const Color(0xFF2C4448),
+              foregroundColor: menuText,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              textStyle: const TextStyle(
+                fontFamily: 'sans-serif',
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            onPressed: onPressed,
+            icon: Icon(icon, size: 23),
+            label: Text(text, textAlign: TextAlign.center),
+          ),
+        ),
+      );
+
   Future<void> showGuide() => showModalBottomSheet<void>(
     context: context,
-    backgroundColor: cream,
+    backgroundColor: menuBackground,
     showDragHandle: true,
     isScrollControlled: true,
     builder: (context) => SafeArea(
@@ -2460,14 +3058,7 @@ class _GameScreenState extends State<GameScreen>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'A game of balance.',
-                style: TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -1,
-                ),
-              ),
+              const MenuHeading('A game of balance.', eyebrow: 'HOW TO PLAY'),
               const SizedBox(height: 20),
               guideRow(
                 '01',
@@ -2546,7 +3137,7 @@ class _GameScreenState extends State<GameScreen>
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(number, style: label(orange)),
+        Text(number, style: label(menuGold)),
         const SizedBox(width: 16),
         Expanded(
           child: Column(
@@ -2562,11 +3153,7 @@ class _GameScreenState extends State<GameScreen>
               const SizedBox(height: 5),
               Text(
                 body,
-                style: TextStyle(
-                  fontSize: 13,
-                  height: 1.5,
-                  color: ink.withAlpha(175),
-                ),
+                style: TextStyle(fontSize: 13, height: 1.5, color: menuMuted),
               ),
             ],
           ),
@@ -2594,7 +3181,7 @@ class _GameScreenState extends State<GameScreen>
 
   Future<void> showSettings() => showModalBottomSheet<void>(
     context: context,
-    backgroundColor: cream,
+    backgroundColor: menuBackground,
     showDragHandle: true,
     isScrollControlled: true,
     useSafeArea: true,
@@ -2602,27 +3189,35 @@ class _GameScreenState extends State<GameScreen>
       maxHeight: MediaQuery.sizeOf(context).height * .9,
     ),
     builder: (context) => StatefulBuilder(
-      builder: (context, update) => SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      builder: (context, update) => MenuSurface(
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(22, 0, 22, 24),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
-                  'Make yourself at home.',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+                MenuHeading(
+                  'Options',
+                  eyebrow: 'YOUR ARCADE. YOUR WAY.',
+                  trailing: MenuIconButton(
+                    icon: Icons.close,
+                    tooltip: 'Close settings',
+                    onPressed: () => Navigator.pop(context),
+                  ),
                 ),
-                TextButton.icon(
+                MenuAction(
                   key: const ValueKey('replay-tutorial'),
-                  onPressed: () {
+                  title: 'Replay Tutorial',
+                  subtitle: 'A quick refresher on the essentials',
+                  icon: Icons.school_outlined,
+                  onTap: () {
                     Navigator.pop(context);
                     replayTutorial();
                   },
-                  icon: const Icon(Icons.school_outlined),
-                  label: const Text('Replay Tutorial'),
                 ),
                 const SizedBox(height: 14),
+                const MenuSection('Choose your controls'),
+                const SizedBox(height: 12),
                 ControlOptions(
                   value: profile.controlMode,
                   onChanged: (mode) {
@@ -2633,37 +3228,52 @@ class _GameScreenState extends State<GameScreen>
                     unawaited(profile.save());
                   },
                 ),
-                const SizedBox(height: 8),
-                SensitivitySetting(
-                  id: 'analog-sensitivity',
-                  title: 'Vertical Analog sensitivity',
-                  value: profile.analogSensitivity,
-                  onChanged: (value) {
-                    update(() => profile.analogSensitivity = value);
-                    game.analogSensitivity = value;
-                    game.clearInput();
-                  },
-                  onChangeEnd: () => unawaited(profile.save()),
+                const SizedBox(height: 14),
+                const MenuSection('Fine tune your movement'),
+                const SizedBox(height: 12),
+                MenuPanel(
+                  child: Column(
+                    children: [
+                      SensitivitySetting(
+                        id: 'analog-sensitivity',
+                        title: 'Vertical Analog sensitivity',
+                        value: profile.analogSensitivity,
+                        onChanged: (value) {
+                          update(() => profile.analogSensitivity = value);
+                          game.analogSensitivity = value;
+                          game.clearInput();
+                        },
+                        onChangeEnd: () => unawaited(profile.save()),
+                      ),
+                      SensitivitySetting(
+                        id: 'two-finger-sensitivity',
+                        title: 'Two-Finger sensitivity',
+                        value: profile.twoFingerSensitivity,
+                        onChanged: (value) {
+                          update(() => profile.twoFingerSensitivity = value);
+                          game.twoFingerSensitivity = value;
+                          game.clearInput();
+                        },
+                        onChangeEnd: () => unawaited(profile.save()),
+                      ),
+                      const Text(
+                        '0 = no touch movement · 1 = full response. Lower values make smaller adjustments. Sensitivity does not add delay.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          height: 1.4,
+                          color: menuMuted,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                SensitivitySetting(
-                  id: 'two-finger-sensitivity',
-                  title: 'Two-Finger sensitivity',
-                  value: profile.twoFingerSensitivity,
-                  onChanged: (value) {
-                    update(() => profile.twoFingerSensitivity = value);
-                    game.twoFingerSensitivity = value;
-                    game.clearInput();
-                  },
-                  onChangeEnd: () => unawaited(profile.save()),
-                ),
-                const Text(
-                  '0 = no touch movement · 1 = full response. Lower values make smaller adjustments. Sensitivity does not add delay.',
-                  style: TextStyle(fontSize: 11, height: 1.4),
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Sound Effects'),
-                  subtitle: Text(profile.sound ? 'ON' : 'OFF'),
+                const SizedBox(height: 26),
+                const MenuSection('Feel & sound'),
+                const SizedBox(height: 12),
+                MenuToggle(
+                  title: 'Sound Effects',
+                  icon: Icons.graphic_eq_rounded,
+                  subtitle: 'Shots, lasers, rewards, and game cues',
                   value: profile.sound,
                   onChanged: (v) {
                     update(() => profile.sound = v);
@@ -2671,10 +3281,10 @@ class _GameScreenState extends State<GameScreen>
                     unawaited(profile.save());
                   },
                 ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Music'),
-                  subtitle: Text(profile.music ? 'ON' : 'OFF'),
+                MenuToggle(
+                  title: 'Music',
+                  icon: Icons.music_note_rounded,
+                  subtitle: 'Background soundtrack',
                   value: profile.music,
                   onChanged: (v) {
                     update(() => profile.music = v);
@@ -2682,53 +3292,62 @@ class _GameScreenState extends State<GameScreen>
                     unawaited(profile.save());
                   },
                 ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Haptic feedback'),
+                MenuToggle(
+                  title: 'Haptic feedback',
+                  icon: Icons.vibration_rounded,
+                  subtitle: 'Feel targets and impacts',
                   value: profile.haptics,
                   onChanged: (v) {
                     update(() => profile.haptics = v);
                     unawaited(profile.save());
                   },
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  'Classic best ${profile.best}  •  ${profile.runs} runs',
-                  style: label(),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Infinite best ${profile.infiniteBest}m',
-                  style: label().copyWith(fontSize: 9, letterSpacing: 1),
-                ),
-                if (!profile.available)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 10),
-                    child: Text(
-                      'Local storage is unavailable. Records will last for this session.',
-                      textAlign: TextAlign.center,
-                    ),
+                const SizedBox(height: 16),
+                MenuPanel(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const MenuSection('Your records'),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Classic best ${profile.best}  •  ${profile.runs} runs',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Infinite best ${profile.infiniteBest}m',
+                        style: const TextStyle(color: menuMint),
+                      ),
+                      if (!profile.available)
+                        const Text(
+                          'Local storage is unavailable. Records will last for this session.',
+                        ),
+                    ],
                   ),
-                const SizedBox(height: 12),
-                const Text(
-                  'GILT / No rush. Just precision.',
-                  style: TextStyle(fontSize: 11),
                 ),
-                TextButton.icon(
-                  onPressed: () {
+                const SizedBox(height: 18),
+                MenuAction(
+                  title: 'Shop',
+                  icon: Icons.storefront_rounded,
+                  subtitle: 'Find your next signature look',
+                  onTap: () {
                     Navigator.pop(context);
                     showBallShop();
                   },
-                  icon: const Icon(Icons.palette_outlined),
-                  label: const Text('Shop'),
                 ),
-                TextButton.icon(
-                  onPressed: () {
+                MenuAction(
+                  title: 'Goals, friends & backup',
+                  icon: Icons.emoji_events_outlined,
+                  onTap: () {
                     Navigator.pop(context);
                     showClub();
                   },
-                  icon: const Icon(Icons.emoji_events_outlined),
-                  label: const Text('Goals, friends & backup'),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'GILT / No rush. Just precision.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 11, color: menuMuted),
                 ),
               ],
             ),

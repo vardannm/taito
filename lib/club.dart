@@ -1,6 +1,6 @@
+import 'menu_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'board_painter.dart';
 import 'friend_challenge.dart';
 import 'game.dart';
 import 'levels.dart';
@@ -227,7 +227,11 @@ class _ClubScreenState extends State<ClubScreen> {
         children: [
           Text(
             title,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: menuGold,
+            ),
           ),
           const SizedBox(height: 10),
           ...children,
@@ -242,147 +246,162 @@ class _ClubScreenState extends State<ClubScreen> {
         .where((c) => !profile.isUnlocked(c))
         .firstOrNull;
     final recorder = widget.recorder;
-    return Scaffold(
-      backgroundColor: cream,
-      appBar: AppBar(title: const Text('Your arcade club')),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              section('Your next goal', [
-                Text(goal.title, style: const TextStyle(fontSize: 18)),
-                const SizedBox(height: 6),
-                Text(goal.detail),
-                const SizedBox(height: 10),
-                LinearProgressIndicator(
-                  value: profile.totalStars / (ClassicLevels.count * 3),
+    return MenuSurface(
+      child: Scaffold(
+        backgroundColor: menuBackground,
+        appBar: AppBar(
+          backgroundColor: menuBackground,
+          surfaceTintColor: Colors.transparent,
+          title: const Text(
+            'Your arcade club',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                const MenuHeading(
+                  'Keep climbing.',
+                  eyebrow: 'YOUR ARCADE CLUB',
+                  subtitle:
+                      'New goals, shared challenges, and everything you have earned.',
                 ),
-                Text(
-                  '${profile.totalStars}/${ClassicLevels.count * 3} Classic stars',
-                ),
-                if (nextCabinet != null)
-                  Text(
-                    '${nextCabinet.requiredStars - profile.totalStars} more stars unlock ${nextCabinet.title}.',
-                  ),
-                FilledButton(
-                  onPressed: busy
-                      ? null
-                      : () => play(goal.mode, goal.level, goal.date),
-                  child: const Text('PLAY THIS GOAL'),
-                ),
-              ]),
-              section('Daily with friends', [
-                Text(
-                  'Share a personal record for the same board and controls. These are friend-reported scores, saved on this device.',
-                ),
-                Text('Your controls: ${profile.controlMode.label}'),
-                FilledButton.tonal(
-                  onPressed: () => play(
-                    GameMode.daily,
-                    15,
-                    DailyChallenge.day(DateTime.now()),
-                  ),
-                  child: const Text('PLAY TODAY’S DAILY'),
-                ),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    TextButton(
-                      onPressed: shareDaily,
-                      child: const Text('COPY MY CHALLENGE'),
-                    ),
-                    TextButton(
-                      onPressed: importFriend,
-                      child: const Text('ADD FRIEND CODE'),
-                    ),
-                  ],
-                ),
-                if (friends.isEmpty) const Text('No friend challenges yet.'),
-                for (final friend in friends.reversed)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text('${friend.name} · ${friend.score} points'),
-                    subtitle: Text(
-                      '${friend.date} · ${friend.control.label}\nYour best: ${friend.yourScore(profile)}',
-                    ),
-                    trailing: IconButton(
-                      tooltip: 'Play this challenge',
-                      icon: const Icon(Icons.play_arrow),
-                      onPressed: () {
-                        profile.controlMode = friend.control;
-                        play(
-                          GameMode.daily,
-                          15,
-                          DateTime.parse('${friend.date}T00:00:00Z'),
-                        );
-                      },
-                    ),
-                  ),
-              ]),
-              section('Progress backup', [
-                const Text(
-                  'Copy your progress and save it somewhere you trust. Paste it on another device to restore. This is a manual backup; it does not sync automatically.',
-                ),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    TextButton(
-                      onPressed: busy
-                          ? null
-                          : () => copy(
-                              ProgressBackup.encode(profile),
-                              'Progress copied. Save the full text outside the game.',
-                            ),
-                      child: const Text('COPY BACKUP'),
-                    ),
-                    TextButton(
-                      onPressed: busy ? null : restore,
-                      child: const Text('RESTORE BACKUP'),
-                    ),
-                  ],
-                ),
-                if (busy) const LinearProgressIndicator(),
-              ]),
-              if (recorder != null)
-                section('Playtest session', [
-                  const Text(
-                    'Optional local observation for testing. Records control choice, starts, targets and results. No names and no uploads. Copy the report before closing the app.',
+                section('Your next goal', [
+                  Text(goal.title, style: const TextStyle(fontSize: 18)),
+                  const SizedBox(height: 6),
+                  Text(goal.detail),
+                  const SizedBox(height: 10),
+                  LinearProgressIndicator(
+                    value: profile.totalStars / (ClassicLevels.count * 3),
                   ),
                   Text(
-                    '${recorder.active ? 'Recording' : 'Stopped'} · ${recorder.events.length} events',
+                    '${profile.totalStars}/${ClassicLevels.count * 3} Classic stars',
+                  ),
+                  if (nextCabinet != null)
+                    Text(
+                      '${nextCabinet.requiredStars - profile.totalStars} more stars unlock ${nextCabinet.title}.',
+                    ),
+                  FilledButton(
+                    onPressed: busy
+                        ? null
+                        : () => play(goal.mode, goal.level, goal.date),
+                    child: const Text('PLAY THIS GOAL'),
+                  ),
+                ]),
+                section('Daily with friends', [
+                  Text(
+                    'Share a personal record for the same board and controls. These are friend-reported scores, saved on this device.',
+                  ),
+                  Text('Your controls: ${profile.controlMode.label}'),
+                  FilledButton.tonal(
+                    onPressed: () => play(
+                      GameMode.daily,
+                      15,
+                      DailyChallenge.day(DateTime.now()),
+                    ),
+                    child: const Text('PLAY TODAY’S DAILY'),
                   ),
                   Wrap(
                     spacing: 8,
                     children: [
                       TextButton(
-                        onPressed: () => setState(() {
-                          if (recorder.active) {
-                            recorder.stop();
-                          } else {
-                            recorder.start();
-                          }
-                        }),
-                        child: Text(
-                          recorder.active
-                              ? 'STOP SESSION'
-                              : 'START NEW SESSION',
-                        ),
+                        onPressed: shareDaily,
+                        child: const Text('COPY MY CHALLENGE'),
                       ),
                       TextButton(
-                        onPressed: recorder.events.isEmpty
-                            ? null
-                            : () => copy(
-                                recorder.export(),
-                                'Playtest report copied.',
-                              ),
-                        child: const Text('COPY REPORT'),
+                        onPressed: importFriend,
+                        child: const Text('ADD FRIEND CODE'),
                       ),
                     ],
                   ),
+                  if (friends.isEmpty) const Text('No friend challenges yet.'),
+                  for (final friend in friends.reversed)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('${friend.name} · ${friend.score} points'),
+                      subtitle: Text(
+                        '${friend.date} · ${friend.control.label}\nYour best: ${friend.yourScore(profile)}',
+                      ),
+                      trailing: IconButton(
+                        tooltip: 'Play this challenge',
+                        icon: const Icon(Icons.play_arrow),
+                        onPressed: () {
+                          profile.controlMode = friend.control;
+                          play(
+                            GameMode.daily,
+                            15,
+                            DateTime.parse('${friend.date}T00:00:00Z'),
+                          );
+                        },
+                      ),
+                    ),
                 ]),
-            ],
+                section('Progress backup', [
+                  const Text(
+                    'Copy your progress and save it somewhere you trust. Paste it on another device to restore. This is a manual backup; it does not sync automatically.',
+                  ),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      TextButton(
+                        onPressed: busy
+                            ? null
+                            : () => copy(
+                                ProgressBackup.encode(profile),
+                                'Progress copied. Save the full text outside the game.',
+                              ),
+                        child: const Text('COPY BACKUP'),
+                      ),
+                      TextButton(
+                        onPressed: busy ? null : restore,
+                        child: const Text('RESTORE BACKUP'),
+                      ),
+                    ],
+                  ),
+                  if (busy) const LinearProgressIndicator(),
+                ]),
+                if (recorder != null)
+                  section('Playtest session', [
+                    const Text(
+                      'Optional local observation for testing. Records control choice, starts, targets and results. No names and no uploads. Copy the report before closing the app.',
+                    ),
+                    Text(
+                      '${recorder.active ? 'Recording' : 'Stopped'} · ${recorder.events.length} events',
+                    ),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        TextButton(
+                          onPressed: () => setState(() {
+                            if (recorder.active) {
+                              recorder.stop();
+                            } else {
+                              recorder.start();
+                            }
+                          }),
+                          child: Text(
+                            recorder.active
+                                ? 'STOP SESSION'
+                                : 'START NEW SESSION',
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: recorder.events.isEmpty
+                              ? null
+                              : () => copy(
+                                  recorder.export(),
+                                  'Playtest report copied.',
+                                ),
+                          child: const Text('COPY REPORT'),
+                        ),
+                      ],
+                    ),
+                  ]),
+              ],
+            ),
           ),
         ),
       ),

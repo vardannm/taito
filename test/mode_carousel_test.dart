@@ -83,6 +83,7 @@ void main() {
         (tester) async {
           final game = await launch(tester, control);
           await selectWorld(tester, index);
+          await armWorld(tester);
           expect(game.mode, arcadeModes[index]);
           final state = tester.state(controller(game.controlMode));
           final rect = tester.getRect(controller(game.controlMode));
@@ -119,7 +120,7 @@ void main() {
           await finger.up();
           await tester.tap(find.byTooltip('Pause'));
           await tester.pump();
-          await tester.tap(find.text('BACK TO CLUB'));
+          await tester.tap(find.text('BACK TO MENU'));
           await tester.pump();
           await tester.pump(const Duration(milliseconds: 600));
           await tester.pump();
@@ -189,6 +190,7 @@ void main() {
       expect(carousel(tester).page, 0);
       await swipe(tester, from: const Offset(220, 110));
       expect(game.mode, GameMode.classic);
+      await armWorld(tester);
       await tester.sendKeyDownEvent(LogicalKeyboardKey.keyW);
       expect(game.waitingForInput, isFalse);
       expect(game.leftInput, -1);
@@ -237,7 +239,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 400));
         await tester.pump();
         expect(game.mode, GameMode.classic);
-        expect(game.inputLocked, isFalse);
+        expect(game.inputLocked, isTrue);
         await startWorld(tester);
         expect(game.waitingForInput, isFalse);
         await tester.pumpWidget(const SizedBox());
@@ -334,7 +336,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.byType(BallShop), findsOneWidget);
-    await tester.tapAt(const Offset(8, 8));
+    await tester.tap(find.byTooltip('Done shopping'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.byType(BallShop), findsNothing);
@@ -357,7 +359,7 @@ void main() {
       );
       final game = await launch(tester, ControlMode.analog);
       for (var index = 1; index < arcadeModes.length; index++) {
-        await tester.tap(find.byTooltip('Next mode'));
+        await tester.tap(find.byKey(ValueKey('mode-$index')));
         await tester.pump();
         expect(game.mode, arcadeModes[index]);
         expect(carousel(tester).page, index);

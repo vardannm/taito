@@ -20,7 +20,18 @@ Future<void> selectWorld(WidgetTester tester, int index) async {
   await tester.pump();
 }
 
+Future<void> armWorld(WidgetTester tester) async {
+  if (find.byKey(const ValueKey('start-control-prompt')).evaluate().isNotEmpty) {
+    return;
+  }
+  if (find.byKey(const ValueKey('menu-play')).evaluate().isEmpty) return;
+  await tester.tap(find.byKey(const ValueKey('menu-play')));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 600));
+}
+
 Future<void> startWorld(WidgetTester tester) async {
+  await armWorld(tester);
   final board = find.byType(PivotBoard);
   final game = tester.widget<PivotBoard>(board).game;
   final point = game.boardTilt

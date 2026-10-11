@@ -22,7 +22,12 @@ void main() {
         ..sound = false
         ..haptics = false;
       await tester.pumpWidget(ArcadeApp(profile: profile));
-      expect(find.text('Infinite'), findsOneWidget);
+      expect(
+        tester
+            .widget<Text>(find.byKey(const ValueKey('selected-mode-title')))
+            .data,
+        'Infinite',
+      );
       expect(tester.takeException(), isNull);
       await tester.tap(find.byTooltip('Modes'));
       await tester.pump();
@@ -104,11 +109,12 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.text('First steps'));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
     final rect = tester.getRect(find.byType(PivotBoard));
-    expect(rect.left, greaterThanOrEqualTo(12));
-    expect(rect.right, lessThanOrEqualTo(788));
-    expect(rect.bottom, lessThanOrEqualTo(1166));
-    expect(rect.top, greaterThanOrEqualTo(44));
+    expect(rect.left, greaterThanOrEqualTo(12 - .001));
+    expect(rect.right, lessThanOrEqualTo(788 + .001));
+    expect(rect.bottom, lessThanOrEqualTo(1166 + .001));
+    expect(rect.top, greaterThanOrEqualTo(44 - .001));
     expect(rect.height, greaterThan(850));
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());

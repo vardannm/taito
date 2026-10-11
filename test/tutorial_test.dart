@@ -244,8 +244,8 @@ void main() {
       expect(g.tutorialCourse, isFalse);
       await tester.tap(find.byTooltip('Pause'));
       await tester.pump();
-      await tester.ensureVisible(find.text('BACK TO CLUB'));
-      await tester.tap(find.text('BACK TO CLUB'));
+      await tester.ensureVisible(find.text('BACK TO MENU'));
+      await tester.tap(find.text('BACK TO MENU'));
       await frames(tester, 35);
       await tester.tap(find.byTooltip('Settings'));
       await frames(tester);
@@ -296,8 +296,8 @@ void main() {
       expect(p.tutorial.step, TutorialStep.dailyChallenge);
       expect(p.tutorial.gameplayComplete, isTrue);
       expect(find.textContaining('Daily Challenge:'), findsNothing);
-      await tester.ensureVisible(find.text('BACK TO CLUB'));
-      await tester.tap(find.text('BACK TO CLUB'));
+      await tester.ensureVisible(find.text('BACK TO MENU'));
+      await tester.tap(find.text('BACK TO MENU'));
       await frames(tester, 35);
       expect(find.textContaining('Daily Challenge:'), findsOneWidget);
       await tester.tap(find.byTooltip('Daily Challenge'));

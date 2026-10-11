@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'game.dart';
 import 'board_painter.dart';
+import 'menu_design.dart';
 
 class ControlOptions extends StatefulWidget {
   const ControlOptions({
@@ -51,13 +52,11 @@ class _ControlOptionsState extends State<ControlOptions>
         Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: Material(
-            color: widget.value == mode
-                ? const Color(0xFFD9EDE7)
-                : const Color(0xFFFAF7EF),
+            color: widget.value == mode ? const Color(0xFF2C4140) : menuPanel,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
               side: BorderSide(
-                color: widget.value == mode ? ink : brass.withAlpha(100),
+                color: widget.value == mode ? menuGold : menuLine,
                 width: widget.value == mode ? 2 : 1,
               ),
             ),
@@ -81,7 +80,7 @@ class _ControlOptionsState extends State<ControlOptions>
                             ControlMode.boardTilt => Icons.swipe,
                           },
                           size: 22,
-                          color: ink,
+                          color: menuGold,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -100,7 +99,11 @@ class _ControlOptionsState extends State<ControlOptions>
                           ),
                         ),
                         if (widget.value == mode)
-                          const Icon(Icons.check_circle, color: ink, size: 20),
+                          const Icon(
+                            Icons.check_circle,
+                            color: menuMint,
+                            size: 20,
+                          ),
                       ],
                     ),
                     Row(
@@ -116,18 +119,25 @@ class _ControlOptionsState extends State<ControlOptions>
                         ),
                         const SizedBox(width: 10),
                         Expanded(
-                          child: Text(switch (mode) {
-                            ControlMode.twoFinger =>
-                              'Drag each platform end. Lift together, or tilt independently.',
-                            ControlMode.oneFinger =>
-                              'Use the thumb area below the board. Drag sideways to tilt, up or down to move.',
-                            ControlMode.analog =>
-                              'Slide the two bottom controls vertically. Release to hold position.',
-                            ControlMode.tiltLift =>
-                              'Drag sideways to tilt. Release to keep the angle. No manual lift in this test mode.',
-                            ControlMode.boardTilt =>
-                              'Tilt anywhere on the board. The guide appears under your finger, then hides on release. No lift or bottom slider.',
-                          }, style: const TextStyle(fontSize: 12, height: 1.4)),
+                          child: Text(
+                            switch (mode) {
+                              ControlMode.twoFinger =>
+                                'Drag each platform end. Lift together, or tilt independently.',
+                              ControlMode.oneFinger =>
+                                'Use the thumb area below the board. Drag sideways to tilt, up or down to move.',
+                              ControlMode.analog =>
+                                'Slide the two bottom controls vertically. Release to hold position.',
+                              ControlMode.tiltLift =>
+                                'Drag sideways to tilt. Release to keep the angle. No manual lift in this test mode.',
+                              ControlMode.boardTilt =>
+                                'Tilt anywhere on the board. The guide appears under your finger, then hides on release. No lift or bottom slider.',
+                            },
+                            style: const TextStyle(
+                              fontSize: 12,
+                              height: 1.4,
+                              color: menuMuted,
+                            ),
+                          ),
                         ),
                       ],
                     ),

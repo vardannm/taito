@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'menu_design.dart';
 import 'merge.dart';
 
 Color numberColor(int value) {
@@ -145,8 +146,8 @@ class MergeResult extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     decoration: BoxDecoration(
-      color: const Color(0xF0163D3B),
-      borderRadius: BorderRadius.circular(20),
+      color: menuBackground.withAlpha(245),
+      borderRadius: BorderRadius.circular(28),
     ),
     alignment: Alignment.center,
     child: SingleChildScrollView(
@@ -161,7 +162,7 @@ class MergeResult extends StatelessWidget {
                   : 'Number too large.',
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: Color(0xFFF2ECDD),
+                color: menuText,
                 fontSize: 24,
                 fontWeight: FontWeight.w900,
               ),
@@ -171,7 +172,7 @@ class MergeResult extends StatelessWidget {
               '${newBest ? 'NEW BEST' : 'SCORE'} ${run.score}  ·  HIGHEST ${formatMergeNumber(run.highest)}',
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: Color(0xFFFFDF88),
+                color: menuGold,
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
@@ -181,8 +182,8 @@ class MergeResult extends StatelessWidget {
               width: double.infinity,
               child: FilledButton(
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFFFDF88),
-                  foregroundColor: const Color(0xFF163D3B),
+                  backgroundColor: menuGold,
+                  foregroundColor: menuBackground,
                 ),
                 onPressed: onRetry,
                 child: const Text('PLAY AGAIN'),
@@ -192,7 +193,7 @@ class MergeResult extends StatelessWidget {
             Text(
               run.notice,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFFCAD5CD), fontSize: 11),
+              style: const TextStyle(color: menuMuted, fontSize: 11),
             ),
             Wrap(
               alignment: WrapAlignment.center,
@@ -201,7 +202,7 @@ class MergeResult extends StatelessWidget {
                   onPressed: onHome,
                   child: const Text(
                     'BACK TO CLUB',
-                    style: TextStyle(color: Color(0xFFCAD5CD)),
+                    style: TextStyle(color: menuMuted),
                   ),
                 ),
               ],
