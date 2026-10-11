@@ -7,6 +7,7 @@ import 'spider_web.dart';
 import 'porcupines.dart';
 import 'snakes.dart';
 import 'late_enemies.dart';
+import 'infinite_boss.dart';
 import 'encounter_director.dart';
 import 'rewards.dart';
 import 'merge.dart';
@@ -270,6 +271,24 @@ class BalanceGame {
   final snakes = <BoardSnake>[];
   LateEnemyEncounter? lateEnemy;
   bool lateEnemiesEnabled = true;
+  InfiniteBoss? boss;
+  bool bossesEnabled = true;
+  int bossesEncountered = 0;
+  List<int> _bossScoreThresholds = const [100000, 300000, 600000];
+  List<int> get bossScoreThresholds => _bossScoreThresholds;
+  double _nextBossAt = 0;
+  double _lastDamageAt = double.negativeInfinity;
+  double? _bossWarningAt;
+  int? get bossWarningSeconds => _bossWarningAt == null
+      ? null
+      : math.max(1, (_bossWarningAt! + 3 - elapsed).ceil());
+  bool get bossPending =>
+      infinite &&
+      !tutorialCourse &&
+      bossesEnabled &&
+      bossesEncountered < BossKind.values.length &&
+      elapsed >= _nextBossAt &&
+      score >= bossScoreThresholds[bossesEncountered];
   EncounterDirector enemyDirector = EncounterDirector(0);
   // Like mazeSectionsEnabled, lets callers isolate the ordinary hazard stream.
   bool snakeEncountersEnabled = true;
@@ -375,6 +394,8 @@ class BalanceGame {
       hazard.step(dt, ascentSpeed, cameraOffset: cameraOffset);
     }
     if (specialHazards.isNotEmpty ||
+        boss != null ||
+        bossPending ||
         lateEnemy != null ||
         webShots.isNotEmpty ||
         snakes.isNotEmpty ||
@@ -462,11 +483,16 @@ class BalanceGame {
       : _classicBoard;
   int get roundCompleted => completed;
   double screenY(double worldY) => worldY + (scrolling ? cameraOffset : 0);
-  bool get dangerActive => infinite && !tutorialCourse && stallTime >= 10;
+  bool get dangerActive =>
+      infinite && !tutorialCourse && boss == null && stallTime >= 10;
   double get dangerDistance => dangerY - ballY;
 
   void ensureInfiniteBoard({bool retainForSweep = false}) {
     if (!infinite || tutorialCourse) return;
+    if (boss != null) {
+      _nextRowY = math.min(_nextRowY, -cameraOffset + visibleTop - 121);
+      return;
+    }
     while (_nextRowY >= -cameraOffset + visibleTop - 120) {
       final growth = InfiniteTuning.runDensity(score, maxHeight / 10);
       final d = growth * InfiniteDifficulty.obstacleDensity;
@@ -537,6 +563,7 @@ class BalanceGame {
     maxHeight = math.max(maxHeight, infiniteStart - ballRadius - ballY);
     survival.step(dt, maxHeight / 10);
     score = survival.points.floor();
+    _tryStartInfiniteBoss();
     if (leftInput != 0 || rightInput != 0) {
       stallTime = 0;
     } else {
@@ -547,7 +574,12 @@ class BalanceGame {
       dangerY = 640 - cameraOffset;
       return;
     }
-    dangerY = math.min(dangerY, 580 - cameraOffset);
+    if (boss != null) {
+      stallTime = 0;
+      dangerY = 580 - cameraOffset;
+    } else {
+      dangerY = math.min(dangerY, 580 - cameraOffset);
+    }
     if (dangerActive) dangerY -= (24 + math.min(stallTime - 3, 5) * 16) * dt;
     message = dangerActive
         ? 'KEEP STEERING! The red is rising.'
@@ -558,6 +590,10 @@ class BalanceGame {
     ensureEndlessExtras(retainForSweep: true);
     _ensureInfiniteItems();
     if (survival.noticeTime > 0) message = survival.notice;
+    if (boss != null) message = boss!.hint;
+    if (bossWarningSeconds != null)
+      message =
+          'BOSS · ${BossKind.values[bossesEncountered].name} IN $bossWarningSeconds';
   }
 
   void _loseClimb(String reason, {Hole? hole}) {
@@ -566,6 +602,8 @@ class BalanceGame {
     captureX = hole?.x ?? ballX;
     captureY = hole?.y ?? ballY;
     lives--;
+    _lastDamageAt = elapsed;
+    _bossWarningAt = null;
     misses++;
     lastSuccess = false;
     message = reason;
@@ -578,6 +616,9 @@ class BalanceGame {
     velocity = leftSpeed = rightSpeed = 0;
     phase = GamePhase.sinking;
     phaseTime = 0;
+    if (boss != null) _nextBossAt = math.max(_nextBossAt, elapsed + 60);
+    boss = null;
+    _bossWarningAt = null;
   }
 
   double left = 526, right = 526, ballX = 180, velocity = 0;
@@ -624,7 +665,10 @@ class BalanceGame {
     dangerY = math.max(dangerY, ballY + 140);
     survival.recovery = 3;
     lateEnemy = null;
+    boss = null;
     snakes.clear();
+    _bossWarningAt = null;
+    _lastDamageAt = elapsed;
     enemyDirector.rest(elapsed, metres.toDouble());
     survival.announce('BACK IN PLAY · 1 heart · 3 seconds of protection');
     message = survival.notice;
@@ -823,8 +867,21 @@ class BalanceGame {
     quills.clear();
     snakes.clear();
     lateEnemy = null;
-    if (infinite)
-      enemyDirector = EncounterDirector(_runRandom.nextInt(1 << 30));
+    boss = null;
+    bossesEncountered = 0;
+    _nextBossAt = 0;
+    _lastDamageAt = double.negativeInfinity;
+    _bossWarningAt = null;
+    if (infinite) {
+      final encounterSeed = _runRandom.nextInt(1 << 30);
+      enemyDirector = EncounterDirector(encounterSeed);
+      final bossRandom = math.Random(encounterSeed ^ 0xB055);
+      _bossScoreThresholds = List.unmodifiable([
+        for (final kind in BossKind.values)
+          kind.minimumScore +
+              bossRandom.nextInt(kind.maximumScore - kind.minimumScore + 1),
+      ]);
+    }
     _nextPorcupineY = -2700;
     _nextQuillTime = 0;
     if (spiderLevel)
@@ -1096,6 +1153,7 @@ class BalanceGame {
     }
     if (infinite) {
       if (!tutorialCourse) {
+        _updateInfiniteBoss(dt, cameraOffset - (oldScreenY - oldY));
         _updateLateEnemies(dt, cameraOffset - (oldScreenY - oldY));
         _updateSnakes(dt);
         _updateSpecialHazards(dt);

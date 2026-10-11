@@ -26,7 +26,12 @@ Future<Uint8List> bodyPixels(
   final canvas = Canvas(recorder);
   canvas.clipRect(const Rect.fromLTWH(0, 0, 96, 96));
   canvas.translate(48 - 180, 48 - 160);
-  paintLateEnemy(canvas, scene(kind, age), reducedMotion);
+  final game = scene(kind, age);
+  // Isolate the character: later volleys can still cross the perch crop.
+  for (final shot in game.lateEnemy!.shots) {
+    shot.consumed = true;
+  }
+  paintLateEnemy(canvas, game, reducedMotion);
   final picture = recorder.endRecording();
   final image = await picture.toImage(96, 96);
   final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
@@ -47,7 +52,11 @@ void main() {
           final positions = e.shots.map((s) => s.position).toList();
           final budget = DrawingBudget();
           paintLateEnemy(budget, game, reducedMotion);
-          expect(budget.draws, lessThanOrEqualTo(65));
+          // Each of the six additional moth bullets uses four draw calls.
+          expect(
+            budget.draws,
+            lessThanOrEqualTo(kind == LateEnemyKind.moth ? 89 : 65),
+          );
           expect(budget.blurs, 0);
           expect(budget.layers, 0);
           expect(e.age, age);
@@ -60,8 +69,8 @@ void main() {
       tester,
     ) async {
       await tester.runAsync(() async {
-        // Crop just the perch after wind-up: no warning arc or projectile
-        // crosses it. This checks the actual rendered character, not its math.
+        // Crop just the perch after wind-up, with projectiles removed.
+        // This checks the actual rendered character, not its math.
         final a = await bodyPixels(kind, 2.4, false);
         final b = await bodyPixels(kind, 2.65, false);
         expect(a, isNot(orderedEquals(b)));

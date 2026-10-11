@@ -24,7 +24,7 @@ extension LateEnemyDetails on LateEnemyKind {
   };
 }
 
-enum LateShotKind { bomb, acid, ricochet, moth, laser, seed, shard }
+enum LateShotKind { bomb, acid, ricochet, moth, laser, seed, shard, mine }
 
 /// These visitors perch on the rails (the moth hovers above the play area).
 /// Warnings and flying shots use board/screen coordinates, independent of the
@@ -100,7 +100,7 @@ class LateEnemyEncounter {
           ),
         );
       case LateEnemyKind.moth:
-        for (var i = 0; i < 3; i++) {
+        for (var i = 0; i < 6; i++) {
           for (final side in [-1.0, 1.0]) {
             shots.add(
               LateEnemyShot(
@@ -222,6 +222,8 @@ class LateEnemyShot {
     this.curve = 0,
     this.parent,
     this.beamEnd,
+    this.radiusOverride,
+    this.reasonOverride,
   }) : age = -delay,
        _previousAge = -delay;
 
@@ -230,28 +232,38 @@ class LateEnemyShot {
   final double delay, life, bounceTime, curve;
   final LateEnemyShot? parent;
   final EnemyPoint? beamEnd;
+  final double? radiusOverride;
+  final String? reasonOverride;
   double age, _previousAge, _dt = 0, _groundShift = 0, _previousGroundShift = 0;
   bool consumed = false;
   bool get cancelled => consumed || (parent?.consumed ?? false);
   bool get visible => !cancelled && age >= 0 && age < life;
   bool get persistent =>
-      kind == LateShotKind.acid || kind == LateShotKind.laser;
-  double get radius => switch (kind) {
-    LateShotKind.acid => InfiniteTuning.acidRadius,
-    LateShotKind.seed => 5.0,
-    LateShotKind.ricochet => 4.0,
-    LateShotKind.laser => InfiniteTuning.scorpionLaserRadius,
-    _ => 3.0,
-  };
-  String get reason => switch (kind) {
-    LateShotKind.bomb ||
-    LateShotKind.acid => 'Acid hit. Leave the beetle landing circle.',
-    LateShotKind.ricochet => 'Cricket pellet. Watch the wall rebound.',
-    LateShotKind.moth => 'Moth dust. Slip between the curved streams.',
-    LateShotKind.laser => 'Scorpion laser. Step away from its aim line.',
-    LateShotKind.seed ||
-    LateShotKind.shard => 'Seed hit. Watch the three-way split.',
-  };
+      kind == LateShotKind.acid ||
+      kind == LateShotKind.laser ||
+      kind == LateShotKind.mine;
+  double get radius =>
+      radiusOverride ??
+      switch (kind) {
+        LateShotKind.acid => InfiniteTuning.acidRadius,
+        LateShotKind.seed => 5.0,
+        LateShotKind.ricochet => 4.0,
+        LateShotKind.laser => InfiniteTuning.scorpionLaserRadius,
+        LateShotKind.mine => 40.0,
+        _ => 3.0,
+      };
+  String get reason =>
+      reasonOverride ??
+      switch (kind) {
+        LateShotKind.bomb ||
+        LateShotKind.acid => 'Acid hit. Leave the beetle landing circle.',
+        LateShotKind.ricochet => 'Cricket pellet. Watch the wall rebound.',
+        LateShotKind.moth => 'Moth dust. Slip between the curved streams.',
+        LateShotKind.laser => 'Scorpion laser. Step away from its aim line.',
+        LateShotKind.seed ||
+        LateShotKind.shard => 'Seed hit. Watch the three-way split.',
+        LateShotKind.mine => 'Shock mine. Move out of the marked blast circle.',
+      };
 
   EnemyPoint positionAt(double time) {
     var x = origin.x + velocity.x * time;

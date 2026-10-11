@@ -316,6 +316,7 @@ void main() {
         expect(game.pivotTargets, [null, null]);
         await tester.tap(find.text('RESUME RUN'));
         await tester.pump();
+        await tester.pump(const Duration(seconds: 3));
         final next = await tester.startGesture(
           contact(tester, game),
           pointer: 33,

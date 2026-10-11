@@ -1,0 +1,111 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:balance_arcade/game.dart';
+import 'package:balance_arcade/infinite_boss.dart';
+import 'package:balance_arcade/late_enemies.dart';
+import 'infinite_boss_test.dart' show advance, run;
+
+void main() {
+  test(
+    'seeded windows vary between runs and stay fixed on pause and revive',
+    () {
+      final a = BalanceGame(seed: 19), b = BalanceGame(seed: 19);
+      final seen = <String>{};
+      for (var i = 0; i < 20; i++) {
+        a.start(gameMode: GameMode.infinite);
+        b.start(gameMode: GameMode.infinite);
+        expect(a.bossScoreThresholds, b.bossScoreThresholds);
+        for (final kind in BossKind.values) {
+          expect(
+            a.bossScoreThresholds[kind.index],
+            inInclusiveRange(kind.minimumScore, kind.maximumScore),
+          );
+        }
+        seen.add(a.bossScoreThresholds.join(','));
+      }
+      expect(seen.length, greaterThan(1));
+      final thresholds = a.bossScoreThresholds;
+      a.setPaused(true);
+      advance(a, 10);
+      a.setPaused(false);
+      expect(a.bossScoreThresholds, same(thresholds));
+      a.lives = 0;
+      a.phase = GamePhase.over;
+      expect(a.reviveInfinite(), isTrue);
+      expect(a.bossScoreThresholds, same(thresholds));
+    },
+  );
+
+  test('arrival warning lasts three active seconds and freezes on pause', () {
+    final game = run()..survival.points = 120000;
+    advance(game, .1);
+    expect(game.bossWarningSeconds, 3);
+    expect(game.message, contains('SKY WARDEN IN 3'));
+    advance(game, 1);
+    expect(game.bossWarningSeconds, 2);
+    game.setPaused(true);
+    advance(game, 20);
+    expect(game.bossWarningSeconds, 2);
+    game.setPaused(false);
+    advance(game, 1);
+    expect(game.bossWarningSeconds, 1);
+    expect(game.boss, isNull);
+    advance(game, 1);
+    expect(game.boss, isNotNull);
+    expect(game.bossWarningSeconds, isNull);
+  });
+
+  test(
+    'large score jump still gives 60 seconds of normal play between bosses',
+    () {
+      final game = run()
+        ..survival.points = 1000000
+        ..survival.shield = 1000
+        ..lateEnemiesEnabled = false
+        ..snakeEncountersEnabled = false;
+      advance(game, 3.1);
+      expect(game.boss!.kind, BossKind.skyWarden);
+      while (game.boss != null) advance(game, 1 / 120);
+      final end = game.elapsed;
+      advance(game, 59);
+      expect(game.elapsed - end, closeTo(59, .01));
+      expect(game.bossPending, isFalse);
+      expect(game.bossWarningSeconds, isNull);
+      expect(game.board, isNotEmpty);
+      advance(game, 1.1);
+      expect(game.bossPending, isTrue);
+      expect(game.boss, isNull);
+      advance(game, 3.1);
+      expect(game.boss!.kind, BossKind.stormColossus);
+    },
+  );
+
+  test('a lost heart delays and restarts the arrival warning', () {
+    final game = run()..survival.points = 120000;
+    advance(game, 1);
+    game.lateEnemy =
+        LateEnemyEncounter(
+            kind: LateEnemyKind.cricket,
+            origin: (x: 180, y: 160),
+            target: (x: 180, y: 430),
+          )
+          ..shots.add(
+            LateEnemyShot(
+              kind: LateShotKind.shard,
+              origin: (x: game.ballX, y: game.screenY(game.ballY)),
+              velocity: (x: 0, y: 0),
+              delay: 0,
+              life: 1,
+            ),
+          );
+    game.step(1 / 120);
+    expect(game.lives, 2);
+    expect(game.bossWarningSeconds, isNull);
+    game.lateEnemy = null;
+    advance(game, 4.9);
+    expect(game.bossWarningSeconds, isNull);
+    advance(game, .2);
+    expect(game.bossWarningSeconds, 3);
+    advance(game, 3);
+    expect(game.boss, isNotNull);
+  });
+}

@@ -245,6 +245,61 @@ void main() {
     );
   }
 
+  for (final mode in [GameMode.infinite, GameMode.merge2048]) {
+    testWidgets('$mode resumes only after a frozen three-second countdown', (
+      tester,
+    ) async {
+      final game = await launch(tester, ControlMode.oneFinger);
+      await selectWorld(tester, arcadeModes.indexOf(mode));
+      await startWorld(tester);
+      await tester.tap(find.byTooltip('Pause'));
+      await tester.pump();
+      final elapsed = game.elapsed;
+      final camera = game.cameraOffset;
+      final ball = game.ballX;
+      final score = game.score;
+      final countdown = find.byKey(const ValueKey('resume-countdown'));
+      await tester.tap(find.text('RESUME RUN'));
+      await tester.pump();
+      for (final seconds in [3, 2, 1]) {
+        expect(tester.widget<Text>(countdown).data, '$seconds');
+        expect(game.paused, isTrue);
+        expect(game.elapsed, elapsed);
+        expect(game.cameraOffset, camera);
+        expect(game.ballX, ball);
+        expect(game.score, score);
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.keyW);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.keyW);
+        expect(game.canControl, isFalse);
+        await tester.pump(const Duration(seconds: 1));
+      }
+      expect(countdown, findsNothing);
+      expect(game.paused, isFalse);
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(game.elapsed, greaterThan(elapsed));
+
+      await tester.tap(find.byTooltip('Pause'));
+      await tester.pump();
+      await tester.tap(find.text('RESUME RUN'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 3));
+      expect(game.paused, isTrue);
+      expect(countdown, findsNothing);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      await tester.tap(find.text('RESUME RUN'));
+      await tester.pump();
+      expect(tester.widget<Text>(countdown).data, '3');
+      // Disposing during the countdown must cancel the pending resume.
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 3));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (var index = 0; index < arcadeModes.length; index++) {
     testWidgets('a paused run restarts in world $index', (tester) async {
       final game = await launch(tester, ControlMode.oneFinger);

@@ -234,6 +234,18 @@ Settings has independent Sound Effects and Music switches, saved as `gilt.sound`
 and `gilt.music`. Existing muted profiles remain muted when migrating; either
 switch can then be changed independently.
 
+Enemy audio uses 21 original synthesized cues: insect/wing entrances, snake
+hisses, distinct boss arrivals, bullet volleys, ricochets and rail rebounds,
+crystal/petal shots, laser charge/fire, throws and pool landings, mine bursts,
+comet warnings/rain, webs and quills. `lib/enemy_sounds.dart` observes physics
+transitions at 120 Hz, groups volleys and suppresses nearly simultaneous repeats.
+`lib/enemy_audio.dart` preloads short PCM assets into low-latency pools, mixes
+without stealing music focus, and caps playback at four enemy voices. Pause,
+mute, background, home and disposal cancel active/pending effects. Hit/coin
+feedback retains its separate player. Regenerate cues with
+`scripts/generate_enemy_audio.py` (NumPy); the script also writes
+`artifacts/enemy-sound-preview.wav`. Background music is managed separately.
+
 The main Shop contains Balls (19), Platforms (12), and Cabinet Styles. New gear
 includes pearl, malachite, titanium, opal, plasma, comet, quasar and singularity
 balls, plus carbon, pearl, aurora, plasma, celestial and sovereign platforms.
@@ -250,7 +262,7 @@ curving dust streams), Scorpion at 4,100m (a charged continuous laser), and Seed
 Spitter at 4,600m (a slow seed splits into three). Introductions wait for a clear
 attack slot; milestones do not spawn an enemy on top of an existing warning.
 Each visitor locks its aim and warns for 1.2s. Only one visitor is active, with
-at most six projectiles; other ranged attacks, snakes, and special hazards wait
+at most twelve projectiles for the Moth's six paired volleys; other ranged attacks, snakes, and special hazards wait
 their turn. Breathing sections block new visitors while active attacks finish;
 laser-maze sections wait for the current visitor's attack and exit to complete.
 Beetles require a clear side-step route through the existing terrain; their acid
@@ -261,6 +273,50 @@ Tune `lateEnemyMilestones` and `lateEnemyRestSeconds` in
 The simulation is in `lib/late_enemies.dart` and vector art in
 `lib/late_enemy_painter.dart`. Render the warning/attack gallery with
 `scripts/flutter.ps1 test tool/render_late_enemies.dart`.
+
+Between 90,000 and 120,000 points, Infinite introduces the second enemy tier with the Sky
+Warden boss, once per run. It waits for committed attacks and laser mazes to
+finish, then replaces the course with a clear arena: no holes, other enemies,
+ordinary lasers, or rising red floor. The boss stays above the player as the
+board climbs. Over 28 active seconds it fires five bullet fans, three warned
+lasers, and three throws of two amber pools. Landing circles warn for 0.9s;
+the pools cost a heart on contact, respect shields and recovery, and scroll
+with the floor. The boss leaves automatically and normal generation resumes
+ahead of the viewport, preserving the run and score. Pause freezes the whole
+encounter; restarting resets its milestone. Tune and preview it in
+`lib/infinite_boss.dart`, `lib/infinite_boss_painter.dart`, and
+`scripts/flutter.ps1 test tool/render_infinite_boss.dart`.
+
+Between 270,000 and 330,000 points, Storm Colossus follows as the second boss, once per run.
+Its cyan and violet armored body has floating gauntlets instead of wings.
+Across its 28-second encounter it fires eight energy orbs that each rebound
+once from a rail, eight crescent blades in alternating wide/narrow curved
+pairs, then six stationary laser mines with black discs and red laser streaks.
+Mines mark their entire blast circle
+for 1.35 seconds before a 0.65-second damaging burst. The arena stays clear of
+ordinary holes, enemies, lasers and the rising red floor. All boss milestones
+survive a rewarded revive and reset on a new run; if a score jump crosses several,
+Sky Warden still appears first. Thresholds are sampled once per run using a
+seeded random stream. At least 60 seconds of ordinary active gameplay separate
+encounters. Boss entry waits for committed attacks, mazes, recovery and five
+seconds after damage, then gives a three-second warning; pausing freezes the
+warning. Preview: `artifacts/infinite-colossus.png`.
+
+Eclipse Seraph is the third second-tier boss, appearing between 550,000 and
+650,000 points with the same pacing and clear-arena rules. Its six layered
+gold-and-rose feathers unfold on arrival, a segmented halo rotates behind its
+crown, ribbons sway, and its crystal core pulses and charges with its attacks.
+The 28-second encounter sends 16 curving crystal petals, six warned laser
+curtains with wide escape lanes, and nine comets with marked, locked trails.
+All attacks finish before departure. Preview: `artifacts/infinite-seraph.png`.
+Sky Warden now has iridescent wing beats, a swaying body, charging accents and
+firing pulses. Colossus has independently floating/recoiling gauntlets,
+spinning turbines, thruster flames and a charging reactor. Visual motion uses
+the encounter clock, freezes on pause, and respects reduced motion without
+changing attack geometry. All three stay within 65 drawing calls per frame
+without blur or offscreen layers. Render animation frames with
+`scripts/flutter.ps1 test tool/render_boss_animation.dart`.
+
 The beetle steps and opens its shell, the cricket crouches and kicks on firing,
 the moth beats its patterned wings, the scorpion curls its tail and claws, and
 the seed spitter sways its leaves and recoils. Poses follow the encounter clock,

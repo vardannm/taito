@@ -21,6 +21,7 @@ import 'package:flutter/services.dart';
 
 import 'board_painter.dart';
 import 'game.dart';
+import 'enemy_sounds.dart';
 import 'levels.dart';
 import 'level_picker.dart';
 import 'profile.dart';
@@ -117,6 +118,7 @@ class _GameScreenState extends State<GameScreen>
   final hud = ValueNotifier<Object?>(null);
   final backdrop = ValueNotifier<int>(0);
   final feedback = GameFeedback();
+  final enemySounds = EnemySoundDirector();
   final playtest = PlaytestRecorder();
   late final analytics = widget.analytics ?? AppAnalytics();
   late final reviveAds = widget.reviveAds ?? const UnavailableReviveAds();
@@ -129,6 +131,8 @@ class _GameScreenState extends State<GameScreen>
   late final Ticker ticker;
   Duration? previous;
   double accumulator = 0;
+  Timer? resumeTimer;
+  int resumeSeconds = 0;
   bool recorded = false, newBest = false, briefing = false;
   List<CabinetStyle> newUnlocks = [];
   TutorialRun? tutorialRun;
@@ -297,13 +301,18 @@ class _GameScreenState extends State<GameScreen>
     final inputEpoch = game.inputEpoch;
     final before =
         '${game.phase}/${game.target}/${game.lives}/${game.inputEpoch}/$recorded';
+    final enemyCues = <EnemyCue>{};
     while (accumulator >= 1 / 120) {
       game.step(1 / 120);
+      enemyCues.addAll(enemySounds.capture(game));
       tutorialRun?.tick(1 / 120);
       accumulator -= 1 / 120;
     }
     if (game.lives < observedLives) spawnHeartLoss();
     syncMusic();
+    for (final cue in enemyCues) {
+      unawaited(feedback.playEnemy(cue));
+    }
     observedLives = game.lives;
     // Feedback (including a lost heart) must not invalidate held input.
     // Only simulation transitions that actually clear input release keys.
@@ -749,6 +758,14 @@ class _GameScreenState extends State<GameScreen>
   /// holds the track rather than restarting it.
   static const themeTrack = 'audio/theme.m4a';
   void syncMusic() {
+    feedback.setEnemyEffectsEnabled(
+      profile.sound &&
+          game.started &&
+          game.phase == GamePhase.playing &&
+          !game.paused &&
+          !game.waitingForInput &&
+          !returning,
+    );
     final wants =
         (game.infinite || game.merging) &&
         profile.music &&
@@ -765,6 +782,26 @@ class _GameScreenState extends State<GameScreen>
   void pause() => setState(() {
     briefing = false;
     clearControls();
+    if (resumeSeconds > 0) {
+      cancelResumeCountdown();
+      return;
+    }
+    if (game.paused && (game.infinite || game.merging)) {
+      resumeSeconds = 3;
+      resumeTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        setState(() {
+          resumeSeconds--;
+          if (resumeSeconds == 0) {
+            cancelResumeCountdown();
+            clearControls();
+            game.setPaused(false);
+            syncMusic();
+            runTicker();
+          }
+        });
+      });
+      return;
+    }
     game.setPaused(!game.paused);
     syncMusic();
     if (game.paused) {
@@ -773,6 +810,13 @@ class _GameScreenState extends State<GameScreen>
       runTicker();
     }
   });
+
+  void cancelResumeCountdown() {
+    resumeTimer?.cancel();
+    resumeTimer = null;
+    resumeSeconds = 0;
+  }
+
   void prepareInfinite({bool retry = false}) {
     prepareWorld(0, retry: retry);
   }
@@ -795,6 +839,7 @@ class _GameScreenState extends State<GameScreen>
 
   void prepareWorld(int index, {bool retry = false}) {
     if (adBusy) return;
+    cancelResumeCountdown();
     if (game.finished) recordFinalResult();
     reviveDeclined = false;
     reviveError = null;
@@ -842,11 +887,13 @@ class _GameScreenState extends State<GameScreen>
     final index = arcadeModes.indexOf(game.mode);
     setState(() {
       returning = true;
+      cancelResumeCountdown();
       clearControls();
       game.setPaused(true);
       ticker.stop();
       heartEffects.clear();
     });
+    syncMusic();
     if (MediaQuery.disableAnimationsOf(context)) {
       entrance.value = 0;
     } else {
@@ -872,6 +919,7 @@ class _GameScreenState extends State<GameScreen>
         return;
       }
       setState(() {
+        cancelResumeCountdown();
         clearControls();
         game.setPaused(true);
         ticker.stop();
@@ -882,6 +930,7 @@ class _GameScreenState extends State<GameScreen>
 
   @override
   void dispose() {
+    cancelResumeCountdown();
     game.onInputStarted = null;
     if (game.infinite && game.finished) recordFinalResult();
     reviveAds.dispose();
@@ -1956,12 +2005,41 @@ class _GameScreenState extends State<GameScreen>
                   ],
                 ),
               ),
-              if (!returning && (game.paused || game.finished))
+              if (!returning &&
+                  resumeSeconds == 0 &&
+                  (game.paused || game.finished))
                 SafeArea(
                   key: const ValueKey('run-overlay'),
                   child: Padding(
                     padding: const EdgeInsets.all(12),
                     child: boardOverlay(),
+                  ),
+                ),
+              if (resumeSeconds > 0)
+                Positioned.fill(
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      ModalBarrier(
+                        color: ink.withAlpha(160),
+                        dismissible: false,
+                      ),
+                      Center(
+                        child: Semantics(
+                          liveRegion: true,
+                          label: 'Resuming in $resumeSeconds',
+                          child: Text(
+                            '$resumeSeconds',
+                            key: const ValueKey('resume-countdown'),
+                            style: const TextStyle(
+                              color: cream,
+                              fontSize: 96,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               if (game.infinite && !game.waitingForInput ||
@@ -2589,7 +2667,7 @@ class _GameScreenState extends State<GameScreen>
                   value: profile.sound,
                   onChanged: (v) {
                     update(() => profile.sound = v);
-
+                    syncMusic();
                     unawaited(profile.save());
                   },
                 ),

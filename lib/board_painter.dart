@@ -15,6 +15,8 @@ import 'spider_painter.dart';
 import 'porcupine_painter.dart';
 import 'snake_painter.dart';
 import 'late_enemy_painter.dart';
+import 'infinite_boss.dart';
+import 'infinite_boss_painter.dart';
 import 'cabinet.dart';
 import 'heart_loss_effect.dart';
 import 'pickup_painter.dart';
@@ -449,6 +451,29 @@ class BoardPainter extends CustomPainter {
     paintPorcupines(canvas, game, reducedMotion);
     paintSnakes(canvas, game, reducedMotion);
     paintLateEnemy(canvas, game, reducedMotion);
+    paintInfiniteBoss(canvas, game, reducedMotion);
+    final boss = game.boss;
+    if (boss != null && boss.phase != BossPhase.leaving) {
+      final labelY =
+          boss.top + (boss.kind == BossKind.eclipseSeraph ? 205 : 165);
+      final bossInk = infiniteBoardInk(game, Offset(180, labelY));
+      text(
+        canvas,
+        boss.displayName,
+        Offset(180, labelY),
+        11,
+        bossInk,
+        weight: FontWeight.w800,
+        spacing: 2,
+      );
+      text(
+        canvas,
+        '${boss.phase.name.toUpperCase()} · ${(InfiniteBoss.duration - boss.age).ceil()}s',
+        Offset(180, labelY + 16),
+        9,
+        bossInk,
+      );
+    }
     if (game.infinite && showHud) {
       // Lives ride in the board's own top-left corner, just clear of the rail.
       canvas.save();

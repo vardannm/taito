@@ -77,7 +77,10 @@ void main() {
         final e = encounter(kind);
         e.step(InfiniteTuning.lateEnemyWarning - .01);
         expect(e.warning, isTrue);
-        expect(e.shots.length, lessThanOrEqualTo(6));
+        expect(
+          e.shots.length,
+          lessThanOrEqualTo(kind == LateEnemyKind.moth ? 12 : 6),
+        );
         expect(e.bodyContact(43, 160, 43, 160), isNull);
         for (final shot in e.shots) {
           expect(shot.contact(0, 0, 360, 560), isNull);
@@ -156,7 +159,13 @@ void main() {
       target: (x: 180, y: 420),
     );
     final a = e.shots[0], b = e.shots[1];
-    expect(e.shots.length, 6);
+    expect(e.shots.length, 12);
+    for (var i = 0; i < 6; i++) {
+      final left = e.shots[i * 2], right = e.shots[i * 2 + 1];
+      expect(left.delay, InfiniteTuning.lateEnemyWarning + i * .22);
+      expect(right.delay, left.delay);
+      expect(left.curve, -right.curve);
+    }
     expect(a.positionAt(0), b.positionAt(0));
     expect(
       (a.positionAt(1.4).x - b.positionAt(1.4).x).abs(),
@@ -419,7 +428,10 @@ void main() {
             expect(g.webShots, isEmpty);
             expect(g.quills, isEmpty);
             expect(g.porcupines.every((p) => p.charge == null), isTrue);
-            expect(e.shots.length, lessThanOrEqualTo(6));
+            expect(
+              e.shots.length,
+              lessThanOrEqualTo(e.kind == LateEnemyKind.moth ? 12 : 6),
+            );
           }
           previous = e;
         }

@@ -58,6 +58,70 @@ extension InfiniteGameplay on BalanceGame {
     porcupines.removeWhere((p) => screenY(p.y) > 640);
   }
 
+  void _tryStartInfiniteBoss() {
+    if (!bossPending ||
+        boss != null ||
+        mazeSection ||
+        mazeGates.isNotEmpty ||
+        lateEnemy != null ||
+        specialHazards.isNotEmpty ||
+        snakes.isNotEmpty ||
+        webShots.isNotEmpty ||
+        quills.isNotEmpty ||
+        porcupines.any((p) => p.charge != null) ||
+        survival.recovery > 0 ||
+        elapsed - _lastDamageAt < 5) {
+      _bossWarningAt = null;
+      return;
+    }
+    _bossWarningAt ??= elapsed;
+    if (elapsed - _bossWarningAt! < 3) return;
+    _bossWarningAt = null;
+    boss = InfiniteBoss(
+      top: visibleTop,
+      kind: BossKind.values[bossesEncountered],
+    );
+    bossesEncountered++;
+    // The boss replaces the whole course for this interlude. Clear ordinary
+    // terrain and enemies, while keeping the player's run, rewards and score.
+    _endlessHoles.clear();
+    spiders.clear();
+    porcupines.clear();
+    stallTime = 0;
+    dangerY = 580 - cameraOffset;
+    survival.announce('BOSS · ${boss!.displayName}');
+  }
+
+  void _updateInfiniteBoss(double dt, double scrollDistance) {
+    final active = boss;
+    if (active == null) return;
+    if (bossesEnabled) {
+      active.step(
+        dt,
+        target: (x: ballX, y: screenY(ballY)),
+        scrollDistance: scrollDistance,
+        visibleTop: visibleTop,
+      );
+      message = active.hint;
+      if (!active.expired) return;
+    }
+    boss = null;
+    _nextBossAt = elapsed + 60;
+    // Resume generation ahead of the viewport, with no backlog from the fight.
+    _nextRowY = -cameraOffset + visibleTop - 121;
+    _nextSpiderY = math.min(_nextSpiderY, -cameraOffset - 900);
+    _nextPorcupineY = math.min(_nextPorcupineY, -cameraOffset - 1200);
+    _nextMazeMetres = metres + InfiniteTuning.mazeRestMetres;
+    _nextHazardTime = math.max(_nextHazardTime, elapsed + 3);
+    _nextWebTime = math.max(_nextWebTime, elapsed + 3);
+    _nextQuillTime = math.max(_nextQuillTime, elapsed + 3);
+    enemyDirector.rest(elapsed, metres.toDouble());
+    stallTime = 0;
+    dangerY = 580 - cameraOffset;
+    survival.announce('BOSS CLEARED · Keep climbing');
+    message = survival.notice;
+  }
+
   void _updateLateEnemies(double dt, double scrollDistance) {
     if (mazeSection || (!lateEnemiesEnabled && !snakeEncountersEnabled)) {
       if (lateEnemy != null) {
@@ -85,6 +149,7 @@ extension InfiniteGameplay on BalanceGame {
       }
       return;
     }
+    if (boss != null || bossPending) return;
     // Recovery blocks new visitors, but never erases one that has already
     // announced its attack. Finish its warning, projectiles, and normal exit.
     if (section == InfiniteSection.breath) {
@@ -164,6 +229,7 @@ extension InfiniteGameplay on BalanceGame {
   }
 
   void _updateSnakes(double dt) {
+    if (boss != null) return;
     if (!snakeEncountersEnabled ||
         mazeSection ||
         section == InfiniteSection.breath) {
@@ -228,6 +294,7 @@ extension InfiniteGameplay on BalanceGame {
   }
 
   void _updatePorcupines(double dt) {
+    if (boss != null) return;
     if (mazeSection || section == InfiniteSection.breath) {
       quills.clear();
       for (final p in porcupines) {
@@ -258,6 +325,7 @@ extension InfiniteGameplay on BalanceGame {
       }
     }
     if (elapsed < _nextQuillTime ||
+        bossPending ||
         lateEnemy != null ||
         snakes.isNotEmpty ||
         quills.isNotEmpty ||
@@ -338,6 +406,7 @@ extension InfiniteGameplay on BalanceGame {
   }
 
   void _updateSpiderWebs(double dt) {
+    if (boss != null) return;
     // Maze and breathing sections provide a clean break from ranged attacks.
     if (mazeSection || section == InfiniteSection.breath) {
       webShots.clear();
@@ -349,6 +418,7 @@ extension InfiniteGameplay on BalanceGame {
       shot.step(dt);
     }
     if (elapsed < _nextWebTime ||
+        bossPending ||
         lateEnemy != null ||
         snakes.isNotEmpty ||
         quills.isNotEmpty ||
@@ -449,7 +519,7 @@ extension InfiniteGameplay on BalanceGame {
       if (!mazeSectionsEnabled || climbed < _nextMazeMetres) return;
       // A maze clears ranged attacks. Wait for the current visitor to leave
       // rather than cancelling its warning or deleting live projectiles.
-      if (lateEnemy != null) return;
+      if (lateEnemy != null || boss != null || bossPending) return;
       _mazeEndMetres = climbed + InfiniteTuning.mazeSectionMetres;
       _mazeSectionTime = 0;
       _lastGateY = 90;
@@ -581,6 +651,21 @@ extension InfiniteGameplay on BalanceGame {
             reason: shot.reason,
           ));
         }
+      }
+    }
+    for (final shot in boss?.shots ?? <LateEnemyShot>[]) {
+      final t = shot.contact(oldX, oldScreenY, ballX, screenY(ballY));
+      if (t != null) {
+        events.add((
+          t: t,
+          item: null,
+          coin: null,
+          hole: null,
+          web: null,
+          quill: null,
+          lateShot: shot,
+          reason: shot.reason,
+        ));
       }
     }
     for (final snake in snakes) {

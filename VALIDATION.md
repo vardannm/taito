@@ -1,5 +1,144 @@
 # Validation record
 
+## Enemy and weapon sound effects — 2026-10-09
+
+- Added 21 original synthesized mono 44.1 kHz / 16-bit PCM cues (872 KB):
+  enemy arrivals/hisses, three distinct boss entrances, bullets, ricochets,
+  rebounds, petals/crystals, laser charge/fire, bomb throws, pool landings,
+  mine charge/burst, comet warning/fire, webs and quill bursts.
+- A pure observer captures actual transitions at each fixed physics tick;
+  paired projectiles/volleys share one cue and close rebounds coalesce.
+  Sound settings remain independent from music/haptics. Low-latency pools
+  use shared audio focus and a global four-voice limit, with explicit timers
+  returning SoundPool players. Muting, pausing, backgrounding, returning home
+  and disposal stop active effects and invalidate pending starts.
+- All 13 focused audio checks passed, including asset duration/format/peak
+  bounds/fades, boss cue counts, firing transitions, whole-volley grouping,
+  waiting/pause/restart, voice limits, pending cancellation and platform
+  failures. Log: `artifacts/enemy-audio-focused-tests.txt`.
+- Broader run: 150 passed; two unchanged experience tests failed (early pace
+  ceiling and obsolete Choose Level finder). Both reproduce in the unchanged
+  baseline. Logs: `artifacts/enemy-audio-regression-tests.txt`,
+  `artifacts/enemy-audio-baseline-tests.txt`. Analysis: six files, no issues.
+- Sound-design report: `artifacts/enemy-sound-report.json`; all asset peaks
+  are 0.72 with click-free fades. Preview: `artifacts/enemy-sound-preview.wav`
+  (15.2 seconds). Background music and existing UI sound assets are unchanged.
+- ARM64 release APK rebuilt successfully (29.9 MB); verified all 21 cues are
+  packaged. Build log: `artifacts/enemy-audio-apk-build.txt`. No phone connected
+  for installation or real-device listening verification.
+
+## Eclipse Seraph and boss animation upgrades — 2026-10-09
+
+- Added the third second-tier Infinite boss at a seeded 550,000–650,000
+  score threshold. Existing order, three-second warning, damage delays,
+  60-second active rest, clean arena, pause/revive and restart rules apply.
+- Its 28-second encounter fires 16 curved crystal petals, six laser curtains
+  with 1.2-second warnings and broad escape lanes, and nine comets with
+  0.9-second marked trails. All attacks finish before the exit phase.
+- Gold/rose feather gradients, entrance unfolding, segmented rotating halo,
+  swaying ribbons, pulsing crystal and scheduled firing/charging reactions.
+  Sky Warden gains wing motion, body sway and core pulses; Colossus gains
+  independently floating/recoiling gauntlets, turbine rotation, thruster
+  flames and a charging reactor. Reduced motion keeps decorative poses still.
+- All 151 focused tests passed, covering three-boss order/cooldowns, attack
+  counts, locked warnings, tall boards, damage/protection, pause/revive,
+  ordinary encounters, UI flows and rendering. Log:
+  `artifacts/seraph-regression-tests.txt`. Analysis: seven files, no issues.
+- Every phase of every boss stays within 65 drawing calls, without blur or
+  offscreen layers, in both motion settings. Inspected light/dark galleries:
+  `artifacts/infinite-seraph.png`, `artifacts/infinite-boss.png`,
+  `artifacts/infinite-colossus.png`. Animation preview:
+  `artifacts/boss-animations.gif` (84 frames at 12 fps).
+- ARM64 release APK built successfully (29.1 MB). Build log:
+  `artifacts/seraph-apk-build.txt`. No phone connected for installation.
+
+## Random boss windows and pacing — 2026-10-09
+
+- Sky Warden draws a threshold in 90,000–120,000; Storm Colossus draws in
+  270,000–330,000. Seeded draws happen once per run and survive pause/revive.
+- After a boss ends, ordinary active gameplay continues for at least 60
+  seconds before the next warning. Committed attacks/mazes finish first;
+  entry also waits for recovery and five seconds after losing a heart.
+  A three-second arrival warning freezes on pause and restarts after damage.
+- All 23 boss simulation/pacing checks passed. Broader regression run:
+  147 passed, one unchanged spider-web timing check failed (expected x=118,
+  actual x=136). The same failure was reproduced in the unchanged baseline.
+  Logs: `artifacts/boss-pacing-tests.txt`,
+  `artifacts/boss-pacing-regression-tests.txt`,
+  `artifacts/boss-pacing-baseline-web-test.txt`.
+- Static analysis found no issues in all seven updated Dart files.
+- ARM64 release APK rebuilt successfully. Log:
+  `artifacts/boss-pacing-apk-build.txt`. No phone connected for installation.
+
+## Colossus black circles with red lasers — 2026-10-09
+
+- Replaced the board mine circles' scope-like rings and spokes with solid
+  black discs and diagonal red laser streaks. The charging rim stays red;
+  active streaks have bright cores. Updated player hints to match the effect.
+- All 23 focused boss, rendering and preview checks passed; static analysis
+  found no issues. Inspected light/dark previews in `artifacts/infinite-colossus.png`.
+  Shooting, activation timing and damage mechanics remain as verified.
+  Log: `artifacts/colossus-red-lasers-tests.txt`.
+- ARM64 release APK rebuilt successfully. Build log:
+  `artifacts/colossus-red-lasers-apk-build.txt`. Phone disconnected; installation pending.
+
+## Colossus milestone moved to 500,000 — 2026-10-09
+
+- Storm Colossus now triggers at 500,000 points. Sky Warden remains at 100,000.
+- All 19 boss checks passed, including no Colossus at 200,000 or just below
+  500,000, the new trigger, milestone order, revive and restart.
+  Log: `artifacts/colossus-500k-tests.txt`.
+- ARM64 release APK rebuilt successfully. Build log:
+  `artifacts/colossus-500k-apk-build.txt`.
+
+## Storm Colossus at 200,000 points — 2026-10-09
+
+- Added a second 28-second Infinite boss with cyan/violet armor and floating
+  gauntlets. Its three weapon phases fire eight rail-bouncing energy orbs,
+  eight curving crescent blades, and six stationary shock mines. Mines warn
+  for 1.35 seconds before their whole disk becomes damaging for 0.65 seconds.
+- Boss milestones now track both encounters: Sky Warden at 100,000 and
+  Colossus at 200,000, once each per run and in order even after a score jump.
+  Revive preserves encountered milestones; restart resets them. The same clear
+  arena, pause, heart/recovery rules, and return to ordinary generation apply.
+- All 129 focused boss, enemy, maze, revive, control and preview checks passed.
+  Static analysis of ten changed files found no issues. Both bosses stay within
+  65 draw calls with no blur or offscreen layers. Inspected light/dark previews
+  in `artifacts/infinite-colossus.png`. Logs:
+  `artifacts/colossus-focused-tests.txt` and `artifacts/colossus-regression-tests.txt`.
+- ARM64 release APK rebuilt successfully and verified to contain both bosses
+  and the Colossus mine weapon. SHA-256:
+  `7E7CBEC6C4BE2E00AC9529E1975CB76489DFB0EDABE768F74E97AD96660F0AA6`.
+  Build log: `artifacts/colossus-apk-build.txt`. The phone is disconnected;
+  installation and physical gameplay verification of this update are pending.
+
+## Infinite second-tier boss — 2026-10-08
+
+- Sky Warden appears once per run at 100,000 points, after any committed
+  attack or maze and its final gates have finished. The 28-second encounter
+  replaces ordinary terrain and enemies with a clear arena and holds the red
+  floor below play. The boss stays above the climbing player, fires five
+  bullet fans, three warned lasers, then three pairs of thrown amber pools.
+- Boss damage uses the existing swept collision and reward ordering, heart,
+  shield, recovery, pause and revive rules. Pools warn before landing and then
+  scroll with the floor. Bullet flight reaches expanded portrait boards.
+  After the boss exits, holes generate ahead of the viewport without backlog.
+- All 119 focused boss, render, encounter, maze, revive, mode and pause/resume
+  checks passed. Static analysis of the nine boss-related files found no
+  issues. Boss rendering stays within 65 draw calls with zero blur/layer
+  passes. Inspected light and dark phase previews in `artifacts/infinite-boss.png`.
+- Broader Infinite testing also found six existing failures in ascent speed,
+  pivot limits, red-floor timing, shield tuning and pickup counts. The same
+  six failures reproduce in an isolated copy of unchanged HEAD; no new boss
+  regression was found. Logs: `artifacts/boss-regression-tests.txt` and
+  `artifacts/boss-baseline-tests.txt`. Physical-device playtesting is pending.
+- Rebuilt the ARM64 release APK with the boss, 12-bullet Moth and three-second
+  resume countdown. Installed successfully on the Redmi Note 8 Pro and verified
+  the launched process remains running. Installed version 0.11.1, ABI version
+  code 2016. SHA-256:
+  `FB1E91F230927DD59B38FAF022B2EF8C3D0AD2D68CCDF4E017A88835AFA3558A`.
+  Build log: `artifacts/boss-apk-build.txt`. Extended gameplay is still pending.
+
 ## Scorpion laser attack — 2026-10-07
 
 - Replaced the three-needle burst with one fixed laser: a dashed 1.2-second

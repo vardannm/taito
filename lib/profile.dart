@@ -7,6 +7,8 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'game.dart';
+import 'enemy_sounds.dart';
+import 'enemy_audio.dart';
 import 'levels.dart';
 import 'rewards.dart';
 import 'onboarding.dart';
@@ -572,6 +574,9 @@ class PlayerProfile {
 
 class GameFeedback {
   AudioPlayer? _player;
+  final _enemyAudio = EnemyAudio();
+  void setEnemyEffectsEnabled(bool enabled) => _enemyAudio.setEnabled(enabled);
+  Future<void> playEnemy(EnemyCue cue) => _enemyAudio.play(cue);
   static bool _sharedContext = false;
 
   /// Effects and music are two players in one app. Left at the plugin's
@@ -659,6 +664,7 @@ class GameFeedback {
   }
 
   void dispose() {
+    _enemyAudio.dispose();
     _player?.dispose();
     _music?.dispose();
   }
