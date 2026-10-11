@@ -88,6 +88,8 @@ void main() {
       );
       await settle();
       await capture('home-$variant');
+      await selectWorld(tester, 2);
+      await capture('merge-$variant');
       await selectWorld(tester, 1);
       await capture('classic-$variant');
       await tester.tap(find.byKey(const ValueKey('choose-level')));
@@ -134,6 +136,16 @@ void main() {
       await tester.tap(find.byTooltip('Daily prizes'));
       await settle();
       await capture('prizes-$variant');
+      profile.dailyPrizes.claimed = 4;
+      profile.dailyPrizes.lastClaim = DateTime.now().toUtc().subtract(
+        const Duration(days: 1),
+      );
+      await tester.pump(const Duration(seconds: 1));
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('daily-claim-platform')),
+      );
+      await settle();
+      await capture('prizes-day-five-$variant');
       Navigator.of(tester.element(find.byType(GameScreen))).pop();
       await settle();
       await tester.tap(find.byTooltip('Modes'));

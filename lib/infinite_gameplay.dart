@@ -230,9 +230,7 @@ extension InfiniteGameplay on BalanceGame {
 
   void _updateSnakes(double dt) {
     if (boss != null) return;
-    if (!snakeEncountersEnabled ||
-        mazeSection ||
-        section == InfiniteSection.breath) {
+    if (!snakeEncountersEnabled) {
       if (snakes.isNotEmpty) enemyDirector.rest(elapsed, metres.toDouble());
       snakes.clear();
       enemyDirector.deferUntil(elapsed + 2);
@@ -519,7 +517,8 @@ extension InfiniteGameplay on BalanceGame {
       if (!mazeSectionsEnabled || climbed < _nextMazeMetres) return;
       // A maze clears ranged attacks. Wait for the current visitor to leave
       // rather than cancelling its warning or deleting live projectiles.
-      if (lateEnemy != null || boss != null || bossPending) return;
+      if (lateEnemy != null || snakes.isNotEmpty || boss != null || bossPending)
+        return;
       _mazeEndMetres = climbed + InfiniteTuning.mazeSectionMetres;
       _mazeSectionTime = 0;
       _lastGateY = 90;

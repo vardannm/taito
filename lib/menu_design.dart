@@ -464,11 +464,13 @@ class MenuTabs extends StatelessWidget {
     required this.selected,
     required this.onChanged,
     this.minimal = false,
+    this.icons,
   });
   final List<String> labels;
   final int selected;
   final ValueChanged<int> onChanged;
   final bool minimal;
+  final List<IconData>? icons;
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, bounds) {
@@ -481,7 +483,7 @@ class MenuTabs extends StatelessWidget {
           for (var i = 0; i < labels.length; i++)
             SizedBox(
               width: (bounds.maxWidth - 6 * (columns - 1)) / columns,
-              height: 48 + 32 * (scale - 1).clamp(0, 2),
+              height: (icons == null ? 48 : 70) + 32 * (scale - 1).clamp(0, 2),
               child: Semantics(
                 button: true,
                 selected: i == selected,
@@ -516,23 +518,38 @@ class MenuTabs extends StatelessWidget {
                       child: Center(
                         child: Padding(
                           padding: const EdgeInsets.all(6),
-                          child: Text(
-                            labels[i],
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: minimal
-                                  ? (i == selected ? menuGold : menuMuted)
-                                  : i == selected
-                                  ? menuBackground
-                                  : menuText,
-                              fontSize: 11,
-                              height: 1.2,
-                              fontWeight: minimal
-                                  ? FontWeight.w600
-                                  : FontWeight.w800,
-                            ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              if (icons != null) ...[
+                                Icon(
+                                  icons![i],
+                                  size: 22,
+                                  color: i == selected ? menuGold : menuMuted,
+                                ),
+                                const SizedBox(height: 4),
+                              ],
+                              Flexible(
+                                child: Text(
+                                  labels[i],
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: minimal
+                                        ? (i == selected ? menuGold : menuMuted)
+                                        : i == selected
+                                        ? menuBackground
+                                        : menuText,
+                                    fontSize: 11,
+                                    height: 1.2,
+                                    fontWeight: minimal
+                                        ? FontWeight.w600
+                                        : FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),

@@ -401,6 +401,12 @@ class _BallShopState extends State<BallShop>
                   ],
                   selected: category,
                   minimal: true,
+                  icons: const [
+                    Icons.sports_baseball_outlined,
+                    Icons.horizontal_rule_rounded,
+                    Icons.crop_portrait_rounded,
+                    Icons.upgrade_rounded,
+                  ],
                   onChanged: (value) => setState(() => category = value),
                 ),
               ),

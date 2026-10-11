@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'menu_design.dart';
 import 'tutorial_spotlight.dart';
 import 'package:flutter/material.dart';
@@ -52,11 +53,6 @@ class _LevelPickerState extends State<LevelPicker> {
       children: [
         LayoutBuilder(
           builder: (context, bounds) {
-            final columns = bounds.maxWidth < 360
-                ? 3
-                : bounds.maxWidth < 600
-                ? 4
-                : 6;
             final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
             Widget heading(String title, String subtitle) => SliverToBoxAdapter(
               child: Padding(
@@ -82,116 +78,178 @@ class _LevelPickerState extends State<LevelPicker> {
                 ),
               ),
             );
-            Widget grid(int first, int count) => SliverPadding(
+            Widget road(int first, int count) => SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-              sliver: SliverGrid(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: columns,
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
-                  mainAxisExtent: 166 + 75 * (textScale - 1).clamp(0, 2),
-                ),
+              sliver: SliverList(
                 delegate: SliverChildBuilderDelegate((context, index) {
-                  final number = first + index,
-                      active = number == selected && this.unlocked(number),
-                      spider = number >= 31;
-                  final unlocked = this.unlocked(number);
+                  final number = first + index;
+                  final open = unlocked(number);
+                  final active = number == selected && open;
                   final required = ClassicLevels.requiredStars(number);
                   final record =
                       control != null && widget.recordForControl != null
                       ? widget.recordForControl!(number, control!)
                       : records[number] ?? const LevelRecord();
-                  return Semantics(
-                    button: true,
-                    enabled: unlocked,
-                    label:
-                        'Level $number: ${ClassicLevels.names[number - 1]}${spider ? ", spider territory" : ""}${unlocked ? "" : ", locked, needs $required stars; you have $totalStars"}',
-                    child: Material(
-                      key: number == 1 ? firstLevelKey : null,
-                      color: active ? const Color(0xFF2C4140) : menuPanel,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        side: BorderSide(
-                          color: active ? menuGold : menuLine,
-                          width: active ? 2 : 1,
+                  return SizedBox(
+                    height: 166 + 65 * (textScale - 1).clamp(0, 2),
+                    child: CustomPaint(
+                      painter: LevelRoadPainter(number, open: open),
+                      child: Align(
+                        alignment: Alignment(
+                          math.sin((number - 1) * math.pi / 2) * .78,
+                          0,
                         ),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        key: ValueKey('level-$number'),
-                        onTap:
-                            unlocked &&
-                                (!widget.tutorial || skipped || number == 1)
-                            ? () => onSelected(number)
-                            : null,
-                        child: Padding(
-                          padding: const EdgeInsets.all(7),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  '$number'.padLeft(2, '0'),
-                                  maxLines: 1,
-                                  style: TextStyle(
-                                    fontSize: 27,
-                                    fontWeight: FontWeight.w800,
-                                    fontFamily: 'monospace',
-                                    color: active ? menuGold : menuText,
+                        child: SizedBox(
+                          width: math.min(180, bounds.maxWidth - 70),
+                          child: Semantics(
+                            button: true,
+                            enabled: open,
+                            label:
+                                'Level $number: ${ClassicLevels.names[number - 1]}${number >= 31 ? ", spider territory" : ""}${open ? "" : ", locked, needs $required stars; you have $totalStars"}',
+                            child: Material(
+                              key: number == 1 ? firstLevelKey : null,
+                              color: Colors.transparent,
+                              child: InkWell(
+                                key: ValueKey('level-$number'),
+                                borderRadius: BorderRadius.circular(28),
+                                onTap:
+                                    open &&
+                                        (!widget.tutorial ||
+                                            skipped ||
+                                            number == 1)
+                                    ? () => onSelected(number)
+                                    : null,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Container(
+                                        width: number % 10 == 0 ? 72 : 64,
+                                        height: number % 10 == 0 ? 72 : 64,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: active
+                                              ? menuGold
+                                              : open
+                                              ? menuRaised
+                                              : menuBackground,
+                                          border: Border.all(
+                                            color: active
+                                                ? menuGold
+                                                : open
+                                                ? menuMint
+                                                : menuLine,
+                                            width: active ? 4 : 2,
+                                          ),
+                                          boxShadow: active
+                                              ? [
+                                                  BoxShadow(
+                                                    color: menuGold.withAlpha(
+                                                      45,
+                                                    ),
+                                                    blurRadius: 22,
+                                                  ),
+                                                ]
+                                              : [],
+                                        ),
+                                        child: Center(
+                                          child: open
+                                              ? Text(
+                                                  '$number'.padLeft(2, '0'),
+                                                  style: TextStyle(
+                                                    fontSize: 23,
+                                                    fontWeight: FontWeight.w800,
+                                                    fontFamily: 'sans-serif',
+                                                    color: active
+                                                        ? menuBackground
+                                                        : menuText,
+                                                  ),
+                                                )
+                                              : Column(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  children: [
+                                                    const Icon(
+                                                      Icons
+                                                          .lock_outline_rounded,
+                                                      size: 18,
+                                                      color: menuMuted,
+                                                    ),
+                                                    Text(
+                                                      '$number',
+                                                      style: const TextStyle(
+                                                        fontSize: 12,
+                                                        color: menuMuted,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 7),
+                                      Flexible(
+                                        child: Text(
+                                          number % 10 == 0
+                                              ? ClassicLevels.finaleTitle(
+                                                  number,
+                                                )
+                                              : ClassicLevels.names[number - 1],
+                                          textAlign: TextAlign.center,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            backgroundColor: menuBackground,
+                                            fontSize: 11,
+                                            height: 1.2,
+                                            color: menuText,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      if (open)
+                                        ColoredBox(
+                                          color: menuBackground,
+                                          child: StarRow(
+                                            record.starMask,
+                                            size: 15,
+                                            dark: true,
+                                          ),
+                                        ),
+                                      const SizedBox(height: 3),
+                                      FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          !open
+                                              ? '$totalStars / $required STARS'
+                                              : record.bestScore > 0
+                                              ? 'PB ${record.bestScore}'
+                                              : number % 10 == 0
+                                              ? 'FINALE'
+                                              : 'UNPLAYED',
+                                          style: const TextStyle(
+                                            backgroundColor: menuBackground,
+                                            fontSize: 9,
+                                            color: menuMuted,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                      if (open && record.bestTime != null)
+                                        Text(
+                                          formatRunTime(record.bestTime!),
+                                          style: const TextStyle(
+                                            backgroundColor: menuBackground,
+                                            fontSize: 9,
+                                            color: menuMuted,
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 5),
-                              Text(
-                                number % 10 == 0
-                                    ? ClassicLevels.finaleTitle(number)
-                                    : ClassicLevels.names[number - 1],
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  height: 1.15,
-                                  color: menuText,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              if (unlocked)
-                                StarRow(record.starMask, size: 16, dark: true)
-                              else
-                                const Icon(
-                                  Icons.lock_outline,
-                                  size: 18,
-                                  color: menuText,
-                                ),
-                              const SizedBox(height: 3),
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  !unlocked
-                                      ? '$totalStars / $required STARS'
-                                      : record.bestScore > 0
-                                      ? 'PB ${record.bestScore}'
-                                      : (number % 10 == 0
-                                            ? 'FINALE'
-                                            : 'UNPLAYED'),
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w700,
-                                    color: menuMuted,
-                                  ),
-                                ),
-                              ),
-                              if (unlocked && record.bestTime != null)
-                                Text(
-                                  formatRunTime(record.bestTime!),
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    color: menuText,
-                                  ),
-                                ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
@@ -239,18 +297,18 @@ class _LevelPickerState extends State<LevelPicker> {
                       ),
                     ),
                   ),
-                grid(1, 30),
+                road(1, 30),
                 heading(
                   'The web · 31–50',
                   'Spiders patrol the marked territories. Cross a boundary and they chase. Contact ends your run.',
                 ),
-                grid(31, 20),
+                road(31, 20),
                 if (ClassicLevels.count > 50) ...[
                   heading(
                     'More challenges · 51–${ClassicLevels.count}',
                     'New boards, new routes. Keep climbing.',
                   ),
-                  grid(51, ClassicLevels.count - 50),
+                  road(51, ClassicLevels.count - 50),
                 ],
               ],
             );
@@ -273,4 +331,59 @@ class _LevelPickerState extends State<LevelPicker> {
       ],
     ),
   );
+}
+
+class LevelRoadPainter extends CustomPainter {
+  const LevelRoadPainter(this.number, {required this.open});
+  final int number;
+  final bool open;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final nodeWidth = math.min(180.0, size.width - 30);
+    double x(int n) =>
+        size.width / 2 +
+        math.sin((n - 1) * math.pi / 2) * .78 * (size.width - nodeWidth) / 2;
+    final current = x(number), before = x(number - 1), after = x(number + 1);
+    final path = Path()
+      ..moveTo((before + current) / 2, 0)
+      ..cubicTo(
+        current,
+        size.height * .15,
+        current,
+        size.height * .3,
+        current,
+        size.height * .5,
+      )
+      ..cubicTo(
+        current,
+        size.height * .7,
+        current,
+        size.height * .85,
+        (current + after) / 2,
+        size.height,
+      );
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 18
+        ..color = menuRaised,
+    );
+    for (final metric in path.computeMetrics()) {
+      for (var at = 0.0; at < metric.length; at += 15) {
+        canvas.drawPath(
+          metric.extractPath(at, math.min(at + 6, metric.length)),
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2
+            ..strokeCap = StrokeCap.round
+            ..color = open ? menuGold.withAlpha(130) : menuLine,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(LevelRoadPainter old) =>
+      old.number != number || old.open != open;
 }

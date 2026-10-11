@@ -19,6 +19,12 @@ void main() {
       '$control swipes from top and hero, then waits for Play and input',
       (tester) async {
         final game = await launch(tester, control);
+        final shop = tester.getRect(find.byKey(const ValueKey('board-shop')));
+        final play = tester.getRect(find.byKey(const ValueKey('menu-play')));
+        expect(shop.bottom, lessThan(play.top));
+        expect(shop.height, greaterThanOrEqualTo(58));
+        expect(find.byTooltip('Achievements'), findsOneWidget);
+        expect(find.byTooltip('Daily prizes'), findsOneWidget);
         await tester.tapAt(contact(tester, game));
         await tester.sendKeyDownEvent(LogicalKeyboardKey.keyW);
         await tester.sendKeyUpEvent(LogicalKeyboardKey.keyW);

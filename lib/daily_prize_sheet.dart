@@ -106,17 +106,39 @@ class _DailyPrizeSheetState extends State<DailyPrizeSheet> {
                   day == 5 &&
                   (p.prizeBall != null || p.prizePlatform != null)) ...[
                 if (p.prizeBall != null)
-                  FilledButton(
+                  FilledButton.icon(
+                    key: const ValueKey('daily-claim-ball'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 56),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                    ),
+                    icon: const Icon(Icons.sports_baseball_outlined),
                     onPressed: busy ? null : () => claim(),
-                    child: Text(
+                    label: Text(
                       'CLAIM ${p.prizeBall!.label.toUpperCase()} BALL',
+                      textAlign: TextAlign.center,
                     ),
                   ),
+                if (p.prizeBall != null && p.prizePlatform != null)
+                  const SizedBox(height: 16),
                 if (p.prizePlatform != null)
-                  FilledButton(
+                  FilledButton.icon(
+                    key: const ValueKey('daily-claim-platform'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 56),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                    ),
+                    icon: const Icon(Icons.horizontal_rule_rounded),
                     onPressed: busy ? null : () => claim(platform: true),
-                    child: Text(
+                    label: Text(
                       'CLAIM ${p.prizePlatform!.label.toUpperCase()} PLATFORM',
+                      textAlign: TextAlign.center,
                     ),
                   ),
               ] else

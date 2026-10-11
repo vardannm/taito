@@ -93,6 +93,10 @@ void main() {
         ),
       );
       await show(1);
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('level-2')),
+        150,
+      );
       expect(find.text('1 / 2 STARS'), findsOneWidget);
       expect(
         tester.widget<InkWell>(find.byKey(const ValueKey('level-2'))).onTap,
@@ -100,9 +104,11 @@ void main() {
       );
       await tester.tap(find.byKey(const ValueKey('level-2')));
       expect(selected, isNull);
+      await tester.ensureVisible(find.byKey(const ValueKey('level-1')));
       await tester.tap(find.byKey(const ValueKey('level-1')));
       expect(selected, 1);
       await show(2);
+      await tester.ensureVisible(find.byKey(const ValueKey('level-2')));
       await tester.tap(find.byKey(const ValueKey('level-2')));
       expect(selected, 2);
       expect(tester.takeException(), isNull);

@@ -167,18 +167,23 @@ void main() {
     },
   );
 
-  test('breathing sections, mazes and restart clear snakes', () {
-    for (final maze in [false, true]) {
+  test(
+    'section changes preserve active snakes and mazes wait for their exit',
+    () {
+      for (final maze in [false, true]) {
+        final g = run();
+        g.snakes.add(BoardSnake(x: 100, y: 200));
+        g.maxHeight = maze ? 8000 : 1800;
+        g.mazeSectionsEnabled = maze;
+        g.step(1 / 120);
+        expect(g.snakes, hasLength(1));
+        expect(g.snakes.single.age, greaterThan(0));
+        if (maze) expect(g.mazeSection, isFalse);
+      }
       final g = run();
       g.snakes.add(BoardSnake(x: 100, y: 200));
-      g.maxHeight = maze ? 8000 : 1800;
-      g.mazeSectionsEnabled = maze;
-      g.step(1 / 120);
+      g.start(gameMode: GameMode.classic, levelNumber: 31);
       expect(g.snakes, isEmpty);
-    }
-    final g = run();
-    g.snakes.add(BoardSnake(x: 100, y: 200));
-    g.start(gameMode: GameMode.classic, levelNumber: 31);
-    expect(g.snakes, isEmpty);
-  });
+    },
+  );
 }

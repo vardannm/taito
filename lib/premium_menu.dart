@@ -6,6 +6,7 @@ import 'ball_cosmetics.dart';
 import 'ball_painter.dart';
 import 'ball_world.dart';
 import 'menu_design.dart';
+import 'game.dart' show GameMode;
 
 /// Menu clocks repaint the decorative canvases only. They never advance a run.
 class MenuMotion extends StatefulWidget {
@@ -117,8 +118,10 @@ class MenuReveal extends StatelessWidget {
 }
 
 class PremiumMenuBackdrop extends CustomPainter {
-  PremiumMenuBackdrop(this.ball, this.drift) : super(repaint: drift);
+  PremiumMenuBackdrop(this.ball, this.drift, {this.page = 0})
+    : super(repaint: drift);
   final BallCosmetic ball;
+  final double page;
   final Animation<double> drift;
 
   @override
@@ -126,7 +129,30 @@ class PremiumMenuBackdrop extends CustomPainter {
     final world = BallWorld.of(ball);
     final w = size.width, h = size.height;
     final phase = drift.value * math.pi * 2;
-    final horizon = Color.lerp(const Color(0xFF3A6666), world.accent, .25)!;
+    Color modeColor(List<Color> colors) {
+      final p = page.clamp(0.0, 2.0);
+      return Color.lerp(colors[p.floor()], colors[p.ceil()], p - p.floor())!;
+    }
+
+    final horizon = Color.lerp(
+      modeColor(const [
+        Color(0xFF3A6666),
+        Color(0xFF907442),
+        Color(0xFF8265AF),
+      ]),
+      world.accent,
+      .18,
+    )!;
+    final night = modeColor(const [
+      Color(0xFF07171E),
+      Color(0xFF201B14),
+      Color(0xFF1C162E),
+    ]);
+    final middle = modeColor(const [
+      Color(0xFF183336),
+      Color(0xFF36352A),
+      Color(0xFF302944),
+    ]);
     canvas.drawRect(
       Offset.zero & size,
       Paint()
@@ -135,9 +161,9 @@ class PremiumMenuBackdrop extends CustomPainter {
           end: Alignment.bottomCenter,
           stops: const [0, .38, .64, 1],
           colors: [
-            const Color(0xFF07171E),
+            night,
             Color.lerp(const Color(0xFF24474D), horizon, .45)!,
-            const Color(0xFF183336),
+            middle,
             menuBackground,
           ],
         ).createShader(Offset.zero & size),
@@ -247,13 +273,18 @@ class PremiumMenuBackdrop extends CustomPainter {
 
   @override
   bool shouldRepaint(PremiumMenuBackdrop old) =>
-      old.ball != ball || old.drift != drift;
+      old.ball != ball || old.drift != drift || old.page != page;
 }
 
 class MenuBallStage extends CustomPainter {
-  MenuBallStage(this.ball, this.drift, {required this.reducedMotion})
-    : super(repaint: drift);
+  MenuBallStage(
+    this.ball,
+    this.drift, {
+    required this.reducedMotion,
+    this.mode = GameMode.infinite,
+  }) : super(repaint: drift);
   final BallCosmetic ball;
+  final GameMode mode;
   final Animation<double> drift;
   final bool reducedMotion;
 
@@ -266,47 +297,53 @@ class MenuBallStage extends CustomPainter {
     final baseY = h * .47 + radius * 1.75;
     final rx = radius * 2.2, ry = radius * .55;
 
-    // Three suspended stone steps, rendered with the game's native canvas.
-    for (var i = 2; i >= 0; i--) {
-      final spread = 1 + i * .16;
-      final y = baseY + i * radius * .28;
-      final edge = Path()
-        ..moveTo(center.dx - rx * spread, y)
-        ..lineTo(center.dx, y + ry * spread)
-        ..lineTo(center.dx + rx * spread, y)
-        ..lineTo(center.dx + rx * spread, y + radius * .2)
-        ..lineTo(center.dx, y + ry * spread + radius * .2)
-        ..lineTo(center.dx - rx * spread, y + radius * .2)
-        ..close();
-      canvas.drawPath(
-        edge,
-        Paint()
-          ..shader = const LinearGradient(
-            colors: [Color(0xFF152C31), Color(0xFF29464A), Color(0xFF10262C)],
-          ).createShader(edge.getBounds()),
-      );
-      final top = Path()
-        ..moveTo(center.dx, y - ry * spread)
-        ..lineTo(center.dx + rx * spread, y)
-        ..lineTo(center.dx, y + ry * spread)
-        ..lineTo(center.dx - rx * spread, y)
-        ..close();
-      canvas.drawPath(
-        top,
-        Paint()
-          ..shader = const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF648481), Color(0xFF335359)],
-          ).createShader(top.getBounds()),
-      );
-      canvas.drawPath(
-        top,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = .8
-          ..color = menuGold.withAlpha(i == 0 ? 70 : 25),
-      );
+    if (mode == GameMode.merge2048) {
+      paintMergeStage(canvas, center.dx, baseY, radius, phase);
+    } else if (mode == GameMode.classic) {
+      paintClassicStage(canvas, center.dx, baseY, radius, phase);
+    } else {
+      // Three suspended stone steps, rendered with the game's native canvas.
+      for (var i = 2; i >= 0; i--) {
+        final spread = 1 + i * .16;
+        final y = baseY + i * radius * .28;
+        final edge = Path()
+          ..moveTo(center.dx - rx * spread, y)
+          ..lineTo(center.dx, y + ry * spread)
+          ..lineTo(center.dx + rx * spread, y)
+          ..lineTo(center.dx + rx * spread, y + radius * .2)
+          ..lineTo(center.dx, y + ry * spread + radius * .2)
+          ..lineTo(center.dx - rx * spread, y + radius * .2)
+          ..close();
+        canvas.drawPath(
+          edge,
+          Paint()
+            ..shader = const LinearGradient(
+              colors: [Color(0xFF152C31), Color(0xFF29464A), Color(0xFF10262C)],
+            ).createShader(edge.getBounds()),
+        );
+        final top = Path()
+          ..moveTo(center.dx, y - ry * spread)
+          ..lineTo(center.dx + rx * spread, y)
+          ..lineTo(center.dx, y + ry * spread)
+          ..lineTo(center.dx - rx * spread, y)
+          ..close();
+        canvas.drawPath(
+          top,
+          Paint()
+            ..shader = const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF648481), Color(0xFF335359)],
+            ).createShader(top.getBounds()),
+        );
+        canvas.drawPath(
+          top,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = .8
+            ..color = menuGold.withAlpha(i == 0 ? 70 : 25),
+        );
+      }
     }
     final shadow = Rect.fromCenter(
       center: Offset(center.dx, baseY),
@@ -348,8 +385,185 @@ class MenuBallStage extends CustomPainter {
     );
   }
 
+  void paintMergeStage(
+    Canvas canvas,
+    double x,
+    double y,
+    double r,
+    double phase,
+  ) {
+    const colors = [
+      Color(0xFF70D8CA),
+      Color(0xFFAA86F1),
+      Color(0xFFF29A87),
+      Color(0xFFF2CD77),
+    ];
+    for (var row = 0; row < 3; row++) {
+      for (var col = 0; col < 3; col++) {
+        final cx = x + (col - row) * r * .72;
+        final cy = y + (col + row - 2) * r * .26;
+        final color = colors[(row * 3 + col) % colors.length];
+        final top = Path()
+          ..moveTo(cx, cy - r * .24)
+          ..lineTo(cx + r * .68, cy)
+          ..lineTo(cx, cy + r * .24)
+          ..lineTo(cx - r * .68, cy)
+          ..close();
+        final side = Path()
+          ..moveTo(cx - r * .68, cy)
+          ..lineTo(cx, cy + r * .24)
+          ..lineTo(cx + r * .68, cy)
+          ..lineTo(cx + r * .68, cy + r * .2)
+          ..lineTo(cx, cy + r * .44)
+          ..lineTo(cx - r * .68, cy + r * .2)
+          ..close();
+        canvas.drawPath(
+          side,
+          Paint()..color = Color.lerp(color, menuBackground, .55)!,
+        );
+        canvas.drawPath(
+          top,
+          Paint()
+            ..shader = LinearGradient(
+              colors: [Color.lerp(color, Colors.white, .25)!, color],
+            ).createShader(top.getBounds()),
+        );
+        canvas.drawPath(
+          top,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1
+            ..color = Colors.white.withAlpha(90),
+        );
+        final label = TextPainter(
+          text: TextSpan(
+            text: '${1 << ((row + col) % 3 + 1)}',
+            style: TextStyle(
+              fontFamily: 'sans-serif',
+              fontSize: r * .19,
+              fontWeight: FontWeight.w800,
+              color: menuBackground.withAlpha(170),
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        label.paint(
+          canvas,
+          Offset(cx - label.width / 2, cy - label.height / 2),
+        );
+      }
+    }
+    for (var i = 0; i < 3; i++) {
+      final p = Offset(
+        x + (i - 1) * r * 1.6,
+        y - r * (1.1 + .15 * math.sin(phase + i)),
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: p, width: r * .22, height: r * .22),
+          Radius.circular(r * .04),
+        ),
+        Paint()..color = colors[i].withAlpha(130),
+      );
+    }
+  }
+
+  void paintClassicStage(
+    Canvas canvas,
+    double x,
+    double y,
+    double r,
+    double phase,
+  ) {
+    final base = Rect.fromCenter(
+      center: Offset(x, y + r * .17),
+      width: r * 4.5,
+      height: r * 1.2,
+    );
+    canvas.drawOval(
+      base,
+      Paint()
+        ..shader = const LinearGradient(
+          colors: [Color(0xFF785C37), Color(0xFF302F2A)],
+        ).createShader(base),
+    );
+    final top = Rect.fromCenter(
+      center: Offset(x, y),
+      width: r * 4.5,
+      height: r * .95,
+    );
+    canvas.drawOval(
+      top,
+      Paint()
+        ..shader = const LinearGradient(
+          colors: [Color(0xFFE1C88D), Color(0xFF927B53)],
+        ).createShader(top),
+    );
+    canvas.drawOval(
+      top.deflate(r * .12),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = r * .025
+        ..color = const Color(0xFF655638),
+    );
+    for (var i = 0; i < 16; i++) {
+      final angle = i * math.pi * 2 / 16;
+      canvas.drawLine(
+        Offset(x + math.cos(angle) * r * 1.95, y + math.sin(angle) * r * .37),
+        Offset(x + math.cos(angle) * r * 2.12, y + math.sin(angle) * r * .42),
+        Paint()
+          ..color = const Color(0xFF6D5638)
+          ..strokeWidth = r * .025,
+      );
+    }
+    for (final side in [-1, 1]) {
+      final postX = x + side * r * 1.8;
+      final post = RRect.fromRectAndRadius(
+        Rect.fromLTRB(postX - r * .1, y - r * .65, postX + r * .1, y),
+        Radius.circular(r * .05),
+      );
+      canvas.drawRRect(
+        post,
+        Paint()
+          ..shader = const LinearGradient(
+            colors: [Color(0xFFFADE99), Color(0xFF75643F)],
+          ).createShader(post.outerRect),
+      );
+      canvas.drawCircle(
+        Offset(postX, y - r * .72),
+        r * .13,
+        Paint()..color = menuGold,
+      );
+    }
+    final arch = Path()
+      ..moveTo(x - r * 1.8, y - r * .65)
+      ..cubicTo(
+        x - r * 1.9,
+        y - r * 3.6,
+        x + r * 1.9,
+        y - r * 3.6,
+        x + r * 1.8,
+        y - r * .65,
+      );
+    canvas.drawPath(
+      arch,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = r * .055
+        ..color = menuGold.withAlpha(105),
+    );
+    canvas.drawPath(
+      arch,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = r * .013
+        ..color = menuGold,
+    );
+  }
+
   @override
   bool shouldRepaint(MenuBallStage old) =>
+      old.mode != mode ||
       old.ball != ball ||
       old.drift != drift ||
       old.reducedMotion != reducedMotion;
@@ -561,6 +775,44 @@ class MenuBestScore extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    ),
+  );
+}
+
+class MenuActionButton extends StatelessWidget {
+  const MenuActionButton({
+    super.key,
+    required this.label,
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+  final String label, tooltip;
+  final IconData icon;
+  final VoidCallback? onPressed;
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip,
+    child: SizedBox(
+      height: 60,
+      child: FilledButton.icon(
+        style: FilledButton.styleFrom(
+          backgroundColor: const Color(0xFF2C4448),
+          foregroundColor: menuText,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          textStyle: const TextStyle(
+            fontFamily: 'sans-serif',
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        onPressed: onPressed,
+        icon: Icon(icon, size: 26),
+        label: FittedBox(fit: BoxFit.scaleDown, child: Text(label)),
       ),
     ),
   );

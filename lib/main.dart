@@ -1727,7 +1727,16 @@ class _GameScreenState extends State<GameScreen>
     return Stack(
       fit: StackFit.expand,
       children: [
-        Opacity(opacity: tutorialActive ? 1 : 1 - chromeOpacity, child: board),
+        Opacity(
+          opacity: tutorialActive ? 1 : 1 - chromeOpacity,
+          child: LayoutBuilder(
+            builder: (context, bounds) => OverflowBox(
+              minHeight: math.max(200, bounds.maxHeight),
+              maxHeight: math.max(200, bounds.maxHeight),
+              child: board,
+            ),
+          ),
+        ),
         if (!tutorialActive && chromeOpacity > 0)
           IgnorePointer(
             child: ExcludeSemantics(
@@ -1738,6 +1747,7 @@ class _GameScreenState extends State<GameScreen>
                     painter: MenuBallStage(
                       profile.selectedBall,
                       drift,
+                      mode: arcadeModes[index],
                       reducedMotion: MediaQuery.disableAnimationsOf(context),
                     ),
                   ),
@@ -2142,6 +2152,12 @@ class _GameScreenState extends State<GameScreen>
     return Row(
       children: [
         MenuQuietButton(
+          icon: Icons.emoji_events_outlined,
+          tooltip: 'Achievements',
+          badge: profile.achievementsReady > 0,
+          onPressed: carouselMoving ? null : showAchievements,
+        ),
+        MenuQuietButton(
           icon: Icons.redeem_outlined,
           tooltip: 'Daily prizes',
           badge: profile.dailyPrizes.canClaim(DateTime.now()),
@@ -2279,6 +2295,34 @@ class _GameScreenState extends State<GameScreen>
                   ],
                 ),
               ),
+              Row(
+                children: [
+                  Expanded(
+                    child: KeyedSubtree(
+                      key: shopOriginKey,
+                      child: MenuActionButton(
+                        key: game.waitingForInput
+                            ? const ValueKey('board-shop')
+                            : null,
+                        label: 'Shop',
+                        icon: Icons.storefront_outlined,
+                        tooltip: 'Gear shop',
+                        onPressed: carouselMoving ? null : showBallShop,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: MenuActionButton(
+                      label: 'Arcade',
+                      icon: Icons.grid_view_rounded,
+                      tooltip: 'Modes',
+                      onPressed: carouselMoving ? null : showModes,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
               PremiumPlayButton(
                 height: compactMenu ? 56 : 64,
                 key: game.waitingForInput ? const ValueKey('menu-play') : null,
@@ -2288,20 +2332,8 @@ class _GameScreenState extends State<GameScreen>
               ),
               SizedBox(height: compactMenu ? 8 : 14),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  KeyedSubtree(
-                    key: shopOriginKey,
-                    child: MenuQuietButton(
-                      key: game.waitingForInput
-                          ? const ValueKey('board-shop')
-                          : null,
-                      label: 'Shop',
-                      icon: Icons.storefront_outlined,
-                      tooltip: 'Gear shop',
-                      onPressed: carouselMoving ? null : showBallShop,
-                    ),
-                  ),
                   Flexible(
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -2354,12 +2386,6 @@ class _GameScreenState extends State<GameScreen>
                           ),
                       ],
                     ),
-                  ),
-                  MenuQuietButton(
-                    label: 'Arcade',
-                    icon: Icons.grid_view_rounded,
-                    tooltip: 'Modes',
-                    onPressed: carouselMoving ? null : showModes,
                   ),
                 ],
               ),
@@ -2425,8 +2451,8 @@ class _GameScreenState extends State<GameScreen>
           final menuFooterHeight = tutorialActive
               ? 84.0
               : compactMenu
-              ? 208.0
-              : 234.0;
+              ? 284.0
+              : 310.0;
           final menuGap = !tutorialActive && compactMenu ? 4.0 : 12.0;
           final controlHeight = game.bottomControls
               ? (MediaQuery.sizeOf(context).height * .19).clamp(104.0, 140.0)
@@ -2464,6 +2490,7 @@ class _GameScreenState extends State<GameScreen>
                                   : PremiumMenuBackdrop(
                                       profile.selectedBall,
                                       drift,
+                                      page: page,
                                     ),
                             ),
                           ),
