@@ -405,10 +405,14 @@ void paintInfiniteMagnet(Canvas c, BalanceGame game, bool reducedMotion) {
   }
   c.restore();
   if (game.survival.magnet > 0) {
+    final remaining = (game.survival.magnet / game.magnetDuration).clamp(
+      0.0,
+      1.0,
+    );
     c.drawArc(
       Rect.fromCircle(center: p, radius: 21),
       -math.pi / 2,
-      math.pi * 2 * game.survival.magnet / InfiniteTuning.magnetSeconds,
+      math.pi * 2 * remaining,
       false,
       Paint()
         ..color = tint
@@ -417,24 +421,119 @@ void paintInfiniteMagnet(Canvas c, BalanceGame game, bool reducedMotion) {
     );
     final label = TextPainter(
       text: TextSpan(
-        text: 'MAGNET ${game.survival.magnet.ceil()}s',
+        text: 'MAGNET',
         style: const TextStyle(
-          fontFamily: 'monospace',
-          fontSize: 9,
-          fontWeight: FontWeight.w800,
-          color: tint,
-          backgroundColor: Color(0xEFFFF9ED),
+          fontFamily: 'sans-serif',
+          fontSize: 7.5,
+          letterSpacing: .7,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFFD5C6F0),
         ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    label.paint(
-      c,
-      Offset(
-        (p.dx - label.width / 2).clamp(22.0, 338 - label.width),
-        p.dy - 37,
+    final time = TextPainter(
+      text: TextSpan(
+        text: '${game.survival.magnet.ceil()}s',
+        style: const TextStyle(
+          fontFamily: 'sans-serif',
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFFF8F2FF),
+        ),
       ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final width = 37 + label.width + time.width;
+    final left = (p.dx - width / 2).clamp(22.0, 338 - width);
+    final above = p.dy - 49;
+    final top = (above < game.visibleTop + 4 ? p.dy + 27 : above).clamp(
+      game.visibleTop + 4,
+      548.0,
     );
+    final bounds = Rect.fromLTWH(left, top, width, 23);
+    final badge = RRect.fromRectAndRadius(bounds, const Radius.circular(11.5));
+    c.drawRRect(
+      badge.shift(const Offset(0, 2)),
+      Paint()..color = const Color(0x30000000),
+    );
+    c.drawRRect(
+      badge,
+      Paint()
+        ..shader = const LinearGradient(
+          colors: [Color(0xF21A2730), Color(0xF22D2540)],
+        ).createShader(bounds),
+    );
+    c.drawRRect(
+      badge,
+      Paint()
+        ..color = const Color(0xFFB49AD7).withAlpha(125)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .7,
+    );
+    // A tiny horseshoe magnet, with the pickup's blue and red pole tips.
+    final icon = Offset(left + 11, top + 10.5);
+    c.drawPath(
+      Path()
+        ..moveTo(icon.dx - 3.5, icon.dy - 3)
+        ..lineTo(icon.dx - 3.5, icon.dy + 1)
+        ..cubicTo(
+          icon.dx - 3.5,
+          icon.dy + 5.5,
+          icon.dx + 3.5,
+          icon.dy + 5.5,
+          icon.dx + 3.5,
+          icon.dy + 1,
+        )
+        ..lineTo(icon.dx + 3.5, icon.dy - 3),
+      Paint()
+        ..color = const Color(0xFFDDCFF2)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2
+        ..strokeCap = StrokeCap.round,
+    );
+    for (final pole in [
+      (icon.dx - 3.5, const Color(0xFF7BD6E2)),
+      (icon.dx + 3.5, const Color(0xFFF498A8)),
+    ]) {
+      c.drawLine(
+        Offset(pole.$1, icon.dy - 3.5),
+        Offset(pole.$1, icon.dy - 1.5),
+        Paint()
+          ..color = pole.$2
+          ..strokeWidth = 2.2
+          ..strokeCap = StrokeCap.round,
+      );
+    }
+    label.paint(c, Offset(left + 21, top + (21 - label.height) / 2));
+    final divider = left + 26 + label.width;
+    c.drawLine(
+      Offset(divider, top + 6),
+      Offset(divider, top + 16),
+      Paint()
+        ..color = const Color(0xFFB49AD7).withAlpha(90)
+        ..strokeWidth = .7,
+    );
+    time.paint(c, Offset(divider + 6, top + (21 - time.height) / 2));
+    final track = Rect.fromLTWH(left + 12, top + 19, width - 24, 1.5);
+    c.drawRRect(
+      RRect.fromRectAndRadius(track, const Radius.circular(1)),
+      Paint()..color = const Color(0xFFB49AD7).withAlpha(45),
+    );
+    c.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          track.left,
+          track.top,
+          track.width * remaining,
+          track.height,
+        ),
+        const Radius.circular(1),
+      ),
+      Paint()..color = const Color(0xFFC7A4F4),
+    );
+    label.dispose();
+    time.dispose();
   }
 }
 

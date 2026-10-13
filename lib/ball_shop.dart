@@ -31,6 +31,22 @@ class BallShop extends StatefulWidget {
 class _BallShopState extends State<BallShop>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   int category = 0;
+  double swipeDistance = 0;
+
+  void finishSwipe(DragEndDetails details) {
+    if (guiding) return;
+    final velocity = details.primaryVelocity ?? 0;
+    if (swipeDistance.abs() < 56 && velocity.abs() < 500) return;
+    final direction = swipeDistance.abs() >= 56 ? swipeDistance : velocity;
+    if (direction < 0 && category == 0) {
+      Navigator.of(context).maybePop();
+    } else {
+      setState(
+        () => category = (category + (direction > 0 ? 1 : -1)).clamp(0, 3),
+      );
+    }
+  }
+
   final exampleKey = GlobalKey();
   bool get guiding =>
       !widget.profile.tutorialSeen &&
@@ -261,6 +277,7 @@ class _BallShopState extends State<BallShop>
     required bool selected,
     required CustomPainter painter,
     required VoidCallback buy,
+    bool purchaseOnly = false,
     BallCosmetic? worldBall,
   }) => ShopGalleryCard(
     name: name,
@@ -270,6 +287,8 @@ class _BallShopState extends State<BallShop>
         ? 'EQUIPPED'
         : owned
         ? 'IN YOUR COLLECTION'
+        : purchaseOnly
+        ? 'PREMIUM · COMING SOON'
         : 'DISCOVER',
     worldName: worldBall == null ? null : BallWorld.of(worldBall).name,
     artHeight: worldBall == null ? 136 : 188,
@@ -286,7 +305,9 @@ class _BallShopState extends State<BallShop>
                   : preview,
             ),
     ),
-    detail: bonus == 0
+    detail: purchaseOnly
+        ? 'Premium · +${formatBoost(bonus)}× Infinite points'
+        : bonus == 0
         ? 'Base equipment'
         : '+${formatBoost(bonus)}× Infinite points',
     action: ShopPurchaseButton(
@@ -296,8 +317,12 @@ class _BallShopState extends State<BallShop>
           ? 'Equipped'
           : owned
           ? 'Equip'
+          : purchaseOnly
+          ? 'Coming soon'
           : '$cost coins',
-      onPressed: selected || (!owned && !widget.profile.canAfford(cost))
+      onPressed:
+          selected ||
+              (!owned && (purchaseOnly || !widget.profile.canAfford(cost)))
           ? null
           : buy,
     ),
@@ -470,6 +495,7 @@ class _BallShopState extends State<BallShop>
                                   '${b.description}\n${b.magnetLabel} · Infinite',
                               cost: b.cost,
                               bonus: b.scoreBonus,
+                              purchaseOnly: b.purchaseOnly,
                               owned: p.ownedBalls.contains(b),
                               selected: p.selectedBall == b,
                               painter: CosmeticPreview(b, animation: preview),
@@ -483,6 +509,7 @@ class _BallShopState extends State<BallShop>
                               description: rail.description,
                               cost: rail.cost,
                               bonus: rail.scoreBonus,
+                              purchaseOnly: rail.purchaseOnly,
                               owned: p.ownedPlatforms.contains(rail),
                               selected: p.selectedPlatform == rail,
                               painter: PlatformPreview(
@@ -649,7 +676,16 @@ class _BallShopState extends State<BallShop>
 
   @override
   Widget build(BuildContext context) {
-    if (!guiding) return collection();
+    if (!guiding) {
+      return GestureDetector(
+        key: const ValueKey('shop-swipe-area'),
+        behavior: HitTestBehavior.translucent,
+        onHorizontalDragStart: (_) => swipeDistance = 0,
+        onHorizontalDragUpdate: (details) => swipeDistance += details.delta.dx,
+        onHorizontalDragEnd: finishSwipe,
+        child: collection(),
+      );
+    }
     final p = widget.profile;
     return MenuSurface(
       child: Stack(

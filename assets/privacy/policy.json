@@ -1,0 +1,45 @@
+{
+  "title": "GILT Privacy Policy",
+  "updated": "2026-10-12",
+  "publisher": "",
+  "contactEmail": "",
+  "publicUrl": "",
+  "sections": [
+    {
+      "title": "Your game data",
+      "body": "GILT stores progress, scores, earned coins, equipment, achievements, tutorial progress, settings, and saved friend challenges on your device. These records support gameplay and are not automatically uploaded to a GILT server. GILT does not require an account. Your operating system may include app data in device backups, depending on your backup settings."
+    },
+    {
+      "title": "Backups, challenges, and playtests",
+      "body": "When you choose to copy a progress backup, friend challenge, or playtest report, GILT writes that content to your clipboard. A friend challenge includes the name you enter and your challenge result. Imports use text you paste into the app. The optional playtest recorder keeps gameplay observations in memory until the app closes or another recording starts. GILT does not upload these exports automatically. If you send them to another person or service, that recipient controls its copy."
+    },
+    {
+      "title": "Optional rewarded ads",
+      "body": "On supported mobile devices, you can choose to request a rewarded ad to revive an Infinite run or double that run's collected coins after losing with more than 10 coins. Google Mobile Ads processes the request and may receive your IP address, approximate location inferred from it, device identifiers, ad views and interactions, and crash or performance information. Google uses this information for advertising, measurement, security, and service improvement. The current development build uses test ads; test ads should not be assumed to prevent SDK data processing. You can continue playing without requesting a rewarded ad."
+    },
+    {
+      "title": "Analytics",
+      "body": "On Android and iOS, GILT uses Google Analytics for Firebase to understand how the game is used and improve it. It sends mode selections, run starts and finishes, shop opens, control scheme, level, practice status, score, outcome, and run duration to Google. The SDK also collects standard app-usage events, app and device information, and installation or device identifiers. We do not attach your challenge name, email, or a custom user ID to gameplay events. Google processes and retains analytics data under its policies and the project's analytics settings. Advertising services may separately process measurement data when you request an ad."
+    },
+    {
+      "title": "Permissions and access",
+      "body": "GILT does not request access to your contacts, photos, camera, microphone, or precise location. Control gestures stay within the game. Clipboard exports occur when you choose to copy content, and imports use the text you provide."
+    },
+    {
+      "title": "Retention and your choices",
+      "body": "Local progress remains in app storage until that storage is removed. On iOS, deleting the app removes its local app storage; offloading the app can retain it. Exported copies and device backups may remain separately, so manage those copies too. Google controls retention of data processed by its advertising services under its policies. Skipping rewarded ads avoids new ad requests from GILT."
+    },
+    {
+      "title": "Children",
+      "body": "GILT does not ask players to provide their age or create an account. Parents and guardians should supervise any sharing of challenge names, backups, or reports, and use device controls to manage access to advertising."
+    },
+    {
+      "title": "Policy updates",
+      "body": "We will update this policy when GILT's data practices change. The date above identifies the version included with this app."
+    }
+  ],
+  "references": [
+    { "title": "Google Privacy Policy", "url": "https://policies.google.com/privacy" },
+    { "title": "How Google uses information from apps", "url": "https://policies.google.com/technologies/partner-sites" }
+  ]
+}

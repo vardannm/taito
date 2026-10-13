@@ -76,7 +76,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       await capture('controls-cards-${width.toInt()}');
       await tester.ensureVisible(
-        find.byKey(const ValueKey('analog-sensitivity')),
+        find.byKey(const ValueKey('two-finger-sensitivity')),
       );
       await tester.pump();
       await capture('controls-sensitivity-${width.toInt()}');

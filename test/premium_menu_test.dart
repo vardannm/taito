@@ -58,46 +58,52 @@ void main() {
     }
   }
 
-  testWidgets(
-    'menu reads saved scores for the selected mode and classic control',
-    (tester) async {
-      final profile = PlayerProfile()
-        ..tutorialSeen = true
-        ..music = false
-        ..sound = false
-        ..haptics = false
-        ..infiniteBestScore = 148620
-        ..mergeBest = 28640
-        ..classicLevel = 3;
-      profile.levelRecords[profile.recordKey(3, ControlMode.oneFinger)] =
-          const LevelRecord(bestScore: 9600);
-      await profile.save();
-      final loaded = PlayerProfile();
-      await loaded.load();
-      await tester.pumpWidget(ArcadeApp(profile: loaded));
-      String displayedScore() => tester
-          .widget<Text>(find.byKey(const ValueKey('menu-best-score')))
-          .data!;
-      expect(displayedScore(), '148,620');
-      await selectWorld(tester, 1);
-      expect(displayedScore(), '9,600');
-      await selectWorld(tester, 2);
-      expect(displayedScore(), '28,640');
-      await startWorld(tester);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 600));
-      await tester.tap(find.byTooltip('Pause'));
-      await tester.pump();
-      await tester.tap(find.text('BACK TO MENU'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 650));
-      await tester.pump();
-      expect(displayedScore(), '28,640');
-      expect(find.byKey(const ValueKey('menu-play')), findsOneWidget);
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox());
-    },
-  );
+  testWidgets('menu shows saved scores and total earned Classic stars', (
+    tester,
+  ) async {
+    final profile = PlayerProfile()
+      ..tutorialSeen = true
+      ..music = false
+      ..sound = false
+      ..haptics = false
+      ..infiniteBestScore = 148620
+      ..mergeBest = 28640
+      ..classicLevel = 3;
+    profile.levelRecords[profile.recordKey(3, ControlMode.oneFinger)] =
+        const LevelRecord(bestScore: 9600, starMask: 3);
+    profile.levelRecords[profile.recordKey(4, ControlMode.twoFinger)] =
+        const LevelRecord(starMask: 7);
+    await profile.save();
+    final loaded = PlayerProfile();
+    await loaded.load();
+    await tester.pumpWidget(ArcadeApp(profile: loaded));
+    String displayedScore() => tester
+        .widget<Text>(find.byKey(const ValueKey('menu-best-score')))
+        .data!;
+    expect(displayedScore(), '148,620');
+    await selectWorld(tester, 1);
+    expect(find.byKey(const ValueKey('menu-best-score')), findsNothing);
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('menu-earned-stars'))).data,
+      '5',
+    );
+    expect(find.byKey(const ValueKey('choose-level')), findsOneWidget);
+    await selectWorld(tester, 2);
+    expect(displayedScore(), '28,640');
+    await startWorld(tester);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.tap(find.byTooltip('Pause'));
+    await tester.pump();
+    await tester.tap(find.text('BACK TO MENU'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 650));
+    await tester.pump();
+    expect(displayedScore(), '28,640');
+    expect(find.byKey(const ValueKey('menu-play')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
 
   testWidgets(
     'ambient paint stops for sheets, background, gameplay and reduced motion',

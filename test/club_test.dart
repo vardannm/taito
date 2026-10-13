@@ -72,7 +72,8 @@ void main() {
       await fresh.load();
       expect(fresh.classicLevel, 9);
       expect(fresh.sound, false);
-      expect(fresh.levelRecord(9).bestTime, 80);
+      expect(fresh.controlMode, ControlMode.oneFinger);
+      expect(fresh.levelRecord(9, ControlMode.analog).bestTime, 80);
       expect(fresh.tutorialSeen, true);
       expect(fresh.wallet, 80);
     },

@@ -1,8 +1,6 @@
 # Firebase Analytics setup
 
-The app includes Firebase Analytics, but reporting is inactive until a real
-Firebase project is configured. No Apple or Google Play store account is needed.
-Unconfigured builds and analytics failures do not prevent gameplay.
+Firebase project `gilt-ead46` is configured for Android and iOS. Native configuration files and `lib/firebase_options.dart` are included; initialization enables Analytics collection. No Apple or Google Play store account is needed for Firebase. Web/desktop analytics remain unconfigured. Live event delivery still needs an Android/iOS device check; iOS compilation needs the release Mac.
 
 ## Connect your project
 
@@ -11,15 +9,18 @@ Unconfigured builds and analytics failures do not prevent gameplay.
 2. Install the Firebase CLI and sign in with `firebase login`. Install FlutterFire
    with `dart pub global activate flutterfire_cli`.
 3. From this repository, run
-   `flutterfire configure --project=YOUR_PROJECT_ID --platforms=android,ios`.
-   This replaces the placeholder
-   `lib/firebase_options.dart` and generates/registers the native configuration.
+   `flutterfire configure --project=gilt-ead46 --platforms=android,ios`.
+   This refreshes `lib/firebase_options.dart` and generates/registers the native configuration.
    Use these existing application identifiers:
    - Android: `com.giltarcade.balance_arcade`
    - iOS: `com.giltarcade.balanceArcade`
 4. Rebuild the app. Firebase initialization enables analytics collection. Merely
    hot reloading is insufficient after adding native Firebase configuration.
    Build and validate iOS on a Mac with Xcode.
+
+The Windows workspace includes local Firebase and FlutterFire tools in ignored `.tools/` and `.pub-cache/` directories. `scripts/firebase.ps1` wraps the local Firebase CLI and keeps sign-in credentials in ignored `.tools/firebase-config/`. If PowerShell blocks scripts, set `XDG_CONFIG_HOME` to that directory and invoke `node .tools/firebase-cli/node_modules/firebase-tools/lib/bin/firebase.js` directly. Do not commit CLI credentials or debug logs.
+
+FlutterFire skips native iOS writes on Windows. The downloaded `ios/Runner/GoogleService-Info.plist` has been explicitly included in Runner's Resources build phase. Android uses the Google Services Gradle plugin and `android/app/google-services.json`.
 
 Keep the generated Firebase options and native configuration with the app source.
 They identify the project; do not add service-account private keys to the app.

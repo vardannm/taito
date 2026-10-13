@@ -26,6 +26,8 @@ void main() {
         BossKind.skyWarden => [3.6, 10.7, 11.6, 18.5, 19.5],
         BossKind.stormColossus => [4.1, 11.5, 13.1, 18.6, 19.5],
         BossKind.eclipseSeraph => [4.5, 10.8, 11.7, 18.5, 20.4],
+        BossKind.prismReaver => [3.2, 4.5, 12.0, 18.5, 20.4],
+        BossKind.venomCrown => [3.0, 5.8, 13.4, 19.0, 23.8],
       };
       final labels = switch (kind) {
         BossKind.skyWarden => [
@@ -48,6 +50,20 @@ void main() {
           'LASER CURTAINS',
           'COMET WARNING',
           'COMET RAIN',
+        ],
+        BossKind.prismReaver => [
+          'SWEEP WARNING',
+          'MOVING LASER',
+          'TWIN LASERS',
+          'ROTOR PATHS',
+          'SPINNING ROTORS',
+        ],
+        BossKind.venomCrown => [
+          'TOXIC WARNING',
+          'POISON SLALOM',
+          'PULSING WALLS',
+          'GAUNTLET WARNING',
+          'TOXIC GAUNTLET',
         ],
       };
       final recorder = ui.PictureRecorder();
@@ -106,6 +122,8 @@ void main() {
           BossKind.skyWarden => 'artifacts/infinite-boss.png',
           BossKind.stormColossus => 'artifacts/infinite-colossus.png',
           BossKind.eclipseSeraph => 'artifacts/infinite-seraph.png',
+          BossKind.prismReaver => 'artifacts/infinite-reaver.png',
+          BossKind.venomCrown => 'artifacts/infinite-venom-crown.png',
         }).writeAsBytes(bytes!.buffer.asUint8List());
       });
       image.dispose();

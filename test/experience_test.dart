@@ -125,8 +125,8 @@ void main() {
     tester,
   ) async {
     final profile = PlayerProfile()..wallet = 10000;
-    expect(BallCosmetic.values.length, 19);
-    expect(PlatformStyle.values.length, 12);
+    expect(BallCosmetic.values.length, 23);
+    expect(PlatformStyle.values.length, 16);
     expect(profile.selectBall(BallCosmetic.singularity), true);
     expect(profile.selectPlatform(PlatformStyle.sovereign), true);
     await profile.save();

@@ -274,21 +274,23 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.byType(ControlOptions), findsOneWidget);
       expect(find.byType(DropdownButtonFormField<ControlMode>), findsNothing);
-      await tester.ensureVisible(find.byKey(const ValueKey('control-analog')));
-      await tester.tap(find.byKey(const ValueKey('control-analog')));
-      await tester.pump();
-      expect(p.controlMode, ControlMode.analog);
       await tester.ensureVisible(
-        find.byKey(const ValueKey('analog-sensitivity')),
+        find.byKey(const ValueKey('control-twoFinger')),
+      );
+      await tester.tap(find.byKey(const ValueKey('control-twoFinger')));
+      await tester.pump();
+      expect(p.controlMode, ControlMode.twoFinger);
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('two-finger-sensitivity')),
       );
       await tester.pump();
       final slider = tester.widget<Slider>(
-        find.byKey(const ValueKey('analog-sensitivity')),
+        find.byKey(const ValueKey('two-finger-sensitivity')),
       );
       slider.onChanged!(.4);
       slider.onChangeEnd!(.4);
       await tester.pump();
-      expect(p.analogSensitivity, .4);
+      expect(p.twoFingerSensitivity, .4);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
     },

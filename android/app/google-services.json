@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "619290167363",
+    "project_id": "gilt-ead46",
+    "storage_bucket": "gilt-ead46.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:619290167363:android:2f53889d0cb7ee9101ecf6",
+        "android_client_info": {
+          "package_name": "com.giltarcade.balance_arcade"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAb0VpneOHpgGEd9TOQkZdg2vVwQ0lsv0U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -2,7 +2,6 @@ import 'support/mode_navigation.dart' show armWorld;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:balance_arcade/analog_controls.dart';
 import 'package:balance_arcade/board_tilt_controls.dart';
 import 'package:balance_arcade/board_painter.dart';
 import 'package:balance_arcade/game.dart';
@@ -232,14 +231,16 @@ void main() {
       await tester.sendKeyDownEvent(LogicalKeyboardKey.keyW);
       await tester.sendKeyUpEvent(LogicalKeyboardKey.keyW);
       expect(game.waitingForInput, isTrue);
-      await tester.ensureVisible(find.byKey(const ValueKey('control-analog')));
-      await tester.tap(find.byKey(const ValueKey('control-analog')));
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('control-oneFinger')),
+      );
+      await tester.tap(find.byKey(const ValueKey('control-oneFinger')));
       await tester.pump();
       Navigator.of(tester.element(find.byTooltip('Close settings'))).pop();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
-      expect(game.analog, isTrue);
-      expect(find.byType(AnalogControls), findsOneWidget);
+      expect(game.oneFinger, isTrue);
+      expect(find.byType(OneFingerControls), findsOneWidget);
       expect(game.waitingForInput, isTrue);
       expect(game.elapsed, 0);
       await armWorld(tester);
@@ -248,7 +249,7 @@ void main() {
         game.tiltOnly ? const Offset(3, 0) : const Offset(0, -3),
       );
       expect(game.waitingForInput, isFalse);
-      expect(game.analogInputs[0], lessThan(0));
+      expect(game.controlHeld, isTrue);
       await finger.up();
       await tester.pumpWidget(const SizedBox());
     },

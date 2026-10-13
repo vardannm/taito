@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'ball_cosmetics.dart';
+import 'premium_gear_painter.dart';
 
 void paintCosmetic(
   Canvas canvas,
@@ -176,7 +177,12 @@ void paintCosmetic(
       Paint()..color = const Color(0xFFF0FFFF),
     );
   }
-  if (ball.index >= BallCosmetic.pearl.index) {
+  if (ball.purchaseOnly) {
+    canvas.save();
+    canvas.clipPath(shape);
+    paintPremiumBallBody(canvas, center, radius, ball, time, reducedMotion);
+    canvas.restore();
+  } else if (ball.index >= BallCosmetic.pearl.index) {
     final phase = reducedMotion ? 0.0 : time * .7;
     canvas.save();
     canvas.clipPath(shape);
@@ -318,6 +324,9 @@ void paintCosmetic(
   canvas.restore();
   canvas.restore();
   final phase = reducedMotion ? 0.0 : time * .7;
+  if (ball.purchaseOnly) {
+    paintPremiumBallEffects(canvas, center, radius, ball, time, reducedMotion);
+  }
   if (ball == BallCosmetic.quasar || ball == BallCosmetic.singularity) {
     final orbit = Rect.fromCenter(
       center: center,

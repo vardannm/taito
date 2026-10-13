@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'game.dart';
 import 'enemy_sounds.dart';
 import 'enemy_audio.dart';
+import 'music_output.dart';
 import 'levels.dart';
 import 'rewards.dart';
 import 'onboarding.dart';
@@ -18,7 +19,7 @@ import 'survival_upgrades.dart';
 
 class PlayerProfile {
   PlayerProfile({
-    this.unlimitedCoins = const bool.fromEnvironment('GILT_UNLIMITED_COINS'),
+    this.unlimitedCoins = false,
     this.temporaryLevelAccess = const bool.fromEnvironment(
       'GILT_UNLOCK_ALL_LEVELS',
       defaultValue: true,
@@ -120,14 +121,18 @@ class PlayerProfile {
 
   BallCosmetic? get prizeBall {
     final choices =
-        BallCosmetic.values.where((b) => !ownedBalls.contains(b)).toList()
+        BallCosmetic.values
+            .where((b) => !b.purchaseOnly && !ownedBalls.contains(b))
+            .toList()
           ..sort((a, b) => a.cost.compareTo(b.cost));
     return choices.firstOrNull;
   }
 
   PlatformStyle? get prizePlatform {
     final choices =
-        PlatformStyle.values.where((p) => !ownedPlatforms.contains(p)).toList()
+        PlatformStyle.values
+            .where((p) => !p.purchaseOnly && !ownedPlatforms.contains(p))
+            .toList()
           ..sort((a, b) => a.cost.compareTo(b.cost));
     return choices.firstOrNull;
   }
@@ -165,26 +170,6 @@ class PlayerProfile {
     return reward;
   }
 
-  bool _ballTestCreditApplied = false;
-  bool _temporaryNormalCreditApplied = false;
-
-  /// Temporary one-time credit, including release builds, in the normal wallet.
-  Future<void> grantTemporaryNormalCoins() async {
-    if (_temporaryNormalCreditApplied || unlimitedCoins || !available) return;
-    wallet += 100000;
-    _temporaryNormalCreditApplied = true;
-    await saveEconomy();
-  }
-
-  /// One development credit, persisted with the balance so it cannot refill
-  /// spent coins on every restart. Called by the debug app entry point only.
-  Future<void> grantBallTestCoins() async {
-    if (_ballTestCreditApplied || unlimitedCoins || !available) return;
-    wallet += 10000;
-    _ballTestCreditApplied = true;
-    await saveEconomy();
-  }
-
   BallCosmetic selectedBall = BallCosmetic.steel;
   double analogSensitivity = 1, twoFingerSensitivity = 1;
   PlatformStyle selectedPlatform = PlatformStyle.classic;
@@ -193,7 +178,32 @@ class PlayerProfile {
       1 + selectedBall.scoreBonus + selectedPlatform.scoreBonus;
   final ownedBalls = <BallCosmetic>{BallCosmetic.steel};
   final _bankedCoins = Expando<({int serial, int count})>();
+  final _doubledCoinRuns = Expando<int>();
   Future<void> _economyWrites = Future<void>.value();
+
+  bool infiniteCoinsDoubled(BalanceGame game) =>
+      _doubledCoinRuns[game] == game.runSerial;
+
+  bool canDoubleInfiniteCoins(BalanceGame game) =>
+      game.started &&
+      game.infinite &&
+      game.finished &&
+      game.lives <= 0 &&
+      !game.won &&
+      !game.practice &&
+      game.coinsCollected > 10 &&
+      !infiniteCoinsDoubled(game);
+
+  /// Called only after the ad reward is earned and the ad has closed.
+  /// The collected-coin ledger stays unchanged, so banking cannot pay again.
+  bool doubleInfiniteCoins(BalanceGame game) {
+    if (!canDoubleInfiniteCoins(game)) return false;
+    bankCoins(game);
+    _doubledCoinRuns[game] = game.runSerial;
+    wallet += game.coinsCollected;
+    unawaited(saveEconomy());
+    return true;
+  }
 
   bool bankCoins(BalanceGame game) {
     if (!game.infinite) return false;
@@ -209,7 +219,7 @@ class PlayerProfile {
 
   bool selectBall(BallCosmetic ball) {
     if (!ownedBalls.contains(ball)) {
-      if (!canAfford(ball.cost)) return false;
+      if (ball.purchaseOnly || !canAfford(ball.cost)) return false;
       if (!unlimitedCoins) wallet -= ball.cost;
       ownedBalls.add(ball);
     }
@@ -220,7 +230,7 @@ class PlayerProfile {
 
   bool selectPlatform(PlatformStyle platform) {
     if (!ownedPlatforms.contains(platform)) {
-      if (!canAfford(platform.cost)) return false;
+      if (platform.purchaseOnly || !canAfford(platform.cost)) return false;
       if (!unlimitedCoins) wallet -= platform.cost;
       ownedPlatforms.add(platform);
     }
@@ -238,8 +248,6 @@ class PlayerProfile {
       ),
       'dailyPrizes': dailyPrizes.toJson(),
       'claimedAchievements': _claimedAchievements.map((a) => a.name).toList(),
-      'ballTestCreditApplied': _ballTestCreditApplied,
-      'temporaryNormalCreditApplied': _temporaryNormalCreditApplied,
       'owned': ownedBalls.map((b) => b.name).toList(),
       'selected': selectedBall.name,
       'bestScore': infiniteBestScore,
@@ -276,9 +284,6 @@ class PlayerProfile {
           Achievement.values.where((a) => claimed.contains(a.name)),
         );
       }
-      _ballTestCreditApplied = data['ballTestCreditApplied'] == true;
-      _temporaryNormalCreditApplied =
-          data['temporaryNormalCreditApplied'] == true;
       if (data['wallet'] is int)
         wallet = (data['wallet'] as int).clamp(0, 1 << 30);
       if (data['bestScore'] is int)
@@ -491,8 +496,9 @@ class PlayerProfile {
           : 1;
       final savedMode = await storage.getString('gilt.controlMode');
       controlMode =
-          ControlMode.values.where((m) => m.name == savedMode).firstOrNull ??
-          controlMode;
+          (ControlMode.values.where((m) => m.name == savedMode).firstOrNull ??
+                  controlMode)
+              .supportedMode;
       classicLevel = (await storage.getInt('gilt.classicLevel') ?? 1).clamp(
         1,
         ClassicLevels.count,
@@ -573,6 +579,9 @@ class PlayerProfile {
 }
 
 class GameFeedback {
+  GameFeedback({MusicOutput Function()? musicOutput})
+    : _musicFactory = musicOutput ?? AudioMusicOutput.new;
+  final MusicOutput Function() _musicFactory;
   AudioPlayer? _player;
   final _enemyAudio = EnemyAudio();
   void setEnemyEffectsEnabled(bool enabled) => _enemyAudio.setEnabled(enabled);
@@ -623,9 +632,14 @@ class GameFeedback {
     }
   }
 
-  AudioPlayer? _music;
+  MusicOutput? _music;
   String? _track;
   bool _musicPlaying = false;
+  bool _disposed = false;
+  double _musicRate = 1, _musicVolume = .32;
+  ({String? track, bool playing, double volume, double rate})? _wantedMusic;
+  ({String? track, bool playing, double volume, double rate})? _handledMusic;
+  Future<void>? _musicUpdate;
 
   /// Background music for the modes that want one. Passing a null track stops
   /// it; [playing] false holds it where it is, so pausing a run and resuming
@@ -634,36 +648,90 @@ class GameFeedback {
     required String? track,
     required bool playing,
     double volume = .32,
+    double playbackRate = 1,
   }) async {
-    if (track == _track && (track == null || playing == _musicPlaying)) return;
-    try {
-      if (track == null) {
-        _track = null;
-        _musicPlaying = false;
-        await _music?.stop();
-        return;
+    if (_disposed ||
+        (track == null && _track == null && _musicUpdate == null)) {
+      return;
+    }
+    final request = (
+      track: track,
+      playing: playing,
+      volume: volume.clamp(0.0, 1.0),
+      rate: playbackRate.clamp(.5, 2.0),
+    );
+    _wantedMusic = request;
+    // Coalesce ticker updates during asset loading. A later mute, pause or
+    // rate replaces pending work instead of starting overlapping players.
+    while (!_disposed && _handledMusic != _wantedMusic) {
+      final pending = _musicUpdate;
+      if (pending != null) {
+        await pending;
+        continue;
       }
-      await _shareAudioFocus();
-      final music = _music ??= AudioPlayer()..setReleaseMode(ReleaseMode.loop);
-      if (track != _track) {
-        _track = track;
-        _musicPlaying = true;
-        await music.setVolume(volume);
-        await music.play(AssetSource(track), volume: volume);
-        if (!playing) {
-          _musicPlaying = false;
-          await music.pause();
-        }
-        return;
+      final completion = Completer<void>();
+      _musicUpdate = completion.future;
+      try {
+        await _flushMusic();
+      } finally {
+        _musicUpdate = null;
+        completion.complete();
       }
-      _musicPlaying = playing;
-      await (playing ? music.resume() : music.pause());
-    } catch (_) {
-      /* Audio restrictions must never interrupt a run. */
+    }
+  }
+
+  Future<void> _flushMusic() async {
+    while (!_disposed) {
+      final request = _wantedMusic!;
+      try {
+        await _applyMusic(request);
+      } catch (_) {
+        /* Audio restrictions must never interrupt a run. */
+      }
+      _handledMusic = request;
+      if (request == _wantedMusic) return;
+    }
+  }
+
+  Future<void> _applyMusic(
+    ({String? track, bool playing, double volume, double rate}) request,
+  ) async {
+    final track = request.track;
+    if (track == null) {
+      _track = null;
+      _musicPlaying = false;
+      _musicRate = 1;
+      await _music?.stop();
+      return;
+    }
+    if (_disposed) return;
+    final music = _music ??= _musicFactory();
+    if (track != _track) {
+      await music.play(track, request.volume);
+      _track = track;
+      _musicPlaying = true;
+      _musicVolume = request.volume;
+      _musicRate = double.nan;
+    }
+    if (_disposed || request != _wantedMusic) return;
+    if (request.playing != _musicPlaying) {
+      await (request.playing ? music.resume() : music.pause());
+      _musicPlaying = request.playing;
+    }
+    // The platform expects playback to have started before changing rate.
+    // Pause keeps position; resume re-applies a changed rate without seeking.
+    if (request.playing && request.rate != _musicRate) {
+      await music.setPlaybackRate(request.rate);
+      _musicRate = request.rate;
+    }
+    if (request.volume != _musicVolume) {
+      await music.setVolume(request.volume);
+      _musicVolume = request.volume;
     }
   }
 
   void dispose() {
+    _disposed = true;
     _enemyAudio.dispose();
     _player?.dispose();
     _music?.dispose();

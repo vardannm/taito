@@ -83,7 +83,7 @@ void main() {
       expect(g.coins.first.collected, false);
       pullFor(g, 70);
       expect(g.survival.combo, 2);
-      expect(g.survival.shield, greaterThan(9));
+      expect(g.survival.shield, greaterThan(g.shieldDuration - 1));
       expect(g.lives, 3);
       expect(g.coinsCollected, 1);
       expect(far.collected, false);
@@ -111,7 +111,7 @@ void main() {
       for (var i = 0; i < 120 && g.survival.magnet < 4; i++) {
         tick(g);
       }
-      expect(g.survival.magnet, 12);
+      expect(g.survival.magnet, g.magnetDuration);
       g.survival.magnet = .001;
       tick(g);
       expect(g.survival.magnet, 0);
@@ -138,7 +138,7 @@ void main() {
         pullFor(g, 60);
         expect(near.collected, ball.magnetRadius >= 30, reason: ball.name);
         expect(medium.collected, ball.magnetRadius >= 75, reason: ball.name);
-        expect(far.collected, false, reason: ball.name);
+        expect(far.collected, ball.magnetRadius >= 120, reason: ball.name);
         g.start(gameMode: GameMode.classic);
         expect(g.magnetRadius, 0);
         g.start(gameMode: GameMode.classic);

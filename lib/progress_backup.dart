@@ -212,7 +212,7 @@ class ProgressBackup {
       ..mergeRuns = source.mergeRuns
       ..wallet = source.wallet
       ..dailyPrizes = DailyPrizes.fromJson(source.dailyPrizes.toJson())
-      ..controlMode = source.controlMode
+      ..controlMode = source.controlMode.supportedMode
       ..classicLevel = source.classicLevel
       ..sound = source.sound
       ..haptics = source.haptics

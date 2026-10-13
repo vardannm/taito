@@ -22,7 +22,8 @@ class UnavailableReviveAds implements RewardedReviveAds {
 }
 
 /// Google sample units only. Replace both native app IDs and these units before
-/// monetizing. Loading is on demand, while the game is stopped at game over.
+/// monetizing. Shared by revive and coin-doubling offers; the caller grants
+/// only the chosen reward. Loading is on demand while gameplay is stopped.
 class GoogleTestReviveAds implements RewardedReviveAds {
   static const androidUnit = 'ca-app-pub-3940256099942544/5224354917';
   static const iosUnit = 'ca-app-pub-3940256099942544/1712485313';

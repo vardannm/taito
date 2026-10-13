@@ -121,6 +121,7 @@ class EnemySoundDirector {
             LateShotKind.bomb => EnemyCue.bombThrow,
             LateShotKind.acid => EnemyCue.poolLand,
             LateShotKind.mine => EnemyCue.mineFire,
+            LateShotKind.spinner => EnemyCue.ricochet,
           });
         }
         if (shot.kind == LateShotKind.ricochet &&
@@ -136,6 +137,8 @@ class EnemySoundDirector {
         BossKind.skyWarden => EnemyCue.wardenArrival,
         BossKind.stormColossus => EnemyCue.colossusArrival,
         BossKind.eclipseSeraph => EnemyCue.seraphArrival,
+        BossKind.prismReaver => EnemyCue.colossusArrival,
+        BossKind.venomCrown => EnemyCue.seraphArrival,
       });
       shots(boss.shots, boss.kind);
     }

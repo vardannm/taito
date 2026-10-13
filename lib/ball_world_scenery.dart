@@ -1,8 +1,9 @@
 import 'dart:ui' as ui;
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'ball_cosmetics.dart';
 
-// At most nineteen immutable display lists. Scenery has no per-frame geometry,
+// One immutable display list per ball. Scenery has no per-frame geometry,
 // blur filters, offscreen layers, timers or simulation state.
 final _scenes = <BallCosmetic, ui.Picture>{};
 
@@ -629,6 +630,129 @@ class _Scenery {
             ..style = PaintingStyle.stroke
             ..strokeWidth = 1,
         );
+      case BallCosmetic.aether:
+        wash(
+          const Rect.fromLTWH(-60, -140, 450, 350),
+          color(0xFFBAE5FF).withAlpha(65),
+        );
+        stars(color(0xFFF8DEBB), 36);
+        for (var i = 0; i < 4; i++) {
+          final inset = 10.0 + i * 23;
+          c.drawPath(
+            Path()
+              ..moveTo(inset, 550)
+              ..lineTo(inset, 174)
+              ..quadraticBezierTo(170, -90 + i * 25, 340 - inset, 174)
+              ..lineTo(340 - inset, 550),
+            Paint()
+              ..color = accent.withAlpha(30 + i * 10)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = i == 0 ? 7 : 1.2,
+          );
+        }
+        ridge(501, 48, color(0xFF72869C), seed: 4);
+        ridge(553, 75, color(0xFF34435F), seed: 1);
+      case BallCosmetic.phoenix:
+        wash(
+          const Rect.fromLTWH(-40, -100, 420, 300),
+          color(0xFFFFB95D).withAlpha(72),
+        );
+        stars(color(0xFFFFDEAD), 29);
+        for (var i = 0; i < 7; i++) {
+          final x = 40.0 + i * 45;
+          c.drawPath(
+            Path()
+              ..moveTo(170, 515)
+              ..cubicTo(x - 80, 280, x - 60, 130, x, 35),
+            Paint()
+              ..color = accent.withAlpha(20 + i % 3 * 9)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = i.isEven ? 12 : 2,
+          );
+        }
+        ridge(494, 80, color(0xFFAA615D), seed: 2);
+        ridge(550, 96, color(0xFF542B46), seed: 5);
+      case BallCosmetic.chronosphere:
+        wash(
+          const Rect.fromLTWH(-45, -110, 450, 380),
+          color(0xFF7CDFCE).withAlpha(40),
+        );
+        stars(color(0xFFEADAA6), 28);
+        final ticks = Path();
+        for (var i = 0; i < 36; i++) {
+          final a = i * math.pi / 18;
+          final d = Offset(math.cos(a), math.sin(a));
+          final p = const Offset(170, 126) + d * 116;
+          final q = const Offset(170, 126) + d * (i % 3 == 0 ? 132 : 122);
+          ticks.moveTo(p.dx, p.dy);
+          ticks.lineTo(q.dx, q.dy);
+        }
+        c.drawPath(
+          ticks,
+          Paint()
+            ..color = accent.withAlpha(85)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5,
+        );
+        c.drawCircle(
+          const Offset(170, 126),
+          106,
+          Paint()
+            ..color = accent.withAlpha(35)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1,
+        );
+        skyline(523, color(0xFF2D666B), 4);
+        ridge(561, 48, color(0xFF163B4C), seed: 3);
+      case BallCosmetic.genesis:
+        wash(
+          const Rect.fromLTWH(-100, -80, 410, 330),
+          color(0xFFF5B1EC).withAlpha(55),
+        );
+        wash(
+          const Rect.fromLTWH(80, 80, 390, 360),
+          color(0xFF9DFFF1).withAlpha(24),
+        );
+        stars(color(0xFFFFE1F4), 39);
+        const ribbons = [
+          Color(0xFFF9C5EA),
+          Color(0xFFBAF5EC),
+          Color(0xFFD3C3FF),
+        ];
+        for (var i = 0; i < 3; i++) {
+          c.drawPath(
+            Path()
+              ..moveTo(-30, 90 + i * 33.0)
+              ..cubicTo(
+                75,
+                -15 + i * 20,
+                195,
+                280 + i * 22,
+                375,
+                86 + i * 22.0,
+              ),
+            Paint()
+              ..color = ribbons[i].withAlpha(40)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 15 - i * 3.0,
+          );
+        }
+        for (var i = 0; i < 8; i++) {
+          final x = i * 48.0 - 15, h = 35.0 + i * 27 % 60;
+          polygon([
+            Offset(x - 14, 550),
+            Offset(x - 7, 550 - h),
+            Offset(x, 534 - h),
+            Offset(x + 15, 550 - h * .3),
+            Offset(x + 20, 550),
+          ], ribbons[i % 3].withAlpha(100));
+          line(
+            Offset(x, 534 - h),
+            Offset(x + 4, 550),
+            accent.withAlpha(110),
+            .8,
+          );
+        }
     }
   }
 }

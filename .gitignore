@@ -7,5 +7,6 @@ build/
 
 .tools/
 .pub-cache/
+firebase-debug*.log
 artifacts/
 

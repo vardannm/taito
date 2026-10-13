@@ -118,7 +118,7 @@ Native iOS compilation, signing, real-device haptics/audio, and frame-time profi
 
 ## Commercial status
 
-This is a playable, tested game build, not an App Store submission or a revenue guarantee. Infinite offers one rewarded-ad revive per run on Android/iOS, using Google's sample app IDs and rewarded test units. Earning the reward and dismissing the ad continues the same run with one heart and three seconds of protection; the next game over has no ad offer. Skipped or unavailable ads give no heart. Desktop/web skip the offer. Ad units live in `lib/rewarded_revive_ads.dart`; native app IDs live in `android/app/src/main/AndroidManifest.xml` and `ios/Runner/Info.plist`. Replace test IDs and complete release setup before monetizing. See `PRODUCT.md` for the proposed release and monetization sequence. No Taito artwork, branding, recordings, or game code is used.
+This is a playable, tested game build, not an App Store submission or a revenue guarantee. Infinite offers one rewarded-ad revive per run on Android/iOS, using Google's sample app IDs and rewarded test units. Earning the reward and dismissing the ad continues the same run with one heart and three seconds of protection; the next game over has no ad offer. Skipped or unavailable ads give no heart. Desktop/web skip the offer. Ad units live in `lib/rewarded_revive_ads.dart`; native app IDs live in `android/app/src/main/AndroidManifest.xml` and `ios/Runner/Info.plist`. Replace test IDs and complete release setup before monetizing. See `PRODUCT.md` for the proposed release and monetization sequence.
 
 ## Code map
 
@@ -160,9 +160,9 @@ Moving balls now leave a short teal-to-gold wake and a soft glow that responds t
 
 Gear tables are in `lib/ball_cosmetics.dart` and `lib/platforms.dart`; animated control cards and sensitivity sliders are in `lib/control_options.dart`. Regenerate phone renders with `tool/render_refinements.dart`.
 
-### Unlimited-coin testing APK
+### Coin economy
 
-Build with `--dart-define=GILT_UNLIMITED_COINS=true` to enable unlimited Gear Shop purchases. The shop displays an infinity balance and a TEST BUILD label. The default build keeps the normal economy. Test purchases use `gilt.economy.coinsTest.v1`, separate from the normal wallet and gear ownership; other settings and progression remain shared.
+New app profiles start with zero coins. Automatic testing credits and the `GILT_UNLIMITED_COINS` build flag have been removed. Automated shop fixtures can still explicitly construct an unlimited profile, using an economy separate from saved player wallets.
 
 
 ## Interactive onboarding and arcade club (0.11.0)
@@ -177,9 +177,15 @@ Manual progress backups include records, wallet, owned/selected gear and setting
 
 The optional local playtest recorder is in the same club screen. Start a session, replay the tutorial and observe the player, then stop and copy the report before closing the app. It captures up to 1,000 events without names or uploads. Starting another session replaces the in-memory report. See `playtest/NEXT_SESSION.md`; human sessions are still pending.
 
-Normal builds now respect saved wallets instead of resetting them to 99,999. For free test purchases use the existing `--dart-define=GILT_UNLIMITED_COINS=true` build flag; its economy remains separate.
+Normal builds respect saved wallets. Launching or restarting the game does not grant testing coins.
 
 Release preparation: `python scripts/release_check.py`, `release/DEVICE_QA.md`, and `release/STORE_COPY.md`. Android release signing reads ignored `android/key.properties` when configured; without it the APK remains development-signed. iOS compilation, signing and physical-device tests require the release Mac/iPhone. Review screenshots can be regenerated with `flutter test tool/render_growth.dart`.
+
+Privacy preparation: Settings > Privacy Policy reads `assets/privacy/policy.json` offline. Run `python scripts/privacy_policy.py` to generate `release/privacy-policy.html` from the same text. Publisher, contact email, and hosting URL are pending; the release check flags these fields. `release/APP_PRIVACY.md` contains the data inventory, App Store disclosure worksheet, and final iOS archive verification steps.
+
+Firebase project `gilt-ead46` is registered for the existing Android and iOS identifiers. Both native configuration files and shared Dart options are included; Android uses the Google Services plugin and iOS includes its plist in Runner Resources. Analytics initialization enables gameplay reporting. See `ANALYTICS.md` for device DebugView verification. Web/desktop analytics are not configured; live event delivery and the iOS build still require device/Mac checks.
+
+Infinite coin bonus: after losing with more than 10 collected coins, supported mobile devices offer a rewarded ad to double that run's coins once. Choosing this offer ends the run instead of reviving it. The bonus equals the run's collected coins; the existing wallet balance and collection ledger are unchanged. Skipped/unavailable ads keep the original coins and allow a retry. A revived run can double its final coin total at its last game over. This uses the current Google test rewarded-ad adapter until production ad setup is completed.
 
 
 ## One-finger thumb area (0.11.1)
@@ -244,14 +250,39 @@ without stealing music focus, and caps playback at four enemy voices. Pause,
 mute, background, home and disposal cancel active/pending effects. Hit/coin
 feedback retains its separate player. Regenerate cues with
 `scripts/generate_enemy_audio.py` (NumPy); the script also writes
-`artifacts/enemy-sound-preview.wav`. Background music is managed separately.
+`artifacts/enemy-sound-preview.wav`. Laser charge/fire use transformer buzz,
+corona hiss and irregular electrical arcs; rebuild just those two with
+`scripts/generate_enemy_audio.py --only laserCharge laserFire`.
 
-The main Shop contains Balls (19), Platforms (12), and Cabinet Styles. New gear
+Infinite uses `assets/audio/theme_infinite.wav`, a 5:10 arrangement of
+**Furious Freak** by Kevin MacLeod. It starts with the full drum/bass groove,
+uses six recorded sections and melody variations, and loops continuously.
+`lib/infinite_music.dart` raises playback from about 135 to 165 BPM as active
+time and height-based pace increase. Tempo updates retain the track's position,
+are coalesced during loading, and never advance the game clock while paused.
+2048 uses its separate 82 BPM `theme_dark.wav` Rhodes groove.
+Both tracks are stereo PCM WAV with effects headroom. Attribution is available
+in Settings > Music credits. Source, CC BY 4.0 licenses and reproduction commands
+are in `assets/audio/CREDITS.md`; music and effect switches remain independent.
+
+The main Shop contains Balls (23), Platforms (16), and Cabinet Styles. New gear
 includes pearl, malachite, titanium, opal, plasma, comet, quasar and singularity
 balls, plus carbon, pearl, aurora, plasma, celestial and sovereign platforms.
 Premium gear uses bounded orbit sparks, light channels and short trails; physics
 and collision sizes stay shared. Owned items and equipment continue to save by
 their stable names. Cabinet unlocks still use Classic stars.
+
+After Singularity (Black Hole), the reserved store-purchase tier adds Aether,
+Phoenix, Chronosphere and Genesis, with four matching platforms after Sovereign.
+Each has distinct procedural artwork; every ball also includes its own world.
+Ball bonuses rise from +4x to +6.5x with permanent magnet radii of 78, 90, 105 and
+120; platform bonuses rise from +3.5x to +5x, for a maximum combined x12.5.
+These eight items show Coming soon until store billing is connected. Coins,
+unlimited-coin mode and daily gifts cannot unlock them. Existing owned store
+entitlements can equip and persist, ready for later billing integration.
+`tool/render_premium_gear.dart` renders the actual artwork and shop screenshots
+to `artifacts/premium-gear-gallery.png`, `artifacts/premium-gear-shop.png` and
+`artifacts/premium-platform-shop.png`.
 
 
 Infinite tuning: `lib/infinite_difficulty.dart` includes `spiderSpeed` (base chase speed) and `spiderBulletSpeed` (web flight speed), in world units per second. Magnet fields pull rewards toward the ball; their bonuses activate only on physical collection. The Infinite HUD centers the score and combo without a distance readout.
@@ -288,7 +319,9 @@ encounter; restarting resets its milestone. Tune and preview it in
 `scripts/flutter.ps1 test tool/render_infinite_boss.dart`.
 
 Between 270,000 and 330,000 points, Storm Colossus follows as the second boss, once per run.
-Its cyan and violet armored body has floating gauntlets instead of wings.
+Its cyan and violet armored body has floating gauntlets instead of wings;
+its fired orbs and crescent blades use toxic dark violet with vivid pink cores
+or edges.
 Across its 28-second encounter it fires eight energy orbs that each rebound
 once from a rail, eight crescent blades in alternating wide/narrow curved
 pairs, then six stationary laser mines with black discs and red laser streaks.
@@ -317,6 +350,33 @@ changing attack geometry. All three stay within 65 drawing calls per frame
 without blur or offscreen layers. Render animation frames with
 `scripts/flutter.ps1 test tool/render_boss_animation.dart`.
 
+Prism Reaver is the fourth second-tier boss, appearing once per run between
+850,000 and 950,000 points after Seraph and the usual rest interval. Its mint
+and pink prism body keeps moving while firing: two single sweeping lasers,
+then two volleys of paired moving lasers, then twelve independently spinning
+rotors. Lasers charge harmlessly for 1.1 seconds and sweep for 1.65 seconds;
+warnings show the sweep extent, and twin beams retain a wide escape lane.
+Rotors mark their curved paths for 0.8 seconds, then follow three varied motion
+patterns with randomized spread, phase, amplitude and spin. Patterns are seeded
+per run and never home on the ball. Rendering and swept collision share moving
+beam endpoints; pause, shields and recovery retain their existing behavior.
+All attacks end before departure, and the boss stays within the existing
+65-call drawing budget. Preview: `artifacts/infinite-reaver.png`.
+
+Venom Crown is the fifth second-tier boss, unlocking between 1,200,000 and
+1,350,000 points. Its attack forms a moving poison maze: 17 dense walls with
+24 toxic lime bullets each, acid-yellow cores and magenta rims. Five slalom
+walls lead into five walls that pulse their travel speed, then seven faster
+accelerating walls with a narrower opening. Each formation warns for 0.9s;
+the preview traces the actual moving gap. Every overlapping wall shares the
+same continuous escape corridor, which never becomes narrower than 64 units.
+Its direction is seeded and its first opening uses the player's position;
+subsequent shots never track the player. All 408 bullets clear before the
+boss departs. The real rolling-physics survival test crosses the full encounter
+from left, center and right starts, in both seeded directions, without shields
+or lost hearts. Rendering batches the bullets within the existing drawing
+budget. Preview: `artifacts/infinite-venom-crown.png`.
+
 The beetle steps and opens its shell, the cricket crouches and kicks on firing,
 the moth beats its patterned wings, the scorpion curls its tail and claws, and
 the seed spitter sways its leaves and recoils. Poses follow the encounter clock,
@@ -324,7 +384,7 @@ with fixed aim and collision geometry. Reduced motion keeps a steady pose.
 Warning dashes and insect legs use batched paths with no blur or extra layers.
 `tool/render_late_enemy_motion.dart` generates an enlarged animation preview.
 
-Debug launches apply a one-time +10,000 coin credit for testing ball purchases. The credit is saved with the wallet, so spending and restarting do not refill it. Release launches do not apply the credit.
+Debug and release launches both use the normal saved wallet with no automatic testing credits. Existing balances are preserved; old test grants are not subtracted from wallets that may also include earned coins.
 
 ### 2048 difficulty configuration
 

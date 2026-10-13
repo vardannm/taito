@@ -96,35 +96,28 @@ void main() {
     },
   );
 
-  testWidgets(
-    'fifth option starts on the board and persists its selection and records',
-    (tester) async {
-      final game = await launch(tester, ControlMode.oneFinger);
-      await tester.tap(find.byTooltip('Settings'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      final option = find.byKey(const ValueKey('control-boardTilt'));
-      await tester.ensureVisible(option);
-      await tester.tap(option);
-      await tester.pump();
-      expect(game.controlMode, ControlMode.boardTilt);
-      expect(find.byType(BoardTiltControls), findsOneWidget);
-      expect(find.byKey(const ValueKey('tilt-lift-tilt')), findsNothing);
-      expect(find.byKey(const ValueKey('board-tilt-cue')), findsNothing);
-      await tester.pumpWidget(const SizedBox());
-      final profile = PlayerProfile()..controlMode = ControlMode.boardTilt;
-      profile.levelRecords['boardTilt:1'] = const LevelRecord(starMask: 3);
-      await profile.save();
-      final restored = PlayerProfile();
-      await restored.load();
-      expect(restored.controlMode, ControlMode.boardTilt);
-      expect(restored.levelRecord(1).starMask, 3);
-      final backup = ProgressBackup.decode(
-        ProgressBackup.encode(restored),
-        testEconomy: false,
-      );
-      expect(backup.controlMode, ControlMode.boardTilt);
-      expect(backup.levelRecord(1).starMask, 3);
-    },
-  );
+  testWidgets('legacy board tilt is hidden and its records survive migration', (
+    tester,
+  ) async {
+    final game = await launch(tester, ControlMode.oneFinger);
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byKey(const ValueKey('control-boardTilt')), findsNothing);
+    expect(game.controlMode, ControlMode.oneFinger);
+    await tester.pumpWidget(const SizedBox());
+    final profile = PlayerProfile()..controlMode = ControlMode.boardTilt;
+    profile.levelRecords['boardTilt:1'] = const LevelRecord(starMask: 3);
+    await profile.save();
+    final restored = PlayerProfile();
+    await restored.load();
+    expect(restored.controlMode, ControlMode.oneFinger);
+    expect(restored.levelRecord(1, ControlMode.boardTilt).starMask, 3);
+    final backup = ProgressBackup.decode(
+      ProgressBackup.encode(restored),
+      testEconomy: false,
+    );
+    expect(backup.controlMode, ControlMode.oneFinger);
+    expect(backup.levelRecord(1, ControlMode.boardTilt).starMask, 3);
+  });
 }

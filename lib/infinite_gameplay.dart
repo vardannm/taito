@@ -80,6 +80,7 @@ extension InfiniteGameplay on BalanceGame {
     boss = InfiniteBoss(
       top: visibleTop,
       kind: BossKind.values[bossesEncountered],
+      seed: bossScoreThresholds[bossesEncountered],
     );
     bossesEncountered++;
     // The boss replaces the whole course for this interlude. Clear ordinary

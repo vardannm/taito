@@ -13,6 +13,9 @@ Paint _outline(Color color, double width) => Paint()
   ..strokeJoin = StrokeJoin.round;
 
 Offset _point(EnemyPoint point) => Offset(point.x, point.y);
+const toxicLime = Color(0xFFB6FF19), toxicYellow = Color(0xFFEFFF35);
+const toxicMagenta = Color(0xFFFF3ABF);
+const colossusShotViolet = Color(0xFF6418A6), colossusShotPink = Color(0xFFFF3ABF);
 
 /// Shared shot geometry keeps the aim warnings, pools and laser hitboxes in
 /// agreement. Bullets are batched; the encounter uses no blur or saveLayer.
@@ -21,8 +24,20 @@ void paintInfiniteBoss(Canvas canvas, BalanceGame game, bool reducedMotion) {
   if (!game.infinite || boss == null) return;
   final storm = boss.kind == BossKind.stormColossus;
   final seraph = boss.kind == BossKind.eclipseSeraph;
-  final amber = storm ? const Color(0xFF51D6E7) : const Color(0xFFFFB543);
-  final hot = seraph
+  final prism = boss.kind == BossKind.prismReaver;
+  final venom = boss.kind == BossKind.venomCrown;
+  final amber = venom
+      ? toxicLime
+      : prism
+      ? const Color(0xFF70F3D4)
+      : storm
+      ? const Color(0xFF51D6E7)
+      : const Color(0xFFFFB543);
+  final hot = venom
+      ? toxicMagenta
+      : prism
+      ? const Color(0xFFF884D4)
+      : seraph
       ? const Color(0xFFF66C9E)
       : storm
       ? const Color(0xFFAA6DF0)
@@ -33,11 +48,76 @@ void paintInfiniteBoss(Canvas canvas, BalanceGame game, bool reducedMotion) {
   canvas.save();
   canvas.clipRect(Rect.fromLTRB(24, game.visibleTop + 42, 336, 537));
   final bullets = Path(), bulletCores = Path();
+  final toxicBullets = Path(), toxicCores = Path(), toxicWarnings = Path();
   final crystalTrails = Path(), cometWarnings = Path(), cometMarks = Path();
+  if (venom) {
+    final routes = Path();
+    for (final wall in boss.toxicWalls) {
+      if (boss.age >= wall.at + InfiniteBoss.toxicWarning) continue;
+      for (final side in [-1.0, 1.0]) {
+        for (var i = 0; i < 24; i++) {
+          final time = i * InfiniteBoss.toxicLife / 24;
+          final a = wall.positionAt(
+            time,
+            side,
+            side < 0 ? ToxicWall.bulletsPerSide - 1 : 0,
+          );
+          final b = wall.positionAt(
+            time + .045,
+            side,
+            side < 0 ? ToxicWall.bulletsPerSide - 1 : 0,
+          );
+          routes.moveTo(a.x, a.y);
+          routes.lineTo(b.x, b.y);
+        }
+      }
+    }
+    canvas.drawPath(routes, _outline(toxicLime.withAlpha(190), 1.5));
+  }
   for (final shot in boss.shots) {
     if (shot.cancelled) continue;
     final at = _point(shot.position);
-    if (seraph &&
+    if (venom && shot.kind == LateShotKind.shard) {
+      final oval = Rect.fromCircle(center: at, radius: shot.radius);
+      if (shot.age < 0) {
+        toxicWarnings.addOval(oval);
+      } else if (shot.visible) {
+        toxicBullets.addOval(oval);
+        toxicCores.addOval(
+          Rect.fromCircle(center: at + const Offset(-1.5, -1.5), radius: 2.5),
+        );
+      }
+    } else if (shot.kind == LateShotKind.spinner) {
+      if (shot.age < 0) {
+        final trail = Path();
+        for (var t = 0.0; t < shot.life; t += .12) {
+          final a = _point(shot.positionAt(t));
+          final b = _point(shot.positionAt(math.min(t + .045, shot.life)));
+          trail.moveTo(a.dx, a.dy);
+          trail.lineTo(b.dx, b.dy);
+        }
+        canvas.drawPath(trail, _outline(hot.withAlpha(150), 1.25));
+      } else if (shot.visible) {
+        final rotor = Path();
+        // Four asymmetric vanes spin independently of the travel direction.
+        for (var i = 0; i < 8; i++) {
+          final angle =
+              (reducedMotion ? shot.pathPhase : shot.rotation) +
+              i * math.pi / 4;
+          final radius = i.isEven ? shot.radius : shot.radius * .4;
+          final point = at + Offset(math.cos(angle), math.sin(angle)) * radius;
+          if (i == 0) {
+            rotor.moveTo(point.dx, point.dy);
+          } else {
+            rotor.lineTo(point.dx, point.dy);
+          }
+        }
+        rotor.close();
+        canvas.drawPath(rotor, _outline(ink, 4));
+        canvas.drawPath(rotor, Paint()..color = amber);
+        canvas.drawCircle(at, 2.5, Paint()..color = hot);
+      }
+    } else if (seraph &&
         (shot.kind == LateShotKind.moth || shot.kind == LateShotKind.shard)) {
       if (shot.age < 0 && shot.kind == LateShotKind.shard) {
         final end = _point(shot.positionAt(2.1));
@@ -110,8 +190,8 @@ void paintInfiniteBoss(Canvas canvas, BalanceGame game, bool reducedMotion) {
       }
     } else if (storm && shot.visible && shot.kind == LateShotKind.ricochet) {
       canvas.drawCircle(at, 9, Paint()..color = ink);
-      canvas.drawCircle(at, 6, Paint()..color = amber);
-      canvas.drawCircle(at, 3, Paint()..color = pale);
+      canvas.drawCircle(at, 6, Paint()..color = colossusShotViolet);
+      canvas.drawCircle(at, 3, Paint()..color = colossusShotPink);
     } else if (storm && shot.visible && shot.kind == LateShotKind.moth) {
       final ahead = shot.positionAt(math.min(shot.age + .01, shot.life));
       final angle = math.atan2(ahead.y - at.dy, ahead.x - at.dx);
@@ -135,10 +215,11 @@ void paintInfiniteBoss(Canvas canvas, BalanceGame game, bool reducedMotion) {
       );
       blade.close();
       canvas.drawPath(blade, _outline(ink, 4));
-      canvas.drawPath(blade, Paint()..color = amber);
-      canvas.drawPath(blade, _outline(pale, 1));
+      canvas.drawPath(blade, Paint()..color = colossusShotViolet);
+      canvas.drawPath(blade, _outline(colossusShotPink, 1.5));
     } else if (shot.kind == LateShotKind.laser) {
-      final start = _point(shot.origin), end = _point(shot.beamEnd!);
+      final beam = shot.beam;
+      final start = _point(beam.start), end = _point(beam.end);
       if (shot.age < 0) {
         final delta = end - start;
         final dashes = Path();
@@ -152,9 +233,25 @@ void paintInfiniteBoss(Canvas canvas, BalanceGame game, bool reducedMotion) {
         }
         canvas.drawPath(dashes, _outline(hot, 2));
         canvas.drawCircle(end, 9, _outline(ink, 1.5));
+        if (shot.beamPath != null) {
+          final sweep = Path();
+          for (final t in [0.0, shot.life / 2, shot.life]) {
+            final preview = shot.beamAt(t);
+            sweep.moveTo(preview.start.x, preview.start.y);
+            sweep.lineTo(preview.end.x, preview.end.y);
+          }
+          canvas.drawPath(sweep, _outline(amber.withAlpha(90), 1));
+          final destination = _point(shot.beamAt(shot.life).end);
+          canvas.drawLine(
+            end,
+            destination,
+            _outline(amber.withAlpha(170), 1.5),
+          );
+          canvas.drawCircle(destination, 4, _outline(amber, 1.5));
+        }
       } else if (shot.visible) {
         canvas.drawLine(start, end, _outline(ink, 14));
-        canvas.drawLine(start, end, _outline(hot, 10));
+        canvas.drawLine(start, end, _outline(hot, shot.radius * 2));
         canvas.drawLine(start, end, _outline(pale, 3));
       }
     } else if (shot.kind == LateShotKind.acid) {
@@ -235,9 +332,29 @@ void paintInfiniteBoss(Canvas canvas, BalanceGame game, bool reducedMotion) {
   canvas.drawPath(bullets, _outline(ink, 4));
   canvas.drawPath(bullets, Paint()..color = amber);
   canvas.drawPath(bulletCores, Paint()..color = pale);
+  if (venom) {
+    // Dense volleys are batched, so bullet count does not multiply draw calls.
+    canvas.drawPath(toxicWarnings, _outline(toxicMagenta.withAlpha(150), 1.5));
+    canvas.drawPath(toxicBullets, _outline(ink, 4));
+    canvas.drawPath(toxicBullets, Paint()..color = toxicLime);
+    canvas.drawPath(toxicBullets, _outline(toxicMagenta, 1));
+    canvas.drawPath(toxicCores, Paint()..color = toxicYellow);
+  }
 
   canvas.save();
   canvas.translate(position.dx, position.dy);
+  if (venom) {
+    _paintVenom(canvas, boss, reducedMotion, ink);
+    canvas.restore();
+    canvas.restore();
+    return;
+  }
+  if (prism) {
+    _paintPrism(canvas, boss, reducedMotion, ink, amber, hot);
+    canvas.restore();
+    canvas.restore();
+    return;
+  }
   if (seraph) {
     _paintSeraph(canvas, boss, reducedMotion, ink);
     canvas.restore();
@@ -461,6 +578,136 @@ void _paintColossus(
       _outline(violet.withAlpha((recoil * 200).round()), 2),
     );
   }
+}
+
+void _paintVenom(
+  Canvas canvas,
+  InfiniteBoss boss,
+  bool reducedMotion,
+  Color ink,
+) {
+  const carapace = Color(0xFF293018), purple = Color(0xFF51224F);
+  final time = reducedMotion ? 0.0 : boss.age;
+  final pulse = reducedMotion ? 0.0 : boss.recoil;
+  final crown = Path();
+  for (final side in [-1.0, 1.0]) {
+    crown.moveTo(side * 15, -20);
+    crown.lineTo(side * 23, -54);
+    crown.lineTo(side * 35, -26);
+    crown.lineTo(side * 57, -41);
+    crown.lineTo(side * 46, -3);
+    crown.lineTo(side * 24, 7);
+    crown.close();
+  }
+  canvas.drawPath(crown, _outline(ink, 6));
+  canvas.drawPath(crown, Paint()..color = purple);
+  canvas.drawPath(crown, _outline(toxicLime, 2));
+  final body = Path()
+    ..moveTo(0, -36)
+    ..lineTo(30, -16)
+    ..lineTo(33, 14)
+    ..lineTo(20, 34)
+    ..lineTo(0, 45)
+    ..lineTo(-20, 34)
+    ..lineTo(-33, 14)
+    ..lineTo(-30, -16)
+    ..close();
+  canvas.drawPath(body, _outline(ink, 5));
+  canvas.drawPath(body, Paint()..color = carapace);
+  canvas.drawPath(body, _outline(toxicLime, 2));
+  final eyes = Path(), vents = Path();
+  for (final side in [-1.0, 1.0]) {
+    eyes.addOval(
+      Rect.fromCenter(center: Offset(side * 14, -12), width: 14, height: 7),
+    );
+    final center = Offset(side * 35, 16 + math.sin(time * 2) * 2 - pulse * 3);
+    canvas.drawCircle(center, 12, Paint()..color = purple);
+    canvas.drawCircle(center, 12, _outline(toxicMagenta, 2));
+    for (var i = 0; i < 3; i++) {
+      vents.moveTo(center.dx - 5 + i * 5, center.dy - 5);
+      vents.lineTo(center.dx - 5 + i * 5, center.dy + 5);
+    }
+  }
+  canvas.drawPath(eyes, Paint()..color = toxicYellow);
+  canvas.drawPath(vents, _outline(toxicLime, 1.5));
+  canvas.drawCircle(const Offset(0, 11), 13, _outline(toxicMagenta, 2));
+  final emblem = Path();
+  for (var i = 0; i < 3; i++) {
+    final angle = time * .5 + i * math.pi * 2 / 3;
+    final center =
+        Offset(math.cos(angle), math.sin(angle)) * 7 + const Offset(0, 11);
+    emblem.addOval(Rect.fromCircle(center: center, radius: 4 + boss.charge));
+  }
+  canvas.drawPath(emblem, _outline(toxicLime, 2));
+  canvas.drawCircle(const Offset(0, 11), 3, Paint()..color = toxicYellow);
+  canvas.drawLine(
+    const Offset(-9, 31),
+    const Offset(9, 31),
+    _outline(toxicLime, 2),
+  );
+}
+
+void _paintPrism(
+  Canvas canvas,
+  InfiniteBoss boss,
+  bool reducedMotion,
+  Color ink,
+  Color mint,
+  Color pink,
+) {
+  const shell = Color(0xFF202C40), pale = Color(0xFFF5FFF5);
+  final time = reducedMotion ? 0.0 : boss.age;
+  final ring = Path();
+  for (var i = 0; i < 6; i++) {
+    final angle = i * math.pi / 3 + time * .7;
+    final p = Offset(math.cos(angle), math.sin(angle)) * 39;
+    if (i == 0) {
+      ring.moveTo(p.dx, p.dy);
+    } else {
+      ring.lineTo(p.dx, p.dy);
+    }
+  }
+  ring.close();
+  canvas.drawPath(ring, _outline(ink, 6));
+  canvas.drawPath(ring, _outline(mint, 2));
+  final body = Path()
+    ..moveTo(0, -32)
+    ..lineTo(24, -10)
+    ..lineTo(19, 25)
+    ..lineTo(0, 38)
+    ..lineTo(-19, 25)
+    ..lineTo(-24, -10)
+    ..close();
+  canvas.drawPath(body, _outline(ink, 5));
+  canvas.drawPath(body, Paint()..color = shell);
+  canvas.drawPath(body, _outline(pink, 2));
+  final arms = Path();
+  for (final side in [-1.0, 1.0]) {
+    arms.moveTo(side * 22, -2);
+    arms.lineTo(side * 48, 12);
+    arms.lineTo(side * 18, 26);
+    canvas.drawCircle(Offset(side * 18, 26), 7, Paint()..color = shell);
+    canvas.drawCircle(
+      Offset(side * 18, 26),
+      4 + boss.charge * 2,
+      Paint()..color = mint,
+    );
+  }
+  canvas.drawPath(arms, _outline(ink, 6));
+  canvas.drawPath(arms, _outline(pink, 2));
+  canvas.drawCircle(const Offset(0, 4), 14, _outline(mint, 2));
+  canvas.drawCircle(
+    const Offset(0, 4),
+    7 + boss.charge * 4,
+    Paint()..color = pink,
+  );
+  canvas.drawCircle(const Offset(0, 4), 3, Paint()..color = pale);
+  canvas.drawCircle(const Offset(0, 26), 4, Paint()..color = mint);
+  canvas.drawLine(
+    const Offset(-8, -17),
+    const Offset(8, -17),
+    _outline(pale, 2),
+  );
 }
 
 void _paintSeraph(

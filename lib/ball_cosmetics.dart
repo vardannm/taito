@@ -25,6 +25,38 @@ enum BallCosmetic {
     0xFFFFDC87,
     0,
     3.5,
+  ),
+  aether(
+    'Aether',
+    'Platinum glass with rose-gold celestial rings',
+    0,
+    0xFFCCE8FF,
+    0,
+    4,
+  ),
+  phoenix(
+    'Phoenix',
+    'Ruby fire with a gold feather corona',
+    0,
+    0xFFFFAD70,
+    0,
+    4.75,
+  ),
+  chronosphere(
+    'Chronosphere',
+    'A sapphire timepiece in gilded crystal',
+    0,
+    0xFF71F0E5,
+    0,
+    5.5,
+  ),
+  genesis(
+    'Genesis',
+    'An iridescent universe blooming around a white core',
+    0,
+    0xFFF6B6F5,
+    0,
+    6.5,
   );
 
   const BallCosmetic(
@@ -39,6 +71,9 @@ enum BallCosmetic {
   final int cost, color, sides;
   final double scoreBonus;
 
+  /// Reserved for verified store purchases once billing is connected.
+  bool get purchaseOnly => index >= aether.index;
+
   /// Permanent Infinite collection radius. Zero means contact collection only.
   double get magnetRadius => switch (this) {
     titanium => 21,
@@ -46,6 +81,10 @@ enum BallCosmetic {
     plasma => 39,
     quasar => 51,
     singularity => 66,
+    aether => 78,
+    phoenix => 90,
+    chronosphere => 105,
+    genesis => 120,
     _ => 0,
   };
   String get magnetLabel => switch (this) {
@@ -53,7 +92,11 @@ enum BallCosmetic {
     eclipse => 'Medium magnet',
     plasma => 'Strong magnet',
     quasar => 'Wide magnet',
-    singularity => 'Largest ball magnet',
+    singularity => 'Large magnet',
+    aether => 'Celestial magnet',
+    phoenix => 'Radiant magnet',
+    chronosphere => 'Quantum magnet',
+    genesis => 'Ultimate magnet',
     _ => 'No built-in magnet',
   };
   bool get glowing => [
@@ -68,6 +111,10 @@ enum BallCosmetic {
     comet,
     quasar,
     singularity,
+    aether,
+    phoenix,
+    chronosphere,
+    genesis,
   ].contains(this);
   bool get premium => index >= plasma.index;
 }

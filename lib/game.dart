@@ -30,7 +30,13 @@ enum GameMode { classic, infinite, practice, daily, merge2048 }
 
 enum ControlMode { twoFinger, oneFinger, analog, tiltLift, boardTilt }
 
+// Keep legacy modes for saved records and backups, but offer only these controls.
+const selectableControlModes = [ControlMode.oneFinger, ControlMode.twoFinger];
+
 extension ControlModeLabel on ControlMode {
+  ControlMode get supportedMode =>
+      selectableControlModes.contains(this) ? this : ControlMode.oneFinger;
+
   String get label => switch (this) {
     ControlMode.twoFinger => 'Two-finger',
     ControlMode.oneFinger => 'One-finger',
@@ -274,7 +280,7 @@ class BalanceGame {
   InfiniteBoss? boss;
   bool bossesEnabled = true;
   int bossesEncountered = 0;
-  List<int> _bossScoreThresholds = const [100000, 300000, 600000];
+  List<int> _bossScoreThresholds = const [100000, 300000, 600000, 900000, 1275000];
   List<int> get bossScoreThresholds => _bossScoreThresholds;
   double _nextBossAt = 0;
   double _lastDamageAt = double.negativeInfinity;

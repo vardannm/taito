@@ -2,12 +2,15 @@
 from pathlib import Path
 import re
 import sys
+from privacy_policy import release_blockers
+from coin_release_check import testing_coin_blockers
 
 root = Path(__file__).resolve().parents[1]
 blockers = []
+blockers.extend(release_blockers())
 profile = (root / "lib/profile.dart").read_text(encoding="utf-8")
-if re.search(r"wallet\s*=\s*99999", profile):
-    blockers.append("Remove the temporary 99,999-coin override from the normal economy before store release.")
+main = (root / "lib/main.dart").read_text(encoding="utf-8")
+blockers.extend(testing_coin_blockers(profile, main))
 if not (root / "android/key.properties").is_file():
     blockers.append("Android upload signing is not configured; local APKs use development signing.")
 ios = (root / "ios/Runner.xcodeproj/project.pbxproj").read_text(encoding="utf-8")

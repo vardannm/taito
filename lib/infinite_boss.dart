@@ -1,23 +1,35 @@
 import 'dart:math' as math;
 import 'late_enemies.dart';
 
-enum BossKind { skyWarden, stormColossus, eclipseSeraph }
+enum BossKind {
+  skyWarden,
+  stormColossus,
+  eclipseSeraph,
+  prismReaver,
+  venomCrown,
+}
 
 extension BossKindDetails on BossKind {
   int get minimumScore => switch (this) {
     BossKind.skyWarden => 90000,
     BossKind.stormColossus => 270000,
     BossKind.eclipseSeraph => 550000,
+    BossKind.prismReaver => 850000,
+    BossKind.venomCrown => 1200000,
   };
   int get maximumScore => switch (this) {
     BossKind.skyWarden => 120000,
     BossKind.stormColossus => 330000,
     BossKind.eclipseSeraph => 650000,
+    BossKind.prismReaver => 950000,
+    BossKind.venomCrown => 1350000,
   };
   String get name => switch (this) {
     BossKind.skyWarden => 'SKY WARDEN',
     BossKind.stormColossus => 'STORM COLOSSUS',
     BossKind.eclipseSeraph => 'ECLIPSE SERAPH',
+    BossKind.prismReaver => 'PRISM REAVER',
+    BossKind.venomCrown => 'VENOM CROWN',
   };
 }
 
@@ -32,13 +44,20 @@ enum BossPhase {
   petals,
   curtains,
   comets,
+  sweepingLaser,
+  twinLasers,
+  rotors,
+  toxicSlalom,
+  toxicPulse,
+  toxicGauntlet,
   leaving,
 }
 
 /// A timed survival encounter. The boss stays in screen space as the board
 /// climbs; thrown pools attach to the scrolling floor only after landing.
 class InfiniteBoss {
-  InfiniteBoss({this.top = 0, this.kind = BossKind.skyWarden});
+  InfiniteBoss({this.top = 0, this.kind = BossKind.skyWarden, int seed = 0})
+    : _random = math.Random(seed);
 
   static const duration = 28.0;
   static const laserWarning = 1.1;
@@ -48,11 +67,27 @@ class InfiniteBoss {
   static const poolRadius = 30.0;
   static const name = 'SKY WARDEN';
   static const mineWarning = 1.35, mineLife = .65, mineRadius = 40.0;
+  static const toxicWarning = .9, toxicLife = 2.5;
 
   final BossKind kind;
+  final math.Random _random;
   String get displayName => kind.name;
   double age = 0, top;
   final shots = <LateEnemyShot>[];
+  final toxicWalls = <ToxicWall>[];
+  double? _toxicAnchor;
+  double _toxicDirection = 1;
+
+  /// Every overlapping wall shares this corridor. It moves independently of
+  /// the player after the first warning, at a speed the rolling ball can match.
+  double toxicLaneAt(double time) {
+    final t = math.max(0.0, time - 2.6 - toxicWarning);
+    return (180 +
+            ((_toxicAnchor ?? 180) - 180) * math.exp(-t / 2) +
+            _toxicDirection * 72 * math.sin(t * .9) * (1 - math.exp(-t / 1.4)))
+        .clamp(80.0, 280.0);
+  }
+
   int _bulletWave = 0, _laserWave = 0, _poolWave = 0;
   double _lastVolleyAt = double.negativeInfinity;
 
@@ -68,12 +103,15 @@ class InfiniteBoss {
     var result = 0.0;
     for (final shot in shots) {
       if (shot.age >= 0 || shot.cancelled) continue;
-      final warning = shot.kind == LateShotKind.mine
+      final warning = kind == BossKind.venomCrown
+          ? toxicWarning
+          : shot.kind == LateShotKind.mine
           ? mineWarning
           : kind == BossKind.eclipseSeraph
           ? 1.2
           : laserWarning;
       if (shot.kind == LateShotKind.laser ||
+          (kind == BossKind.venomCrown && shot.kind == LateShotKind.shard) ||
           shot.kind == LateShotKind.mine ||
           (kind == BossKind.eclipseSeraph && shot.kind == LateShotKind.shard)) {
         result = math.max(result, (1 + shot.age / warning).clamp(0.0, 1.0));
@@ -89,18 +127,24 @@ class InfiniteBoss {
           BossKind.skyWarden => BossPhase.bullets,
           BossKind.stormColossus => BossPhase.ricochets,
           BossKind.eclipseSeraph => BossPhase.petals,
+          BossKind.prismReaver => BossPhase.sweepingLaser,
+          BossKind.venomCrown => BossPhase.toxicSlalom,
         }
       : age < 18
       ? switch (kind) {
           BossKind.skyWarden => BossPhase.lasers,
           BossKind.stormColossus => BossPhase.blades,
           BossKind.eclipseSeraph => BossPhase.curtains,
+          BossKind.prismReaver => BossPhase.twinLasers,
+          BossKind.venomCrown => BossPhase.toxicPulse,
         }
       : age < 26
       ? switch (kind) {
           BossKind.skyWarden => BossPhase.pools,
           BossKind.stormColossus => BossPhase.mines,
           BossKind.eclipseSeraph => BossPhase.comets,
+          BossKind.prismReaver => BossPhase.rotors,
+          BossKind.venomCrown => BossPhase.toxicGauntlet,
         }
       : BossPhase.leaving;
   bool get expired => age >= duration;
@@ -116,11 +160,22 @@ class InfiniteBoss {
     BossPhase.petals => 'BOSS · Slip between the crystal petals',
     BossPhase.curtains => 'BOSS · Find a lane between the laser curtains',
     BossPhase.comets => 'BOSS · Move away from the comet trails',
+    BossPhase.sweepingLaser => 'BOSS · Keep moving as the laser sweeps',
+    BossPhase.twinLasers => 'BOSS · Follow the gap between the moving lasers',
+    BossPhase.rotors => 'BOSS · Watch the spinning rotors change direction',
+    BossPhase.toxicSlalom => 'BOSS · Follow the opening in the toxic walls',
+    BossPhase.toxicPulse => 'BOSS · Watch the poison walls change speed',
+    BossPhase.toxicGauntlet =>
+      'BOSS · Stay inside the narrowing toxic corridor',
     BossPhase.leaving => 'BOSS · Clear! Keep climbing',
   };
 
   EnemyPoint positionAt(double time) {
-    final x = time < 10
+    final x = kind == BossKind.venomCrown
+        ? 180 + math.sin(time * .65) * 35
+        : kind == BossKind.prismReaver
+        ? 180 + math.sin(time * 1.05) * 52 + math.sin(time * 1.83) * 16
+        : time < 10
         ? 180 + math.sin(time * math.pi / 5) * 55
         : time < 18
         ? 180.0
@@ -129,7 +184,8 @@ class InfiniteBoss {
         : 180.0;
     final entrance = time < 2 ? -150 * math.pow(1 - time / 2, 2) : 0.0;
     final exit = time > 26 ? -170 * math.pow((time - 26) / 2, 2) : 0.0;
-    return (x: x, y: top + 105 + entrance + exit);
+    final drift = kind == BossKind.prismReaver ? math.sin(time * 1.4) * 8 : 0.0;
+    return (x: x, y: top + 105 + entrance + exit + drift);
   }
 
   EnemyPoint get position => positionAt(age);
@@ -147,12 +203,19 @@ class InfiniteBoss {
     // Keep shots that expire in this step until their last swept contact has
     // been resolved. Discard them at the start of the following step.
     shots.removeWhere((shot) => shot.age >= shot.life || shot.cancelled);
+    toxicWalls.removeWhere(
+      (wall) => before >= wall.at + toxicWarning + toxicLife,
+    );
 
     if (kind != BossKind.skyWarden) {
       if (kind == BossKind.stormColossus) {
         _stormWeapons(before, target);
-      } else {
+      } else if (kind == BossKind.eclipseSeraph) {
         _seraphWeapons(before, target);
+      } else if (kind == BossKind.prismReaver) {
+        _prismWeapons(before, target);
+      } else {
+        _toxicWeapons(before, target);
       }
       for (final shot in shots) {
         shot.step(dt, scrollDistance: scrollDistance);
@@ -250,6 +313,138 @@ class InfiniteBoss {
     }
     for (final shot in shots) {
       shot.step(dt, scrollDistance: scrollDistance);
+    }
+  }
+
+  void _toxicWeapons(double before, EnemyPoint target) {
+    if (_toxicAnchor == null && age >= 2.6) {
+      _toxicAnchor = target.x.clamp(80.0, 280.0);
+      _toxicDirection = _random.nextBool() ? 1 : -1;
+    }
+    void wall(double at, BossPhase mode) {
+      final formation = ToxicWall(
+        at: at,
+        top: top,
+        mode: mode,
+        laneAt: toxicLaneAt,
+      );
+      toxicWalls.add(formation);
+      _lastVolleyAt = at + toxicWarning;
+      for (final side in [-1.0, 1.0]) {
+        for (var i = 0; i < ToxicWall.bulletsPerSide; i++) {
+          shots.add(
+            LateEnemyShot(
+              kind: LateShotKind.shard,
+              origin: formation.positionAt(0, side, i),
+              velocity: (x: 0, y: 0),
+              delay: at - before + toxicWarning,
+              life: toxicLife,
+              positionPath: (t) => formation.positionAt(t, side, i),
+              radiusOverride: ToxicWall.bulletRadius,
+              reasonOverride: 'Toxic wall. Follow the marked moving opening.',
+            ),
+          );
+        }
+      }
+    }
+
+    while (_bulletWave < 5 && age >= 2.6 + _bulletWave * .95) {
+      wall(2.6 + _bulletWave++ * .95, BossPhase.toxicSlalom);
+    }
+    while (_laserWave < 5 && age >= 10.2 + _laserWave * .95) {
+      wall(10.2 + _laserWave++ * .95, BossPhase.toxicPulse);
+    }
+    while (_poolWave < 7 && age >= 18.1 + _poolWave * .65) {
+      wall(18.1 + _poolWave++ * .65, BossPhase.toxicGauntlet);
+    }
+  }
+
+  void _prismWeapons(double before, EnemyPoint target) {
+    void laser(double at, int wave, double side) {
+      final body = positionAt(at);
+      final aim = math
+          .atan2(math.max(80.0, target.y - body.y), target.x - body.x)
+          .clamp(1.15, 1.99);
+      final direction = wave.isEven ? 1.0 : -1.0;
+      final baseAngle = aim + side * .30;
+      EnemyBeam path(double time) {
+        final body = positionAt(at + laserWarning + time);
+        final origin = (x: body.x + side * 18, y: body.y + 26);
+        // Warning follows the emitter; live sweep starts only after charging.
+        final progress = time.clamp(0.0, 1.65) / 1.65;
+        final angle = baseAngle + direction * (progress - .5) * .30;
+        final dx = math.cos(angle), dy = math.sin(angle);
+        final length = math.min(
+          (537 - origin.y) / dy,
+          dx.abs() < 1e-9
+              ? double.infinity
+              : ((dx > 0 ? 336 : 24) - origin.x) / dx,
+        );
+        return (
+          start: origin,
+          end: (x: origin.x + dx * length, y: origin.y + dy * length),
+        );
+      }
+
+      final initial = path(0);
+      shots.add(
+        LateEnemyShot(
+          kind: LateShotKind.laser,
+          origin: initial.start,
+          velocity: (x: 0, y: 0),
+          delay: at - before + laserWarning,
+          life: 1.65,
+          beamEnd: initial.end,
+          beamPath: path,
+          radiusOverride: 5,
+          reasonOverride: side == 0
+              ? 'Reaver laser. Keep clear of the moving beam.'
+              : 'Reaver twin lasers. Follow the moving escape lane.',
+        ),
+      );
+      _lastVolleyAt = at + laserWarning;
+    }
+
+    while (_bulletWave < 2 && age >= 2.6 + _bulletWave * 3.2) {
+      final wave = _bulletWave++;
+      laser(2.6 + wave * 3.2, wave, 0);
+    }
+    while (_laserWave < 2 && age >= 10.2 + _laserWave * 3.2) {
+      final wave = _laserWave++;
+      for (final side in [-1.0, 1.0]) laser(10.2 + wave * 3.2, wave, side);
+    }
+    while (_poolWave < 3 && age >= 18.1 + _poolWave * 1.9) {
+      final wave = _poolWave++;
+      final at = 18.1 + wave * 1.9;
+      _lastVolleyAt = at + .8;
+      final origin = positionAt(at);
+      final aim = math.atan2(
+        math.max(80.0, target.y - origin.y),
+        target.x - origin.x,
+      );
+      final distance = math.sqrt(
+        math.pow(target.x - origin.x, 2) + math.pow(target.y - origin.y, 2),
+      );
+      final speed = math.max(135.0, distance / 2.3);
+      for (var i = 0; i < 4; i++) {
+        final angle = aim + (i - 1.5) * .23 + (_random.nextDouble() - .5) * .12;
+        final pattern = (wave + i) % 3;
+        shots.add(
+          LateEnemyShot(
+            kind: LateShotKind.spinner,
+            origin: origin,
+            velocity: (x: math.cos(angle) * speed, y: math.sin(angle) * speed),
+            delay: at - before + .8,
+            life: 3.0,
+            radiusOverride: 8,
+            curve: 26 + _random.nextDouble() * 24,
+            pathFrequency: [2.1, 3.4, 4.7][pattern],
+            pathPhase: _random.nextDouble() * math.pi * 2,
+            pathMix: pattern == 2 ? .45 : 0,
+            spin: (i.isEven ? 1 : -1) * (4 + _random.nextDouble() * 4),
+          ),
+        );
+      }
     }
   }
 
@@ -406,5 +601,47 @@ class InfiniteBoss {
         );
       }
     }
+  }
+}
+
+/// A dense horizontal poison formation, with a shared moving gap rather than
+/// aimed fans, homing shots, lasers or rebounds. Twelve bullets on either side
+/// close incidental slits; the deliberate opening never becomes smaller than
+/// 64 units (38 units remain after ball and bullet collision radii).
+class ToxicWall {
+  ToxicWall({
+    required this.at,
+    required this.top,
+    required this.mode,
+    required this.laneAt,
+  });
+  static const bulletsPerSide = 12, bulletRadius = 6.0;
+  final double at, top;
+  final BossPhase mode;
+  final double Function(double) laneAt;
+  double gapAt(double time) => switch (mode) {
+    BossPhase.toxicSlalom => 94.0,
+    BossPhase.toxicPulse =>
+      88 - 20 * math.pow(math.sin(time * 2.1), 2).toDouble(),
+    _ => 64.0,
+  };
+  double yAt(double liveTime) {
+    final t = (liveTime / InfiniteBoss.toxicLife).clamp(0.0, 1.0);
+    final progress = switch (mode) {
+      BossPhase.toxicPulse => t - .1 * math.sin(math.pi * 2 * t),
+      BossPhase.toxicGauntlet => .35 * t + .65 * t * t,
+      _ => t,
+    };
+    return top + 202 + (570 - top - 202) * progress;
+  }
+
+  EnemyPoint positionAt(double liveTime, double side, int index) {
+    final time = at + InfiniteBoss.toxicWarning + math.max(0.0, liveTime);
+    final center = laneAt(time), halfGap = gapAt(time) / 2;
+    final fraction = index / (bulletsPerSide - 1);
+    final x = side < 0
+        ? 24 + (center - halfGap - 24) * fraction
+        : center + halfGap + (336 - center - halfGap) * fraction;
+    return (x: x, y: yAt(liveTime));
   }
 }

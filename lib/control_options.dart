@@ -42,13 +42,7 @@ class _ControlOptionsState extends State<ControlOptions>
   @override
   Widget build(BuildContext context) => Column(
     children: [
-      for (final mode in [
-        ControlMode.oneFinger,
-        ControlMode.twoFinger,
-        ControlMode.analog,
-        ControlMode.tiltLift,
-        ControlMode.boardTilt,
-      ])
+      for (final mode in selectableControlModes)
         Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: Material(
@@ -177,7 +171,7 @@ class SensitivitySetting extends StatelessWidget {
             ),
           ),
           Text(
-            value.toStringAsFixed(2),
+            value.toStringAsFixed(1),
             style: const TextStyle(
               fontFeatures: [FontFeature.tabularFigures()],
             ),
@@ -190,7 +184,7 @@ class SensitivitySetting extends StatelessWidget {
         min: 0,
         max: 1,
         divisions: 20,
-        label: value.toStringAsFixed(2),
+        label: value.toStringAsFixed(1),
         onChanged: onChanged,
         onChangeEnd: (_) => onChangeEnd?.call(),
       ),
@@ -207,7 +201,7 @@ class _ControlDemo extends CustomPainter {
     final t = demo.value * math.pi * 2;
     c.drawRRect(
       RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(12)),
-      Paint()..color = const Color(0xFFEAE3D0),
+      Paint()..color = menuRaised,
     );
     final a = Offset(10, 34 + math.sin(t) * 9),
         b = Offset(96, 34 + math.sin(t + 1) * 9);
@@ -215,7 +209,7 @@ class _ControlDemo extends CustomPainter {
       a,
       b,
       Paint()
-        ..color = ink
+        ..color = menuGold
         ..strokeWidth = 4
         ..strokeCap = StrokeCap.round,
     );

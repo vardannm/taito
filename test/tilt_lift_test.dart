@@ -18,26 +18,21 @@ BalanceGame splitGame() => BalanceGame(seed: 9)
   ..right = 340;
 
 void main() {
-  testWidgets(
-    'fourth settings option activates the controls on a small phone',
-    (tester) async {
-      SharedPreferencesAsyncPlatform.instance =
-          InMemorySharedPreferencesAsync.empty();
-      final game = await launch(tester, ControlMode.oneFinger);
-      await tester.tap(find.byTooltip('Settings'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      final option = find.byKey(const ValueKey('control-tiltLift'));
-      await tester.ensureVisible(option);
-      await tester.tap(option);
-      await tester.pump();
-      expect(game.controlMode, ControlMode.tiltLift);
-      expect(find.byKey(const ValueKey('tilt-lift-tilt')), findsOneWidget);
-      expect(find.byKey(const ValueKey('tilt-lift-lift')), findsNothing);
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox());
-    },
-  );
+  testWidgets('legacy tilt-only controls are absent from settings', (
+    tester,
+  ) async {
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+    final game = await launch(tester, ControlMode.oneFinger);
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byKey(const ValueKey('control-tiltLift')), findsNothing);
+    expect(game.controlMode, ControlMode.oneFinger);
+    expect(find.byKey(const ValueKey('tilt-lift-tilt')), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
 
   test(
     'tilt preserves height and lift preserves angle; release stops lift',
@@ -108,7 +103,7 @@ void main() {
     await profile.save();
     final restored = PlayerProfile();
     await restored.load();
-    expect(restored.controlMode, ControlMode.tiltLift);
+    expect(restored.controlMode, ControlMode.oneFinger);
     expect(restored.levelRecord(1, ControlMode.tiltLift).starMask, 3);
   });
 

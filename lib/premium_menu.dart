@@ -780,6 +780,36 @@ class MenuBestScore extends StatelessWidget {
   );
 }
 
+class MenuEarnedStars extends StatelessWidget {
+  const MenuEarnedStars({super.key, required this.stars});
+  final int stars;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label: '$stars Classic stars earned',
+    excludeSemantics: true,
+    child: FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.star_rounded, color: menuGold, size: 25),
+          const SizedBox(width: 7),
+          Text(
+            formatMenuScore(stars),
+            key: const ValueKey('menu-earned-stars'),
+            style: const TextStyle(
+              color: menuText,
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 class MenuActionButton extends StatelessWidget {
   const MenuActionButton({
     super.key,
@@ -806,7 +836,7 @@ class MenuActionButton extends StatelessWidget {
           ),
           textStyle: const TextStyle(
             fontFamily: 'sans-serif',
-            fontSize: 16,
+            fontSize: 19,
             fontWeight: FontWeight.w600,
           ),
         ),

@@ -23,9 +23,38 @@ enum PlatformStyle {
     2300,
     0xFFFFD380,
     3,
+  ),
+  aether(
+    'Aether bridge',
+    'Platinum filigree and rose-gold starlight',
+    0,
+    0xFFCFEAFF,
+    3.5,
+  ),
+  phoenix(
+    'Phoenix forge',
+    'Ruby enamel with flowing golden feathers',
+    0,
+    0xFFFFAB65,
+    4,
+  ),
+  chrono(
+    'Chrono relay',
+    'Teal sapphire, precision gears and gold seams',
+    0,
+    0xFF83F1E0,
+    4.5,
+  ),
+  genesis(
+    'Genesis arc',
+    'Iridescent crystal petals and luminous pearl',
+    0,
+    0xFFF4B6F0,
+    5,
   );
 
   bool get energized => index >= aurora.index;
+  bool get purchaseOnly => index >= aether.index;
 
   const PlatformStyle(
     this.label,

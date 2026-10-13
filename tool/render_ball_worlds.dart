@@ -76,8 +76,13 @@ void main() {
     }
     final picture = recorder.endRecording();
     await tester.runAsync(
-      () async =>
-          writeImage(await picture.toImage(1100, 1280), 'ball-worlds-gallery'),
+      () async => writeImage(
+        await picture.toImage(
+          1100,
+          ((BallCosmetic.values.length + 4) ~/ 5) * 320,
+        ),
+        'ball-worlds-gallery',
+      ),
     );
     picture.dispose();
     // Exercise every game mode against dark scenery.

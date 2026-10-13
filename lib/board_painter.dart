@@ -468,7 +468,15 @@ class BoardPainter extends CustomPainter {
       );
       text(
         canvas,
-        '${boss.phase.name.toUpperCase()} · ${(InfiniteBoss.duration - boss.age).ceil()}s',
+        '${switch (boss.phase) {
+          BossPhase.sweepingLaser => 'LASER SWEEP',
+          BossPhase.twinLasers => 'TWIN LASERS',
+          BossPhase.rotors => 'SPINNING ROTORS',
+          BossPhase.toxicSlalom => 'TOXIC SLALOM',
+          BossPhase.toxicPulse => 'POISON PULSE',
+          BossPhase.toxicGauntlet => 'TOXIC GAUNTLET',
+          _ => boss.phase.name.toUpperCase(),
+        }} · ${(InfiniteBoss.duration - boss.age).ceil()}s',
         Offset(180, labelY + 16),
         9,
         bossInk,

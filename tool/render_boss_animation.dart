@@ -8,7 +8,7 @@ import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/infinite_boss.dart';
 
 void main() {
-  testWidgets('render all three boss animations together', (tester) async {
+  testWidgets('render all boss animations together', (tester) async {
     await (FontLoader('monospace')..addFont(
           Future.value(
             ByteData.sublistView(
@@ -68,7 +68,7 @@ void main() {
         canvas.restore();
       }
       final picture = recorder.endRecording();
-      final image = await picture.toImage(900, 484);
+      final image = await picture.toImage(games.length * 300, 484);
       await tester.runAsync(() async {
         final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
         await File(

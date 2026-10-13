@@ -4,6 +4,7 @@ Short mono PCM cues are small and decode directly in Android's SoundPool.
 Run separately from generate_audio.py to leave the existing music/UI cues intact.
 """
 from pathlib import Path
+import argparse
 import json
 import wave
 import numpy as np
@@ -33,6 +34,55 @@ def decay(t, seconds, attack=.004):
     return np.minimum(1, t / attack) * np.exp(-t / seconds)
 
 
+def electrical_noise(rng, count, low, high):
+    """Band-limited corona hiss, without harsh ultrasonic white noise."""
+    frequencies = np.fft.rfftfreq(count, 1 / RATE)
+    spectrum = np.fft.rfft(rng.normal(0, 1, count))
+    shape = np.minimum(1, (frequencies / low) ** 2)
+    shape *= 1 / (1 + (frequencies / high) ** 4)
+    signal = np.fft.irfft(spectrum * shape, n=count)
+    return signal / max(np.sqrt(np.mean(signal ** 2)), .001)
+
+
+def electricity(t, firing):
+    """Transformer buzz, unstable arcs and a hard capacitor discharge."""
+    # Local seeds keep every unrelated cue unchanged when lasers are rebuilt.
+    rng = np.random.default_rng(901 if firing else 900)
+    duration = len(t) / RATE
+    progress = t / duration
+    corona = electrical_noise(rng, len(t), 850, 6500)
+    body = electrical_noise(rng, len(t), 140, 1800)
+    drift = np.interp(t, np.linspace(0, duration, 45), rng.uniform(.35, 1, 45))
+    frequency = 112 + (18 * progress if firing else 45 * progress ** 2)
+    phase = 2 * np.pi * np.cumsum(frequency) / RATE
+    buzz = np.tanh(2.8 * (np.sin(phase) + .32 * np.sin(phase * 3.03)))
+    buzz += .22 * np.sin(2 * np.pi * 60 * t)
+    sputter = .45 + .55 * np.maximum(0, np.sin(phase * 1.51)) ** 2
+
+    if firing:
+        # The beam stays electrically alive after the opening crack; it does
+        # not collapse into the old pitched, descending arcade "pew".
+        sustain = np.minimum(1, t / .006) * np.exp(-t / .38)
+        signal = sustain * (.44 * buzz * sputter + .27 * corona * drift + .13 * body)
+        signal += .9 * corona * decay(t, .013, .0004)
+        signal += .45 * sweep(t, 105, 48, duration) * decay(t, .065, .001)
+        starts = np.array([.0, .018, .057, .11, .17, .25, .34, .43, .54, .63])
+    else:
+        rise = (.12 + .88 * progress ** 1.5) * np.minimum(1, t / .015)
+        signal = rise * (.38 * buzz * sputter + .22 * corona * drift + .1 * body)
+        starts = np.sort(rng.uniform(.07, duration - .04, 23))
+
+    for start in starts:
+        age = t - start
+        live = age >= 0
+        length = rng.uniform(.002, .011)
+        envelope = np.where(live, np.exp(-np.maximum(age, 0) / length), 0)
+        envelope *= np.minimum(1, np.maximum(age, 0) / .00035)
+        strength = (.65 * np.exp(-start / .5) if firing else .1 + .45 * start / duration)
+        signal += strength * corona * envelope
+    return np.tanh(signal * 1.3)
+
+
 def synth(name, duration):
     t = np.arange(round(duration * RATE)) / RATE
     noise = RNG.normal(0, 1, len(t))
@@ -51,7 +101,9 @@ def synth(name, duration):
         signal = sum(np.sin(2 * np.pi * base * ratio * t) / (i + 1)
                      for i, ratio in enumerate([1, 1.5, 2.01])) * decay(t, .075, .009)
         signal += .18 * soft * np.sin(np.pi * t / duration) ** 2
-    elif name in ("laserCharge", "mineCharge", "cometCharge"):
+    elif name == "laserCharge":
+        signal = electricity(t, firing=False)
+    elif name in ("mineCharge", "cometCharge"):
         start = 180 if name == "mineCharge" else 330
         end = 1000 if name == "mineCharge" else 1450
         rise = np.sin(np.pi * t / duration) ** .8
@@ -61,9 +113,7 @@ def synth(name, duration):
         if name == "cometCharge":
             signal += .3 * np.sin(2 * np.pi * 1568 * t) * rise
     elif name == "laserFire":
-        signal = .65 * sweep(t, 2100, 130, duration, 1.3) * decay(t, .11)
-        signal += .35 * sweep(t, 180, 65, duration) * decay(t, .15)
-        signal += .18 * air * decay(t, .08)
+        signal = electricity(t, firing=True)
     elif name in ("mineFire", "colossusArrival"):
         signal = .8 * sweep(t, 150, 38, duration) * decay(t, .17)
         signal += .4 * soft * decay(t, .12)
@@ -125,9 +175,15 @@ def write(path, signal):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--only", nargs="+", choices=DURATIONS,
+                        help="Rebuild only the named cues and their preview.")
+    args = parser.parse_args()
     clips, report = [], {}
     for name, duration in DURATIONS.items():
         signal = synth(name, duration)
+        if args.only and name not in args.only:
+            continue
         write(OUT / f"enemy_{name}.wav", signal)
         clips.extend([signal, np.zeros(round(.24 * RATE))])
         report[name] = {"seconds": duration,
@@ -135,8 +191,10 @@ def main():
                         "rms": round(float(np.sqrt(np.mean(signal ** 2))), 4)}
     artifacts = ROOT / "artifacts"
     artifacts.mkdir(exist_ok=True)
-    write(artifacts / "enemy-sound-preview.wav", np.concatenate(clips))
-    (artifacts / "enemy-sound-report.json").write_text(json.dumps(report, indent=2))
+    lasers_only = args.only and set(args.only) <= {"laserCharge", "laserFire"}
+    stem = "laser-sound" if lasers_only else "enemy-sound"
+    write(artifacts / f"{stem}-preview.wav", np.concatenate(clips))
+    (artifacts / f"{stem}-report.json").write_text(json.dumps(report, indent=2))
     print(f"Generated {len(report)} original enemy cues; all peaks <= 0.72.")
 
 

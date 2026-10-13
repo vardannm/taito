@@ -1,5 +1,6 @@
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/shop_design.dart';
+import 'package:balance_arcade/menu_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -82,4 +83,58 @@ void main() {
     expect(find.text('Menu'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'shop swipes tabs, keeps vertical scrolling, and exits left from Balls',
+    (tester) async {
+      final game = await launch(tester, ControlMode.oneFinger);
+      await tester.tap(find.byKey(const ValueKey('board-shop')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 550));
+      int selected() => tester.widget<MenuTabs>(find.byType(MenuTabs)).selected;
+      Future<void> swipe(double dx) async {
+        await tester.dragFrom(const Offset(160, 280), Offset(dx, 0));
+        await tester.pump();
+      }
+
+      expect(selected(), 0);
+      await tester.dragFrom(const Offset(160, 380), const Offset(0, -140));
+      await tester.pump();
+      expect(selected(), 0);
+      final ballList = find.byKey(const ValueKey('collection-0'));
+      expect(
+        tester
+            .state<ScrollableState>(
+              find.descendant(of: ballList, matching: find.byType(Scrollable)),
+            )
+            .position
+            .pixels,
+        greaterThan(0),
+      );
+      for (var tab = 1; tab <= 3; tab++) {
+        await swipe(110);
+        expect(selected(), tab);
+      }
+      await swipe(110);
+      expect(selected(), 3);
+      for (var tab = 2; tab >= 0; tab--) {
+        await swipe(-110);
+        expect(selected(), tab);
+      }
+      final smallDrag = await tester.startGesture(const Offset(160, 280));
+      await smallDrag.moveBy(const Offset(-15, 0));
+      await tester.pump(const Duration(milliseconds: 300));
+      await smallDrag.up();
+      await tester.pump();
+      expect(selected(), 0);
+      await swipe(-110);
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byKey(const ValueKey('shop-swipe-area')), findsNothing);
+      expect(find.byKey(const ValueKey('menu-play')), findsOneWidget);
+      expect(game.waitingForInput, isTrue);
+      expect(game.elapsed, 0);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
 }

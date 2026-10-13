@@ -61,7 +61,7 @@ void main() {
       await p.saveTutorial();
       final restored = PlayerProfile();
       await restored.load();
-      expect(restored.controlMode, ControlMode.analog);
+      expect(restored.controlMode, ControlMode.oneFinger);
       expect(restored.tutorial.step, TutorialStep.completed);
       await restored.replayTutorial();
       restored.tutorial.step = TutorialStep.freePlay;

@@ -154,6 +154,34 @@ class BallWorld {
       Color(0xFF2F3449),
       Color(0xFFE8C98A),
     ),
+    BallCosmetic.aether => const BallWorld(
+      'Aether Cathedral',
+      'Platinum arches under a lavender celestial dawn',
+      Color(0xFF26364F),
+      Color(0xFF526276),
+      Color(0xFFF1D0B6),
+    ),
+    BallCosmetic.phoenix => const BallWorld(
+      'Phoenix Ascendant',
+      'Golden feather rays above a ruby volcanic horizon',
+      Color(0xFF401D36),
+      Color(0xFF864754),
+      Color(0xFFFFCB82),
+    ),
+    BallCosmetic.chronosphere => const BallWorld(
+      'Chrono Citadel',
+      'Gilded clockwork and teal crystal towers',
+      Color(0xFF113D49),
+      Color(0xFF356564),
+      Color(0xFFE9D28D),
+    ),
+    BallCosmetic.genesis => const BallWorld(
+      'Genesis Bloom',
+      'Opalescent ribbons and rose crystal gardens in deep space',
+      Color(0xFF382B57),
+      Color(0xFF665177),
+      Color(0xFFF9CDE9),
+    ),
   };
 }
 

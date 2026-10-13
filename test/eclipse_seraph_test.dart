@@ -5,29 +5,26 @@ import 'package:balance_arcade/late_enemies.dart';
 import 'infinite_boss_test.dart' show run, advance;
 
 void main() {
-  test(
-    'a big score jump still visits all three bosses in order with rest gaps',
-    () {
-      final game = run()
-        ..survival.points = 1000000
-        ..survival.shield = 1000
-        ..lateEnemiesEnabled = false
-        ..snakeEncountersEnabled = false;
-      double? previousEnd;
-      for (final kind in BossKind.values) {
-        while (game.boss == null) advance(game, 1 / 120);
-        expect(game.boss!.kind, kind);
-        if (previousEnd != null)
-          expect(game.elapsed - previousEnd, greaterThanOrEqualTo(63));
-        while (game.boss != null) advance(game, 1 / 120);
-        previousEnd = game.elapsed;
-      }
-      expect(game.bossesEncountered, 3);
-      advance(game, 65);
-      expect(game.boss, isNull);
-      expect(game.bossPending, isFalse);
-    },
-  );
+  test('a big score jump visits every boss in order with rest gaps', () {
+    final game = run()
+      ..survival.points = 2000000
+      ..survival.shield = 1000
+      ..lateEnemiesEnabled = false
+      ..snakeEncountersEnabled = false;
+    double? previousEnd;
+    for (final kind in BossKind.values) {
+      while (game.boss == null) advance(game, 1 / 120);
+      expect(game.boss!.kind, kind);
+      if (previousEnd != null)
+        expect(game.elapsed - previousEnd, greaterThanOrEqualTo(63));
+      while (game.boss != null) advance(game, 1 / 120);
+      previousEnd = game.elapsed;
+    }
+    expect(game.bossesEncountered, BossKind.values.length);
+    advance(game, 65);
+    expect(game.boss, isNull);
+    expect(game.bossPending, isFalse);
+  });
   test(
     'Seraph has three distinct phases and finishes all attacks before exit',
     () {
@@ -182,7 +179,14 @@ void main() {
   test('recoil follows volleys and charging builds during a warning', () {
     for (final kind in BossKind.values) {
       final boss = InfiniteBoss(kind: kind);
-      boss.step(2.6, target: (x: 180, y: 430));
+      boss.step(
+        kind == BossKind.prismReaver
+            ? 3.7
+            : kind == BossKind.venomCrown
+            ? 3.5
+            : 2.6,
+        target: (x: 180, y: 430),
+      );
       expect(boss.recoil, closeTo(1, 1e-8));
       boss.step(.4, target: (x: 180, y: 430));
       expect(boss.recoil, 0);

@@ -3,6 +3,7 @@ import 'infinite_progress.dart';
 import 'encounter_director.dart';
 
 typedef EnemyPoint = ({double x, double y});
+typedef EnemyBeam = ({EnemyPoint start, EnemyPoint end});
 
 enum LateEnemyKind { beetle, cricket, moth, scorpion, seedSpitter }
 
@@ -24,7 +25,17 @@ extension LateEnemyDetails on LateEnemyKind {
   };
 }
 
-enum LateShotKind { bomb, acid, ricochet, moth, laser, seed, shard, mine }
+enum LateShotKind {
+  bomb,
+  acid,
+  ricochet,
+  moth,
+  laser,
+  seed,
+  shard,
+  mine,
+  spinner,
+}
 
 /// These visitors perch on the rails (the moth hovers above the play area).
 /// Warnings and flying shots use board/screen coordinates, independent of the
@@ -224,6 +235,12 @@ class LateEnemyShot {
     this.beamEnd,
     this.radiusOverride,
     this.reasonOverride,
+    this.beamPath,
+    this.positionPath,
+    this.pathFrequency = 0,
+    this.pathPhase = 0,
+    this.pathMix = 0,
+    this.spin = 0,
   }) : age = -delay,
        _previousAge = -delay;
 
@@ -234,6 +251,13 @@ class LateEnemyShot {
   final EnemyPoint? beamEnd;
   final double? radiusOverride;
   final String? reasonOverride;
+  final EnemyBeam Function(double time)? beamPath;
+  final EnemyPoint Function(double time)? positionPath;
+  final double pathFrequency, pathPhase, pathMix, spin;
+  EnemyBeam beamAt(double time) =>
+      beamPath?.call(time) ?? (start: origin, end: beamEnd ?? origin);
+  EnemyBeam get beam => beamAt(age.clamp(-delay, life));
+  double get rotation => pathPhase + math.max(0, age) * spin;
   double age, _previousAge, _dt = 0, _groundShift = 0, _previousGroundShift = 0;
   bool consumed = false;
   bool get cancelled => consumed || (parent?.consumed ?? false);
@@ -263,9 +287,11 @@ class LateEnemyShot {
         LateShotKind.seed ||
         LateShotKind.shard => 'Seed hit. Watch the three-way split.',
         LateShotKind.mine => 'Shock mine. Move out of the marked blast circle.',
+        LateShotKind.spinner => 'Prism rotor. Watch its changing curved path.',
       };
 
   EnemyPoint positionAt(double time) {
+    if (positionPath != null) return positionPath!(time);
     var x = origin.x + velocity.x * time;
     var y = origin.y + velocity.y * time;
     if (kind == LateShotKind.ricochet && time > bounceTime) {
@@ -276,9 +302,16 @@ class LateEnemyShot {
       final speed = math.sqrt(
         velocity.x * velocity.x + velocity.y * velocity.y,
       );
-      final offset = math.sin(time / life * math.pi) * curve;
-      x -= velocity.y / speed * offset;
-      y += velocity.x / speed * offset;
+      final offset = kind == LateShotKind.spinner
+          ? math.sin(time / life * math.pi) *
+                curve *
+                (math.sin(time * pathFrequency + pathPhase) +
+                    pathMix * math.sin(time * pathFrequency * 1.73 - pathPhase))
+          : math.sin(time / life * math.pi) * curve;
+      if (speed > 0) {
+        x -= velocity.y / speed * offset;
+        y += velocity.x / speed * offset;
+      }
     }
     return (x: x, y: y);
   }
@@ -305,6 +338,8 @@ class LateEnemyShot {
     final start = math.max(0.0, _previousAge), end = math.min(life, age);
     if (end <= start) return null;
     if (kind == LateShotKind.laser) {
+      if (beamPath != null)
+        return _movingBeamContact(ax, ay, bx, by, start, end);
       final from = (start - _previousAge) / _dt;
       final until = (end - _previousAge) / _dt;
       final t = _beamContact(
@@ -317,7 +352,7 @@ class LateEnemyShot {
     }
     final cuts = <double>[start];
     if (bounceTime > start && bounceTime < end) cuts.add(bounceTime);
-    if (curve != 0) {
+    if (curve != 0 || positionPath != null) {
       final count = ((end - start) * 120).ceil();
       for (var i = 1; i < count; i++) {
         cuts.add(start + (end - start) * i / count);
@@ -353,27 +388,68 @@ class LateEnemyShot {
 
   // Sweep the ball through a finite capsule: a rectangle in beam coordinates
   // plus circular end caps. This catches fast crossings without sampling.
-  double? _beamContact(double ax, double ay, double bx, double by) {
-    final tip = beamEnd ?? origin;
-    final dx = tip.x - origin.x, dy = tip.y - origin.y;
+  double? _movingBeamContact(
+    double ax,
+    double ay,
+    double bx,
+    double by,
+    double start,
+    double end,
+  ) {
+    // Sweep short time slices using the same moving endpoints as the painter.
+    // A tiny conservative margin covers endpoint travel between samples, so
+    // a rotating beam cannot skip a stationary ball during a long frame.
+    final count = ((end - start) * 240).ceil();
+    for (var i = 0; i < count; i++) {
+      final a = start + (end - start) * i / count;
+      final b = start + (end - start) * (i + 1) / count;
+      final first = beamAt(a), last = beamAt(b), middle = beamAt((a + b) / 2);
+      double distance(EnemyPoint p, EnemyPoint q) =>
+          math.sqrt(math.pow(p.x - q.x, 2) + math.pow(p.y - q.y, 2));
+      final padding = math.max(
+        math.max(
+          distance(first.start, middle.start),
+          distance(last.start, middle.start),
+        ),
+        math.max(
+          distance(first.end, middle.end),
+          distance(last.end, middle.end),
+        ),
+      );
+      final from = (a - _previousAge) / _dt, until = (b - _previousAge) / _dt;
+      final t = _beamContact(
+        ax + (bx - ax) * from,
+        ay + (by - ay) * from,
+        ax + (bx - ax) * until,
+        ay + (by - ay) * until,
+        segment: middle,
+        padding: padding,
+      );
+      if (t != null) return from + t * (until - from);
+    }
+    return null;
+  }
+
+  double? _beamContact(
+    double ax,
+    double ay,
+    double bx,
+    double by, {
+    EnemyBeam? segment,
+    double padding = 0,
+  }) {
+    final start = segment?.start ?? origin;
+    final tip = segment?.end ?? beamEnd ?? origin;
+    final dx = tip.x - start.x, dy = tip.y - start.y;
     final length = math.sqrt(dx * dx + dy * dy);
-    final contactRadius = 7 + radius;
-    final near = circleContact(
-      ax,
-      ay,
-      bx,
-      by,
-      origin.x,
-      origin.y,
-      contactRadius,
-    );
+    final contactRadius = 7 + radius + padding;
+    final near = circleContact(ax, ay, bx, by, start.x, start.y, contactRadius);
     if (length < 1e-9) return near;
     final far = circleContact(ax, ay, bx, by, tip.x, tip.y, contactRadius);
     final ux = dx / length, uy = dy / length;
-    double along(double x, double y) =>
-        (x - origin.x) * ux + (y - origin.y) * uy;
+    double along(double x, double y) => (x - start.x) * ux + (y - start.y) * uy;
     double across(double x, double y) =>
-        -(x - origin.x) * uy + (y - origin.y) * ux;
+        -(x - start.x) * uy + (y - start.y) * ux;
     var lo = 0.0, hi = 1.0;
     for (final axis in [
       (along(ax, ay), along(bx, by), 0.0, length),

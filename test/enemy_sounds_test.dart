@@ -132,6 +132,13 @@ void main() {
           EnemyCue.cometCharge: 3,
           EnemyCue.cometFire: 3,
         },
+        BossKind.prismReaver => {
+          EnemyCue.colossusArrival: 1,
+          EnemyCue.laserCharge: 4,
+          EnemyCue.laserFire: 4,
+          EnemyCue.ricochet: 3,
+        },
+        BossKind.venomCrown => {EnemyCue.seraphArrival: 1, EnemyCue.bullet: 17},
       });
     });
   }

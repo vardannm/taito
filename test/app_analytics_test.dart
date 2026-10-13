@@ -63,9 +63,8 @@ void main() {
     await Future<void>.delayed(Duration.zero);
   });
 
-  test('an unconfigured Firebase project leaves analytics inactive', () async {
-    // The placeholder is replaced at setup; this also exercises the fallback
-    // when no native Firebase implementation exists in a unit test.
+  test('an unavailable Firebase implementation leaves analytics inactive', () async {
+    // Desktop tests have no configured native Firebase implementation.
     final analytics = await AppAnalytics.initialize();
     analytics.openShop(GameMode.infinite);
   });

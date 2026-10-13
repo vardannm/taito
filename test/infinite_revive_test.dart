@@ -153,13 +153,13 @@ void main() {
       ads,
       analytics: AppAnalytics(send: (name, _) async => events.add(name)),
     );
-      game.survival.points = 900;
+    game.survival.points = 900;
     await loseLastHeart(tester, game);
     expect(find.byKey(const ValueKey('revive-offer')), findsOneWidget);
     expect(profile.infiniteRuns, 0);
     expect(events.where((e) => e == 'run_finished'), isEmpty);
-      final serial = game.runSerial, score = game.score;
-      expect(score, greaterThanOrEqualTo(900));
+    final serial = game.runSerial, score = game.score;
+    expect(score, greaterThanOrEqualTo(900));
     final elapsed = game.elapsed;
     await tester.tap(find.byKey(const ValueKey('watch-revive-ad')));
     await tester.pump();
@@ -178,13 +178,13 @@ void main() {
     expect(profile.infiniteRuns, 0);
     expect(find.byKey(const ValueKey('revive-offer')), findsNothing);
 
-      game.survival.points = 1700;
+    game.survival.points = 1700;
     game.maxHeight = 900;
     await loseLastHeart(tester, game);
     expect(find.byKey(const ValueKey('revive-offer')), findsNothing);
     expect(profile.infiniteRuns, 1);
-      expect(profile.infiniteBestScore, game.score);
-      expect(profile.infiniteBestScore, greaterThan(score));
+    expect(profile.infiniteBestScore, game.score);
+    expect(profile.infiniteBestScore, greaterThan(score));
     expect(profile.infiniteBest, game.metres);
     expect(events.where((e) => e == 'run_started'), hasLength(1));
     expect(events.where((e) => e == 'run_finished'), hasLength(1));
@@ -239,6 +239,7 @@ void main() {
     final dynamic state = tester.state(find.byType(GameScreen));
     state.start(GameMode.infinite);
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 650));
     await startWorld(tester);
     await loseLastHeart(tester, game);
     expect(find.byKey(const ValueKey('revive-offer')), findsOneWidget);
