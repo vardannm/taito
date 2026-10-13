@@ -43,6 +43,7 @@ import 'mode_world_preview.dart';
 import 'heart_loss_effect.dart';
 import 'control_hint.dart';
 import 'one_finger_controls.dart';
+import 'boot_splash.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -63,6 +64,7 @@ Future<void> main() async {
       profile: profile,
       analytics: analytics,
       reviveAds: GoogleTestReviveAds(),
+      intro: true,
     ),
   );
 }
@@ -73,15 +75,24 @@ class ArcadeApp extends StatelessWidget {
     required this.profile,
     this.analytics,
     this.reviveAds,
+    this.intro = false,
   });
   final PlayerProfile profile;
   final AppAnalytics? analytics;
   final RewardedReviveAds? reviveAds;
+
+  /// The boot animation belongs to the real launch only; tests pump this app
+  /// straight into the menu rather than waiting an intro out.
+  final bool intro;
   @override
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
     title: 'GILT • Precision Arcade',
     theme: arcadeMenuTheme(),
+    // Wrapping the navigator keeps the intro above anything the menu opens.
+    builder: intro
+        ? (context, child) => GiltIntroGate(child: child ?? const SizedBox())
+        : null,
     home: GameScreen(
       profile: profile,
       analytics: analytics,
