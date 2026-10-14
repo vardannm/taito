@@ -35,6 +35,36 @@ class PlayerProfile {
       unlimitedCoins ? 'gilt.economy.coinsTest.v1' : 'gilt.economy.v1';
   bool canAfford(int cost) => unlimitedCoins || wallet >= cost;
 
+  /// Hint only for a purchasable improvement beyond the gear already owned.
+  bool get shopUpgradeAvailable {
+    final strongerBall = BallCosmetic.values.any(
+      (ball) =>
+          !ball.purchaseOnly &&
+          !ownedBalls.contains(ball) &&
+          canAfford(ball.cost) &&
+          (ownedBalls.every((owned) => owned.scoreBonus < ball.scoreBonus) ||
+              ownedBalls.every(
+                (owned) => owned.magnetRadius < ball.magnetRadius,
+              )),
+    );
+    final strongerPlatform = PlatformStyle.values.any(
+      (platform) =>
+          !platform.purchaseOnly &&
+          !ownedPlatforms.contains(platform) &&
+          canAfford(platform.cost) &&
+          ownedPlatforms.every(
+            (owned) => owned.scoreBonus < platform.scoreBonus,
+          ),
+    );
+    return strongerBall ||
+        strongerPlatform ||
+        SurvivalUpgrade.values.any(
+          (upgrade) =>
+              upgradeLevel(upgrade) < upgrade.maxLevel &&
+              canAfford(upgrade.costAt(upgradeLevel(upgrade))),
+        );
+  }
+
   late final SharedPreferencesAsync storage = SharedPreferencesAsync();
   int best = 0, runs = 0;
   int infiniteBest = 0, infiniteRuns = 0, infiniteBestScore = 0;

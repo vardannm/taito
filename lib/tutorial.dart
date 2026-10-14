@@ -1,8 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'analog_controls.dart';
-import 'tilt_lift_controls.dart';
 import 'board_painter.dart';
 import 'game.dart';
 import 'pivot_board.dart';
@@ -12,7 +10,7 @@ class FirstPlayTutorial extends StatefulWidget {
   const FirstPlayTutorial({
     super.key,
     required this.onDone,
-    this.control = ControlMode.twoFinger,
+    this.control = ControlMode.oneFinger,
     this.onControlChanged,
     this.onLessonComplete,
     this.onExit,
@@ -49,7 +47,7 @@ class _FirstPlayTutorialState extends State<FirstPlayTutorial>
   }
 
   void reset(ControlMode control) {
-    game.setControlMode(control);
+    game.setControlMode(control.supportedMode);
     game.start(gameMode: GameMode.practice);
     // A zero sensitivity would make the lesson impossible. Applies only here.
     game.analogSensitivity = math.max(.25, widget.analogSensitivity);
@@ -113,20 +111,12 @@ class _FirstPlayTutorialState extends State<FirstPlayTutorial>
 
   String get instruction => switch (lesson) {
     0 =>
-      game.tiltOnly
-          ? 'Tilt-only test: manual lift is disabled. Select another control mode to practice lifting.'
-          : game.oneFinger
+      game.oneFinger
           ? 'Drag up in the thumb area below the board, then let go. The platform holds its height.'
-          : game.analog
-          ? 'Drag both bottom joysticks up, then let go. The platform holds its height.'
           : 'Drag both end grips up, then let go. The platform holds its height.',
     1 =>
-      game.tiltOnly
-          ? 'Drag sideways to tilt until the ball rolls.'
-          : game.oneFinger
+      game.oneFinger
           ? 'Drag sideways in the thumb area below the board. Tilt until the ball rolls to either side.'
-          : game.analog
-          ? 'Move one bottom joystick up or down. Tilt until the ball rolls to either side.'
           : 'Move one end grip up or down. Tilt until the ball rolls to either side.',
     _ =>
       'Lift toward the glowing hole. Use a little tilt to line up the ball. Take your time.',
@@ -174,7 +164,7 @@ class _FirstPlayTutorialState extends State<FirstPlayTutorial>
                           value: game.controlMode,
                           isExpanded: true,
                           items: [
-                            for (final mode in ControlMode.values)
+                            for (final mode in selectableControlModes)
                               DropdownMenuItem(
                                 value: mode,
                                 child: Text(mode.label),
@@ -213,16 +203,6 @@ class _FirstPlayTutorialState extends State<FirstPlayTutorial>
                             ),
                           ),
                         ),
-                        if (game.bottomControls)
-                          SizedBox(
-                            height: 104,
-                            child: GestureDetector(
-                              onPanUpdate: (_) {},
-                              child: game.tiltLift
-                                  ? TiltLiftControls(game: game, frame: frame)
-                                  : AnalogControls(game: game, frame: frame),
-                            ),
-                          ),
                         Semantics(
                           liveRegion: true,
                           child: Text(

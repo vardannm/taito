@@ -15,6 +15,7 @@ abstract final class InfiniteTuning {
   static double runDensity(num score, double metres) =>
       math.min(densityAt(score), difficultyAt(metres));
   static const hazardMilestones = [450, 900, 1500, 2250];
+  static const platformGapUnlockScore = 1000000;
   static double complexityAt(double metres) =>
       ((metres - 2400) / 1800).clamp(0.0, 1.0);
   static double densityAt(num score) {

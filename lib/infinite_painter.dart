@@ -419,19 +419,6 @@ void paintInfiniteMagnet(Canvas c, BalanceGame game, bool reducedMotion) {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2,
     );
-    final label = TextPainter(
-      text: TextSpan(
-        text: 'MAGNET',
-        style: const TextStyle(
-          fontFamily: 'sans-serif',
-          fontSize: 7.5,
-          letterSpacing: .7,
-          fontWeight: FontWeight.w700,
-          color: Color(0xFFD5C6F0),
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
     final time = TextPainter(
       text: TextSpan(
         text: '${game.survival.magnet.ceil()}s',
@@ -444,7 +431,7 @@ void paintInfiniteMagnet(Canvas c, BalanceGame game, bool reducedMotion) {
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    final width = 37 + label.width + time.width;
+    final width = 30 + time.width;
     final left = (p.dx - width / 2).clamp(22.0, 338 - width);
     final above = p.dy - 49;
     final top = (above < game.visibleTop + 4 ? p.dy + 27 : above).clamp(
@@ -505,16 +492,7 @@ void paintInfiniteMagnet(Canvas c, BalanceGame game, bool reducedMotion) {
           ..strokeCap = StrokeCap.round,
       );
     }
-    label.paint(c, Offset(left + 21, top + (21 - label.height) / 2));
-    final divider = left + 26 + label.width;
-    c.drawLine(
-      Offset(divider, top + 6),
-      Offset(divider, top + 16),
-      Paint()
-        ..color = const Color(0xFFB49AD7).withAlpha(90)
-        ..strokeWidth = .7,
-    );
-    time.paint(c, Offset(divider + 6, top + (21 - time.height) / 2));
+    time.paint(c, Offset(left + 22, top + (21 - time.height) / 2));
     final track = Rect.fromLTWH(left + 12, top + 19, width - 24, 1.5);
     c.drawRRect(
       RRect.fromRectAndRadius(track, const Radius.circular(1)),
@@ -532,7 +510,6 @@ void paintInfiniteMagnet(Canvas c, BalanceGame game, bool reducedMotion) {
       ),
       Paint()..color = const Color(0xFFC7A4F4),
     );
-    label.dispose();
     time.dispose();
   }
 }

@@ -176,22 +176,10 @@ class BalanceGame {
 
   void releaseControl() {
     controlHeld = false;
-    _liftInput = 0;
   }
-
-  /// Levels read the one-finger pad as a stick, so a held deflection
-  /// keeps climbing. Infinite and 2048 keep their one-to-one finger drag.
-  bool get stickLift => oneFinger && !infinite && !merging;
-
-  /// Held deflection of that stick, -1 (full up) to 1 (full down).
-  double _liftInput = 0;
 
   /// Board units a second at full deflection: a whole rail in about 3.5s.
   static const liftMotor = 140.0;
-  void setLiftInput(double value) {
-    if (!canControl || !oneFinger || !value.isFinite) return;
-    _liftInput = value.clamp(-1.0, 1.0);
-  }
 
   void dragControlVertical(double delta) {
     if (!canControl || !oneFinger || !controlHeld || !delta.isFinite) return;
@@ -282,7 +270,13 @@ class BalanceGame {
   InfiniteBoss? boss;
   bool bossesEnabled = true;
   int bossesEncountered = 0;
-  List<int> _bossScoreThresholds = const [100000, 300000, 600000, 900000, 1275000];
+  List<int> _bossScoreThresholds = const [
+    100000,
+    300000,
+    600000,
+    900000,
+    1275000,
+  ];
   List<int> get bossScoreThresholds => _bossScoreThresholds;
   double _nextBossAt = 0;
   double _lastDamageAt = double.negativeInfinity;
@@ -428,9 +422,17 @@ class BalanceGame {
             InfiniteTuning.hazardMilestones.first ||
         section == InfiniteSection.breath)
       return;
-    final unlocked = InfiniteTuning.hazardMilestones
+    final distanceUnlocked = InfiniteTuning.hazardMilestones
         .where((m) => metres * InfiniteDifficulty.hazardUnlocks >= m)
         .length;
+    // The temporary platform cut is a late-score challenge. Earlier runs can
+    // still introduce and repeat the other distance-based hazards.
+    final unlocked = math.min(
+      distanceUnlocked,
+      score >= InfiniteTuning.platformGapUnlockScore
+          ? HazardKind.values.length
+          : HazardKind.platformGap.index,
+    );
     final index = _introducedHazards < unlocked
         ? _introducedHazards++
         : (_hazardSequence + 1 + _random.nextInt(math.max(1, unlocked - 1))) %
@@ -441,7 +443,8 @@ class BalanceGame {
             InfiniteTuning.complexityAt(metres.toDouble()) *
                 InfiniteDifficulty.hardHazards &&
         section == InfiniteSection.encounter &&
-        _introducedHazards >= 4;
+        distanceUnlocked >= 4 &&
+        _introducedHazards >= 3;
     final sweeping = hard && _hardHazardSequence % 3 == 0;
     final zigzag = hard && _hardHazardSequence % 3 == 1;
     final orbiting = hard && _hardHazardSequence % 3 == 2;
@@ -805,7 +808,6 @@ class BalanceGame {
     liftInput = 0;
     controlHeld = false;
     _controlLift = 0;
-    _liftInput = 0;
     leftSpeed = rightSpeed = 0;
     pivotTargets.fillRange(0, 2, null);
     _released.fillRange(0, 2, false);
@@ -1119,10 +1121,9 @@ class BalanceGame {
     }
     if (oneFinger) {
       final halfTilt = controlPosition * 70;
-      final push = stickLift ? _liftInput * liftMotor * dt : 0.0;
       final center =
           (controlHeld || _controlLift != 0
-                  ? (left + right) / 2 + _controlLift + push
+                  ? (left + right) / 2 + _controlLift
                   : (left + right) / 2)
               .clamp(minimum + halfTilt.abs(), maximum - halfTilt.abs());
       left = center - halfTilt;

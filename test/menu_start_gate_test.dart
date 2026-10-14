@@ -1,4 +1,5 @@
 import 'package:balance_arcade/game.dart';
+import 'package:balance_arcade/one_finger_controls.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -19,6 +20,8 @@ void main() {
       '$control swipes from top and hero, then waits for Play and input',
       (tester) async {
         final game = await launch(tester, control);
+        final dimmer = find.byKey(const ValueKey('infinite-start-dimmer'));
+        expect(dimmer, findsNothing);
         final shop = tester.getRect(find.byKey(const ValueKey('board-shop')));
         final play = tester.getRect(find.byKey(const ValueKey('menu-play')));
         expect(shop.bottom, lessThan(play.top));
@@ -41,6 +44,15 @@ void main() {
         }
         final serial = game.runSerial;
         await armWorld(tester);
+        expect(dimmer, findsOneWidget);
+        if (game.oneFinger) {
+          expect(
+            tester.getRect(dimmer).bottom,
+            lessThanOrEqualTo(
+              tester.getRect(find.byType(OneFingerControls)).top,
+            ),
+          );
+        }
         expect(
           find.byKey(const ValueKey('start-control-prompt')),
           findsOneWidget,
@@ -54,6 +66,7 @@ void main() {
         await finger.moveBy(const Offset(3, -3));
         await tester.pump(const Duration(milliseconds: 16));
         expect(game.waitingForInput, isFalse);
+        expect(dimmer, findsNothing);
         expect(game.elapsed, greaterThan(0));
         expect(game.runSerial, serial);
         expect(
@@ -61,10 +74,28 @@ void main() {
           findsNothing,
         );
         await finger.up();
+        await tester.pump();
+        expect(dimmer, findsNothing); // Releasing never dims an active run.
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox());
       },
     );
+  }
+
+  for (final mode in [1, 2]) {
+    testWidgets('start dimming is exclusive to Infinite, not world $mode', (
+      tester,
+    ) async {
+      await launch(tester, ControlMode.oneFinger);
+      await selectWorld(tester, mode);
+      await armWorld(tester);
+      expect(
+        find.byKey(const ValueKey('start-control-prompt')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('infinite-start-dimmer')), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+    });
   }
 
   testWidgets(

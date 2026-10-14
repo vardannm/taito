@@ -141,7 +141,6 @@ class _GameScreenState extends State<GameScreen>
   Timer? resumeTimer;
   int resumeSeconds = 0;
   bool recorded = false, newBest = false, briefing = false;
-  List<CabinetStyle> newUnlocks = [];
   TutorialRun? tutorialRun;
   bool tutorialSheetOpen = false;
   final tutorialShopKey = GlobalKey();
@@ -385,11 +384,7 @@ class _GameScreenState extends State<GameScreen>
         advanceTutorial(TutorialStep.dailyChallenge);
       }
       if (!game.practice) {
-        final locked = CabinetStyle.values
-            .where((c) => !profile.isUnlocked(c))
-            .toList();
         newBest = profile.recordResult(game);
-        newUnlocks = locked.where(profile.isUnlocked).toList();
         unawaited(profile.save());
       }
     }
@@ -583,7 +578,6 @@ class _GameScreenState extends State<GameScreen>
     game.analogSensitivity = profile.analogSensitivity;
     game.twoFingerSensitivity = profile.twoFingerSensitivity;
     profile.applyInfiniteStart(game, tutorial: tutorialActive);
-    newUnlocks = [];
     game.start(
       gameMode: mode,
       levelNumber: profile.classicLevel,
@@ -822,6 +816,7 @@ class _GameScreenState extends State<GameScreen>
           !returning,
     );
     final wants =
+        InfiniteMusic.bundled &&
         (game.infinite || game.merging) &&
         profile.music &&
         game.started &&
@@ -916,7 +911,6 @@ class _GameScreenState extends State<GameScreen>
     playArmed = false;
     clearControls();
     recorded = newBest = briefing = false;
-    newUnlocks = [];
     game.setControlMode(controlForMode(arcadeModes[index]));
     game.cabinet = profile.cabinet;
     profile.applySurvivalUpgrades(game);
@@ -1041,7 +1035,10 @@ class _GameScreenState extends State<GameScreen>
     if (!guidedPlay && !objective && !menu) return null;
     if (step == TutorialStep.freePlay) return null;
     final message = switch (step) {
-      TutorialStep.controls => 'Drag to control the platform.',
+      TutorialStep.controls =>
+        game.oneFinger
+            ? 'Drag the thumb pad: sideways to tilt, up or down to lift. Hold still to keep the height.'
+            : 'Drag either end grip up or down. Move both ends to lift; move one to tilt.',
       TutorialStep.heartsHoles => 'Avoid holes. A fall costs 1 heart.',
       TutorialStep.heartsFeedback =>
         game.misses > 0
@@ -1051,17 +1048,24 @@ class _GameScreenState extends State<GameScreen>
       TutorialStep.coinsFeedback => 'Coin saved. Spend it later.',
       TutorialStep.shield => 'Shield protects you from danger.',
       TutorialStep.shieldFeedback => 'Protected! Watch the blue ring.',
+      TutorialStep.magnet =>
+        'Collect the red-and-blue magnet. It pulls nearby rewards toward you.',
+      TutorialStep.magnetFeedback =>
+        'The magnet icon and seconds show how long the pickup lasts.',
       TutorialStep.metrics => 'Climb higher. Grow your score.',
       TutorialStep.combo => 'Collect the gold crystal.',
       TutorialStep.comboFeedback => 'Collect crystals to grow your Combo.',
       TutorialStep.shop ||
       TutorialStep.shopBall ||
       TutorialStep.shopPlatform ||
-      TutorialStep.shopBrowse => 'Spend your coins and customize your game.',
+      TutorialStep.shopBrowse =>
+        'Buy stronger balls, platforms and Infinite upgrades. A gold dot on Shop means you can afford an improvement.',
       TutorialStep.levels => 'There are more ways to play. Open Levels.',
       TutorialStep.level1 => 'Open Levels, then choose Level 1.',
       TutorialStep.classicPlay =>
-        'Reach glowing holes in order, 1–10. Avoid dark holes. Drag to begin.',
+        game.oneFinger
+            ? 'Same thumb-pad controls. Lift to glowing holes in order, 1–10. Avoid dark holes. Drag to begin.'
+            : 'Reach glowing holes in order, 1–10. Avoid dark holes. Drag the end grips to begin.',
       TutorialStep.dailyChallenge =>
         'Daily Challenge: a new board each day. Earn stars and beat your best.',
       _ => '',
@@ -1159,11 +1163,15 @@ class _GameScreenState extends State<GameScreen>
                 worldPoint(coin.x, coin.y);
             case TutorialStep.coinsFeedback:
               ui(tutorialCoinsKey);
-            case TutorialStep.shield || TutorialStep.combo:
+            case TutorialStep.shield ||
+                TutorialStep.magnet ||
+                TutorialStep.combo:
               if (tutorialRun?.pickup case final item?)
                 worldPoint(item.x, item.y);
             case TutorialStep.shieldFeedback:
               worldPoint(game.ballX, game.ballY, 28);
+            case TutorialStep.magnetFeedback:
+              worldPoint(game.ballX, game.ballY - 35, 40);
             case TutorialStep.metrics || TutorialStep.comboFeedback:
               ui(tutorialScoreKey);
             default:
@@ -1750,6 +1758,11 @@ class _GameScreenState extends State<GameScreen>
               frame: frame,
               fillWidth: expansion,
               overlay: boardChrome(),
+              dimUntilInput:
+                  game.infinite &&
+                  game.waitingForInput &&
+                  (tutorialActive || playArmed) &&
+                  !returning,
               showHint:
                   (tutorialActive || playArmed) &&
                   game.waitingForInput &&
@@ -1821,6 +1834,7 @@ class _GameScreenState extends State<GameScreen>
     VoidCallback action, {
     Key? targetKey,
     Key? tapKey,
+    bool upgradeAvailable = false,
   }) => Expanded(
     child: Tooltip(
       message: tooltip,
@@ -1840,7 +1854,12 @@ class _GameScreenState extends State<GameScreen>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, size: 17, color: menuGold),
+                ShopHintIcon(
+                  icon,
+                  size: 17,
+                  color: menuGold,
+                  available: upgradeAvailable,
+                ),
                 const SizedBox(width: 6),
                 Flexible(
                   child: FittedBox(
@@ -1870,6 +1889,7 @@ class _GameScreenState extends State<GameScreen>
     showBallShop,
     targetKey: tutorialShopKey,
     tapKey: game.waitingForInput ? const ValueKey('board-shop') : null,
+    upgradeAvailable: profile.shopUpgradeAvailable,
   );
 
   Widget tutorialSelectionHeader(double page) {
@@ -2369,6 +2389,7 @@ class _GameScreenState extends State<GameScreen>
                         label: 'Shop',
                         icon: Icons.storefront_outlined,
                         tooltip: 'Gear shop',
+                        upgradeAvailable: profile.shopUpgradeAvailable,
                         onPressed: carouselMoving ? null : showBallShop,
                       ),
                     ),
@@ -3091,7 +3112,7 @@ class _GameScreenState extends State<GameScreen>
                                     game.level,
                                     game.controlMode,
                                   ),
-                            unlocks: newUnlocks,
+                            unlocks: const [],
                           ),
                       ] else
                         const Text(
@@ -3228,23 +3249,23 @@ class _GameScreenState extends State<GameScreen>
               const SizedBox(height: 20),
               guideRow(
                 '01',
-                'Two thumbs. One bar.',
-                'Drag either end of the platform up or down. Use two fingers to move both ends. Release to hold its screen position.',
+                'One finger. Full control.',
+                'Drag in the thumb pad below the board: left or right tilts the platform, up or down raises or lowers it with your finger. Holding still keeps its height. Release and grab anywhere to continue without a jump. The same controls work in Levels, Infinite and Merge.',
               ),
               guideRow(
                 '02',
-                'Follow the light.',
-                'Tilt to roll. Lift both ends to climb. Sink the ball into the glowing numbered hole; every other hole is a trap.',
+                'Prefer two fingers?',
+                'Choose One-finger or Two-finger in Options. With two fingers, drag either end grip up or down. Move both ends together to lift, or one end to tilt and roll. Release to hold the platform. Options also adjusts two-finger sensitivity.',
               ),
               guideRow(
                 '03',
-                'Make it a perfect ten.',
-                'Each target returns the bar to the bottom. Clear all ten with three balls. Consecutive targets build a multiplier; faster climbs earn bonus points.',
+                'Levels: follow the light.',
+                'Lift and tilt into the glowing numbered holes in order, 1–10. Dark holes are traps. Each target returns the platform to the bottom; clear all ten with three balls. Consecutive targets build a multiplier and faster climbs earn bonus points. Choose your board with Choose Level.',
               ),
               guideRow(
                 '04',
-                'Go beyond ten.',
-                'Infinite begins with ${profile.startingHearts} hearts. Upgrade starting hearts and pickup durations in the Gear Shop. Laser-wall sections arrive from time to time: the traps stop and wide laser walls come down instead, so steer through their openings. A hit costs a heart and resets your combo; the ball and platform blink for 2.5 seconds of protection while you keep steering from the same position. Gold crystals build combos up to x10; violet and midnight tiers build toward electric cyan at x9 and a golden maximum at x10. Blue shields protect for ${profile.shieldDuration} seconds. Red-and-blue magnets collect nearby coins, combo crystals, shields and hearts for ${profile.magnetDuration} seconds. Rare hearts restore a life. Keep steering to escape the rising red floor.',
+                'Infinite: keep climbing.',
+                'Start with ${profile.startingHearts} hearts and steer as the board climbs. A hit costs one heart and resets your combo. You keep your position and controls, with ${InfiniteTuning.recoverySeconds} seconds of protection. Keep moving to escape the rising red floor. Pace grows from x1 to x${InfiniteTuning.maxPace} as you climb; gold crystals build your combo up to x${InfiniteTuning.maxCombo}. Missing a crystal keeps the combo; losing a heart resets it.',
               ),
               const Text(
                 'Desktop: W / S = left end. ↑ / ↓ = right end. Esc = pause.',
@@ -3252,38 +3273,33 @@ class _GameScreenState extends State<GameScreen>
               ),
               guideRow(
                 '05',
-                'Watch the warnings.',
-                'Infinite starts with open spaces and builds difficulty with height. Warning holes unlock at 180m, moving holes at 350m, lasers at 600m and platform gaps at 900m. Move away from red warnings before they activate. In late Infinite encounters, orbiting holes follow a marked circle.',
+                'Collect the power-ups.',
+                'Blue shields protect you for ${profile.shieldDuration.toInt()} seconds. Red-and-blue magnets pull in nearby coins, crystals, shields and hearts for ${profile.magnetDuration.toInt()} seconds; the magnet icon and countdown show time left. Another pickup refreshes its timer. Hearts restore a life up to your upgraded limit. Pausing freezes pickup timers.',
               ),
               guideRow(
                 '06',
-                'Stay out of the web.',
-                'Classic levels 31–50 have slow patrolling spiders. Enter a marked territory and its spider chases you. Contact ends the run immediately. Each successful target resets the spiders. In Infinite, spiders move slowly and fire aimed webs: move away from the marked line before the slow shot arrives. Web hits cost a heart; shields block them.',
+                'Read the warnings.',
+                'Infinite adds forming holes, moving holes and lasers as you climb. Temporary platform cuts unlock at 1,000,000 points. Leave red warnings before they activate. During laser mazes, steer through the openings in the descending walls. Spiders fire aimed webs and later enemies attack in turns. In Levels, entering a spider territory starts a chase; contact ends the run. Each target resets the spiders.',
               ),
-              const Text(
-                'Deep in Infinite, five new visitors unlock: the beetle at 2,600m marks an acid landing; the cricket at 3,100m bounces one pellet off a wall; the moth at 3,600m fires curved dust streams; the scorpion at 4,100m charges a laser along a locked aim line, then holds the beam for 1.5 seconds; and the seed spitter at 4,600m splits a seed into three. Watch their aim markers before they fire. These attacks take turns, and stop during breathing stretches and laser mazes.',
-                style: TextStyle(fontSize: 12, height: 1.5),
-              ),
-              const SizedBox(height: 20),
               guideRow(
                 '07',
-                'Face the second tier.',
-                'Five bosses appear as your Infinite score grows. Sky Warden fires fixed lasers, Storm Colossus throws bouncing orbs and laser mines, and Eclipse Seraph fires laser curtains and comets. Between 850,000 and 950,000 points, Prism Reaver fires moving lasers and spinning rotors. Between 1,200,000 and 1,350,000 points, Venom Crown sends dense lime-green and acid-yellow bullet walls through a moving opening. Its walls change speed and the final corridor gets narrower. Read the warning trails and keep moving. Each boss lasts 28 active seconds.',
+                'Merge: grow your number.',
+                'Swipe to 2048 Merge before starting. Collect numbers equal to or smaller than your head and dodge larger numbers. Matching values merge and grow your chain. Build enough value to pass each numbered gate. Use the same tilt and lift controls to line up your next catch.',
               ),
               guideRow(
                 '08',
                 'Three ways to master it.',
-                'Earn a star for finishing, one for a finish without misses, and one for beating the active-time target in the HUD. Pauses and ball resets do not count. Stars and records are saved separately for each control mode.',
+                'Earn a star for finishing, one for a finish without misses, and one for beating the active-time target in the HUD. Pauses and ball resets do not count. Stars earned with either control contribute to the same board; best scores and times are tracked for each control.',
               ),
               guideRow(
                 '09',
-                'Take the detour.',
-                'Classic and Daily brass coins are worth 250 points. Infinite coins save to your local wallet immediately. Open the Gear Shop for balls and platforms that add Infinite point multipliers. Selected balls also have permanent magnets with different collection ranges in Infinite; handling stays the same. Each coin can be collected once. Classic stars unlock cabinet styles with identical handling.',
+                'Make your coins count.',
+                'Infinite coins save to your wallet. Shop offers balls with their own backgrounds, platforms, and permanent Infinite upgrades for hearts, shields and magnets. Stronger gear increases Infinite points; some balls add a built-in magnet. A gold dot on Shop means you can afford stronger gear or an upgrade. Equipment keeps the same movement and collision size.',
               ),
               guideRow(
                 '10',
-                'Return for the daily.',
-                'The daily board changes at midnight UTC. Retry its fixed layout to improve your local record. Infinite pace rises smoothly from x1 to x5, increasing speed, distance points and obstacle frequency. Every run starts gently at x1; pace rises gradually over longer distances. Combo crystals award 50 × combo × pace points. Missing a crystal keeps your combo; losing a heart resets it.',
+                'Choose your next run.',
+                'Swipe between Infinite, Levels and 2048 Merge, tap Play, then touch your controls to begin. Arcade opens Daily, Practice and How to Play. Daily changes at midnight UTC; retry the same board to improve your record. Replay Tutorial in Options walks you through the controls, pickups and shop again.',
               ),
               primary('TRY PRACTICE', () {
                 Navigator.pop(context);
@@ -3476,17 +3492,18 @@ class _GameScreenState extends State<GameScreen>
                     unawaited(profile.save());
                   },
                 ),
-                MenuToggle(
-                  title: 'Music',
-                  icon: Icons.music_note_rounded,
-                  subtitle: 'Background soundtrack',
-                  value: profile.music,
-                  onChanged: (v) {
-                    update(() => profile.music = v);
-                    syncMusic();
-                    unawaited(profile.save());
-                  },
-                ),
+                if (InfiniteMusic.bundled)
+                  MenuToggle(
+                    title: 'Music',
+                    icon: Icons.music_note_rounded,
+                    subtitle: 'Background soundtrack',
+                    value: profile.music,
+                    onChanged: (v) {
+                      update(() => profile.music = v);
+                      syncMusic();
+                      unawaited(profile.save());
+                    },
+                  ),
                 MenuToggle(
                   title: 'Haptic feedback',
                   icon: Icons.vibration_rounded,
@@ -3497,12 +3514,13 @@ class _GameScreenState extends State<GameScreen>
                     unawaited(profile.save());
                   },
                 ),
-                MenuAction(
-                  title: 'Music credits',
-                  subtitle: 'Infinite & 2048 · Kevin MacLeod',
-                  icon: Icons.piano_rounded,
-                  onTap: () => showMusicCredits(context),
-                ),
+                if (InfiniteMusic.bundled)
+                  MenuAction(
+                    title: 'Music credits',
+                    subtitle: 'Infinite & 2048 · Kevin MacLeod',
+                    icon: Icons.piano_rounded,
+                    onTap: () => showMusicCredits(context),
+                  ),
                 const SizedBox(height: 16),
                 MenuPanel(
                   child: Column(

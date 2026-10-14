@@ -111,13 +111,13 @@ void main() {
             .pixels,
         greaterThan(0),
       );
-      for (var tab = 1; tab <= 3; tab++) {
+      for (var tab = 1; tab <= 2; tab++) {
         await swipe(110);
         expect(selected(), tab);
       }
       await swipe(110);
-      expect(selected(), 3);
-      for (var tab = 2; tab >= 0; tab--) {
+      expect(selected(), 2);
+      for (var tab = 1; tab >= 0; tab--) {
         await swipe(-110);
         expect(selected(), tab);
       }
@@ -130,7 +130,7 @@ void main() {
       await swipe(-110);
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.byKey(const ValueKey('shop-swipe-area')), findsNothing);
-      expect(find.byKey(const ValueKey('menu-play')), findsOneWidget);
+      expect(find.byKey(const ValueKey('board-shop')), findsOneWidget);
       expect(game.waitingForInput, isTrue);
       expect(game.elapsed, 0);
       expect(tester.takeException(), isNull);

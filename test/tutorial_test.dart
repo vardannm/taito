@@ -178,6 +178,13 @@ void main() {
       simulate(g, lesson, .02);
       expect(g.survival.shield, greaterThan(0));
       expect(progress.step, TutorialStep.shieldFeedback);
+      simulate(g, lesson, 2.6);
+      expect(progress.step, TutorialStep.magnet);
+      g.ballX = lesson.pickup!.x;
+      g.left = g.right = lesson.pickup!.y + BalanceGame.ballRadius;
+      simulate(g, lesson, .02);
+      expect(g.survival.magnet, greaterThan(0));
+      expect(progress.step, TutorialStep.magnetFeedback);
       simulate(g, lesson, 5.1);
       expect(progress.step, TutorialStep.combo);
       g.ballX = lesson.pickup!.x;
@@ -227,7 +234,7 @@ void main() {
       await launch(tester, p);
       final g = currentGame(tester);
       expect(g.oneFinger, isTrue);
-      expect(find.text('Drag to control the platform.'), findsOneWidget);
+      expect(find.textContaining('Drag the thumb pad:'), findsOneWidget);
       await frames(tester);
       expect(p.tutorial.step, TutorialStep.controls);
       final finger = await tester.startGesture(

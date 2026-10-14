@@ -177,6 +177,24 @@ class PremiumMenuBackdrop extends CustomPainter {
         ).createShader(Rect.fromCircle(center: light, radius: w * .95)),
     );
 
+    if (ball == BallCosmetic.steel) {
+      // The starter sphere sits in an open atelier, with light instead of
+      // oversized scenery competing with the ball and menu controls.
+      final glow = Rect.fromCenter(
+        center: Offset(w * .5, h * .39),
+        width: w * 1.2,
+        height: h * .7,
+      );
+      canvas.drawOval(
+        glow,
+        Paint()
+          ..shader = RadialGradient(
+            colors: [world.accent.withAlpha(24), world.accent.withAlpha(0)],
+          ).createShader(glow),
+      );
+      return;
+    }
+
     // Far architecture: large quiet silhouettes, softened by the lit horizon.
     for (final side in [-1.0, 1.0]) {
       final x = w * .5 + side * w * .35;
@@ -301,6 +319,32 @@ class MenuBallStage extends CustomPainter {
       paintMergeStage(canvas, center.dx, baseY, radius, phase);
     } else if (mode == GameMode.classic) {
       paintClassicStage(canvas, center.dx, baseY, radius, phase);
+    } else if (ball == BallCosmetic.steel) {
+      final surface = Rect.fromCenter(
+        center: Offset(center.dx, baseY),
+        width: rx * 2,
+        height: ry * 2,
+      );
+      canvas.drawOval(
+        surface.shift(Offset(0, radius * .16)),
+        Paint()..color = const Color(0xFF0E252D),
+      );
+      canvas.drawOval(
+        surface,
+        Paint()
+          ..shader = const RadialGradient(
+            center: Alignment(-.25, -.3),
+            radius: 1,
+            colors: [Color(0xFF719393), Color(0xFF345A63), Color(0xFF183B47)],
+          ).createShader(surface),
+      );
+      canvas.drawOval(
+        surface,
+        Paint()
+          ..color = const Color(0xFF9BC9CB).withAlpha(100)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1,
+      );
     } else {
       // Three suspended stone steps, rendered with the game's native canvas.
       for (var i = 2; i >= 0; i--) {
@@ -817,10 +861,12 @@ class MenuActionButton extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     required this.onPressed,
+    this.upgradeAvailable = false,
   });
   final String label, tooltip;
   final IconData icon;
   final VoidCallback? onPressed;
+  final bool upgradeAvailable;
   @override
   Widget build(BuildContext context) => Tooltip(
     message: tooltip,
@@ -841,9 +887,36 @@ class MenuActionButton extends StatelessWidget {
           ),
         ),
         onPressed: onPressed,
-        icon: Icon(icon, size: 26),
+        icon: ShopHintIcon(icon, size: 26, available: upgradeAvailable),
         label: FittedBox(fit: BoxFit.scaleDown, child: Text(label)),
       ),
+    ),
+  );
+}
+
+/// A quiet gold notification dot for an affordable gear improvement.
+class ShopHintIcon extends StatelessWidget {
+  const ShopHintIcon(
+    this.icon, {
+    super.key,
+    required this.size,
+    this.available = false,
+    this.color,
+  });
+  final IconData icon;
+  final double size;
+  final bool available;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label: available ? 'Upgrade available in Shop' : null,
+    child: Badge(
+      key: available ? const ValueKey('shop-upgrade-hint') : null,
+      isLabelVisible: available,
+      backgroundColor: menuGold,
+      smallSize: 8,
+      child: Icon(icon, size: size, color: color),
     ),
   );
 }

@@ -216,34 +216,39 @@ class _Scenery {
   void paint(BallCosmetic ball) {
     switch (ball) {
       case BallCosmetic.steel:
-        // An art-deco pavilion, with a quiet open central aisle.
-        for (var i = 0; i < 3; i++) {
-          final inset = 14.0 + i * 19;
+        // Soft light at the edges leaves a quiet, high-contrast playfield.
+        wash(const Rect.fromLTWH(-130, -120, 430, 400), accent.withAlpha(34));
+        wash(
+          const Rect.fromLTWH(185, 290, 300, 380),
+          color(0xFF68A7B4).withAlpha(28),
+        );
+        for (final x in [6.0, 334.0]) {
+          c.drawRect(
+            Rect.fromLTWH(x - 2, 0, 4, 540),
+            Paint()
+              ..shader = LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  accent.withAlpha(0),
+                  accent.withAlpha(85),
+                  accent.withAlpha(0),
+                ],
+              ).createShader(Rect.fromLTWH(x - 2, 0, 4, 540)),
+          );
+        }
+        for (var i = 0; i < 2; i++) {
+          final y = 465.0 + i * 32;
           c.drawPath(
             Path()
-              ..moveTo(inset, 540)
-              ..lineTo(inset, 130)
-              ..quadraticBezierTo(170, -38 + i * 24, 340 - inset, 130)
-              ..lineTo(340 - inset, 540),
+              ..moveTo(-20, y)
+              ..cubicTo(85, y - 26, 245, y + 26, 360, y - 12),
             Paint()
-              ..color = accent.withAlpha(45 + i * 12)
+              ..color = accent.withAlpha(18)
               ..style = PaintingStyle.stroke
-              ..strokeWidth = i == 0 ? 9 : 1,
+              ..strokeWidth = .8,
           );
         }
-        for (final x in [18.0, 322.0]) {
-          c.drawRect(
-            Rect.fromLTWH(x - 9, 140, 18, 400),
-            Paint()..color = color(0xFFD5BA87).withAlpha(100),
-          );
-          for (var i = 0; i < 5; i++)
-            line(
-              Offset(x - 9, 180 + i * 75.0),
-              Offset(x + 9, 180 + i * 75.0),
-              accent.withAlpha(80),
-            );
-        }
-        dune(515, accent.withAlpha(24), 0);
       case BallCosmetic.coral:
         for (var i = 0; i < 3; i++)
           polygon([

@@ -11,9 +11,6 @@ import 'menu_design.dart';
 import 'survival_upgrades.dart';
 import 'shop_design.dart';
 import 'premium_menu.dart';
-import 'board_painter.dart';
-import 'game.dart';
-import 'rewards.dart';
 
 class BallShop extends StatefulWidget {
   const BallShop({
@@ -42,7 +39,7 @@ class _BallShopState extends State<BallShop>
       Navigator.of(context).maybePop();
     } else {
       setState(
-        () => category = (category + (direction > 0 ? 1 : -1)).clamp(0, 3),
+        () => category = (category + (direction > 0 ? 1 : -1)).clamp(0, 2),
       );
     }
   }
@@ -418,18 +415,12 @@ class _BallShopState extends State<BallShop>
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 18),
                 child: MenuTabs(
-                  labels: const [
-                    'Balls',
-                    'Platforms',
-                    'Cabinet Styles',
-                    'Upgrades',
-                  ],
+                  labels: const ['Balls', 'Platforms', 'Upgrades'],
                   selected: category,
                   minimal: true,
                   icons: const [
                     Icons.sports_baseball_outlined,
                     Icons.horizontal_rule_rounded,
-                    Icons.crop_portrait_rounded,
                     Icons.upgrade_rounded,
                   ],
                   onChanged: (value) => setState(() => category = value),
@@ -452,7 +443,6 @@ class _BallShopState extends State<BallShop>
                           [
                             'A new ball. A new world.',
                             'Precision, restyled.',
-                            'Frame your arcade.',
                             'Built for a longer run.',
                           ][category],
                           style: const TextStyle(
@@ -467,7 +457,6 @@ class _BallShopState extends State<BallShop>
                           [
                             '${p.ownedBalls.length} of ${BallCosmetic.values.length} collected · Each ball includes its world.',
                             '${p.ownedPlatforms.length} of ${PlatformStyle.values.length} collected · Same handling. Fresh style.',
-                            '${p.totalStars} Classic stars · Unlock frames as you master levels.',
                             'Permanent Infinite upgrades. Extra hearts apply to your next run; duration upgrades apply to pickups you collect.',
                           ][category],
                           style: const TextStyle(
@@ -519,45 +508,6 @@ class _BallShopState extends State<BallShop>
                               buy: () => setState(() => p.selectPlatform(rail)),
                             ),
                         if (category == 2)
-                          for (final style in CabinetStyle.values)
-                            ShopGalleryCard(
-                              name: style.title,
-                              description: 'Identical handling in every style.',
-                              selected: p.cabinet == style,
-                              status: p.cabinet == style
-                                  ? 'EQUIPPED'
-                                  : p.isUnlocked(style)
-                                  ? 'UNLOCKED'
-                                  : 'CLASSIC REWARD',
-                              detail: '${style.requiredStars} Classic stars',
-                              artHeight: 180,
-                              artwork: ColoredBox(
-                                color: const Color(0xFFC1D1CC),
-                                child: CustomPaint(
-                                  painter: BoardPainter(
-                                    BalanceGame()..cabinet = style,
-                                    reducedMotion: true,
-                                  ),
-                                ),
-                              ),
-                              action: ShopPurchaseButton(
-                                buttonKey: ValueKey('cabinet-${style.name}'),
-                                equipped: p.cabinet == style,
-                                label: p.cabinet == style
-                                    ? 'Equipped'
-                                    : p.isUnlocked(style)
-                                    ? 'Equip'
-                                    : 'Locked',
-                                onPressed:
-                                    p.cabinet == style || !p.isUnlocked(style)
-                                    ? null
-                                    : () {
-                                        setState(() => p.selectCabinet(style));
-                                        p.save();
-                                      },
-                              ),
-                            ),
-                        if (category == 3)
                           for (final upgrade in SurvivalUpgrade.values)
                             collectionUpgrade(upgrade),
                       ],
@@ -756,8 +706,8 @@ class _BallShopState extends State<BallShop>
           ),
           TutorialSpotlight(
             message: p.tutorial.step == TutorialStep.shopBall
-                ? 'Unlock and equip different balls. Tap Equip to try.'
-                : 'Customize your platform and game style. Tap Equip.',
+                ? 'Each ball includes a background. Stronger balls boost Infinite points. Tap Equip on your starter ball.'
+                : 'Platforms add an Infinite point boost. Tap Equip on your starter platform, then browse gear and upgrades.',
             blockOutside: true,
             onSkip: () {
               widget.onSkipTutorial?.call();

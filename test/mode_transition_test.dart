@@ -76,6 +76,8 @@ void main() {
         final preview = tester.getRect(board);
         final boardState = tester.state(board);
         final controlState = tester.state(controller(control));
+        await tester.tap(find.byKey(const ValueKey('menu-play')));
+        await tester.pump();
         final finger = await tester.startGesture(
           contact(tester, game),
           pointer: 72,
@@ -145,6 +147,7 @@ void main() {
         ControlMode.oneFinger,
         size: const Size(390, 844),
       );
+      await armWorld(tester);
       final dynamic state = screen(tester);
       final finger = await tester.startGesture(
         contact(tester, game),

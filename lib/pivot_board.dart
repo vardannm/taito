@@ -13,12 +13,14 @@ class PivotBoard extends StatefulWidget {
     required this.frame,
     this.fillWidth = 0,
     this.showHint = false,
+    this.dimUntilInput = false,
     this.overlay,
   });
   final BalanceGame game;
   final Listenable frame;
   final double fillWidth;
   final bool showHint;
+  final bool dimUntilInput;
   final Widget? overlay;
   @override
   State<PivotBoard> createState() => _PivotBoardState();
@@ -156,6 +158,22 @@ class _PivotBoardState extends State<PivotBoard> {
                 child: const SizedBox.expand(),
               ),
             ),
+            if (widget.dimUntilInput)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: ExcludeSemantics(
+                    child: AnimatedBuilder(
+                      animation: widget.frame,
+                      builder: (context, _) => game.waitingForInput
+                          ? const ColoredBox(
+                              key: ValueKey('infinite-start-dimmer'),
+                              color: Color(0x73000000),
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+                  ),
+                ),
+              ),
             if (widget.showHint &&
                 !game.bottomControls &&
                 !game.oneFinger &&

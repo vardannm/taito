@@ -13,6 +13,8 @@ enum TutorialStep {
   coinsFeedback,
   shield,
   shieldFeedback,
+  magnet,
+  magnetFeedback,
   metrics,
   combo,
   comboFeedback,
@@ -118,10 +120,15 @@ class TutorialRun {
       game.board.add(hole!);
     }
     if (step == TutorialStep.coins) spawnCoin();
-    if (step == TutorialStep.shield || step == TutorialStep.combo)
+    if (step == TutorialStep.shield ||
+        step == TutorialStep.magnet ||
+        step == TutorialStep.combo)
       spawnPickup();
     if (step == TutorialStep.shieldFeedback) {
       game.survival.shield = math.max(game.survival.shield, 3);
+    }
+    if (step == TutorialStep.magnetFeedback) {
+      game.survival.magnet = math.max(game.survival.magnet, 3);
     }
     if (step == TutorialStep.comboFeedback) {
       game.survival.combo = math.max(2, game.survival.combo);
@@ -139,6 +146,8 @@ class TutorialRun {
     pickup = InfiniteItem(
       progress.step == TutorialStep.shield
           ? InfiniteItemKind.shield
+          : progress.step == TutorialStep.magnet
+          ? InfiniteItemKind.magnet
           : InfiniteItemKind.combo,
       game.ballX.clamp(55, 305),
       game.ballY - 90,
@@ -191,6 +200,15 @@ class TutorialRun {
           spawnPickup();
         }
       case TutorialStep.shieldFeedback:
+        if (age >= 2.5) advance(TutorialStep.magnet);
+      case TutorialStep.magnet:
+        if (game.survival.magnet > 0) {
+          advance(TutorialStep.magnetFeedback);
+        } else if (pickup!.y > game.ballY + 32 ||
+            !game.survival.items.contains(pickup)) {
+          spawnPickup();
+        }
+      case TutorialStep.magnetFeedback:
         if (age >= 2.5) advance(TutorialStep.metrics);
       case TutorialStep.metrics:
         if (age >= 2.5 && game.score > 0) advance(TutorialStep.combo);

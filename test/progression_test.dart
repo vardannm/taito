@@ -1,5 +1,6 @@
 import 'support/mode_navigation.dart';
 import 'package:balance_arcade/one_finger_controls.dart';
+import 'package:balance_arcade/control_options.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -58,7 +59,8 @@ void main() {
     await tester.tap(find.byTooltip('Settings'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    await tester.tap(find.text('Two-Finger Control'));
+    await tester.ensureVisible(find.byKey(const ValueKey('control-twoFinger')));
+    await tester.tap(find.byKey(const ValueKey('control-twoFinger')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await tester.ensureVisible(find.byKey(const ValueKey('control-oneFinger')));
@@ -67,7 +69,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     expect(p.controlMode, ControlMode.oneFinger);
     expect(tester.takeException(), isNull);
-    Navigator.of(tester.element(find.text('Make yourself at home.'))).pop();
+    Navigator.of(tester.element(find.byType(ControlOptions))).pop();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await openClassicLevels(tester);
@@ -75,9 +77,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey('level-50')),
-      250,
+      500,
       scrollable: find.byType(Scrollable).last,
-      maxScrolls: 30,
+      maxScrolls: 80,
     );
     await tester.pump(const Duration(milliseconds: 200));
     await Scrollable.ensureVisible(
@@ -177,9 +179,12 @@ void main() {
     }
     expect(
       previous,
-      68 +
-          112 * InfiniteDifficulty.speedGrowth +
-          36 * InfiniteDifficulty.paceGrowth,
+      InfiniteTuning.startSpeed +
+          (InfiniteTuning.baseTopSpeed - InfiniteTuning.startSpeed) *
+              InfiniteDifficulty.speedGrowth +
+          InfiniteTuning.paceSpeedBonus *
+              (InfiniteTuning.maxPace - 1) *
+              InfiniteDifficulty.paceGrowth,
     );
     final a = BalanceGame(seed: 17)..start(gameMode: GameMode.infinite);
     final b = BalanceGame(seed: 17)..start(gameMode: GameMode.infinite);
@@ -300,6 +305,10 @@ void main() {
         ..setControlMode(ControlMode.oneFinger)
         ..start(gameMode: mode);
       g.board.clear(); // Platform travel only; no holes to sink into.
+      if (g.infinite) {
+        g.tutorialCourse = true;
+        g.tutorialAscent = 0;
+      }
       final frame = ValueNotifier(0);
       await tester.pumpWidget(
         MaterialApp(
@@ -323,28 +332,20 @@ void main() {
       await finger.moveBy(Offset(-400 * scale, 0));
       g.step(1 / 120);
       expect(g.right - g.left, closeTo(-140, .001));
-      if (g.infinite) {
-        // Infinite steers one-to-one: the platform tracks the finger exactly,
-        // and a held position adds nothing of its own.
-        final before = (g.left + g.right) / 2;
-        await finger.moveBy(Offset(0, -40 * scale));
-        g.step(1 / 120);
-        expect((g.left + g.right) / 2, lessThan(before - 39));
-      } else {
-        // Levels and mazes hold a stick: pushed up and held, the platform
-        // climbs on its own until it reaches the top of its travel.
-        await finger.moveBy(const Offset(0, -60));
-        for (var i = 0; i < 360; i++) {
-          g.step(1 / 120);
-        }
-        expect(math.min(g.left, g.right), closeTo(g.minPivot, .001));
-        // Pushed the other way it runs all the way back down.
-        await finger.moveBy(const Offset(0, 400));
-        for (var i = 0; i < 720; i++) {
-          g.step(1 / 120);
-        }
-        expect(math.max(g.left, g.right), closeTo(g.maxPivot, .001));
-      }
+      // Both modes track the same drag exactly. No held-stick motor.
+      final before = (g.left + g.right) / 2;
+      await finger.moveBy(Offset(0, -40 * scale));
+      g.step(1 / 120);
+      expect(
+        (g.left + g.right) / 2,
+        closeTo((before - 40).clamp(g.minPivot + 70, g.maxPivot - 70), .001),
+      );
+      await finger.moveBy(const Offset(0, -600));
+      g.step(1 / 120);
+      expect(math.min(g.left, g.right), closeTo(g.minPivot, .001));
+      await finger.moveBy(const Offset(0, 1000));
+      g.step(1 / 120);
+      expect(math.max(g.left, g.right), closeTo(g.maxPivot, .001));
       g.setPaused(true);
       final left = g.left;
       await finger.moveBy(Offset(50, 0));

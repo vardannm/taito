@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:balance_arcade/infinite_music.dart';
 import 'package:balance_arcade/music_output.dart';
 import 'package:balance_arcade/profile.dart';
@@ -36,6 +38,30 @@ class _MusicOutput implements MusicOutput {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'temporary build excludes background tracks and keeps sound effects',
+    () async {
+      expect(InfiniteMusic.bundled, isFalse);
+      for (final asset in [
+        'target.wav',
+        'miss.wav',
+        'complete.wav',
+        'enemy_laserFire.wav',
+      ]) {
+        expect(
+          (await rootBundle.load('assets/audio/$asset')).lengthInBytes,
+          greaterThan(0),
+        );
+      }
+      for (final asset in ['theme_infinite.wav', 'theme_dark.wav']) {
+        await expectLater(
+          rootBundle.load('assets/audio/$asset'),
+          throwsA(isA<FlutterError>()),
+        );
+      }
+    },
+  );
 
   test('a quiet screen never reaches for the audio platform', () async {
     final feedback = GameFeedback();

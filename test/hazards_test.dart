@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/hazards.dart';
+import 'package:balance_arcade/infinite_progress.dart';
 
 void main() {
   test('sweeping laser warns still and detects its own sweep over a ball', () {
@@ -156,13 +157,14 @@ void main() {
     },
   );
   test(
-    'all four milestones introduce their hazards in order without stacking',
+    'distance introduces other hazards; platform cuts also need a million points',
     () {
       final game = BalanceGame()
         ..start(gameMode: GameMode.infinite)
         // Enemy and maze encounters have their own tests; this one is about the
         // ordinary hazard scheduler.
         ..mazeSectionsEnabled = false
+        ..bossesEnabled = false
         ..lateEnemiesEnabled = false
         ..snakeEncountersEnabled = false;
       game.maxHeight = 290;
@@ -171,6 +173,10 @@ void main() {
       final seen = <HazardKind>{};
       for (final height in [4500.0, 10800.0, 15000.0, 22500.0]) {
         game.maxHeight = height;
+        if (height == 22500) {
+          game.survival.points = InfiniteTuning.platformGapUnlockScore
+              .toDouble();
+        }
         for (var i = 0; i < 25 * 120; i++) {
           // Isolate scheduling from traps, ranged spiders and the idle penalty.
           game.board.clear();
@@ -186,6 +192,103 @@ void main() {
       }
       expect(seen, containsAll(HazardKind.values));
       expect(game.finished, isFalse);
+    },
+  );
+  test(
+    'long runs cannot introduce or randomly repeat platform cuts below a million',
+    () {
+      final otherHazards = <HazardKind>{};
+      var hardVariants = 0;
+      for (var seed = 0; seed < 20; seed++) {
+        final game = BalanceGame(seed: seed)
+          ..start(gameMode: GameMode.infinite)
+          ..mazeSectionsEnabled = false
+          ..bossesEnabled = false
+          ..lateEnemiesEnabled = false
+          ..snakeEncountersEnabled = false;
+        game.survival.recovery = 1000;
+        for (final metres in [2250.0, 4290.0, 10000.0]) {
+          game.maxHeight = metres * 10;
+          game.survival.scoredMetres = metres;
+          game.survival.points = InfiniteTuning.platformGapUnlockScore - 1.0;
+          for (var attempt = 0; attempt < 16; attempt++) {
+            game.elapsed += 20;
+            game.specialHazards.clear();
+            game.board.clear();
+            game.spiders.clear();
+            game.porcupines.clear();
+            game.webShots.clear();
+            game.quills.clear();
+            game.stallTime = 0;
+            game.step(1 / 120);
+            expect(game.score, lessThan(InfiniteTuning.platformGapUnlockScore));
+            for (final hazard in game.specialHazards) {
+              expect(hazard.kind, isNot(HazardKind.platformGap));
+              otherHazards.add(hazard.kind);
+              if (hazard.sweeping ||
+                  hazard.zigzag ||
+                  hazard.motion == HazardMotion.circle) {
+                hardVariants++;
+              }
+            }
+          }
+        }
+      }
+      expect(
+        otherHazards,
+        containsAll([
+          HazardKind.formingHole,
+          HazardKind.movingHole,
+          HazardKind.laser,
+        ]),
+      );
+      expect(hardVariants, greaterThan(0));
+    },
+  );
+
+  test(
+    'crossing exactly one million introduces the cut; retry locks it again',
+    () {
+      final game = BalanceGame(seed: 4)
+        ..start(gameMode: GameMode.infinite)
+        ..mazeSectionsEnabled = false
+        ..bossesEnabled = false
+        ..lateEnemiesEnabled = false
+        ..snakeEncountersEnabled = false;
+      game.maxHeight = 22500; // All distance milestones, without hard variants.
+      game.survival.scoredMetres = 2250;
+      game.survival.points = InfiniteTuning.platformGapUnlockScore - 1.0;
+      game.survival.recovery = 1000;
+      void nextHazard() {
+        game.elapsed += 20;
+        game.specialHazards.clear();
+        game.board.clear();
+        game.spiders.clear();
+        game.porcupines.clear();
+        game.webShots.clear();
+        game.quills.clear();
+        game.stallTime = 0;
+        game.step(1 / 120);
+      }
+
+      for (var i = 0; i < 6; i++) {
+        nextHazard();
+        expect(game.specialHazards.single.kind, isNot(HazardKind.platformGap));
+      }
+      game.survival.points = InfiniteTuning.platformGapUnlockScore.toDouble();
+      nextHazard();
+      expect(game.score, InfiniteTuning.platformGapUnlockScore);
+      expect(game.specialHazards.single.kind, HazardKind.platformGap);
+      expect(game.specialHazards.single.warning, isTrue);
+      game.start(gameMode: GameMode.infinite);
+      expect(game.score, 0);
+      expect(game.specialHazards, isEmpty);
+      game.maxHeight = 22500;
+      game.survival.scoredMetres = 2250;
+      for (var i = 0; i < 6; i++) {
+        nextHazard();
+        expect(game.specialHazards.single.kind, isNot(HazardKind.platformGap));
+      }
     },
   );
   test(

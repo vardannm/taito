@@ -6,9 +6,42 @@ import 'menu_design.dart';
 
 /// The intro is storyboarded in milliseconds, so every phase below is written
 /// in the same units and the timeline reads top to bottom.
-const _introMs = 1900;
-const _reducedMs = 700;
-const _exitMs = 1540;
+const _introMs = 2400;
+const _reducedMs = 800;
+const _expandMs = 1860;
+
+/// Taken from the launcher icon, so the intro is that icon coming to life.
+/// The icon art itself is never touched.
+const _plate = Color(0xFF163D3B);
+const _gold = Color(0xFFD9AE65);
+const _hole = Color(0xFF0E2929);
+const _board = Color(0xFFF2ECDD);
+const _boardEdge = Color(0xFFE3E0D2);
+const _ballLight = Color(0xFFF9FAF8);
+const _ballMid = Color(0xFFC3CCC1);
+const _ballDark = Color(0xFF4B6864);
+
+/// The stage is laid out in the icon's own 1024 unit square and scaled to
+/// whatever box it is given, so these are the icon's measurements.
+const _plateInset = 99.5;
+const _plateCorner = 156.0;
+const _plateStroke = 8.0;
+const _boardCenter = Offset(580, 420);
+const _boardHalf = 265.0;
+const _boardHalfThick = 8.25;
+
+/// The icon's own board angle, then the angle it rolls the ball off at.
+const _tiltRest = -0.2009;
+const _tiltRoll = -0.46;
+const _ballRadius = 51.0;
+
+/// Where along the board the ball lands, and where it runs out of board.
+const _landAt = 200.0;
+const _leaveAt = -265.0;
+const _holeCenter = Offset(330, 700);
+const _holeRadius = 80.0;
+const _ringRadius = 137.0;
+const _ringStroke = 29.6;
 
 /// Progress of one phase of the storyboard, 0 before it starts and 1 once it
 /// has run out.
@@ -20,6 +53,14 @@ double _phase(
 ]) => curve.transform(
   ((value * _introMs - startMs) / (endMs - startMs)).clamp(0.0, 1.0),
 );
+
+/// Where the ball sits when it is resting on the board: out along the board by
+/// [along], then off its face by the two radii.
+Offset _ballOnBoard(double tilt, double along) {
+  final dir = Offset(math.cos(tilt), math.sin(tilt));
+  final up = Offset(math.sin(tilt), -math.cos(tilt));
+  return _boardCenter + dir * along + up * (_boardHalfThick + _ballRadius);
+}
 
 /// Holds the intro over the running app until it finishes. The game builds and
 /// loads underneath, so the animation costs no start-up time.
@@ -48,8 +89,9 @@ class _GiltIntroGateState extends State<GiltIntroGate> {
   );
 }
 
-/// The gilt ball drops onto its beam, the beam rocks level, and the wordmark
-/// lands under it. A tap skips ahead to the fade.
+/// The launcher icon, animated: the ball drops onto the icon's board, the board
+/// tips, the ball rolls off into the hole, and the hole opens out over the
+/// screen to hand the game over. A tap skips to the hole.
 class GiltIntro extends StatefulWidget {
   const GiltIntro({super.key, required this.onFinished});
   final VoidCallback onFinished;
@@ -83,11 +125,11 @@ class _GiltIntroState extends State<GiltIntro>
     widget.onFinished();
   }
 
-  /// A skip still plays the fade, so the menu is never cut in abruptly.
+  /// A skip still opens the hole, so the game is never cut in abruptly.
   void skip() {
-    final exit = reduced ? .72 : _exitMs / _introMs;
+    final exit = reduced ? .6 : _expandMs / _introMs;
     if (controller.value >= exit) return;
-    // Setting the value stops the controller, so run the fade out from there.
+    // Setting the value stops the controller, so run the rest from there.
     controller.value = exit;
     controller.forward();
   }
@@ -99,283 +141,293 @@ class _GiltIntroState extends State<GiltIntro>
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: controller,
-    builder: (context, _) {
-      final v = controller.value;
-      final ring = reduced ? 1.0 : _phase(v, 100, 760, Curves.easeOutCubic);
-      final land = reduced ? 1.0 : _phase(v, 160, 720, Curves.easeInCubic);
-      final settle = reduced ? 1.0 : _phase(v, 720, 1450);
-      // A decaying swing, forced to exactly zero so the beam ends dead level.
-      final damp = math.exp(-5.2 * settle) * (1 - settle);
-      final tilt = .085 * math.sin(settle * math.pi * 5) * damp;
-      final word = reduced ? 1.0 : _phase(v, 800, 1280, Curves.easeOutCubic);
-      final tag = reduced ? 1.0 : _phase(v, 1050, 1430, Curves.easeOut);
-      final exit = reduced
-          ? Curves.easeIn.transform(((v - .72) / .28).clamp(0.0, 1.0))
-          : _phase(v, _exitMs, _introMs, Curves.easeIn);
-      final enter = reduced
-          ? Curves.easeOut.transform((v / .25).clamp(0.0, 1.0))
-          : 1.0;
-      final spacing = 9 + (1 - word) * 13;
-      return Opacity(
-        opacity: (1 - exit) * enter,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: skip,
-          child: ColoredBox(
-            color: menuBackground,
-            child: Center(
-              child: Transform.scale(
-                scale: 1 + exit * .06,
-                // A short viewport shrinks the mark rather than clipping it.
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox.square(
-                        dimension: 132,
-                        child: CustomPaint(
-                          painter: _GiltMarkPainter(
-                            ring: ring,
-                            land: land,
-                            tilt: tilt,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 26),
-                      Opacity(
-                        opacity: word,
-                        child: Transform.translate(
-                          offset: Offset(0, (1 - word) * 10),
-                          child: Padding(
-                            // Letter spacing trails the last glyph; shifting by
-                            // one step puts the wordmark back on the axis.
-                            padding: EdgeInsets.only(left: spacing),
-                            child: Text(
-                              'GILT',
-                              style: TextStyle(
-                                fontFamily: 'sans-serif',
-                                color: menuText,
-                                fontSize: 37,
-                                height: 1.15,
-                                fontWeight: FontWeight.w300,
-                                letterSpacing: spacing,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Opacity(
-                        opacity: tag,
-                        child: const Padding(
-                          padding: EdgeInsets.only(left: 2.6),
-                          child: Text(
-                            'THE ART OF BALANCE',
-                            style: TextStyle(
-                              color: menuMuted,
-                              fontSize: 9,
-                              letterSpacing: 2.6,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+  Widget build(BuildContext context) => Semantics(
+    label: 'GILT',
+    container: true,
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: skip,
+      child: AnimatedBuilder(
+        animation: controller,
+        builder: (context, _) {
+          final v = controller.value;
+          if (reduced) {
+            // One still of the icon, held briefly and handed over.
+            final fade =
+                Curves.easeOut.transform((v / .3).clamp(0.0, 1.0)) *
+                (1 -
+                    Curves.easeIn.transform(((v - .72) / .28).clamp(0.0, 1.0)));
+            return CustomPaint(
+              painter: _IntroPainter(
+                plate: 1,
+                board: 1,
+                ring: 1,
+                tilt: _tiltRest,
+                ball: _ballOnBoard(_tiltRest, _landAt),
+                ballIn: 1,
+                grow: 1,
+                word: 1,
+                fade: fade,
               ),
+            );
+          }
+          final plate = _phase(v, 0, 320, Curves.easeOutCubic);
+          final ring = _phase(v, 120, 420, Curves.easeOutCubic);
+          final board = _phase(v, 180, 480, Curves.easeOutCubic);
+          final fall = _phase(v, 420, 880, Curves.easeInCubic);
+          // The board takes the hit, then swings itself quiet again.
+          final hit = _phase(v, 880, 1180);
+          final damp = math.exp(-5 * hit) * (1 - hit);
+          final turn = _phase(v, 1040, 1620, Curves.easeInOutCubic);
+          final roll = _phase(v, 1040, 1620, Curves.easeInQuad);
+          final drop = _phase(v, 1620, 1880, Curves.easeInQuad);
+          final open = _phase(v, _expandMs, 2280, Curves.easeInOutCubic);
+          final word = _phase(v, 700, 1100, Curves.easeOutCubic);
+
+          final tilt =
+              _tiltRest +
+              (_tiltRoll - _tiltRest) * turn +
+              .035 * math.sin(hit * math.pi * 4) * damp;
+          final resting = _ballOnBoard(
+            tilt,
+            _landAt + (_leaveAt - _landAt) * roll,
+          );
+          final ball = drop > 0
+              ? Offset.lerp(
+                  _ballOnBoard(_tiltRoll, _leaveAt),
+                  // Far enough in to be out of sight under the rim.
+                  _holeCenter + const Offset(0, 20),
+                  drop,
+                )!
+              : Offset(resting.dx, resting.dy - (1 - fall) * 1150);
+
+          return CustomPaint(
+            painter: _IntroPainter(
+              plate: plate,
+              board: board,
+              ring: ring,
+              tilt: tilt,
+              ball: ball,
+              ballIn: fall,
+              grow: open,
+              word: word * (1 - _phase(v, 2180, _introMs, Curves.easeIn)),
+              fade: 1,
             ),
-          ),
-        ),
-      );
-    },
+          );
+        },
+      ),
+    ),
   );
 }
 
-/// The mark: a gilt ball resting on a fulcrum beam inside a closing ring. Laid
-/// out in a 132 unit square and scaled to whatever box it is given.
-class _GiltMarkPainter extends CustomPainter {
-  _GiltMarkPainter({
+class _IntroPainter extends CustomPainter {
+  _IntroPainter({
+    required this.plate,
+    required this.board,
     required this.ring,
-    required this.land,
     required this.tilt,
+    required this.ball,
+    required this.ballIn,
+    required this.grow,
+    required this.word,
+    required this.fade,
   });
 
-  /// How far the ring has closed, how far the ball has fallen, and the beam
-  /// angle in radians.
-  final double ring, land, tilt;
+  /// How far each piece has arrived, the board angle, the ball's place on the
+  /// stage, how far the hole has opened, and the two opacities.
+  final double plate, board, ring, tilt, ballIn, grow, word, fade;
+  final Offset ball;
 
-  static const _pivot = Offset(66, 88);
-  static const _ringCenter = Offset(66, 66);
-  static const _ringRadius = 58.0;
-  static const _beamHalf = 40.0;
-  static const _beamHalfThick = 3.0;
-  static const _ballRadius = 15.5;
+  static final _word = TextPainter(textDirection: TextDirection.ltr);
 
   @override
   void paint(Canvas canvas, Size size) {
+    canvas.drawRect(Offset.zero & size, Paint()..color = menuBackground);
+    if (fade <= 0) return;
+    // The icon sits a little above centre to leave the wordmark its room.
+    final stage = math.min(size.width * .82, size.height * .46);
+    final origin = Offset(
+      (size.width - stage) / 2,
+      (size.height - stage) / 2 - stage * .1,
+    );
+    final unit = stage / 1024;
+    final holeAt = origin + _holeCenter * unit;
+    // Opening all the way means reaching the furthest corner of the screen.
+    final full = [
+      Offset.zero,
+      Offset(size.width, 0),
+      Offset(0, size.height),
+      Offset(size.width, size.height),
+    ].map((corner) => (corner - holeAt).distance).reduce(math.max);
+    final open = _holeRadius * unit + (full - _holeRadius * unit) * grow;
+
+    if (fade < 1) canvas.saveLayer(Offset.zero & size, _alpha(fade));
     canvas.save();
-    canvas.scale(size.shortestSide / 132);
-    final ball = Offset.lerp(
-      const Offset(66, -26),
-      _pivot + _rotate(const Offset(0, -(_beamHalfThick + _ballRadius)), tilt),
-      land,
-    )!;
+    canvas.translate(origin.dx, origin.dy);
+    canvas.scale(unit);
+    _paintPlate(canvas);
+    _paintBoard(canvas);
     _paintRing(canvas);
-    _paintBeam(canvas);
-    _paintContact(canvas, ball);
-    _paintBall(canvas, ball);
+    _paintBall(canvas);
+    canvas.restore();
+    // Drawn over the stage in screen space: this is what swallows the ball and
+    // then the icon, and it lands on the menu's own colour.
+    canvas.drawCircle(
+      holeAt,
+      open,
+      Paint()..color = Color.lerp(_hole, menuBackground, grow)!,
+    );
+    _paintRim(canvas, holeAt, open, unit);
+    _paintWord(canvas, size, origin, stage);
+    if (fade < 1) canvas.restore();
+  }
+
+  Paint _alpha(double value) =>
+      Paint()..color = Colors.white.withValues(alpha: value);
+
+  void _paintPlate(Canvas canvas) {
+    if (plate <= 0) return;
+    canvas.save();
+    canvas.translate(512, 512);
+    canvas.scale(.93 + .07 * plate);
+    canvas.translate(-512, -512);
+    final shape = RRect.fromRectAndRadius(
+      const Rect.fromLTRB(
+        _plateInset,
+        _plateInset,
+        1024 - _plateInset,
+        1024 - _plateInset,
+      ),
+      const Radius.circular(_plateCorner),
+    );
+    canvas.drawRRect(shape, Paint()..color = _plate.withValues(alpha: plate));
+    canvas.drawRRect(
+      shape,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = _plateStroke
+        ..color = _gold.withValues(alpha: plate),
+    );
     canvas.restore();
   }
 
+  /// The icon's gold ring, while the hole is still the icon's hole.
   void _paintRing(Canvas canvas) {
+    if (ring <= 0 || grow > 0) return;
     canvas.drawCircle(
-      _ringCenter,
+      _holeCenter,
       _ringRadius,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.4
-        ..color = menuLine.withValues(alpha: .7),
-    );
-    if (ring <= 0) return;
-    canvas.drawArc(
-      Rect.fromCircle(center: _ringCenter, radius: _ringRadius),
-      -math.pi / 2,
-      math.pi * 2 * ring,
-      false,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.6
-        ..strokeCap = StrokeCap.round
-        ..color = menuGold,
-    );
-    if (ring >= 1) return;
-    final head = -math.pi / 2 + math.pi * 2 * ring;
-    canvas.drawCircle(
-      _ringCenter + Offset(math.cos(head), math.sin(head)) * _ringRadius,
-      3.2,
-      Paint()..color = menuGold,
+        ..strokeWidth = _ringStroke
+        ..color = _gold.withValues(alpha: ring),
     );
   }
 
-  void _paintBeam(Canvas canvas) {
-    // The fulcrum stands still; only the beam above it swings.
-    final base = Path()
-      ..moveTo(_pivot.dx, _pivot.dy)
-      ..lineTo(_pivot.dx - 9.5, _pivot.dy + 14)
-      ..lineTo(_pivot.dx + 9.5, _pivot.dy + 14)
-      ..close();
-    canvas.drawPath(
-      base,
-      Paint()..color = Color.lerp(menuGold, menuBackground, .45)!,
-    );
-    canvas.drawPath(
-      base,
+  /// Once the hole opens, the same ring becomes its rim: it closes the icon's
+  /// gap onto the edge and rides outwards with it.
+  void _paintRim(Canvas canvas, Offset at, double open, double unit) {
+    if (ring <= 0 || grow <= 0) return;
+    final gap = (_ringRadius - _holeRadius) * unit * (1 - grow);
+    canvas.drawCircle(
+      at,
+      open + gap,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.3
-        ..color = menuGold,
+        ..strokeWidth = _ringStroke * unit
+        ..color = _gold.withValues(alpha: ring * (1 - grow * grow)),
     );
-    canvas.drawLine(
-      Offset(_pivot.dx - 14, _pivot.dy + 14.7),
-      Offset(_pivot.dx + 14, _pivot.dy + 14.7),
-      Paint()
-        ..strokeWidth = 1.8
-        ..strokeCap = StrokeCap.round
-        ..color = menuGold,
-    );
+  }
+
+  void _paintBoard(Canvas canvas) {
+    if (board <= 0) return;
     canvas.save();
-    canvas.translate(_pivot.dx, _pivot.dy);
+    canvas.translate(_boardCenter.dx, _boardCenter.dy);
     canvas.rotate(tilt);
-    const bar = Rect.fromLTRB(
-      -_beamHalf,
-      -_beamHalfThick,
-      _beamHalf,
-      _beamHalfThick,
+    final length = _boardHalf * board;
+    final bar = Rect.fromLTRB(
+      -length,
+      -_boardHalfThick,
+      length,
+      _boardHalfThick,
     );
     canvas.drawRRect(
-      RRect.fromRectAndRadius(bar, const Radius.circular(3)),
-      // Lit from above, the way the ball is.
+      RRect.fromRectAndRadius(bar, const Radius.circular(_boardHalfThick)),
       Paint()
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [menuText, menuMuted, Color.lerp(menuLine, menuText, .15)!],
+          colors: [_board, _board, _boardEdge],
         ).createShader(bar),
     );
     canvas.restore();
   }
 
-  /// A shadow that tightens under the ball as it arrives.
-  void _paintContact(Canvas canvas, Offset ball) {
-    if (land <= 0) return;
-    canvas.save();
-    canvas.translate(_pivot.dx, _pivot.dy);
-    canvas.rotate(tilt);
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: const Offset(0, -_beamHalfThick + .6),
-        width: 30 - land * 12,
-        height: 5,
-      ),
-      Paint()
-        ..color = menuBackground.withValues(alpha: .3 + land * .35)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.2),
-    );
-    canvas.restore();
-  }
-
-  void _paintBall(Canvas canvas, Offset center) {
+  void _paintBall(Canvas canvas) {
+    if (ballIn <= 0) return;
+    // A shadow on the board that tightens as the ball arrives.
+    if (ballIn < 1) {
+      canvas.save();
+      canvas.translate(_boardCenter.dx, _boardCenter.dy);
+      canvas.rotate(tilt);
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: Offset(_landAt, -_boardHalfThick),
+          width: 150 - 60 * ballIn,
+          height: 18,
+        ),
+        Paint()
+          ..color = _plate.withValues(alpha: .22 * ballIn)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
+      );
+      canvas.restore();
+    }
     canvas.drawCircle(
-      center,
-      _ballRadius * 1.7,
-      // Gold laid over near-black at low alpha only turns grey; adding light
-      // keeps the halo gold.
-      Paint()
-        ..blendMode = BlendMode.plus
-        ..shader =
-            RadialGradient(
-              colors: [
-                menuGold.withValues(alpha: .2 * land),
-                menuGold.withValues(alpha: 0),
-              ],
-            ).createShader(
-              Rect.fromCircle(center: center, radius: _ballRadius * 1.7),
-            ),
-    );
-    canvas.drawCircle(
-      center,
+      ball,
       _ballRadius,
       Paint()
-        ..shader = RadialGradient(
-          center: const Alignment(-.4, -.5),
+        ..shader = const RadialGradient(
+          center: Alignment(-.38, -.45),
           radius: .95,
-          colors: [
-            Color.lerp(menuGold, Colors.white, .8)!,
-            menuGold,
-            Color.lerp(menuGold, menuBackground, .62)!,
-          ],
-        ).createShader(Rect.fromCircle(center: center, radius: _ballRadius)),
-    );
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: center + const Offset(-4.6, -5.4),
-        width: 8.4,
-        height: 5.6,
-      ),
-      Paint()..color = Colors.white.withValues(alpha: .55),
+          colors: [_ballLight, _ballMid, _ballDark],
+        ).createShader(Rect.fromCircle(center: ball, radius: _ballRadius)),
     );
   }
 
-  Offset _rotate(Offset point, double angle) => Offset(
-    point.dx * math.cos(angle) - point.dy * math.sin(angle),
-    point.dx * math.sin(angle) + point.dy * math.cos(angle),
-  );
+  void _paintWord(Canvas canvas, Size size, Offset origin, double stage) {
+    if (word <= 0) return;
+    final spacing = stage * .028;
+    _word
+      ..text = TextSpan(
+        text: 'GILT',
+        style: TextStyle(
+          fontFamily: 'sans-serif',
+          color: menuText.withValues(alpha: word),
+          fontSize: stage * .125,
+          fontWeight: FontWeight.w300,
+          letterSpacing: spacing,
+        ),
+      )
+      ..layout();
+    _word.paint(
+      canvas,
+      Offset(
+        // Letter spacing trails the last glyph; half a step back re-centres it.
+        (size.width - _word.width) / 2 + spacing / 2,
+        origin.dy + stage + stage * .11,
+      ),
+    );
+  }
 
   @override
-  bool shouldRepaint(_GiltMarkPainter old) =>
-      old.ring != ring || old.land != land || old.tilt != tilt;
+  bool shouldRepaint(_IntroPainter old) =>
+      old.plate != plate ||
+      old.board != board ||
+      old.ring != ring ||
+      old.tilt != tilt ||
+      old.ball != ball ||
+      old.ballIn != ballIn ||
+      old.grow != grow ||
+      old.word != word ||
+      old.fade != fade;
 }

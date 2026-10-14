@@ -25,6 +25,18 @@ void pullFor(BalanceGame g, int ticks) {
 }
 
 void main() {
+  test('magnet pickup starts its timer without a text announcement', () {
+    final g = cleanRun();
+    g.survival.notice = '';
+    g.survival.noticeTime = 0;
+    g.survival.items.add(
+      InfiniteItem(InfiniteItemKind.magnet, g.ballX, g.ballY),
+    );
+    tick(g);
+    expect(g.survival.magnet, InfiniteTuning.magnetSeconds);
+    expect(g.survival.notice, isEmpty);
+    expect(g.survival.noticeTime, 0);
+  });
   test('smaller magnet pulls only rewards inside its visible radius', () {
     for (final ball in [BallCosmetic.steel, BallCosmetic.singularity]) {
       final g = cleanRun(ball: ball)..survival.magnet = 10;

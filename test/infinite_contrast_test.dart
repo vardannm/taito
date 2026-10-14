@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/game.dart';
+import 'package:balance_arcade/ball_cosmetics.dart';
 import 'package:balance_arcade/rewards.dart';
 import 'package:balance_arcade/spiders.dart';
 import 'package:balance_arcade/spider_painter.dart';
@@ -9,6 +10,7 @@ import 'package:balance_arcade/infinite_painter.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'start_flow_test.dart' show launch, contact;
+import 'support/mode_navigation.dart' show armWorld;
 
 double contrast(Color a, Color b) {
   final x = a.computeLuminance(), y = b.computeLuminance();
@@ -48,7 +50,9 @@ void main() {
   );
 
   test('web strands switch from dark to light with the actual field', () {
-    final game = BalanceGame()..start(gameMode: GameMode.infinite);
+    final game = BalanceGame()
+      ..cosmetic = BallCosmetic.coral
+      ..start(gameMode: GameMode.infinite);
     game.spiders
       ..clear()
       ..add(BoardSpider(180, 280, 45));
@@ -70,6 +74,7 @@ void main() {
     SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty();
     final game = await launch(tester, ControlMode.twoFinger);
+    await armWorld(tester);
     await tester.tapAt(contact(tester, game));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));

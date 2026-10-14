@@ -37,6 +37,9 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.text('A game of balance.'), findsOneWidget);
+      expect(find.text('One finger. Full control.'), findsOneWidget);
+      expect(find.text('Merge: grow your number.'), findsOneWidget);
+      expect(find.textContaining('unlock cabinet styles'), findsNothing);
       await tester.ensureVisible(find.text('TRY PRACTICE'));
       await tester.pump();
       await tester.tap(find.text('TRY PRACTICE'));

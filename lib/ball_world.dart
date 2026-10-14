@@ -22,11 +22,11 @@ class BallWorld {
 
   static BallWorld of(BallCosmetic ball) => switch (ball) {
     BallCosmetic.steel => const BallWorld(
-      'Clockwork Hall',
-      'Champagne arches in an Art Deco pavilion',
-      Color(0xFFF4ECDB),
-      Color(0xFFBBCBC7),
-      Color(0xFF617E80),
+      'Steel Atelier',
+      'Midnight teal, soft light and brushed silver',
+      Color(0xFF122B35),
+      Color(0xFF244B52),
+      Color(0xFF91C7C5),
     ),
     BallCosmetic.coral => const BallWorld(
       'Coral Lagoon',

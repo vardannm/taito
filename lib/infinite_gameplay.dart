@@ -583,9 +583,6 @@ extension InfiniteGameplay on BalanceGame {
         );
       case InfiniteItemKind.magnet:
         survival.magnet = magnetDuration;
-        survival.announce(
-          'MAGNET · ${magnetDuration} seconds of nearby rewards',
-        );
       case InfiniteItemKind.heart:
         if (lives < infiniteMaxLives) {
           lives++;

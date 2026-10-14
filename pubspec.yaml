@@ -22,6 +22,31 @@ flutter:
   uses-material-design: true
   assets:
     - assets/privacy/policy.json
-    - assets/audio/
+    # Background music temporarily excluded. Keep the original WAV tracks on
+    # disk for restoration; ship only sound effects in this lightweight build.
+    - assets/audio/complete.wav
+    - assets/audio/enemy_bombThrow.wav
+    - assets/audio/enemy_bounce.wav
+    - assets/audio/enemy_bullet.wav
+    - assets/audio/enemy_colossusArrival.wav
+    - assets/audio/enemy_cometCharge.wav
+    - assets/audio/enemy_cometFire.wav
+    - assets/audio/enemy_crystal.wav
+    - assets/audio/enemy_insectArrival.wav
+    - assets/audio/enemy_laserCharge.wav
+    - assets/audio/enemy_laserFire.wav
+    - assets/audio/enemy_mineCharge.wav
+    - assets/audio/enemy_mineFire.wav
+    - assets/audio/enemy_petal.wav
+    - assets/audio/enemy_poolLand.wav
+    - assets/audio/enemy_quills.wav
+    - assets/audio/enemy_ricochet.wav
+    - assets/audio/enemy_seraphArrival.wav
+    - assets/audio/enemy_snakeHiss.wav
+    - assets/audio/enemy_wardenArrival.wav
+    - assets/audio/enemy_web.wav
+    - assets/audio/enemy_wingArrival.wav
+    - assets/audio/miss.wav
+    - assets/audio/target.wav
     - assets/mode_previews/
 

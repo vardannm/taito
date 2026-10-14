@@ -1,6 +1,9 @@
 /// Changes tempo without restarting the recording. Active gameplay time and
 /// height-based pace both increase pressure; pauses advance neither input.
 abstract final class InfiniteMusic {
+  // Temporary lightweight build. The original tracks remain in the workspace
+  // but are excluded from pubspec assets; restore those entries before enabling.
+  static const bundled = false;
   static const asset = 'audio/theme_infinite.wav';
   static const sourceBpm = 127.0;
   static const openingRate = 1.06, maximumRate = 1.30;

@@ -15,17 +15,20 @@ Widget gate({bool reducedMotion = false}) => MaterialApp(
 
 void main() {
   testWidgets('the intro covers the app, then hands it over', (tester) async {
+    final semantics = tester.ensureSemantics();
     await tester.pumpWidget(gate());
     expect(find.byType(GiltIntro), findsOneWidget);
-    expect(find.text('GILT'), findsOneWidget);
+    // The wordmark is painted, so it shows up as the intro's semantic label.
+    expect(find.bySemanticsLabel('GILT'), findsOneWidget);
 
-    await tester.pump(const Duration(milliseconds: 1000));
+    await tester.pump(const Duration(milliseconds: 1500));
     expect(find.byType(GiltIntro), findsOneWidget);
 
     await tester.pumpAndSettle();
     expect(find.byType(GiltIntro), findsNothing);
     expect(find.text('menu'), findsOneWidget);
     expect(tester.takeException(), isNull);
+    semantics.dispose();
   });
 
   testWidgets('a tap skips to the fade', (tester) async {
@@ -33,13 +36,13 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.byType(GiltIntro));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 700));
     expect(find.byType(GiltIntro), findsNothing);
   });
 
   testWidgets('reduced motion keeps it brief', (tester) async {
     await tester.pumpWidget(gate(reducedMotion: true));
-    await tester.pump(const Duration(milliseconds: 800));
+    await tester.pump(const Duration(milliseconds: 900));
     expect(find.byType(GiltIntro), findsNothing);
     expect(find.text('menu'), findsOneWidget);
   });
