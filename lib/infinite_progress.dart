@@ -73,7 +73,22 @@ abstract final class InfiniteTuning {
   static const heartSpacingJitter =
       InfiniteDifficulty.heartSpacingJitterMetres * 10;
   static const maxItems = 12;
-  static int startingPace(int bestMetres) => 1;
+  static const fastStartUnlockScore = 300000;
+  static const fastStartScoreStep = 30000;
+  static const fastStartSpeedStep = .05, maxStartingSpeedMultiplier = 2.5;
+  static const fastStartEaseSeconds = 2.5;
+
+  /// Add 5% of the original opening speed per 30,000 points above 300,000.
+  /// Fractional progress keeps personal-best improvements smooth.
+  static double startingSpeedMultiplier(int bestScore) =>
+      (1 +
+              math.max(0, bestScore - fastStartUnlockScore) /
+                  fastStartScoreStep *
+                  fastStartSpeedStep)
+          .clamp(1.0, maxStartingSpeedMultiplier);
+
+  static double startingPace(int bestScore) =>
+      startingSpeedMultiplier(bestScore);
 }
 
 enum InfiniteItemKind { combo, shield, heart, magnet }
@@ -85,9 +100,9 @@ class InfiniteItem {
 }
 
 class InfiniteProgress {
-  InfiniteProgress({int startingPace = 1, this.scoreBoost = 1})
+  InfiniteProgress({double startingPace = 1, this.scoreBoost = 1})
     : startingPace = startingPace.clamp(1, 3);
-  final int startingPace;
+  final double startingPace;
   final double scoreBoost;
   int combo = 1, bestCombo = 1, damageSerial = 0;
   double shield = 0, recovery = 0, points = 0, scoredMetres = 0;
@@ -108,11 +123,9 @@ class InfiniteProgress {
     return .35 + .65 * (1 + math.cos(age * math.pi * 4)) / 2;
   }
 
-  double paceAt(double metres) =>
-      (startingPace + metres / InfiniteTuning.metresPerPace).clamp(
-        1.0,
-        InfiniteTuning.maxPace.toDouble(),
-      );
+  double paceAt(double metres) => math
+      .max(startingPace, 1 + metres / InfiniteTuning.metresPerPace)
+      .clamp(1.0, InfiniteTuning.maxPace.toDouble());
   int levelAt(double metres) => paceAt(metres).floor();
   void step(double dt, double metres) {
     shield = math.max(0, shield - dt);

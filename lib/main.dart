@@ -582,9 +582,7 @@ class _GameScreenState extends State<GameScreen>
     game.cabinet = profile.cabinet;
     game.analogSensitivity = profile.analogSensitivity;
     game.twoFingerSensitivity = profile.twoFingerSensitivity;
-    game.infiniteStartingPace = InfiniteTuning.startingPace(
-      profile.infiniteBest,
-    );
+    profile.applyInfiniteStart(game, tutorial: tutorialActive);
     newUnlocks = [];
     game.start(
       gameMode: mode,
@@ -927,9 +925,7 @@ class _GameScreenState extends State<GameScreen>
     game.cabinet = profile.cabinet;
     game.analogSensitivity = profile.analogSensitivity;
     game.twoFingerSensitivity = profile.twoFingerSensitivity;
-    game.infiniteStartingPace = InfiniteTuning.startingPace(
-      profile.infiniteBest,
-    );
+    profile.applyInfiniteStart(game, tutorial: tutorialActive);
     game.start(
       gameMode: arcadeModes[index],
       levelNumber: worldLevel(index),
@@ -3443,6 +3439,29 @@ class _GameScreenState extends State<GameScreen>
                     ],
                   ),
                 ),
+                if (profile.infiniteBestScore >
+                    InfiniteTuning.fastStartUnlockScore) ...[
+                  const SizedBox(height: 26),
+                  const MenuSection('Infinite'),
+                  const SizedBox(height: 12),
+                  MenuToggle(
+                    key: const ValueKey('infinite-fast-start'),
+                    title: 'Faster start',
+                    icon: Icons.speed_rounded,
+                    subtitle:
+                        'Start up to ${InfiniteTuning.startingSpeedMultiplier(profile.infiniteBestScore).toStringAsFixed(2)}× faster with a higher pace. Turn off for a relaxed opening. Applies to your next run.',
+                    value: profile.infiniteFastStart,
+                    onChanged: (value) {
+                      update(() => profile.infiniteFastStart = value);
+                      setState(() {
+                        if (game.infinite && game.waitingForInput) {
+                          prepareInfinite(retry: readyRetry);
+                        }
+                      });
+                      unawaited(profile.save());
+                    },
+                  ),
+                ],
                 const SizedBox(height: 26),
                 const MenuSection('Feel & sound'),
                 const SizedBox(height: 12),

@@ -54,7 +54,9 @@ class BalanceGame {
   math.Random? _previewRandom;
   math.Random get _random => _previewRandom ?? _runRandom;
   InfiniteProgress survival = InfiniteProgress();
-  int infiniteStartingPace = 1;
+  double infiniteStartingPace = 1;
+  double infiniteStartingSpeedMultiplier = 1;
+  double _runStartingSpeedMultiplier = 1;
   int infiniteMaxLives = InfiniteTuning.maxLives;
   double shieldDuration = InfiniteTuning.shieldSeconds;
   double magnetDuration = InfiniteTuning.magnetSeconds;
@@ -363,16 +365,29 @@ class BalanceGame {
   }
 
   double get difficulty => difficultyAt(maxHeight / 10);
-  double get ascentSpeed =>
-      InfiniteTuning.startSpeed +
-      (InfiniteTuning.baseTopSpeed - InfiniteTuning.startSpeed) *
-          difficulty *
-          InfiniteDifficulty.speedGrowth +
-      (infinite
-          ? InfiniteTuning.paceSpeedBonus *
-                (pace - 1) *
-                InfiniteDifficulty.paceGrowth
-          : 0);
+  double get ascentSpeed {
+    final normalSpeed =
+        InfiniteTuning.startSpeed +
+        (InfiniteTuning.baseTopSpeed - InfiniteTuning.startSpeed) *
+            difficulty *
+            InfiniteDifficulty.speedGrowth +
+        (infinite
+            ? InfiniteTuning.paceSpeedBonus *
+                  (pace - 1) *
+                  InfiniteDifficulty.paceGrowth
+            : 0);
+    if (!infinite || tutorialCourse || _runStartingSpeedMultiplier <= 1) {
+      return normalSpeed;
+    }
+    final t = (elapsed / InfiniteTuning.fastStartEaseSeconds).clamp(0.0, 1.0);
+    final ease = t * t * (3 - 2 * t);
+    final openingSpeed =
+        InfiniteTuning.startSpeed *
+        (1 + (_runStartingSpeedMultiplier - 1) * ease);
+    // Normal progression catches up to this floor; the late-run ceiling stays.
+    return math.max(normalSpeed, openingSpeed);
+  }
+
   final specialHazards = <SpecialHazard>[];
 
   /// Infinite's laser maze interludes: a stretch where the hole stream stops
@@ -848,8 +863,14 @@ class BalanceGame {
     // A mode switch releases the previous mode's generated world. These
     // objects own no tickers; the screen drives only this active simulation.
     if (!merging) _mergeRun = null;
+    _runStartingSpeedMultiplier = infinite
+        ? infiniteStartingSpeedMultiplier.clamp(
+            1.0,
+            InfiniteTuning.maxStartingSpeedMultiplier,
+          )
+        : 1;
     survival = InfiniteProgress(
-      startingPace: infiniteStartingPace,
+      startingPace: infinite ? infiniteStartingPace : 1,
       scoreBoost: equipmentMultiplier,
     );
     controlMode = preferredControlMode;

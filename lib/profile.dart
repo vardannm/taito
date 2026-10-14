@@ -16,6 +16,7 @@ import 'onboarding.dart';
 import 'daily_prizes.dart';
 import 'achievements.dart';
 import 'survival_upgrades.dart';
+import 'infinite_progress.dart';
 
 class PlayerProfile {
   PlayerProfile({
@@ -37,6 +38,15 @@ class PlayerProfile {
   late final SharedPreferencesAsync storage = SharedPreferencesAsync();
   int best = 0, runs = 0;
   int infiniteBest = 0, infiniteRuns = 0, infiniteBestScore = 0;
+  bool infiniteFastStart = true;
+
+  void applyInfiniteStart(BalanceGame game, {bool tutorial = false}) {
+    final bestScore = infiniteFastStart && !tutorial ? infiniteBestScore : 0;
+    game.infiniteStartingPace = InfiniteTuning.startingPace(bestScore);
+    game.infiniteStartingSpeedMultiplier =
+        InfiniteTuning.startingSpeedMultiplier(bestScore);
+  }
+
   int wallet = 0;
   final survivalUpgrades = <SurvivalUpgrade, int>{};
   int upgradeLevel(SurvivalUpgrade upgrade) => survivalUpgrades[upgrade] ?? 0;
@@ -510,6 +520,8 @@ class PlayerProfile {
       mergeRuns = await storage.getInt('gilt.merge.runs') ?? 0;
       infiniteBest = await storage.getInt('gilt.ascent.best') ?? 0;
       infiniteRuns = await storage.getInt('gilt.ascent.runs') ?? 0;
+      infiniteFastStart =
+          await storage.getBool('gilt.ascent.fastStart') ?? true;
       sound = await storage.getBool('gilt.sound') ?? true;
       // Preserve an existing player's mute preference when migrating.
       music = await storage.getBool('gilt.music') ?? sound;
@@ -550,6 +562,7 @@ class PlayerProfile {
       await storage.setInt('gilt.runs', runs);
       await storage.setInt('gilt.ascent.best', infiniteBest);
       await storage.setInt('gilt.ascent.runs', infiniteRuns);
+      await storage.setBool('gilt.ascent.fastStart', infiniteFastStart);
       await storage.setBool('gilt.sound', sound);
       await storage.setBool('gilt.music', music);
       await storage.setBool('gilt.haptics', haptics);

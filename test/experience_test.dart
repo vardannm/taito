@@ -60,9 +60,12 @@ void main() {
       }
       expect(
         previous,
-        68 +
-            112 * InfiniteDifficulty.speedGrowth +
-            36 * InfiniteDifficulty.paceGrowth,
+        InfiniteTuning.startSpeed +
+            (InfiniteTuning.baseTopSpeed - InfiniteTuning.startSpeed) *
+                InfiniteDifficulty.speedGrowth +
+            InfiniteTuning.paceSpeedBonus *
+                (InfiniteTuning.maxPace - 1) *
+                InfiniteDifficulty.paceGrowth,
       );
       expect(InfiniteTuning.difficultyAt(900), lessThan(.35));
       expect(InfiniteTuning.difficultyAt(2400), 1);
@@ -71,7 +74,7 @@ void main() {
       expect(InfiniteTuning.runDensity(60000, 2400), 1);
       expect(InfiniteTuning.complexityAt(2400), 0);
       expect(InfiniteTuning.complexityAt(4200), 1);
-      expect(InfiniteTuning.startingPace(999999), 1);
+      expect(InfiniteTuning.startingPace(999999), closeTo(13 / 6, .00001));
     },
   );
   test(
