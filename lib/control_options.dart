@@ -116,7 +116,7 @@ class _ControlOptionsState extends State<ControlOptions>
                           child: Text(
                             switch (mode) {
                               ControlMode.twoFinger =>
-                                'Drag each platform end. Lift together, or tilt independently.',
+                                'Drag the handles below the platform to keep the ball visible. Lift together, or tilt independently.',
                               ControlMode.oneFinger =>
                                 'Use the thumb area below the board. Drag sideways to tilt, up or down to move.',
                               ControlMode.analog =>
@@ -222,8 +222,17 @@ class _ControlDemo extends CustomPainter {
     }
 
     if (mode == ControlMode.twoFinger) {
-      finger(a);
-      finger(b);
+      for (final pivot in [a, b]) {
+        final handle = pivot + const Offset(0, 26);
+        c.drawLine(
+          pivot,
+          handle,
+          Paint()
+            ..color = menuGold
+            ..strokeWidth = 1.5,
+        );
+        finger(handle);
+      }
     }
     if (mode == ControlMode.tiltLift) {
       final track = Paint()

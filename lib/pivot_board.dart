@@ -28,11 +28,13 @@ class PivotBoard extends StatefulWidget {
 
 class _PivotBoardState extends State<PivotBoard> {
   final pointers = <int, int>{};
+  final gripOffsets = <int, double>{};
   int epoch = -1;
 
   void synchronize() {
     if (epoch != widget.game.inputEpoch) {
       pointers.clear();
+      gripOffsets.clear();
       epoch = widget.game.inputEpoch;
     }
   }
@@ -89,7 +91,10 @@ class _PivotBoardState extends State<PivotBoard> {
     void release(PointerEvent event) {
       synchronize();
       final side = pointers.remove(event.pointer);
-      if (side != null && side < 2) game.releasePivot(side);
+      if (side != null && side < 2) {
+        gripOffsets.remove(side);
+        game.releasePivot(side);
+      }
     }
 
     final board = Listener(
@@ -104,18 +109,17 @@ class _PivotBoardState extends State<PivotBoard> {
         final viewport = viewportNow();
         if (!viewport.rect.contains(event.localPosition)) return;
         final side = event.localPosition.dx < viewport.rect.center.dx ? 0 : 1;
-        final pivot = viewport.project(
-          Offset(
-            side == 0 ? 20 : 340,
-            game.screenY(side == 0 ? game.left : game.right),
-          ),
-        );
-        final x = pivot.dx, y = pivot.dy;
-        if ((event.localPosition.dx - x).abs() > 44 ||
-            (event.localPosition.dy - y).abs() > 48 ||
+        if (!viewport.hitsGrip(event.localPosition, game, side) ||
             pointers.containsValue(side))
           return;
         pointers[event.pointer] = side;
+        final pivotY = viewport
+            .project(
+              Offset(0, game.screenY(side == 0 ? game.left : game.right)),
+            )
+            .dy;
+        // Keep the handle on the same side of the platform for this gesture.
+        gripOffsets[side] = viewport.gripCenter(game, side).dy - pivotY;
         game.grabPivot(side);
       },
       onPointerMove: (event) {
@@ -142,7 +146,7 @@ class _PivotBoardState extends State<PivotBoard> {
                 ? 'Use the bottom left and right vertical joysticks to move the platform ends'
                 : game.oneFinger
                 ? 'Use the thumb area below the board to tilt and lift'
-                : 'Drag the left and right ends of the platform up or down'),
+                : 'Drag the offset left and right handles up or down to move the platform ends'),
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -154,6 +158,7 @@ class _PivotBoardState extends State<PivotBoard> {
                   reducedMotion: MediaQuery.of(context).disableAnimations,
                   fillWidth: widget.fillWidth,
                   showHud: widget.overlay == null,
+                  gripOffsets: gripOffsets,
                 ),
                 child: const SizedBox.expand(),
               ),
@@ -181,12 +186,7 @@ class _PivotBoardState extends State<PivotBoard> {
               ControlHint(
                 anchors: [
                   for (final side in [0, 1])
-                    viewportNow().project(
-                      Offset(
-                        side == 0 ? 20 : 340,
-                        game.screenY(side == 0 ? game.left : game.right),
-                      ),
-                    ),
+                    viewportNow().gripCenter(game, side),
                 ],
               ),
             if (widget.overlay != null)

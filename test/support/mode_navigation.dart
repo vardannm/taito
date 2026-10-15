@@ -21,7 +21,10 @@ Future<void> selectWorld(WidgetTester tester, int index) async {
 }
 
 Future<void> armWorld(WidgetTester tester) async {
-  if (find.byKey(const ValueKey('start-control-prompt')).evaluate().isNotEmpty) {
+  if (find
+      .byKey(const ValueKey('start-control-prompt'))
+      .evaluate()
+      .isNotEmpty) {
     return;
   }
   if (find.byKey(const ValueKey('menu-play')).evaluate().isEmpty) return;
@@ -43,9 +46,11 @@ Future<void> startWorld(WidgetTester tester) async {
       : game.oneFinger
       ? tester.getCenter(find.byType(OneFingerControls))
       : tester.getTopLeft(board) +
-            BoardViewport(
+            BoardViewport.forGame(
               tester.getSize(board),
-            ).project(Offset(20, game.screenY(game.left)));
+              game,
+              fillWidth: tester.widget<PivotBoard>(board).fillWidth,
+            ).gripCenter(game, 0);
   await tester.tapAt(point);
   await tester.pump();
 }

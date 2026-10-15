@@ -29,7 +29,7 @@ Offset contact(WidgetTester tester, BalanceGame game) {
           tester.getSize(board),
           game,
           fillWidth: tester.widget<PivotBoard>(board).fillWidth,
-        ).project(Offset(20, game.screenY(game.left)));
+        ).gripCenter(game, 0);
   }
   return tester.getCenter(controller(game.controlMode));
 }
@@ -298,9 +298,11 @@ void main() {
         final rightPoint = game.analog
             ? tester.getCenter(find.byKey(const ValueKey('analog-right')))
             : tester.getTopLeft(board) +
-                  BoardViewport(
+                  BoardViewport.forGame(
                     tester.getSize(board),
-                  ).project(Offset(340, game.screenY(game.right)));
+                    game,
+                    fillWidth: tester.widget<PivotBoard>(board).fillWidth,
+                  ).gripCenter(game, 1);
         final right = await tester.startGesture(rightPoint, pointer: 32);
         await left.moveBy(const Offset(0, -2));
         await right.moveBy(const Offset(0, -3));

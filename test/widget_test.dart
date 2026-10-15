@@ -64,10 +64,11 @@ void main() {
         ),
       );
       final rect = tester.getRect(find.byType(PivotBoard));
-      Offset point(double x, double y) =>
-          rect.topLeft + BoardViewport(rect.size).project(Offset(x, y));
-      final left = await tester.startGesture(point(20, 526), pointer: 1);
-      final right = await tester.startGesture(point(340, 526), pointer: 2);
+      Offset point(int side) =>
+          rect.topLeft +
+          BoardViewport.forGame(rect.size, game).gripCenter(game, side);
+      final left = await tester.startGesture(point(0), pointer: 1);
+      final right = await tester.startGesture(point(1), pointer: 2);
       expect(game.left, 526);
       await left.moveBy(Offset(0, -20 * BoardViewport(rect.size).scale));
       await right.moveBy(Offset(0, -10 * BoardViewport(rect.size).scale));
@@ -82,7 +83,7 @@ void main() {
       await right.cancel();
       expect(game.pivotTargets, [null, null]);
       game.setPaused(true);
-      await tester.tapAt(point(20, 506));
+      await tester.tapAt(point(0));
       expect(game.pivotTargets, [null, null]);
       await tester.pumpWidget(const SizedBox());
       frame.dispose();

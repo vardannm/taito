@@ -7,6 +7,7 @@ import 'package:balance_arcade/pivot_board.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'start_flow_test.dart' show launch, contact, controller, expectOwned;
+import 'support/mode_navigation.dart' show armWorld;
 
 void main() {
   setUp(
@@ -19,6 +20,7 @@ void main() {
       '$mode keeps the same held fingers through two lost hearts and protection expiry',
       (tester) async {
         final game = await launch(tester, mode);
+        await armWorld(tester);
         final first = await tester.startGesture(
           contact(tester, game),
           pointer: 61,
@@ -31,9 +33,11 @@ void main() {
               : game.analog
               ? tester.getCenter(find.byKey(const ValueKey('analog-right')))
               : tester.getTopLeft(board) +
-                    BoardViewport(
+                    BoardViewport.forGame(
                       tester.getSize(board),
-                    ).project(Offset(340, game.screenY(game.right)));
+                      game,
+                      fillWidth: tester.widget<PivotBoard>(board).fillWidth,
+                    ).gripCenter(game, 1);
           second = await tester.startGesture(right, pointer: 62);
         }
         await first.moveBy(
@@ -114,6 +118,7 @@ void main() {
     tester,
   ) async {
     final game = await launch(tester, ControlMode.twoFinger);
+    await armWorld(tester);
     await tester.sendKeyDownEvent(LogicalKeyboardKey.keyW);
     await tester.pump(const Duration(milliseconds: 16));
     game.board

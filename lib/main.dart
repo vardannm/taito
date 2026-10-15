@@ -1038,7 +1038,7 @@ class _GameScreenState extends State<GameScreen>
       TutorialStep.controls =>
         game.oneFinger
             ? 'Drag the thumb pad: sideways to tilt, up or down to lift. Hold still to keep the height.'
-            : 'Drag either end grip up or down. Move both ends to lift; move one to tilt.',
+            : 'Drag either offset handle up or down. Move both handles to lift; move one to tilt.',
       TutorialStep.heartsHoles => 'Avoid holes. A fall costs 1 heart.',
       TutorialStep.heartsFeedback =>
         game.misses > 0
@@ -1065,7 +1065,7 @@ class _GameScreenState extends State<GameScreen>
       TutorialStep.classicPlay =>
         game.oneFinger
             ? 'Same thumb-pad controls. Lift to glowing holes in order, 1–10. Avoid dark holes. Drag to begin.'
-            : 'Reach glowing holes in order, 1–10. Avoid dark holes. Drag the end grips to begin.',
+            : 'Reach glowing holes in order, 1–10. Avoid dark holes. Drag an offset handle to begin.',
       TutorialStep.dailyChallenge =>
         'Daily Challenge: a new board each day. Earn stars and beat your best.',
       _ => '',
@@ -1670,7 +1670,7 @@ class _GameScreenState extends State<GameScreen>
     ControlMode.tiltLift => 'Drag sideways to play',
     ControlMode.boardTilt => 'Drag on the board to tilt',
     ControlMode.oneFinger => 'Drag the thumb area to play',
-    ControlMode.twoFinger => 'Move a platform end to play',
+    ControlMode.twoFinger => 'Move a handle to play',
   };
 
   bool playArmed = false;
@@ -1703,15 +1703,7 @@ class _GameScreenState extends State<GameScreen>
     if (game.bottomControls) return true;
     final viewport = BoardViewport(board.size);
     for (final side in [0, 1]) {
-      final pivot = viewport.project(
-        Offset(
-          side == 0 ? 20 : 340,
-          game.screenY(side == 0 ? game.left : game.right),
-        ),
-      );
-      if ((point.dx - pivot.dx).abs() <= 44 &&
-          (point.dy - pivot.dy).abs() <= 48)
-        return false;
+      if (viewport.hitsGrip(point, game, side)) return false;
     }
     return true;
   }
@@ -3255,7 +3247,7 @@ class _GameScreenState extends State<GameScreen>
               guideRow(
                 '02',
                 'Prefer two fingers?',
-                'Choose One-finger or Two-finger in Options. With two fingers, drag either end grip up or down. Move both ends together to lift, or one end to tilt and roll. Release to hold the platform. Options also adjusts two-finger sensitivity.',
+                'Choose One-finger or Two-finger in Options. With two fingers, drag the handles below the platform up or down. Each handle moves its connected end, keeping your fingers clear of the ball. Move both together to lift, or one to tilt and roll. Release to hold the platform. Options also adjusts two-finger sensitivity.',
               ),
               guideRow(
                 '03',

@@ -29,6 +29,7 @@ const brass = Color(0xFFD9AE65);
 /// One transform shared by rendering and pointer hit testing.
 class BoardViewport {
   BoardViewport(Size size, {double fillWidth = 0, double focusY = 440}) {
+    bounds = Offset.zero & size;
     final fit = math.min(
       size.width / BalanceGame.width,
       size.height / BalanceGame.height,
@@ -63,7 +64,32 @@ class BoardViewport {
   late final double scale;
   late final double topExtension;
   late Offset offset;
+  late final Rect bounds;
   Offset project(Offset point) => offset + point * scale;
+
+  /// Screen-space spacing keeps a thumb clear of the ball at every board scale.
+  Offset gripCenter(BalanceGame game, int side, {double? heldOffset}) {
+    final pivot = project(
+      Offset(
+        side == 0 ? 20 : 340,
+        game.screenY(side == 0 ? game.left : game.right),
+      ),
+    );
+    final visible = rect.intersect(bounds);
+    // At the very bottom, use the space above instead of covering the ball or
+    // drawing an unreachable handle outside the screen.
+    final dy =
+        heldOffset ?? (pivot.dy + 64 + 24 <= visible.bottom ? 64.0 : -64.0);
+    return pivot + Offset(0, dy);
+  }
+
+  bool hitsGrip(Offset point, BalanceGame game, int side) {
+    final grip = gripCenter(game, side);
+    return rect.intersect(bounds).contains(point) &&
+        (point.dx - grip.dx).abs() <= 44 &&
+        (point.dy - grip.dy).abs() <= 24;
+  }
+
   Rect get rect =>
       (offset - Offset(0, topExtension * scale)) &
       Size(
@@ -82,6 +108,7 @@ class BoardPainter extends CustomPainter {
     this.reducedMotion = false,
     this.fillWidth = 0,
     this.showHud = true,
+    this.gripOffsets = const {},
     Listenable? repaint,
   }) : world = BallWorld.of(game.cosmetic),
        super(repaint: repaint);
@@ -90,6 +117,7 @@ class BoardPainter extends CustomPainter {
   final bool reducedMotion;
   final double fillWidth;
   final bool showHud;
+  final Map<int, double> gripOffsets;
 
   void text(
     Canvas c,
@@ -638,23 +666,43 @@ class BoardPainter extends CustomPainter {
         !game.bottomControls &&
         !game.boardTilt;
     for (final p in [a, b]) {
+      final grip = grips
+          ? (viewport.gripCenter(
+                      game,
+                      p == a ? 0 : 1,
+                      heldOffset: gripOffsets[p == a ? 0 : 1],
+                    ) -
+                    viewport.offset) /
+                viewport.scale
+          : p;
+      if (grips) {
+        canvas.drawLine(
+          p,
+          grip,
+          Paint()
+            ..color = brass.withAlpha(180)
+            ..strokeWidth = 2 / viewport.scale,
+        );
+        canvas.drawCircle(p, 3, Paint()..color = ink);
+        canvas.drawCircle(p, 1.5, Paint()..color = brass);
+      }
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           Rect.fromCenter(
-            center: p,
-            width: grips ? 27 : 12,
-            height: grips ? 32 : 19,
+            center: grip,
+            width: grips ? 27 / viewport.scale : 12,
+            height: grips ? 32 / viewport.scale : 19,
           ),
           const Radius.circular(3),
         ),
         Paint()..color = ink,
       );
-      canvas.drawCircle(p, 2, Paint()..color = brass);
+      canvas.drawCircle(grip, 2, Paint()..color = brass);
       if (grips) {
         for (final dy in [-7.0, 7.0]) {
           canvas.drawLine(
-            p + Offset(-6, dy),
-            p + Offset(6, dy),
+            grip + Offset(-6, dy) / viewport.scale,
+            grip + Offset(6, dy) / viewport.scale,
             Paint()
               ..color = brass
               ..strokeWidth = 1.5,
