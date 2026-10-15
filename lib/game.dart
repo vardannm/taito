@@ -153,6 +153,9 @@ class BalanceGame {
   double lastCoinAge = 99, lastCoinX = 0, lastCoinY = 0;
   double targetTime = 180, _nextFinaleAt = 3;
   int _finaleSequence = 0;
+  double _classicSceneTime = 0;
+  final _spawnOverlappingHazards = <SpecialHazard>{};
+  final _spawnOverlappingSpiders = <BoardSpider>{};
   int get earnedStarMask => !finished || !won || practice || infinite || merging
       ? 0
       : 1 | (misses == 0 ? 2 : 0) | (elapsed <= targetTime ? 4 : 0);
@@ -824,16 +827,6 @@ class BalanceGame {
   void resetBall() {
     ballTrail.clear();
     motionSpeed = 0;
-    if (!infinite) {
-      specialHazards.clear();
-      _nextFinaleAt = mode == GameMode.classic
-          ? ClassicLevels.definition(level).firstHazardAfter
-          : 3;
-      _finaleSequence = 0;
-    }
-    for (final spider in spiders) {
-      spider.reset();
-    }
     left = right = infinite
         ? infiniteStart
         : oneFinger
@@ -845,6 +838,26 @@ class BalanceGame {
     legTime = 0;
     controlPosition = 0;
     clearInput();
+    _spawnOverlappingHazards.clear();
+    _spawnOverlappingSpiders.clear();
+    if (mode == GameMode.classic) {
+      // Continuing enemies can occupy the launch point during the ball return.
+      // Ignore only those overlaps until the ball separates; do not reset them.
+      _spawnOverlappingHazards.addAll(
+        specialHazards.where(
+          (h) =>
+              h.active &&
+              h.hits(ballX, ballY, ballX, ballY, boardTop: visibleTop),
+        ),
+      );
+      _spawnOverlappingSpiders.addAll(
+        spiders.where(
+          (s) =>
+              math.pow(s.x - ballX, 2) + math.pow(s.y - ballY, 2) <=
+              math.pow(s.bodyRadius + ballRadius, 2),
+        ),
+      );
+    }
   }
 
   void start({
@@ -881,6 +894,11 @@ class BalanceGame {
         ? DailyChallenge.day(challengeDate ?? DateTime.now())
         : null;
     level = daily ? 15 : levelNumber.clamp(1, ClassicLevels.count);
+    _classicSceneTime = 0;
+    _nextFinaleAt = mode == GameMode.classic
+        ? ClassicLevels.definition(level).firstHazardAfter
+        : 3;
+    _finaleSequence = 0;
     _classicBoard = infinite || merging
         ? []
         : practice
@@ -1023,6 +1041,17 @@ class BalanceGame {
     if (paused) return;
     clock += dt;
     if (!started || finished) return;
+    if (mode == GameMode.classic) {
+      _classicSceneTime += dt;
+      if (phase == GamePhase.sinking || phase == GamePhase.returning) {
+        // The ball is hidden, but the level's patrols, chases and hazard cycle
+        // keep advancing. Pause still freezes everything at the top of _tick.
+        for (final spider in spiders) {
+          spider.step(dt, captureX, captureY, captureX, captureY);
+        }
+        if (finale) _updateFinale(dt, captureX, captureY, canDamage: false);
+      }
+    }
     if (phase == GamePhase.sinking) {
       phaseTime += dt;
       if (phaseTime >= .7) {
@@ -1257,8 +1286,8 @@ class BalanceGame {
         }
       }
     }
-    if (finale && hit == null) {
-      _updateFinale(dt, oldX, oldY);
+    if (finale) {
+      _updateFinale(dt, oldX, oldY, canDamage: hit == null);
       if (phase != GamePhase.playing) return;
     }
     final fraction = firstContact.isFinite ? firstContact : 1.0;
@@ -1301,7 +1330,12 @@ class BalanceGame {
 
   bool _updateSpiders(double dt, double oldX, double oldY) {
     for (final spider in spiders) {
-      if (!spider.step(dt, oldX, oldY, ballX, ballY)) continue;
+      final hit = spider.step(dt, oldX, oldY, ballX, ballY);
+      if (_spawnOverlappingSpiders.contains(spider)) {
+        if (!hit) _spawnOverlappingSpiders.remove(spider);
+        continue;
+      }
+      if (!hit) continue;
       lives = 0;
       misses++;
       streak = 0;
@@ -1317,12 +1351,23 @@ class BalanceGame {
     return false;
   }
 
-  void _updateFinale(double dt, double oldX, double oldY) {
+  void _updateFinale(
+    double dt,
+    double oldX,
+    double oldY, {
+    bool canDamage = true,
+  }) {
     final definition = ClassicLevels.definition(level);
     if (definition.hazards.isEmpty) return;
     for (final h in specialHazards) {
       h.step(dt, 0);
-      if (h.hits(oldX, oldY, ballX, ballY, boardTop: visibleTop)) {
+      if (!canDamage) continue;
+      final hit = h.hits(oldX, oldY, ballX, ballY, boardTop: visibleTop);
+      if (_spawnOverlappingHazards.contains(h)) {
+        if (!hit || !h.active) _spawnOverlappingHazards.remove(h);
+        continue;
+      }
+      if (hit) {
         captureX = ballX;
         captureY = ballY;
         lives--;
@@ -1341,13 +1386,14 @@ class BalanceGame {
       }
     }
     specialHazards.removeWhere((h) => h.expired);
-    if (specialHazards.isNotEmpty || legTime < _nextFinaleAt) return;
+    _spawnOverlappingHazards.removeWhere((h) => h.expired);
+    if (specialHazards.isNotEmpty || _classicSceneTime < _nextFinaleAt) return;
     final wave =
         definition.hazards[_finaleSequence % definition.hazards.length];
     final positions = wave.positions.where((p) => p.target == target).toList();
     if (positions.isEmpty) {
       _finaleSequence++;
-      _nextFinaleAt = legTime + definition.hazardInterval;
+      _nextFinaleAt = _classicSceneTime + definition.hazardInterval;
       return;
     }
     final position = positions[_finaleSequence % positions.length];
@@ -1367,7 +1413,7 @@ class BalanceGame {
       ),
     );
     _finaleSequence++;
-    _nextFinaleAt = legTime + definition.hazardInterval;
+    _nextFinaleAt = _classicSceneTime + definition.hazardInterval;
   }
 
   void _capture(Hole hole) {

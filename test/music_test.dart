@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart';
 import 'package:balance_arcade/infinite_music.dart';
 import 'package:balance_arcade/music_output.dart';
 import 'package:balance_arcade/profile.dart';
@@ -40,9 +39,13 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
-    'temporary build excludes background tracks and keeps sound effects',
+    'build bundles the chosen Infinite track and keeps sound effects',
     () async {
-      expect(InfiniteMusic.bundled, isFalse);
+      expect(InfiniteMusic.bundled, isTrue);
+      expect(
+        (await rootBundle.load('assets/${InfiniteMusic.asset}')).lengthInBytes,
+        greaterThan(0),
+      );
       for (final asset in [
         'target.wav',
         'miss.wav',
@@ -54,18 +57,16 @@ void main() {
           greaterThan(0),
         );
       }
+      final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
       for (final asset in ['theme_infinite.wav', 'theme_dark.wav']) {
-        await expectLater(
-          rootBundle.load('assets/audio/$asset'),
-          throwsA(isA<FlutterError>()),
-        );
+        expect(manifest.listAssets(), isNot(contains('assets/audio/$asset')));
       }
     },
   );
 
   test('a quiet screen never reaches for the audio platform', () async {
     final feedback = GameFeedback();
-    // Every screen outside Infinite and 2048 asks for no track, repeatedly.
+    // Every screen outside Infinite asks for no track, repeatedly.
     // That must stay a no-op: no player is built, so nothing can fail and
     // nothing plays over a mode that wants silence.
     for (var i = 0; i < 5; i++) {
@@ -74,16 +75,77 @@ void main() {
     feedback.dispose();
   });
 
+  test(
+    'waiting for the first touch never creates or starts a music player',
+    () async {
+      var created = 0;
+      final output = _MusicOutput();
+      final feedback = GameFeedback(
+        musicOutput: () {
+          created++;
+          return output;
+        },
+      );
+      await feedback.updateMusic(
+        track: InfiniteMusic.asset,
+        playing: false,
+        playbackSession: 1,
+      );
+      expect(created, 0);
+      expect(output.calls, isEmpty);
+      await feedback.updateMusic(
+        track: InfiniteMusic.asset,
+        playing: true,
+        playbackSession: 1,
+      );
+      expect(created, 1);
+      expect(output.calls, ['play:${InfiniteMusic.asset}', 'rate']);
+      feedback.dispose();
+    },
+  );
+
+  test(
+    'a prepared retry pauses old music and waits before replaying its opening',
+    () async {
+      final output = _MusicOutput();
+      final feedback = GameFeedback(musicOutput: () => output);
+      await feedback.updateMusic(
+        track: InfiniteMusic.asset,
+        playing: true,
+        playbackSession: 1,
+      );
+      await feedback.updateMusic(
+        track: InfiniteMusic.asset,
+        playing: false,
+        playbackSession: 2,
+      );
+      expect(output.calls, ['play:${InfiniteMusic.asset}', 'rate', 'pause']);
+      await feedback.updateMusic(
+        track: InfiniteMusic.asset,
+        playing: true,
+        playbackSession: 2,
+      );
+      expect(output.calls, [
+        'play:${InfiniteMusic.asset}',
+        'rate',
+        'pause',
+        'play:${InfiniteMusic.asset}',
+        'rate',
+      ]);
+      feedback.dispose();
+    },
+  );
+
   test('Infinite tempo builds with active time and pace, then caps', () {
     double rate(double seconds, double pace) =>
         InfiniteMusic.rateFor(seconds: seconds, pace: pace);
-    expect(rate(0, 1), 1.06);
-    expect(rate(60, 1), 1.11);
-    expect(rate(180, 1), 1.20);
-    expect(rate(0, 5), 1.16);
-    expect(rate(180, 5), 1.30);
-    expect(rate(10000, 100), 1.30);
-    expect(rate(-10, -1), 1.06);
+    expect(rate(0, 1), 1.00);
+    expect(rate(60, 1), 1.03);
+    expect(rate(180, 1), 1.08);
+    expect(rate(0, 5), 1.04);
+    expect(rate(180, 5), 1.12);
+    expect(rate(10000, 100), 1.12);
+    expect(rate(-10, -1), 1.00);
     for (var seconds = 0; seconds < 240; seconds++) {
       expect(
         rate(seconds + 1.0, 3),
@@ -162,31 +224,30 @@ void main() {
     feedback.dispose();
   });
 
-  test(
-    'restarting a run resets tempo without reloading an active track',
-    () async {
-      final output = _MusicOutput();
-      final feedback = GameFeedback(musicOutput: () => output);
-      await feedback.updateMusic(
-        track: InfiniteMusic.asset,
-        playing: true,
-        playbackRate: 1.30,
-      );
-      await feedback.updateMusic(
-        track: InfiniteMusic.asset,
-        playing: true,
-        playbackRate: 1.06,
-      );
-      expect(
-        output.calls.where((call) => call.startsWith('play:')),
-        hasLength(1),
-      );
-      expect(output.rates, [1.30, 1.06]);
-      feedback.dispose();
-    },
-  );
+  test('a new run restarts the recording opening and resets tempo', () async {
+    final output = _MusicOutput();
+    final feedback = GameFeedback(musicOutput: () => output);
+    await feedback.updateMusic(
+      track: InfiniteMusic.asset,
+      playing: true,
+      playbackRate: 1.12,
+      playbackSession: 1,
+    );
+    await feedback.updateMusic(
+      track: InfiniteMusic.asset,
+      playing: true,
+      playbackRate: 1.00,
+      playbackSession: 2,
+    );
+    expect(
+      output.calls.where((call) => call.startsWith('play:')),
+      hasLength(2),
+    );
+    expect(output.rates, [1.12, 1.00]);
+    feedback.dispose();
+  });
 
-  test('2048 switches to its own track at normal speed', () async {
+  test('a different track can switch back to normal speed', () async {
     final output = _MusicOutput();
     final feedback = GameFeedback(musicOutput: () => output);
     await feedback.updateMusic(

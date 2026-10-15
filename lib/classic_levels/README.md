@@ -35,8 +35,11 @@ the warning ends. `orientation: LaserOrientation.horizontal` makes a horizontal
 laser beam; the default is vertical. Orientation and movement are independent.
 Keep the entire movement envelope inside the board and clear of the active target.
 Edit `warningSeconds`, `liveSeconds`, `firstHazardAfter`, and `hazardInterval`
-to change timing. Timing restarts with each target attempt. An empty list means
-no hazards. If you move a target hole, update its hazard positions yourself to
+to change timing. The level's hazard clock, moving hazards, and spider patrols
+continue while the ball sinks and the platform returns between targets. Only
+starting or replaying the whole level resets them. Hidden-ball return animation
+does not take damage. An empty list means no hazards. If you move a target hole,
+update its hazard positions yourself to
 maintain safe clearance. `finaleTitle` and `finaleRule` set the optional briefing.
 
 The initial coordinates preserve the previous generated Classic layouts exactly.

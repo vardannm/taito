@@ -22,8 +22,8 @@ flutter:
   uses-material-design: true
   assets:
     - assets/privacy/policy.json
-    # Background music temporarily excluded. Keep the original WAV tracks on
-    # disk for restoration; ship only sound effects in this lightweight build.
+    - assets/audio/theme_infinite_complex.mp3
+    # Previous WAV soundtracks remain archived on disk and outside the bundle.
     - assets/audio/complete.wav
     - assets/audio/enemy_bombThrow.wav
     - assets/audio/enemy_bounce.wav

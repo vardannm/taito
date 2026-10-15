@@ -96,7 +96,7 @@ void main() {
     },
   );
   test(
-    'spider contact ends run instantly once; pause, capture, replay and other modes reset it',
+    'spider contact ends run once; capture preserves pursuit and replay resets it',
     () {
       final g = BalanceGame()..start(levelNumber: 31);
       final s = g.spiders.first;
@@ -107,7 +107,8 @@ void main() {
       s.chasing = true;
       placeAt(g, g.activeHole);
       advance(g, 1.5);
-      expect(g.spiders.every((s) => !s.chasing), isTrue);
+      expect(s.chasing, isTrue);
+      expect(s.time, greaterThan(1.5));
       final score = g.score;
       g.spiders
         ..clear()
@@ -135,47 +136,48 @@ void main() {
     expect(s.step(1 / 120, 100, 250, 260, 250), isTrue);
   });
   for (final width in [320.0, 430.0, 800.0]) {
-    testWidgets('level grid reaches 50 at width $width with large text', (
-      tester,
-    ) async {
-      tester.view.physicalSize = Size(width, 700);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-      int? chosen;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: MediaQuery(
-            data: MediaQueryData(
-              size: Size(width, 700),
-              textScaler: const TextScaler.linear(1.4),
-            ),
-            child: Scaffold(
-              body: LevelPicker(
-                selected: 31,
-                totalStars: 98,
-                onSelected: (n) => chosen = n,
+    testWidgets(
+      'five-level road reaches nearby level 50 at width $width with large text',
+      (tester) async {
+        tester.view.physicalSize = Size(width, 700);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        int? chosen;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: MediaQuery(
+              data: MediaQueryData(
+                size: Size(width, 700),
+                textScaler: const TextScaler.linear(1.4),
+              ),
+              child: Scaffold(
+                body: LevelPicker(
+                  selected: 50,
+                  totalStars: 98,
+                  onSelected: (n) => chosen = n,
+                ),
               ),
             ),
           ),
-        ),
-      );
-      expect(find.byType(SliverGrid), findsWidgets);
-      await tester.scrollUntilVisible(
-        find.byKey(const ValueKey('level-50')),
-        300,
-        scrollable: find.byType(Scrollable).last,
-        maxScrolls: 35,
-      );
-      await tester.pump(const Duration(milliseconds: 200));
-      await Scrollable.ensureVisible(
-        tester.element(find.byKey(const ValueKey('level-50'))),
-        alignment: .5,
-      );
-      await tester.pump(const Duration(milliseconds: 400));
-      await tester.tap(find.byKey(const ValueKey('level-50')));
-      expect(chosen, 50);
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox());
-    });
+        );
+        expect(find.byType(SliverList), findsOneWidget);
+        await tester.scrollUntilVisible(
+          find.byKey(const ValueKey('level-50')),
+          300,
+          scrollable: find.byType(Scrollable).last,
+          maxScrolls: 35,
+        );
+        await tester.pump(const Duration(milliseconds: 200));
+        await Scrollable.ensureVisible(
+          tester.element(find.byKey(const ValueKey('level-50'))),
+          alignment: .5,
+        );
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.tap(find.byKey(const ValueKey('level-50')));
+        expect(chosen, 50);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
   }
 }

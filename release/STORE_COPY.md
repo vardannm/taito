@@ -13,7 +13,7 @@ A little tilt. A lot of nerve.
 
 GILT puts a steel ball and a moving platform in your hands. Lift the ends, find your balance and guide the ball toward the glow.
 
-- Master 50 Classic levels, earn stars and improve your personal records.
+- Master Classic challenges, earn stars and improve your personal records.
 - Survive an Infinite climb with crystals, shields and changing hazards.
 - Combine matching numbers in 2048 / Merge.
 - Learn by playing with Two-finger, One-finger or Vertical Analog controls.

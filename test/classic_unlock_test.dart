@@ -17,6 +17,14 @@ void main() {
         InMemorySharedPreferencesAsync.empty(),
   );
 
+  test('normal profiles keep the playtest level bypass disabled', () {
+    final profile = PlayerProfile();
+    expect(profile.temporaryLevelAccess, isFalse);
+    expect(profile.isClassicLevelUnlocked(1), isTrue);
+    expect(profile.isClassicLevelUnlocked(2), isFalse);
+    expect(profile.isClassicLevelUnlocked(80), isFalse);
+  });
+
   test('all star thresholds are reachable and exact, with level 1 free', () {
     expect(ClassicLevels.isUnlocked(1, 0), isTrue);
     for (var level = 2; level <= ClassicLevels.count; level++) {

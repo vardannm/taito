@@ -46,6 +46,15 @@ class _LevelPickerState extends State<LevelPicker> {
   String get controlLabel => control?.label ?? widget.controlLabel;
   bool unlocked(int number) =>
       widget.allLevelsUnlocked || ClassicLevels.isUnlocked(number, totalStars);
+  int get visibleCount => widget.allLevelsUnlocked
+      ? ClassicLevels.count
+      : math.min(5, ClassicLevels.count);
+  int get firstVisibleLevel {
+    if (widget.allLevelsUnlocked) return 1;
+    final frontier = (totalStars ~/ 2 + 1).clamp(1, ClassicLevels.count);
+    return (frontier - 2).clamp(1, ClassicLevels.count - visibleCount + 1);
+  }
+
   ValueChanged<int> get onSelected => widget.onSelected;
   @override
   Widget build(BuildContext context) => MenuSurface(
@@ -265,7 +274,7 @@ class _LevelPickerState extends State<LevelPicker> {
                   widget.tutorial && !skipped
                       ? ''
                       : widget.allLevelsUnlocked
-                      ? 'All ${ClassicLevels.count} levels temporarily unlocked. $controlLabel records.'
+                      ? 'Development access. $controlLabel records.'
                       : '$totalStars Classic stars · 2 more stars unlock each level. Stars are shared across controls and are not spent. $controlLabel records.',
                 ),
                 if (control != null && (!widget.tutorial || skipped))
@@ -297,19 +306,7 @@ class _LevelPickerState extends State<LevelPicker> {
                       ),
                     ),
                   ),
-                road(1, 30),
-                heading(
-                  'The web · 31–50',
-                  'Spiders patrol the marked territories. Cross a boundary and they chase. Contact ends your run.',
-                ),
-                road(31, 20),
-                if (ClassicLevels.count > 50) ...[
-                  heading(
-                    'More challenges · 51–${ClassicLevels.count}',
-                    'New boards, new routes. Keep climbing.',
-                  ),
-                  road(51, ClassicLevels.count - 50),
-                ],
+                road(firstVisibleLevel, visibleCount),
               ],
             );
           },

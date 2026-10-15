@@ -2,6 +2,25 @@
 
 ## Infinite
 
+`theme_infinite_complex.mp3` is **The Complex** by
+**Kevin MacLeod (incompetech.com)**, used as the original recording with its
+opening and gradual build intact. Synths and percussion, 104 BPM, about 4:28.
+
+- Source and license declaration: https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300025
+- Original recording: https://incompetech.com/music/royalty-free/mp3-royaltyfree/The%20Complex.mp3
+- License: Creative Commons Attribution 4.0,
+  https://creativecommons.org/licenses/by/4.0/
+- In-game attribution: Settings > Music credits.
+- Playback changes: reduced playback level for effects headroom; tempo gradually
+  rises from 1.00 to 1.12x with active gameplay time and height-based pace
+  (104 to about 116 BPM). Pausing holds the position; a new run restarts the opening.
+- Format: original stereo MP3, 10,712,421 bytes. No edits or transcoding.
+- SHA-256: `c270fb44a69828f6cae7412e077a38b92d55015d30ced549d0d477f864e7e41e`
+- Reproduction: download the original recording to
+  `assets/audio/theme_infinite_complex.mp3` and verify the SHA-256 above.
+
+## Archived Infinite soundtrack (not bundled)
+
 `theme_infinite.wav` is a 164-bar gameplay arrangement adapted from
 **Furious Freak** by **Kevin MacLeod (incompetech.com)**. It starts on the full
 groove and combines drum, electric-piano and bass/synth sections, with the
@@ -11,7 +30,7 @@ sparse opening, quiet breakdown and ending fade omitted.
 - Original recording: https://incompetech.com/music/royalty-free/mp3-royaltyfree/Furious%20Freak.mp3
 - License: Creative Commons Attribution 4.0,
   https://creativecommons.org/licenses/by/4.0/
-- In-game attribution: Settings > Music credits.
+- Archived source credit only; this recording is not used in the current build.
 - Adaptation: extended section arrangement, beat-aligned crossfades, bass EQ,
   gain adjustment and variable playback tempo during Infinite.
 - Format: 44.1 kHz stereo, 16-bit PCM WAV, decoded from the artist's MP3.
@@ -21,7 +40,7 @@ sparse opening, quiet breakdown and ending fade omitted.
 - Reproduction: `python scripts/prepare_theme.py path/to/furious-freak.mp3`
   (NumPy and SoundFile).
 
-## 2048
+## Archived 2048 soundtrack (not bundled)
 
 `theme_dark.wav` is a 24-bar dark groove adapted from **Dirt Rhodes** by
 **Kevin MacLeod (incompetech.com)**. The source recording features an actual
@@ -31,7 +50,7 @@ Mark I Stage Piano, electric piano, piano, and drum kit, at 82 BPM.
 - Original recording: https://incompetech.com/music/royalty-free/mp3-royaltyfree/Dirt%20Rhodes.mp3
 - License: Creative Commons Attribution 4.0,
   https://creativecommons.org/licenses/by/4.0/
-- In-game attribution: Settings > Music credits.
+- Archived source credit only; this recording is not used in the current build.
 - Adaptation: musical excerpt, short loop crossfade, bass/low-mid EQ, and
   gain adjustment for effects headroom. Delivered as 44.1 kHz stereo,
   16-bit PCM WAV, decoded from

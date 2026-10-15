@@ -296,7 +296,7 @@ void main() {
     expect(g.targetTime, greaterThan(two + 40));
   });
   test(
-    'finale laser warns, pauses, takes one life, and resets between attempts',
+    'finale laser warns, pauses, takes one life, and advances through ball return',
     () {
       final g = BalanceGame()..start(levelNumber: 10);
       g.board
@@ -320,7 +320,10 @@ void main() {
       advance(g, 1.5);
       expect(g.lives, 2);
       expect(g.phase, GamePhase.sinking);
+      final ageAtHit = h.age;
       advance(g, 1.5);
+      expect(h.age, greaterThan(ageAtHit));
+      expect(h.expired, isTrue);
       expect(g.specialHazards, isEmpty);
       expect(g.phase, GamePhase.playing);
       g.start(gameMode: GameMode.daily);

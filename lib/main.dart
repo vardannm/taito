@@ -255,6 +255,17 @@ class _GameScreenState extends State<GameScreen>
     }
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (profile.applyInitialControlDefault(
+      shortestSide: MediaQuery.sizeOf(context).shortestSide,
+    )) {
+      game.setControlMode(profile.controlMode);
+      unawaited(profile.save());
+    }
+  }
+
   void runTicker() {
     previous = null;
     accumulator = 0;
@@ -803,9 +814,8 @@ class _GameScreenState extends State<GameScreen>
       });
   }
 
-  /// Infinite and 2048 run to a loop; every other screen is quiet. Pausing
+  /// Infinite runs to a loop; every other screen is quiet. Pausing
   /// holds the track rather than restarting it.
-  static const themeTrack = 'audio/theme_dark.wav';
   void syncMusic() {
     feedback.setEnemyEffectsEnabled(
       profile.sound &&
@@ -817,16 +827,15 @@ class _GameScreenState extends State<GameScreen>
     );
     final wants =
         InfiniteMusic.bundled &&
-        (game.infinite || game.merging) &&
+        game.infinite &&
         profile.music &&
         game.started &&
         !game.finished;
     unawaited(
       feedback.updateMusic(
-        track: wants
-            ? (game.infinite ? InfiniteMusic.asset : themeTrack)
-            : null,
+        track: wants ? InfiniteMusic.asset : null,
         playing: !game.paused && !game.waitingForInput && !returning,
+        playbackSession: game.runSerial,
         playbackRate: game.infinite
             ? InfiniteMusic.rateFor(seconds: game.elapsed, pace: game.pace)
             : 1,
@@ -3509,7 +3518,7 @@ class _GameScreenState extends State<GameScreen>
                 if (InfiniteMusic.bundled)
                   MenuAction(
                     title: 'Music credits',
-                    subtitle: 'Infinite & 2048 · Kevin MacLeod',
+                    subtitle: 'The Complex · Kevin MacLeod',
                     icon: Icons.piano_rounded,
                     onTap: () => showMusicCredits(context),
                   ),

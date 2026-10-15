@@ -2,15 +2,12 @@ import 'package:flutter/material.dart';
 
 const _musicCredit =
     'Music by Kevin MacLeod (incompetech.com)\n\n'
-    'Infinite: “Furious Freak”\n'
-    'https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1600021\n\n'
-    '2048: “Dirt Rhodes”\n'
-    'https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100542\n\n'
+    'Infinite: “The Complex”\n'
+    'https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300025\n\n'
     'Licensed under Creative Commons Attribution 4.0\n'
     'https://creativecommons.org/licenses/by/4.0/\n\n'
-    'Adapted for GILT: gameplay arrangements, loop crossfades, '
-    'bass balance and playback level adjustment. '
-    'Infinite also varies playback tempo with the run.';
+    'Used in GILT with playback level adjustment and gradual playback tempo '
+    'changes during Infinite. The original recording is otherwise unchanged.';
 
 Future<void> showMusicCredits(BuildContext context) => showDialog<void>(
   context: context,

@@ -4,6 +4,7 @@ import 'ball_cosmetics.dart';
 import 'platforms.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'game.dart';
@@ -21,14 +22,16 @@ import 'infinite_progress.dart';
 class PlayerProfile {
   PlayerProfile({
     this.unlimitedCoins = false,
-    this.temporaryLevelAccess = const bool.fromEnvironment(
-      'GILT_UNLOCK_ALL_LEVELS',
-      defaultValue: true,
-    ),
+    this.temporaryLevelAccess =
+        !kReleaseMode &&
+        const bool.fromEnvironment(
+          'GILT_UNLOCK_ALL_LEVELS',
+          defaultValue: false,
+        ),
   });
 
   final bool unlimitedCoins;
-  // Temporary playtest access. Disable with GILT_UNLOCK_ALL_LEVELS=false.
+  // Explicit development opt-in only; normal builds enforce star unlocks.
   // Never persisted as stars or completion records.
   final bool temporaryLevelAccess;
   String get _economyKey =>
@@ -355,7 +358,28 @@ class PlayerProfile {
   bool tutorialSeen = false;
   TutorialProgress tutorial = TutorialProgress();
   Future<void> _tutorialWrites = Future<void>.value();
-  ControlMode controlMode = ControlMode.oneFinger;
+  ControlMode _controlMode = ControlMode.oneFinger;
+  bool _needsInitialControlDefault = false;
+  ControlMode get controlMode => _controlMode;
+  set controlMode(ControlMode value) {
+    _controlMode = value;
+    _needsInitialControlDefault = false;
+  }
+
+  /// Choose once from the first usable app window, including foldable screens.
+  /// Resizing later must never replace the player's controls or held input.
+  bool applyInitialControlDefault({required double shortestSide}) {
+    if (!_needsInitialControlDefault ||
+        !shortestSide.isFinite ||
+        shortestSide <= 0) {
+      return false;
+    }
+    controlMode = shortestSide >= 600
+        ? ControlMode.twoFinger
+        : ControlMode.oneFinger;
+    return true;
+  }
+
   int classicLevel = 1;
   CabinetStyle cabinet = CabinetStyle.brass;
   final levelRecords = <String, LevelRecord>{};
@@ -523,7 +547,8 @@ class PlayerProfile {
   Future<void> load() async {
     try {
       tutorialSeen = await storage.getBool('gilt.tutorial.v1.seen') ?? false;
-      controlMode = await storage.getBool('gilt.oneFinger') == false
+      final savedOneFinger = await storage.getBool('gilt.oneFinger');
+      controlMode = savedOneFinger == false
           ? ControlMode.twoFinger
           : ControlMode.oneFinger;
       final analog = await storage.getDouble('gilt.analogSensitivity');
@@ -539,6 +564,7 @@ class PlayerProfile {
           (ControlMode.values.where((m) => m.name == savedMode).firstOrNull ??
                   controlMode)
               .supportedMode;
+      _needsInitialControlDefault = savedMode == null && savedOneFinger == null;
       classicLevel = (await storage.getInt('gilt.classicLevel') ?? 1).clamp(
         1,
         ClassicLevels.count,
@@ -677,11 +703,14 @@ class GameFeedback {
 
   MusicOutput? _music;
   String? _track;
+  int? _musicSession;
   bool _musicPlaying = false;
   bool _disposed = false;
   double _musicRate = 1, _musicVolume = .32;
-  ({String? track, bool playing, double volume, double rate})? _wantedMusic;
-  ({String? track, bool playing, double volume, double rate})? _handledMusic;
+  ({String? track, bool playing, double volume, double rate, int? session})?
+  _wantedMusic;
+  ({String? track, bool playing, double volume, double rate, int? session})?
+  _handledMusic;
   Future<void>? _musicUpdate;
 
   /// Background music for the modes that want one. Passing a null track stops
@@ -692,6 +721,7 @@ class GameFeedback {
     required bool playing,
     double volume = .32,
     double playbackRate = 1,
+    int? playbackSession,
   }) async {
     if (_disposed ||
         (track == null && _track == null && _musicUpdate == null)) {
@@ -702,6 +732,7 @@ class GameFeedback {
       playing: playing,
       volume: volume.clamp(0.0, 1.0),
       rate: playbackRate.clamp(.5, 2.0),
+      session: playbackSession,
     );
     _wantedMusic = request;
     // Coalesce ticker updates during asset loading. A later mute, pause or
@@ -737,21 +768,34 @@ class GameFeedback {
   }
 
   Future<void> _applyMusic(
-    ({String? track, bool playing, double volume, double rate}) request,
+    ({String? track, bool playing, double volume, double rate, int? session})
+    request,
   ) async {
     final track = request.track;
     if (track == null) {
       _track = null;
       _musicPlaying = false;
       _musicRate = 1;
+      _musicSession = null;
       await _music?.stop();
       return;
     }
     if (_disposed) return;
+    final newRecording = track != _track || request.session != _musicSession;
+    // A prepared board must not briefly play audio before its starting touch.
+    // Defer a new run's opening until play, while an existing pause holds it.
+    if (newRecording && !request.playing) {
+      if (_musicPlaying) {
+        await _music?.pause();
+        _musicPlaying = false;
+      }
+      return;
+    }
     final music = _music ??= _musicFactory();
-    if (track != _track) {
+    if (newRecording) {
       await music.play(track, request.volume);
       _track = track;
+      _musicSession = request.session;
       _musicPlaying = true;
       _musicVolume = request.volume;
       _musicRate = double.nan;

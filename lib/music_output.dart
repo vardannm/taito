@@ -21,7 +21,11 @@ class AudioMusicOutput implements MusicOutput {
       AudioContextConfig(focus: AudioContextConfigFocus.mixWithOthers).build(),
     );
     await _player.setReleaseMode(ReleaseMode.loop);
-    await _player.play(AssetSource(asset), volume: volume);
+    await _player.play(
+      AssetSource(asset),
+      volume: volume,
+      position: Duration.zero,
+    );
   }
 
   @override

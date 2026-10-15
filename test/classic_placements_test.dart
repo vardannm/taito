@@ -1,6 +1,7 @@
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/levels.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'game_test.dart' show advance;
 
 void main() {
   test(
@@ -25,10 +26,13 @@ void main() {
                 .toList();
             final expected = choices[sequence % choices.length];
             game.specialHazards.clear();
-            game.legTime =
-                definition.firstHazardAfter +
-                sequence * (definition.hazardInterval + 1);
-            game.step(1 / 120);
+            advance(
+              game,
+              (sequence == 0
+                      ? definition.firstHazardAfter
+                      : definition.hazardInterval) +
+                  1 / 120,
+            );
             expect(game.specialHazards, hasLength(1));
             final hazard = game.specialHazards.single;
             expect(hazard.kind, wave.kind);

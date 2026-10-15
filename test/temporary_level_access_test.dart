@@ -16,7 +16,7 @@ void main() {
   test(
     'temporary access opens all valid levels without adding stars',
     () async {
-      final p = PlayerProfile();
+      final p = PlayerProfile(temporaryLevelAccess: true);
       for (var level = 1; level <= ClassicLevels.count; level++) {
         expect(p.selectClassicLevel(level), isTrue);
       }
@@ -40,7 +40,7 @@ void main() {
         tester.view.physicalSize = const Size(320, 568);
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.reset);
-        final profile = PlayerProfile()
+        final profile = PlayerProfile(temporaryLevelAccess: true)
           ..tutorialSeen = true
           ..sound = false
           ..music = false
