@@ -48,7 +48,44 @@ void main() {
     p.ownedBalls.remove(BallCosmetic.singularity);
     p.ownedBalls.add(BallCosmetic.nova);
     p.wallet = BallCosmetic.titanium.cost;
-    expect(p.shopUpgradeAvailable, isTrue); // Adds permanent magnet reach.
+    // Titanium is cheaper than the owned Nova: never suggest a step back.
+    expect(p.shopUpgradeAvailable, isFalse);
+    p.wallet = BallCosmetic.eclipse.cost;
+    expect(p.shopUpgradeAvailable, isTrue); // The next ball up the price list.
+  });
+
+  test('skipping ahead hides every cheaper ball and platform', () {
+    final p = PlayerProfile()..wallet = 0;
+    for (final upgrade in SurvivalUpgrade.values) {
+      p.survivalUpgrades[upgrade] = upgrade.maxLevel;
+    }
+    // Bought the fifth ball and fourth rail without the earlier ones.
+    p.ownedBalls.add(ballShopOrder[4]);
+    p.ownedPlatforms.add(platformShopOrder[3]);
+    p.wallet = ballShopOrder[4].cost - 1;
+    expect(p.shopUpgradeAvailable, isFalse);
+    p.wallet = ballShopOrder[5].cost;
+    expect(p.shopUpgradeAvailable, isTrue);
+    p.ownedBalls.add(ballShopOrder.lastWhere((b) => !b.purchaseOnly));
+    p.wallet = platformShopOrder[4].cost - 1;
+    expect(p.shopUpgradeAvailable, isFalse);
+    p.wallet = platformShopOrder[4].cost;
+    expect(p.shopUpgradeAvailable, isTrue);
+  });
+
+  test('shop lists coin gear by price, store-only gear last', () {
+    void check<T>(List<T> order, int Function(T) cost, bool Function(T) store) {
+      final coin = order.where((e) => !store(e)).toList();
+      expect(order.take(coin.length), coin);
+      for (var i = 1; i < coin.length; i++) {
+        expect(cost(coin[i]), greaterThanOrEqualTo(cost(coin[i - 1])));
+      }
+    }
+
+    check(ballShopOrder, (b) => b.cost, (b) => b.purchaseOnly);
+    check(platformShopOrder, (p) => p.cost, (p) => p.purchaseOnly);
+    expect(ballShopOrder.toSet(), BallCosmetic.values.toSet());
+    expect(platformShopOrder.toSet(), PlatformStyle.values.toSet());
   });
 
   testWidgets('shop dot clears on return and collection has three tabs', (

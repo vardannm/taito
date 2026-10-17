@@ -9,4 +9,5 @@ build/
 .pub-cache/
 firebase-debug*.log
 artifacts/
-
+__pycache__/
+*.pyc

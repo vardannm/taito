@@ -92,19 +92,17 @@ void main() {
     'level chooser is centered inside the preview and run HUD uses the reclaimed header space',
     (tester) async {
       final game = await launch(tester, ControlMode.twoFinger);
-      for (final mode in [1, 2]) {
-        await selectWorld(tester, mode);
-        final board = tester.getRect(find.byType(PivotBoard));
-        final button = tester.getRect(
-          find.byKey(const ValueKey('choose-level')),
-        );
-        expect(board.contains(button.center), true);
-        expect(button.center.dx, closeTo(board.center.dx, 1));
-        expect(find.byKey(const ValueKey('board-level-name')), findsOneWidget);
-        expect(game.waitingForInput, true);
-      }
+      await selectWorld(tester, 1);
+      expect(game.mode, GameMode.classic);
+      final preview = tester.getRect(find.byType(PivotBoard));
+      final button = tester.getRect(find.byKey(const ValueKey('choose-level')));
+      expect(button.top, greaterThan(preview.bottom));
+      expect(game.waitingForInput, true);
+      await selectWorld(tester, 2);
+      expect(find.byKey(const ValueKey('choose-level')), findsNothing);
       await selectWorld(tester, 0);
       final before = tester.getRect(find.byType(PivotBoard));
+      await armWorld(tester);
       await tester.tapAt(contact(tester, game));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 600));
@@ -142,9 +140,9 @@ void main() {
         home: Scaffold(body: BallShop(profile: restored)),
       ),
     );
-    await tester.tap(find.text('Cabinet Styles'));
     await tester.pump();
-    expect(find.byKey(const ValueKey('cabinet-brass')), findsOneWidget);
+    expect(find.text('Cabinet Styles'), findsNothing);
+    expect(find.byKey(const ValueKey('cabinet-brass')), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

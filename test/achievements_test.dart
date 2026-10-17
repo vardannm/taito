@@ -126,6 +126,36 @@ void main() {
     },
   );
 
+  testWidgets('opening achievements scrolls to the first reward to claim', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final ready = Achievement.values.last;
+    final p = PlayerProfile();
+    // Everything earlier is already claimed; only the last card is ready.
+    switch (ready) {
+      case Achievement.visits60:
+        p.dailyPrizes.claimed = 60;
+      default:
+        fail('Update this test for the new last achievement: $ready');
+    }
+    p.replaceClaimedAchievements(
+      Achievement.values.where((a) => a != ready && p.achievementEarned(a)),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: AchievementSheet(profile: p)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(ValueKey('claim-${ready.name}')).hitTestable(),
+      findsOneWidget,
+    );
+  });
+
   for (final scale in [1.0, 1.5]) {
     testWidgets(
       'achievement sheet fits a small phone at text scale $scale and claims',

@@ -8,7 +8,13 @@ typedef EnemyBeam = ({EnemyPoint start, EnemyPoint end});
 enum LateEnemyKind { beetle, cricket, moth, scorpion, seedSpitter }
 
 extension LateEnemyDetails on LateEnemyKind {
-  EncounterEnemy get encounterKind => EncounterEnemy.values[index + 1];
+  EncounterEnemy get encounterKind => switch (this) {
+    LateEnemyKind.beetle => EncounterEnemy.beetle,
+    LateEnemyKind.cricket => EncounterEnemy.cricket,
+    LateEnemyKind.moth => EncounterEnemy.moth,
+    LateEnemyKind.scorpion => EncounterEnemy.scorpion,
+    LateEnemyKind.seedSpitter => EncounterEnemy.seedSpitter,
+  };
   String get name => switch (this) {
     LateEnemyKind.beetle => 'BOMBARDIER BEETLE',
     LateEnemyKind.cricket => 'RICOCHET CRICKET',

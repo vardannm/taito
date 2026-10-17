@@ -54,7 +54,10 @@ void main() {
   testWidgets(
     'pivot drags are independent, cancel safely and do not jump on grab',
     (tester) async {
-      final game = BalanceGame()..start(gameMode: GameMode.practice);
+      // No holes: a lift from the launch height must not end in a trap.
+      final game = BalanceGame()
+        ..start(gameMode: GameMode.practice)
+        ..board.clear();
       final frame = ValueNotifier(0);
       await tester.pumpWidget(
         MaterialApp(
@@ -69,14 +72,15 @@ void main() {
           BoardViewport.forGame(rect.size, game).gripCenter(game, side);
       final left = await tester.startGesture(point(0), pointer: 1);
       final right = await tester.startGesture(point(1), pointer: 2);
-      expect(game.left, 526);
-      await left.moveBy(Offset(0, -20 * BoardViewport(rect.size).scale));
-      await right.moveBy(Offset(0, -10 * BoardViewport(rect.size).scale));
+      expect(game.left, BalanceGame.launchHeight);
+      final scale = BoardViewport.forGame(rect.size, game).scale;
+      await left.moveBy(Offset(0, -20 * scale));
+      await right.moveBy(Offset(0, -10 * scale));
       for (int i = 0; i < 20; i++) {
         game.step(1 / 120);
       }
-      expect(game.left, closeTo(506, .01));
-      expect(game.right, closeTo(516, .01));
+      expect(game.left, closeTo(BalanceGame.launchHeight - 20, .01));
+      expect(game.right, closeTo(BalanceGame.launchHeight - 10, .01));
       await left.up();
       expect(game.pivotTargets[0], isNull);
       expect(game.pivotTargets[1], isNotNull);

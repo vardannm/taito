@@ -107,7 +107,8 @@ class _PivotBoardState extends State<PivotBoard> {
             game.boardTilt)
           return;
         final viewport = viewportNow();
-        if (!viewport.rect.contains(event.localPosition)) return;
+        // Handles may sit in the strip below the board.
+        if (!viewport.gripArea.contains(event.localPosition)) return;
         final side = event.localPosition.dx < viewport.rect.center.dx ? 0 : 1;
         if (!viewport.hitsGrip(event.localPosition, game, side) ||
             pointers.containsValue(side))

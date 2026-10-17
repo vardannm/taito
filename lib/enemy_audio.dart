@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
+import 'music_output.dart' show gameAudioContext;
 import 'enemy_sounds.dart';
 
 typedef EnemySoundStart = Future<StopFunction> Function(EnemyCue cue);
@@ -50,9 +51,7 @@ class EnemyAudio {
       minPlayers: 1,
       maxPlayers: 4,
       playerMode: PlayerMode.lowLatency,
-      audioContext: AudioContextConfig(
-        focus: AudioContextConfigFocus.mixWithOthers,
-      ).build(),
+      audioContext: gameAudioContext(),
     ),
   );
 

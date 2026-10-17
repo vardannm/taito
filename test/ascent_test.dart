@@ -11,14 +11,14 @@ void main() {
     for (var i = 0; i < 10; i++) {
       game.grabPivot(0);
       game.grabPivot(1);
-      game.dragPivot(0, -100);
-      game.dragPivot(1, -100);
+      game.dragPivot(0, -200);
+      game.dragPivot(1, -200);
       final camera = game.cameraOffset;
       final travel = game.ascentSpeed / 120;
       game.step(1 / 120);
       expect(game.cameraOffset - camera, closeTo(travel, 1e-8));
-      expect(game.screenY(game.left), closeTo(356, 1e-8));
-      expect(game.screenY(game.right), closeTo(356, 1e-8));
+      expect(game.screenY(game.left), closeTo(300, 1e-8));
+      expect(game.screenY(game.right), closeTo(300, 1e-8));
       game.releasePivot(0);
       game.releasePivot(1);
     }
@@ -75,13 +75,13 @@ void main() {
 
   test('ascent accelerates gradually and has a fixed speed cap', () {
     final game = BalanceGame()..start(gameMode: GameMode.infinite);
-    expect(game.ascentSpeed, 68);
+    expect(game.ascentSpeed, 89);
     game.maxHeight = 4500;
     expect(
       game.ascentSpeed,
       closeTo(
-        68 +
-            10.3359375 * InfiniteDifficulty.speedGrowth +
+        89 +
+            8.39794921875 * InfiniteDifficulty.speedGrowth +
             6.75 * InfiniteDifficulty.paceGrowth,
         .001,
       ),
@@ -89,8 +89,8 @@ void main() {
     game.maxHeight = 100000;
     expect(
       game.ascentSpeed,
-      68 +
-          112 * InfiniteDifficulty.speedGrowth +
+      89 +
+          91 * InfiniteDifficulty.speedGrowth +
           36 * InfiniteDifficulty.paceGrowth,
     );
   });

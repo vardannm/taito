@@ -15,6 +15,7 @@ class TutorialSpotlight extends StatefulWidget {
     this.listenable,
     this.bottomInset = 16,
     this.messageTop,
+    this.centerSkip = false,
   });
   final List<Rect> Function(RenderBox layer) targets;
   final String message;
@@ -23,6 +24,9 @@ class TutorialSpotlight extends StatefulWidget {
   final Listenable? listenable;
   final double bottomInset;
   final double? messageTop;
+
+  /// Centres Skip so it stays clear of two-finger handles at both edges.
+  final bool centerSkip;
   @override
   State<TutorialSpotlight> createState() => _TutorialSpotlightState();
 }
@@ -158,18 +162,26 @@ class _TutorialSpotlightState extends State<TutorialSpotlight>
               ),
             ),
             Positioned(
-              left: 16,
+              left: widget.centerSkip ? 0 : 16,
+              right: widget.centerSkip ? 0 : null,
               bottom: widget.bottomInset,
-              child: TextButton(
-                key: const ValueKey('skip-tutorial'),
-                onPressed: widget.onSkip,
-                style: TextButton.styleFrom(
-                  foregroundColor: cream,
-                  backgroundColor: ink.withAlpha(210),
-                ),
-                child: const Text(
-                  'Skip Tutorial',
-                  style: TextStyle(fontSize: 11),
+              child: Align(
+                alignment: widget.centerSkip
+                    ? Alignment.bottomCenter
+                    : Alignment.bottomLeft,
+                widthFactor: widget.centerSkip ? null : 1,
+                heightFactor: 1,
+                child: TextButton(
+                  key: const ValueKey('skip-tutorial'),
+                  onPressed: widget.onSkip,
+                  style: TextButton.styleFrom(
+                    foregroundColor: cream,
+                    backgroundColor: ink.withAlpha(210),
+                  ),
+                  child: const Text(
+                    'Skip Tutorial',
+                    style: TextStyle(fontSize: 11),
+                  ),
                 ),
               ),
             ),

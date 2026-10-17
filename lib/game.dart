@@ -33,6 +33,9 @@ enum ControlMode { twoFinger, oneFinger, analog, tiltLift, boardTilt }
 // Keep legacy modes for saved records and backups, but offer only these controls.
 const selectableControlModes = [ControlMode.oneFinger, ControlMode.twoFinger];
 
+/// Below this, drags barely move the platform and controls feel dead.
+const minSensitivity = .25;
+
 extension ControlModeLabel on ControlMode {
   ControlMode get supportedMode =>
       selectableControlModes.contains(this) ? this : ControlMode.oneFinger;
@@ -217,6 +220,10 @@ class BalanceGame {
   }
 
   static const width = 360.0, height = 560.0, ballRadius = 7.0;
+
+  /// Where a Classic platform rests at the start. The same for every control,
+  /// so the ball starts at the same height whichever one is chosen.
+  static const launchHeight = 500.0;
 
   static const holes = <Hole>[
     Hole(103, 461, target: 1),
@@ -716,6 +723,19 @@ class BalanceGame {
   bool get canControl =>
       started && !paused && !inputLocked && phase == GamePhase.playing;
 
+  // Draws from the preview random while waiting, so previews never consume
+  // the real run's randomness; beginInput re-seeds from the run random.
+  void _seedEncounters() {
+    final encounterSeed = _random.nextInt(1 << 30);
+    enemyDirector = EncounterDirector(encounterSeed);
+    final bossRandom = math.Random(encounterSeed ^ 0xB055);
+    _bossScoreThresholds = List.unmodifiable([
+      for (final kind in BossKind.values)
+        kind.minimumScore +
+            bossRandom.nextInt(kind.maximumScore - kind.minimumScore + 1),
+    ]);
+  }
+
   /// Activate the prepared board without resetting input or rebuilding a run.
   /// The caller continues handling this same key/pointer event as movement.
   void beginInput() {
@@ -725,6 +745,8 @@ class BalanceGame {
       // Replace only the course. Keep pointer ownership, platform and input
       // epoch intact so this very same event also controls the new run.
       if (infinite) {
+        // Same draw order as a direct start: encounters first, then course.
+        _seedEncounters();
         _endlessHoles.clear();
         coins.clear();
         _nextRowY = 300 + _random.nextDouble() * 20;
@@ -745,8 +767,8 @@ class BalanceGame {
     onInputStarted?.call();
   }
 
-  Hole get activeHole =>
-      board.firstWhere((h) => h.target == target.clamp(1, 10));
+  Hole? get activeHole =>
+      board.where((h) => h.target == target.clamp(1, 10)).firstOrNull;
   double get ballY =>
       platformY(ballX) - (merging ? MergeRun.ballRadius : ballRadius);
   double platformY(double x) => left + (right - left) * ((x - 20) / 320);
@@ -827,11 +849,7 @@ class BalanceGame {
   void resetBall() {
     ballTrail.clear();
     motionSpeed = 0;
-    left = right = infinite
-        ? infiniteStart
-        : oneFinger
-        ? 500
-        : 526;
+    left = right = infinite ? infiniteStart : launchHeight;
     ballX = 180;
     ballRotation = 0;
     velocity = leftSpeed = rightSpeed = 0;
@@ -919,16 +937,7 @@ class BalanceGame {
     _nextBossAt = 0;
     _lastDamageAt = double.negativeInfinity;
     _bossWarningAt = null;
-    if (infinite) {
-      final encounterSeed = _runRandom.nextInt(1 << 30);
-      enemyDirector = EncounterDirector(encounterSeed);
-      final bossRandom = math.Random(encounterSeed ^ 0xB055);
-      _bossScoreThresholds = List.unmodifiable([
-        for (final kind in BossKind.values)
-          kind.minimumScore +
-              bossRandom.nextInt(kind.maximumScore - kind.minimumScore + 1),
-      ]);
-    }
+    if (infinite) _seedEncounters();
     _nextPorcupineY = -2700;
     _nextQuillTime = 0;
     if (spiderLevel)
@@ -942,7 +951,7 @@ class BalanceGame {
     coinsCollected = 0;
     lastCoinAge = 99;
     // Active-time targets: fixed lift time plus steering allowance and trap detours.
-    final launch = oneFinger ? 500.0 : 526.0;
+    const launch = launchHeight;
     final liftTime =
         _classicBoard
             .where((h) => h.target > 0)
@@ -1070,7 +1079,7 @@ class BalanceGame {
       phaseTime += dt;
       final t = (phaseTime / .65).clamp(0.0, 1.0);
       final ease = 1 - math.pow(1 - t, 3);
-      final launch = oneFinger ? 500.0 : 526.0;
+      const launch = launchHeight;
       left = returnLeft + (launch - returnLeft) * ease;
       right = returnRight + (launch - returnRight) * ease;
       if (t >= 1) {

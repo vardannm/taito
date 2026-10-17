@@ -67,3 +67,15 @@ enum PlatformStyle {
   final int cost, color;
   final double scoreBonus;
 }
+
+/// Shop order, weakest first: coin rails by price, then store-only rails by
+/// boost. Also ranks strength, so the shop never suggests a weaker rail.
+final List<PlatformStyle> platformShopOrder = List.unmodifiable(
+  [...PlatformStyle.values]..sort(
+    (a, b) => a.purchaseOnly != b.purchaseOnly
+        ? (a.purchaseOnly ? 1 : -1)
+        : a.purchaseOnly
+        ? a.scoreBonus.compareTo(b.scoreBonus)
+        : a.cost.compareTo(b.cost),
+  ),
+);

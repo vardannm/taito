@@ -26,10 +26,36 @@ const ink = Color(0xFF163D3B);
 const orange = Color(0xFFCD542F);
 const brass = Color(0xFFD9AE65);
 
+/// Height kept below the board for the controls: the one-finger thumb pad,
+/// or the strip where two-finger handles sit under the platform. Both modes
+/// share it, so the board and ball sit at the same place on screen.
+const controlStripHeight = 96.0;
+
+/// The strip a full-size board widget lays its board out above. One-finger
+/// places its pad outside the board widget instead, so it needs none here.
+double handleStrip(BalanceGame game) =>
+    game.controlMode == ControlMode.twoFinger ? controlStripHeight : 0;
+
+/// The strip below the board across the whole play area, pad or handles.
+double controlStrip(BalanceGame game) =>
+    game.oneFinger || game.controlMode == ControlMode.twoFinger
+    ? controlStripHeight
+    : 0;
+
 /// One transform shared by rendering and pointer hit testing.
 class BoardViewport {
-  BoardViewport(Size size, {double fillWidth = 0, double focusY = 440}) {
+  /// [bottomInset] keeps a strip below the board for the controls: the board
+  /// is laid out above it, and two-finger handles may sit inside it.
+  BoardViewport(
+    Size full, {
+    double fillWidth = 0,
+    double focusY = 440,
+    double bottomInset = 0,
+  }) {
+    final size = Size(full.width, math.max(1, full.height - bottomInset));
     bounds = Offset.zero & size;
+    // Without a strip, handles stay on the visible board as before.
+    controlBottom = bottomInset > 0 ? full.height : 0;
     final fit = math.min(
       size.width / BalanceGame.width,
       size.height / BalanceGame.height,
@@ -52,19 +78,27 @@ class BoardViewport {
             ),
     );
   }
+
+  /// For a board widget of [size]. Two-finger keeps its handle strip inside
+  /// that size unless [bottomInset] says otherwise.
   factory BoardViewport.forGame(
     Size size,
     BalanceGame game, {
     double fillWidth = 0,
+    double? bottomInset,
   }) => BoardViewport(
     size,
     fillWidth: fillWidth,
+    bottomInset: bottomInset ?? handleStrip(game),
     focusY: game.screenY((game.left + game.right) / 2),
   );
   late final double scale;
   late final double topExtension;
   late Offset offset;
   late final Rect bounds;
+
+  /// Bottom of the control strip below the board, or 0 when there is none.
+  late final double controlBottom;
   Offset project(Offset point) => offset + point * scale;
 
   /// Screen-space spacing keeps a thumb clear of the ball at every board scale.
@@ -75,17 +109,27 @@ class BoardViewport {
         game.screenY(side == 0 ? game.left : game.right),
       ),
     );
-    final visible = rect.intersect(bounds);
     // At the very bottom, use the space above instead of covering the ball or
     // drawing an unreachable handle outside the screen.
     final dy =
-        heldOffset ?? (pivot.dy + 64 + 24 <= visible.bottom ? 64.0 : -64.0);
+        heldOffset ?? (pivot.dy + 64 + 24 <= gripArea.bottom ? 64.0 : -64.0);
     return pivot + Offset(0, dy);
+  }
+
+  /// The visible board plus the control strip below it.
+  Rect get gripArea {
+    final visible = rect.intersect(bounds);
+    return Rect.fromLTRB(
+      visible.left,
+      visible.top,
+      visible.right,
+      math.max(visible.bottom, controlBottom),
+    );
   }
 
   bool hitsGrip(Offset point, BalanceGame game, int side) {
     final grip = gripCenter(game, side);
-    return rect.intersect(bounds).contains(point) &&
+    return gripArea.contains(point) &&
         (point.dx - grip.dx).abs() <= 44 &&
         (point.dy - grip.dy).abs() <= 24;
   }
@@ -665,51 +709,57 @@ class BoardPainter extends CustomPainter {
         !game.oneFinger &&
         !game.bottomControls &&
         !game.boardTilt;
-    for (final p in [a, b]) {
-      final grip = grips
-          ? (viewport.gripCenter(
-                      game,
-                      p == a ? 0 : 1,
-                      heldOffset: gripOffsets[p == a ? 0 : 1],
-                    ) -
-                    viewport.offset) /
-                viewport.scale
-          : p;
-      if (grips) {
-        canvas.drawLine(
-          p,
-          grip,
-          Paint()
-            ..color = brass.withAlpha(180)
-            ..strokeWidth = 2 / viewport.scale,
-        );
-        canvas.drawCircle(p, 3, Paint()..color = ink);
-        canvas.drawCircle(p, 1.5, Paint()..color = brass);
-      }
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(
-            center: grip,
-            width: grips ? 27 / viewport.scale : 12,
-            height: grips ? 32 / viewport.scale : 19,
-          ),
-          const Radius.circular(3),
-        ),
-        Paint()..color = ink,
-      );
-      canvas.drawCircle(grip, 2, Paint()..color = brass);
-      if (grips) {
-        for (final dy in [-7.0, 7.0]) {
+    // Two-finger handles may hang below the playfield into the control strip,
+    // so they are drawn after its clip ends; other controls' caps stay here.
+    void paintEnds() {
+      for (final p in [a, b]) {
+        final grip = grips
+            ? (viewport.gripCenter(
+                        game,
+                        p == a ? 0 : 1,
+                        heldOffset: gripOffsets[p == a ? 0 : 1],
+                      ) -
+                      viewport.offset) /
+                  viewport.scale
+            : p;
+        if (grips) {
           canvas.drawLine(
-            grip + Offset(-6, dy) / viewport.scale,
-            grip + Offset(6, dy) / viewport.scale,
+            p,
+            grip,
             Paint()
-              ..color = brass
-              ..strokeWidth = 1.5,
+              ..color = brass.withAlpha(180)
+              ..strokeWidth = 2 / viewport.scale,
           );
+          canvas.drawCircle(p, 3, Paint()..color = ink);
+          canvas.drawCircle(p, 1.5, Paint()..color = brass);
+        }
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromCenter(
+              center: grip,
+              width: grips ? 27 / viewport.scale : 12,
+              height: grips ? 32 / viewport.scale : 19,
+            ),
+            const Radius.circular(3),
+          ),
+          Paint()..color = ink,
+        );
+        canvas.drawCircle(grip, 2, Paint()..color = brass);
+        if (grips) {
+          for (final dy in [-7.0, 7.0]) {
+            canvas.drawLine(
+              grip + Offset(-6, dy) / viewport.scale,
+              grip + Offset(6, dy) / viewport.scale,
+              Paint()
+                ..color = brass
+                ..strokeWidth = 1.5,
+            );
+          }
         }
       }
     }
+
+    if (!grips) paintEnds();
     if (game.merging) {
       final run = game.mergeRun;
       Offset segmentCenter(int i) {
@@ -797,6 +847,7 @@ class BoardPainter extends CustomPainter {
         }
     }
     canvas.restore();
+    if (grips) paintEnds();
     for (final p in [
       Offset(7, top + 20),
       Offset(353, top + 20),

@@ -475,7 +475,7 @@ class _BallShopState extends State<BallShop>
                             ),
                           ),
                         if (category == 0)
-                          for (final b in BallCosmetic.values)
+                          for (final b in ballShopOrder)
                             galleryItem(
                               id: 'buy-${b.name}',
                               worldBall: b,
@@ -491,7 +491,7 @@ class _BallShopState extends State<BallShop>
                               buy: () => setState(() => p.selectBall(b)),
                             ),
                         if (category == 1)
-                          for (final rail in PlatformStyle.values)
+                          for (final rail in platformShopOrder)
                             galleryItem(
                               id: 'buy-platform-${rail.name}',
                               name: rail.label,

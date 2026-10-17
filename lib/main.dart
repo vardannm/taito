@@ -17,6 +17,7 @@ import 'infinite_progress.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -155,7 +156,20 @@ class _GameScreenState extends State<GameScreen>
 
   void tutorialChanged() {
     unawaited(profile.saveTutorial());
+    restoreReplayControl();
     if (mounted) setState(() {});
+  }
+
+  /// The player's own control choice, set aside while a replayed tutorial
+  /// teaches One-finger.
+  ControlMode? controlBeforeReplay;
+
+  void restoreReplayControl() {
+    final mode = controlBeforeReplay;
+    if (mode == null || tutorialActive) return;
+    controlBeforeReplay = null;
+    profile.controlMode = mode;
+    unawaited(profile.save());
   }
 
   void advanceTutorial(TutorialStep step) {
@@ -167,11 +181,13 @@ class _GameScreenState extends State<GameScreen>
     unawaited(profile.completeTutorial());
     game.endTutorialCourse();
     tutorialRun = null;
+    restoreReplayControl();
     setState(() {});
   }
 
   void replayTutorial() {
     unawaited(profile.replayTutorial());
+    controlBeforeReplay ??= profile.controlMode;
     profile.controlMode = ControlMode.oneFinger;
     unawaited(profile.save());
     setState(() {
@@ -289,6 +305,8 @@ class _GameScreenState extends State<GameScreen>
     final viewport = BoardViewport.forGame(
       Size(
         board.size.width,
+        // Only one-finger's pad lies outside the board here; forGame keeps
+        // the two-finger handle strip itself.
         math.max(
           1,
           board.size.height - (game.oneFinger ? OneFingerControls.height : 0),
@@ -426,7 +444,11 @@ class _GameScreenState extends State<GameScreen>
     } catch (_) {
       result = ReviveAdResult.unavailable;
     }
-    if (!mounted || game.runSerial != serial) return;
+    if (!mounted) return;
+    if (game.runSerial != serial) {
+      setState(() => adBusy = false);
+      return;
+    }
     setState(() {
       adBusy = false;
       if (result == ReviveAdResult.earned && game.reviveInfinite()) {
@@ -469,9 +491,9 @@ class _GameScreenState extends State<GameScreen>
     } catch (_) {
       result = ReviveAdResult.unavailable;
     }
-    if (!mounted ||
-        !identical(game, rewardedGame) ||
-        game.runSerial != serial) {
+    if (!mounted) return;
+    if (!identical(game, rewardedGame) || game.runSerial != serial) {
+      setState(() => adBusy = false);
       return;
     }
     setState(() {
@@ -634,7 +656,10 @@ class _GameScreenState extends State<GameScreen>
             controlMode: profile.controlMode,
             recordForControl: (number, mode) =>
                 profile.levelRecord(number, mode),
-            onControlChanged: (mode) {
+            onControlChanged: (choice) {
+              final mode = profile.temporaryLevelAccess
+                  ? choice
+                  : choice.supportedMode;
               setState(() {
                 profile.controlMode = mode;
                 game.setControlMode(mode);
@@ -976,6 +1001,14 @@ class _GameScreenState extends State<GameScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      // The OS may end the process while in the background.
+      unawaited(
+        game.finished && offeringRevive && !adBusy
+            ? profile.saveProvisionalInfinite(game)
+            : profile.save(),
+      );
+    }
     if (state != AppLifecycleState.resumed && game.started && !game.finished) {
       unawaited(profile.saveTutorial());
       if (game.waitingForInput) {
@@ -1024,7 +1057,35 @@ class _GameScreenState extends State<GameScreen>
   );
 
   @override
-  Widget build(BuildContext context) => playScreen(context);
+  Widget build(BuildContext context) => PopScope(
+    canPop: backLeavesApp,
+    onPopInvokedWithResult: (didPop, _) {
+      if (!didPop) handleBack();
+    },
+    child: playScreen(context),
+  );
+
+  /// System back leaves the app only from the mode menu.
+  bool get backLeavesApp =>
+      !playArmed &&
+      game.waitingForInput &&
+      !returning &&
+      !adBusy &&
+      entrance.isDismissed;
+
+  /// Back pauses a live run; from a paused, armed or finished board it
+  /// returns to the menu (recording any finished result) instead of exiting.
+  void handleBack() {
+    if (adBusy || returning) return;
+    if (game.started &&
+        !game.finished &&
+        !game.paused &&
+        !game.waitingForInput) {
+      pause();
+      return;
+    }
+    unawaited(home());
+  }
 
   Widget? tutorialOverlay() {
     if (!tutorialActive ||
@@ -1091,6 +1152,7 @@ class _GameScreenState extends State<GameScreen>
       messageTop: guidedPlay || objective
           ? MediaQuery.paddingOf(context).top + 118
           : null,
+      centerSkip: game.controlMode == ControlMode.twoFinger,
       targets: (layer) {
         final result = <Rect>[];
         void ui(GlobalKey key) {
@@ -1104,6 +1166,8 @@ class _GameScreenState extends State<GameScreen>
           final viewport = BoardViewport.forGame(
             Size(
               board.size.width,
+              // Only one-finger's pad lies outside the board here; forGame keeps
+              // the two-finger handle strip itself.
               math.max(
                 1,
                 board.size.height -
@@ -1147,7 +1211,8 @@ class _GameScreenState extends State<GameScreen>
         }
 
         if (objective) {
-          worldPoint(game.activeHole.x, game.activeHole.y);
+          final hole = game.activeHole;
+          if (hole != null) worldPoint(hole.x, hole.y);
           controls();
         } else if (menu) {
           ui(
@@ -1710,7 +1775,13 @@ class _GameScreenState extends State<GameScreen>
     if (game.oneFinger)
       return point.dy < board.size.height - OneFingerControls.height;
     if (game.bottomControls) return true;
-    final viewport = BoardViewport(board.size);
+    // The same layout the board paints with, so a touch on a drawn handle
+    // is never mistaken for a world swipe.
+    final viewport = BoardViewport.forGame(
+      board.size,
+      game,
+      fillWidth: expansion,
+    );
     for (final side in [0, 1]) {
       if (viewport.hitsGrip(point, game, side)) return false;
     }
@@ -1786,8 +1857,8 @@ class _GameScreenState extends State<GameScreen>
                       ),
                     ),
                   ),
-                  if (game.oneFinger)
-                    const SizedBox(height: OneFingerControls.height),
+                  if (controlStrip(game) > 0)
+                    SizedBox(height: controlStrip(game)),
                 ],
               ),
             ),
@@ -2495,7 +2566,7 @@ class _GameScreenState extends State<GameScreen>
             returning ||
             !entrance.isDismissed,
         expansion: expansion,
-        controlInset: game.oneFinger ? OneFingerControls.height : 0,
+        controlInset: controlStrip(game),
         acceptSwipe: acceptsWorldSwipe,
         onMoving: (moving) => setState(() {
           carouselMoving = moving;
@@ -3355,7 +3426,8 @@ class _GameScreenState extends State<GameScreen>
       MaterialPageRoute<void>(
         builder: (_) => ClubScreen(
           profile: profile,
-          recorder: playtest,
+          // The playtest recorder is a study tool, not a player feature.
+          recorder: kReleaseMode ? null : playtest,
           onPlay: (mode, level, date) {
             if (mode == GameMode.classic) profile.classicLevel = level;
             unawaited(profile.save());

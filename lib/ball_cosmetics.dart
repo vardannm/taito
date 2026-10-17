@@ -119,5 +119,17 @@ enum BallCosmetic {
   bool get premium => index >= plasma.index;
 }
 
+/// Shop order, weakest first: coin gear by price, then store-only gear by
+/// boost. Also ranks strength, so the shop never suggests a weaker ball.
+final List<BallCosmetic> ballShopOrder = List.unmodifiable(
+  [...BallCosmetic.values]..sort(
+    (a, b) => a.purchaseOnly != b.purchaseOnly
+        ? (a.purchaseOnly ? 1 : -1)
+        : a.purchaseOnly
+        ? a.scoreBonus.compareTo(b.scoreBonus)
+        : a.cost.compareTo(b.cost),
+  ),
+);
+
 String formatBoost(double value) =>
     value.toStringAsFixed(2).replaceFirst(RegExp(r'\.?0+$'), '');

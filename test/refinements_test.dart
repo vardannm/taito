@@ -72,7 +72,7 @@ void main() {
       expect(g.board.map((h) => (h.x, h.y)), positions);
       expect(g.specialHazards, contains(same(warning)));
       expect(warning.age, closeTo(1 / 120, 1e-8));
-      expect(g.cameraOffset - camera, closeTo(68 / 120, 1e-7));
+      expect(g.cameraOffset - camera, closeTo(InfiniteTuning.startSpeed / 120, 1e-7));
       expect(g.survival.recovery, 2.5);
       expect(g.screenY(g.ballY), inInclusiveRange(390, 460));
     },
@@ -127,7 +127,8 @@ void main() {
       g.dragPivot(0, -100);
       g.dragPivot(1, -100);
       g.step(1 / 120);
-      expect(g.cameraOffset, lessThan(2));
+      // Three ticks of automatic ascent only; the manual lift adds nothing.
+      expect(g.cameraOffset, lessThan(3 * InfiniteTuning.startSpeed / 120 + .01));
       expect(h.worldY, y);
       expect(h.y - g.cameraOffset, closeTo(y!, 1e-6));
     },

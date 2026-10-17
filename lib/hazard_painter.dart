@@ -230,4 +230,6 @@ void _caption(
     textDirection: TextDirection.ltr,
   )..layout();
   text.paint(c, center - Offset(text.width / 2, text.height / 2));
+  // Countdown captions change every frame; release each paragraph promptly.
+  text.dispose();
 }

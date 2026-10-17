@@ -8,6 +8,7 @@ import 'ball_cosmetics.dart';
 import 'platforms.dart';
 import 'rewards.dart';
 import 'survival_upgrades.dart';
+import 'achievements.dart';
 
 /// Portable, versioned profile data. No credentials or device identifiers.
 class ProgressBackup {
@@ -38,7 +39,10 @@ class ProgressBackup {
     'level': p.classicLevel,
     'maze': 1, // Reserved for version 1 readers.
     'sound': p.sound,
+    'music': p.music,
     'haptics': p.haptics,
+    'fastStart': p.infiniteFastStart,
+    'achievements': p.claimedAchievements.map((a) => a.name).toList(),
     'tutorial': p.tutorialSeen,
     'onboarding':
         (p.tutorialSeen
@@ -106,12 +110,16 @@ class ProgressBackup {
       ..mergeHighest = n[6]
       ..mergeRuns = n[7]
       // n[8], n[9] and n[10] belong to retired modes.
-      ..wallet = n[11]
+      // The same ceiling the saved wallet uses on load.
+      ..wallet = n[11].clamp(0, 1 << 30)
       ..controlMode = choice(d['control'], ControlMode.values)
       ..classicLevel = integer(d['level'], ClassicLevels.count)
       ..sound = flag('sound')
       ..haptics = flag('haptics')
       ..tutorialSeen = flag('tutorial');
+    // Older backups predate the music switch; music followed sound then.
+    p.music = d['music'] != null ? flag('music') : p.sound;
+    if (d['fastStart'] != null) p.infiniteFastStart = flag('fastStart');
     final upgrades = d['survivalUpgrades'];
     if (upgrades != null) {
       if (upgrades is! Map) invalid();
@@ -123,6 +131,13 @@ class ProgressBackup {
       }
     }
     p.dailyPrizes = DailyPrizes.fromJson(d['dailyPrizes']);
+    final achievements = d['achievements'];
+    if (achievements != null) {
+      if (achievements is! List) invalid();
+      p.replaceClaimedAchievements(
+        achievements.map((name) => choice(name, Achievement.values)),
+      );
+    }
     p.tutorial = d['onboarding'] is Map<String, dynamic>
         ? TutorialProgress.fromJson(d['onboarding'] as Map<String, dynamic>)
         : TutorialProgress(
@@ -137,8 +152,14 @@ class ProgressBackup {
         sensitivity.length != 2 ||
         sensitivity.any((v) => v is! num || !v.isFinite || v < 0 || v > 1))
       invalid();
-    p.analogSensitivity = (sensitivity[0] as num).toDouble();
-    p.twoFingerSensitivity = (sensitivity[1] as num).toDouble();
+    p.analogSensitivity = (sensitivity[0] as num).toDouble().clamp(
+      minSensitivity,
+      1.0,
+    );
+    p.twoFingerSensitivity = (sensitivity[1] as num).toDouble().clamp(
+      minSensitivity,
+      1.0,
+    );
     void records(String name, Map<String, LevelRecord> target, RegExp key) {
       final source = d[name];
       final maxRecords = name == 'levels' ? ClassicLevels.count * 3 : 160;
@@ -172,21 +193,45 @@ class ProgressBackup {
         r'^(oneFinger|twoFinger|analog|tiltLift|boardTilt):\d{4}-\d{2}-\d{2}$',
       ),
     );
-    void owned<T extends Enum>(String key, Set<T> target, List<T> values) {
+    // Store purchases come back from the store, never from a pasted code, so
+    // purchase-only gear in a backup is skipped rather than restored.
+    void owned<T extends Enum>(
+      String key,
+      Set<T> target,
+      List<T> values,
+      bool Function(T) purchaseOnly,
+    ) {
       final source = d[key];
       if (source is! List || source.isEmpty || source.length > values.length)
         invalid();
       target.clear();
       for (final v in source) {
-        target.add(choice(v, values));
+        final item = choice(v, values);
+        if (!purchaseOnly(item)) target.add(item);
       }
     }
 
-    owned('balls', p.ownedBalls, BallCosmetic.values);
-    owned('platforms', p.ownedPlatforms, PlatformStyle.values);
-    p.selectedBall = choice(d['ball'], p.ownedBalls.toList());
-    p.selectedPlatform = choice(d['platform'], p.ownedPlatforms.toList());
+    owned('balls', p.ownedBalls, BallCosmetic.values, (b) => b.purchaseOnly);
+    owned(
+      'platforms',
+      p.ownedPlatforms,
+      PlatformStyle.values,
+      (s) => s.purchaseOnly,
+    );
+    final ball = choice(d['ball'], BallCosmetic.values);
+    p.selectedBall = p.ownedBalls.contains(ball) ? ball : BallCosmetic.steel;
+    final platform = choice(d['platform'], PlatformStyle.values);
+    p.selectedPlatform = p.ownedPlatforms.contains(platform)
+        ? platform
+        : PlatformStyle.classic;
     p.cabinet = choice(d['cabinet'], CabinetStyle.values);
+    // Backups written before claims were exported carry coins already paid
+    // for every earned achievement; treat those as claimed.
+    if (achievements == null) {
+      p.replaceClaimedAchievements(
+        Achievement.values.where(p.achievementEarned),
+      );
+    }
     if (!p.ownedBalls.contains(BallCosmetic.steel) ||
         !p.ownedPlatforms.contains(PlatformStyle.classic) ||
         !p.isUnlocked(p.cabinet))
@@ -215,6 +260,8 @@ class ProgressBackup {
       ..controlMode = source.controlMode.supportedMode
       ..classicLevel = source.classicLevel
       ..sound = source.sound
+      ..music = source.music
+      ..infiniteFastStart = source.infiniteFastStart
       ..haptics = source.haptics
       ..tutorialSeen = source.tutorialSeen
       ..tutorial = TutorialProgress.fromJson(source.tutorial.toJson())
@@ -223,6 +270,10 @@ class ProgressBackup {
       ..cabinet = source.cabinet
       ..selectedBall = source.selectedBall
       ..selectedPlatform = source.selectedPlatform;
+    target.replaceClaimedAchievements(source.claimedAchievements);
+    // Every saved field now comes from the backup, so it is safe to write
+    // even if this session's own load had failed.
+    target.resumeSavingAfterRestore();
     target.survivalUpgrades
       ..clear()
       ..addAll(source.survivalUpgrades);

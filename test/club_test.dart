@@ -63,7 +63,9 @@ void main() {
         testEconomy: false,
       );
       expect(restored.wallet, 80);
-      expect(restored.selectedBall, p.selectedBall);
+      // Purchase-only gear is restored from the store, not from a code.
+      expect(restored.ownedBalls, isNot(contains(BallCosmetic.values.last)));
+      expect(restored.selectedBall, BallCosmetic.steel);
       expect(restored.levelRecord(9).starMask, 7);
       final target = PlayerProfile();
       await ProgressBackup.restore(target, restored);

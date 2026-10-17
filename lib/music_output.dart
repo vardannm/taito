@@ -1,6 +1,19 @@
 import 'dart:async';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart';
+
+/// One audio context for every game sound. It mixes with other apps instead
+/// of taking focus (so effects never stop the music), and on iOS it uses the
+/// ambient category, which follows the Silent switch like players expect.
+AudioContext gameAudioContext() => AudioContext(
+  android: AudioContextConfig(
+    focus: AudioContextConfigFocus.mixWithOthers,
+  ).buildAndroid(),
+  iOS: defaultTargetPlatform == TargetPlatform.iOS
+      ? AudioContextIOS(category: AVAudioSessionCategory.ambient)
+      : null,
+);
 
 abstract interface class MusicOutput {
   Future<void> play(String asset, double volume);
@@ -17,9 +30,7 @@ class AudioMusicOutput implements MusicOutput {
 
   @override
   Future<void> play(String asset, double volume) async {
-    await _player.setAudioContext(
-      AudioContextConfig(focus: AudioContextConfigFocus.mixWithOthers).build(),
-    );
+    await _player.setAudioContext(gameAudioContext());
     await _player.setReleaseMode(ReleaseMode.loop);
     await _player.play(
       AssetSource(asset),

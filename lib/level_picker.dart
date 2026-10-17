@@ -162,7 +162,11 @@ class _LevelPickerState extends State<LevelPicker> {
                                                 ]
                                               : [],
                                         ),
-                                        child: Center(
+                                        // Large system text must shrink to fit
+                                        // the fixed circle, not spill out of it.
+                                        padding: const EdgeInsets.all(6),
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
                                           child: open
                                               ? Text(
                                                   '$number'.padLeft(2, '0'),
@@ -285,7 +289,11 @@ class _LevelPickerState extends State<LevelPicker> {
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          for (final mode in ControlMode.values)
+                          for (final mode
+                              in widget.allLevelsUnlocked
+                                  // Developer builds keep the test modes.
+                                  ? ControlMode.values
+                                  : selectableControlModes)
                             ChoiceChip(
                               key: ValueKey('level-control-${mode.name}'),
                               label: Text(

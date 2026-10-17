@@ -27,7 +27,7 @@ void main() {
         period: 5,
       );
       game.specialHazards.add(laser);
-      placeAt(game, game.activeHole);
+      placeAt(game, game.activeHole!);
       expect(game.target, 2);
       expect(game.phase, GamePhase.sinking);
       final elapsed = game.elapsed;
@@ -63,7 +63,7 @@ void main() {
       game.coins.clear();
       advance(game, 2.8);
       expect(game.specialHazards, isEmpty);
-      placeAt(game, game.activeHole);
+      placeAt(game, game.activeHole!);
       advance(game, .4);
       expect(game.specialHazards, hasLength(1));
       final laser = game.specialHazards.single;
@@ -84,7 +84,7 @@ void main() {
       final game = BalanceGame()..start(levelNumber: 31);
       final spider = game.spiders.first;
       spider.chasing = true;
-      placeAt(game, game.activeHole);
+      placeAt(game, game.activeHole!);
       expect(game.phase, GamePhase.sinking);
       final x = spider.x, y = spider.y, time = spider.time;
       advance(game, .2);
@@ -118,7 +118,7 @@ void main() {
         liveSeconds: 30,
       );
       game.specialHazards.add(laser);
-      placeAt(game, game.activeHole);
+      placeAt(game, game.activeHole!);
       advance(game, 1.5);
       expect(game.phase, GamePhase.playing);
       expect(game.lives, 3);

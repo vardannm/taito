@@ -5,6 +5,7 @@ import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/profile.dart';
 import 'game_test.dart' show advance, placeAt;
+import 'support/mode_navigation.dart';
 
 // Isolate score/idle-floor tests from the independent trap collision system.
 void advanceWithoutTraps(BalanceGame game, double seconds) {
@@ -68,7 +69,7 @@ void main() {
   test('staying still raises the red floor and ends the last life', () {
     final game = BalanceGame()..start(gameMode: GameMode.infinite);
     game.lives = 1;
-    advanceWithoutTraps(game, 2.8);
+    advanceWithoutTraps(game, 9.8);
     expect(game.dangerActive, isFalse);
     expect(game.score, greaterThan(0));
     advanceWithoutTraps(game, .5);
@@ -82,7 +83,7 @@ void main() {
   test('old-height movement cannot farm score or reset the stall timer', () {
     final game = BalanceGame()..start(gameMode: GameMode.infinite);
     placeAtSafeHeight(game, 60);
-    advanceWithoutTraps(game, 1.5);
+    advanceWithoutTraps(game, 8.5);
     final peakScore = game.score;
     for (int i = 0; i < 30; i++) {
       game.board.clear();
@@ -168,6 +169,7 @@ void main() {
         isTrue,
       );
       await tester.pump();
+      await armWorld(tester);
       final game = tester.widget<PivotBoard>(find.byType(PivotBoard)).game;
       game.beginInput();
       await tester.pump();

@@ -55,87 +55,90 @@ class _ControlOptionsState extends State<ControlOptions>
               ),
             ),
             clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              key: ValueKey('control-${mode.name}'),
-              onTap: () => widget.onChanged(mode),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          switch (mode) {
-                            ControlMode.twoFinger => Icons.touch_app,
-                            ControlMode.oneFinger => Icons.pan_tool_alt,
-                            ControlMode.analog => Icons.swap_vert,
-                            ControlMode.tiltLift => Icons.open_with,
-                            ControlMode.boardTilt => Icons.swipe,
-                          },
-                          size: 22,
-                          color: menuGold,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
+            child: Semantics(
+              selected: widget.value == mode,
+              child: InkWell(
+                key: ValueKey('control-${mode.name}'),
+                onTap: () => widget.onChanged(mode),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
                             switch (mode) {
-                              ControlMode.twoFinger => 'Two-Finger Control',
-                              ControlMode.oneFinger => 'One-Finger Control',
-                              ControlMode.analog => 'Vertical Analog Control',
-                              ControlMode.tiltLift => 'Tilt Only',
-                              ControlMode.boardTilt => 'Board Tilt',
+                              ControlMode.twoFinger => Icons.touch_app,
+                              ControlMode.oneFinger => Icons.pan_tool_alt,
+                              ControlMode.analog => Icons.swap_vert,
+                              ControlMode.tiltLift => Icons.open_with,
+                              ControlMode.boardTilt => Icons.swipe,
                             },
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
+                            size: 22,
+                            color: menuGold,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              switch (mode) {
+                                ControlMode.twoFinger => 'Two-Finger Control',
+                                ControlMode.oneFinger => 'One-Finger Control',
+                                ControlMode.analog => 'Vertical Analog Control',
+                                ControlMode.tiltLift => 'Tilt Only',
+                                ControlMode.boardTilt => 'Board Tilt',
+                              },
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ),
-                        ),
-                        if (widget.value == mode)
-                          const Icon(
-                            Icons.check_circle,
-                            color: menuMint,
-                            size: 20,
-                          ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        SizedBox(
-                          width: 106,
-                          height: 83,
-                          child: RepaintBoundary(
-                            child: CustomPaint(
-                              painter: _ControlDemo(mode, demo),
+                          if (widget.value == mode)
+                            const Icon(
+                              Icons.check_circle,
+                              color: menuMint,
+                              size: 20,
+                            ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 106,
+                            height: 83,
+                            child: RepaintBoundary(
+                              child: CustomPaint(
+                                painter: _ControlDemo(mode, demo),
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            switch (mode) {
-                              ControlMode.twoFinger =>
-                                'Drag the handles below the platform to keep the ball visible. Lift together, or tilt independently.',
-                              ControlMode.oneFinger =>
-                                'Use the thumb area below the board. Drag sideways to tilt, up or down to move.',
-                              ControlMode.analog =>
-                                'Slide the two bottom controls vertically. Release to hold position.',
-                              ControlMode.tiltLift =>
-                                'Drag sideways to tilt. Release to keep the angle. No manual lift in this test mode.',
-                              ControlMode.boardTilt =>
-                                'Tilt anywhere on the board. The guide appears under your finger, then hides on release. No lift or bottom slider.',
-                            },
-                            style: const TextStyle(
-                              fontSize: 12,
-                              height: 1.4,
-                              color: menuMuted,
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              switch (mode) {
+                                ControlMode.twoFinger =>
+                                  'Drag the handles below the platform to keep the ball visible. Lift together, or tilt independently.',
+                                ControlMode.oneFinger =>
+                                  'Use the thumb area below the board. Drag sideways to tilt, up or down to move.',
+                                ControlMode.analog =>
+                                  'Slide the two bottom controls vertically. Release to hold position.',
+                                ControlMode.tiltLift =>
+                                  'Drag sideways to tilt. Release to keep the angle. No manual lift in this test mode.',
+                                ControlMode.boardTilt =>
+                                  'Tilt anywhere on the board. The guide appears under your finger, then hides on release. No lift or bottom slider.',
+                              },
+                              style: const TextStyle(
+                                fontSize: 12,
+                                height: 1.4,
+                                color: menuMuted,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -180,10 +183,10 @@ class SensitivitySetting extends StatelessWidget {
       ),
       Slider(
         key: ValueKey(id),
-        value: value,
-        min: 0,
+        value: value.clamp(minSensitivity, 1.0),
+        min: minSensitivity,
         max: 1,
-        divisions: 20,
+        divisions: 15,
         label: value.toStringAsFixed(1),
         onChanged: onChanged,
         onChangeEnd: (_) => onChangeEnd?.call(),

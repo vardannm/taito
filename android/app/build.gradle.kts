@@ -61,6 +61,19 @@ android {
     }
 }
 
+// Debug signing keeps local playtest APKs possible, but a store bundle must
+// never be signed with it.
+gradle.taskGraph.whenReady {
+    if (!releaseKeyFile.exists() &&
+        allTasks.any { it.name.startsWith("bundle") && it.name.endsWith("Release") }
+    ) {
+        throw GradleException(
+            "android/key.properties is missing. Store bundles need the upload key; " +
+                "see android/key.properties.example."
+        )
+    }
+}
+
 kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17

@@ -76,7 +76,8 @@ class _GiltIntroGateState extends State<GiltIntroGate> {
   @override
   Widget build(BuildContext context) => Stack(
     children: [
-      widget.child,
+      // Screen readers must not reach the menu hidden behind the intro.
+      ExcludeSemantics(excluding: playing, child: widget.child),
       if (playing)
         Positioned.fill(
           child: GiltIntro(
@@ -166,7 +167,6 @@ class _GiltIntroState extends State<GiltIntro>
                 ball: _ballOnBoard(_tiltRest, _landAt),
                 ballIn: 1,
                 grow: 1,
-                word: 1,
                 fade: fade,
               ),
             );
@@ -182,7 +182,6 @@ class _GiltIntroState extends State<GiltIntro>
           final roll = _phase(v, 1040, 1620, Curves.easeInQuad);
           final drop = _phase(v, 1620, 1880, Curves.easeInQuad);
           final open = _phase(v, _expandMs, 2280, Curves.easeInOutCubic);
-          final word = _phase(v, 700, 1100, Curves.easeOutCubic);
 
           final tilt =
               _tiltRest +
@@ -210,7 +209,6 @@ class _GiltIntroState extends State<GiltIntro>
               ball: ball,
               ballIn: fall,
               grow: open,
-              word: word * (1 - _phase(v, 2180, _introMs, Curves.easeIn)),
               fade: 1,
             ),
           );
@@ -229,22 +227,19 @@ class _IntroPainter extends CustomPainter {
     required this.ball,
     required this.ballIn,
     required this.grow,
-    required this.word,
     required this.fade,
   });
 
   /// How far each piece has arrived, the board angle, the ball's place on the
-  /// stage, how far the hole has opened, and the two opacities.
-  final double plate, board, ring, tilt, ballIn, grow, word, fade;
+  /// stage, how far the hole has opened, and the overall fade.
+  final double plate, board, ring, tilt, ballIn, grow, fade;
   final Offset ball;
-
-  static final _word = TextPainter(textDirection: TextDirection.ltr);
 
   @override
   void paint(Canvas canvas, Size size) {
     canvas.drawRect(Offset.zero & size, Paint()..color = menuBackground);
     if (fade <= 0) return;
-    // The icon sits a little above centre to leave the wordmark its room.
+    // The icon sits a little above centre.
     final stage = math.min(size.width * .82, size.height * .46);
     final origin = Offset(
       (size.width - stage) / 2,
@@ -278,7 +273,6 @@ class _IntroPainter extends CustomPainter {
       Paint()..color = Color.lerp(_hole, menuBackground, grow)!,
     );
     _paintRim(canvas, holeAt, open, unit);
-    _paintWord(canvas, size, origin, stage);
     if (fade < 1) canvas.restore();
   }
 
@@ -394,31 +388,6 @@ class _IntroPainter extends CustomPainter {
     );
   }
 
-  void _paintWord(Canvas canvas, Size size, Offset origin, double stage) {
-    if (word <= 0) return;
-    final spacing = stage * .028;
-    _word
-      ..text = TextSpan(
-        text: 'GILT',
-        style: TextStyle(
-          fontFamily: 'sans-serif',
-          color: menuText.withValues(alpha: word),
-          fontSize: stage * .125,
-          fontWeight: FontWeight.w300,
-          letterSpacing: spacing,
-        ),
-      )
-      ..layout();
-    _word.paint(
-      canvas,
-      Offset(
-        // Letter spacing trails the last glyph; half a step back re-centres it.
-        (size.width - _word.width) / 2 + spacing / 2,
-        origin.dy + stage + stage * .11,
-      ),
-    );
-  }
-
   @override
   bool shouldRepaint(_IntroPainter old) =>
       old.plate != plate ||
@@ -428,6 +397,5 @@ class _IntroPainter extends CustomPainter {
       old.ball != ball ||
       old.ballIn != ballIn ||
       old.grow != grow ||
-      old.word != word ||
       old.fade != fade;
 }

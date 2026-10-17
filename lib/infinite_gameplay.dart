@@ -1,5 +1,8 @@
 part of 'game.dart';
 
+/// Also tells the fall-through animation that the ball dropped into a gap.
+const _platformGapReason = 'The platform broke beneath you.';
+
 extension InfiniteGameplay on BalanceGame {
   int get metres => (maxHeight / 10).floor();
   int get paceLevel => survival.levelAt(maxHeight / 10);
@@ -187,7 +190,14 @@ extension InfiniteGameplay on BalanceGame {
       }
       return;
     }
-    final kind = LateEnemyKind.values[selected.index - 1];
+    final kind = switch (selected) {
+      EncounterEnemy.beetle => LateEnemyKind.beetle,
+      EncounterEnemy.cricket => LateEnemyKind.cricket,
+      EncounterEnemy.moth => LateEnemyKind.moth,
+      EncounterEnemy.scorpion => LateEnemyKind.scorpion,
+      EncounterEnemy.seedSpitter => LateEnemyKind.seedSpitter,
+      EncounterEnemy.snake => throw StateError('Snakes spawn above.'),
+    };
     final targetY = screenY(ballY).clamp(visibleTop + 160, 500.0);
     // Enter on the farther rail, well above the ball. The moth uses the center
     // so both curved streams have room to spread without crossing the rails.
@@ -840,7 +850,7 @@ extension InfiniteGameplay on BalanceGame {
           lateShot: null,
           reason: switch (hazard.kind) {
             HazardKind.laser => 'Laser hit. Move out of the blinking beam.',
-            HazardKind.platformGap => 'The platform broke beneath you.',
+            HazardKind.platformGap => _platformGapReason,
             HazardKind.formingHole => 'The warning hole opened beneath you.',
             HazardKind.movingHole => 'Caught by a moving hole.',
           },
@@ -902,7 +912,7 @@ extension InfiniteGameplay on BalanceGame {
         if (contact.web != null) contact.web!.consumed = true;
         if (contact.quill != null) contact.quill!.consumed = true;
         if (survival.protected) continue;
-        fellThroughGap = contact.reason == 'The platform broke beneath you.';
+        fellThroughGap = contact.reason == _platformGapReason;
         _loseClimb(contact.reason!, hole: contact.hole);
         if (phase != GamePhase.playing) return;
       }

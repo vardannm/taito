@@ -10,6 +10,7 @@ import 'package:balance_arcade/ball_cosmetics.dart';
 import 'package:balance_arcade/ball_painter.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
+import 'support/mode_navigation.dart';
 
 class RotationCanvas implements Canvas {
   final rotations = <double>[];
@@ -191,6 +192,7 @@ void main() {
       p.survivalUpgrades[SurvivalUpgrade.hearts] = 3;
       await tester.pumpWidget(ArcadeApp(profile: p));
       await tester.pump();
+      await armWorld(tester);
       final game = tester.widget<PivotBoard>(find.byType(PivotBoard)).game;
       game.beginInput();
       await tester.pump();

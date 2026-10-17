@@ -48,5 +48,4 @@ flutter:
     - assets/audio/enemy_wingArrival.wav
     - assets/audio/miss.wav
     - assets/audio/target.wav
-    - assets/mode_previews/
 

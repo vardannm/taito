@@ -18,7 +18,7 @@ void main() {
     final semantics = tester.ensureSemantics();
     await tester.pumpWidget(gate());
     expect(find.byType(GiltIntro), findsOneWidget);
-    // The wordmark is painted, so it shows up as the intro's semantic label.
+    // Nothing is written on screen; the intro still names itself to screen readers.
     expect(find.bySemanticsLabel('GILT'), findsOneWidget);
 
     await tester.pump(const Duration(milliseconds: 1500));

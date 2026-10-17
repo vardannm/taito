@@ -105,7 +105,7 @@ void main() {
       expect(s.time, 0);
       g.setPaused(false);
       s.chasing = true;
-      placeAt(g, g.activeHole);
+      placeAt(g, g.activeHole!);
       advance(g, 1.5);
       expect(s.chasing, isTrue);
       expect(s.time, greaterThan(1.5));

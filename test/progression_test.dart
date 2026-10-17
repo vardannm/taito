@@ -103,7 +103,7 @@ void main() {
     final g = BalanceGame()
       ..setControlMode(ControlMode.oneFinger)
       ..start();
-    g.ballX = g.activeHole.x < 180 ? 300 : 60;
+    g.ballX = g.activeHole!.x < 180 ? 300 : 60;
     g.board.removeWhere((h) => h.target != 1);
     final initialHeight = (g.left + g.right) / 2;
     advance(g, 8);
@@ -207,7 +207,7 @@ void main() {
             ..setControlMode(control)
             ..start(levelNumber: level);
           for (var i = 1; i <= 10; i++) {
-            placeAt(g, g.activeHole);
+            placeAt(g, g.activeHole!);
             advance(g, 1.5);
           }
           expect(g.won, isTrue, reason: 'Level $level / $control');
@@ -273,12 +273,12 @@ void main() {
       g.releasePivot(0);
       g.releasePivot(1);
       g.step(1 / 120);
-      expect(g.left, 346);
-      expect(g.right, 386);
+      expect(g.left, BalanceGame.launchHeight - 180);
+      expect(g.right, BalanceGame.launchHeight - 140);
       expect(g.pivotTargets, [null, null]);
       g.step(1 / 120);
-      expect(g.left, 346);
-      expect(g.right, 386);
+      expect(g.left, BalanceGame.launchHeight - 180);
+      expect(g.right, BalanceGame.launchHeight - 140);
     },
   );
 

@@ -40,7 +40,7 @@ void main() {
     expect(g.cameraOffset, greaterThan(cameraBefore));
     expect(web.y, -800);
     expect(quill.y, -750);
-    expect(web.x, closeTo(109, 1e-6));
+    expect(web.x, closeTo(118, 1e-6));
     expect(quill.x, closeTo(109.5, 1e-6));
     expect(
       g.screenY(web.y),

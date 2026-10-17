@@ -10,7 +10,7 @@ class OneFingerControls extends StatefulWidget {
     required this.frame,
     required this.boardScale,
   });
-  static const height = 96.0;
+  static const height = controlStripHeight;
   final BalanceGame game;
   final Listenable frame;
   final double boardScale;
@@ -137,12 +137,41 @@ class _OneFingerControlsState extends State<OneFingerControls> {
 }
 
 class _ThumbPadPainter extends CustomPainter {
-  _ThumbPadPainter(this.game, this.contact);
-  final BalanceGame game;
+  _ThumbPadPainter(BalanceGame game, this.contact)
+    : enabled = game.canControl,
+      controlPosition = game.controlPosition;
+  final bool enabled;
+  final double controlPosition;
   final Offset? contact;
+
+  // The pad repaints every frame; lay its label out once per state instead.
+  static final _labels = <bool, TextPainter>{};
+  static double _labelWidth = 0;
+
+  TextPainter _label(double maxWidth) {
+    if (_labelWidth != maxWidth) {
+      for (final label in _labels.values) {
+        label.dispose();
+      }
+      _labels.clear();
+      _labelWidth = maxWidth;
+    }
+    return _labels[enabled] ??= TextPainter(
+      text: TextSpan(
+        text: 'TILT LEFT/RIGHT  ·  LIFT UP/DOWN',
+        style: TextStyle(
+          color: ink.withAlpha(enabled ? 210 : 100),
+          fontSize: 10,
+          fontFamily: 'sans-serif',
+          letterSpacing: .7,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: maxWidth);
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
-    final enabled = game.canControl;
     final area = RRect.fromRectAndRadius(
       Rect.fromLTWH(12, 8, size.width - 24, size.height - 14),
       const Radius.circular(22),
@@ -164,7 +193,7 @@ class _ThumbPadPainter extends CustomPainter {
         ..strokeWidth = 2,
     );
     final knob = contact == null
-        ? center + Offset(game.controlPosition * (size.width / 2 - 48), 0)
+        ? center + Offset(controlPosition * (size.width / 2 - 48), 0)
         : Offset(
             contact!.dx.clamp(36.0, size.width - 36),
             contact!.dy.clamp(40.0, size.height - 26),
@@ -191,21 +220,13 @@ class _ThumbPadPainter extends CustomPainter {
           ..strokeWidth = 2,
       );
     }
-    final text = TextPainter(
-      text: TextSpan(
-        text: 'TILT LEFT/RIGHT  ·  LIFT UP/DOWN',
-        style: TextStyle(
-          color: ink.withAlpha(enabled ? 210 : 100),
-          fontSize: 10,
-          fontFamily: 'sans-serif',
-          letterSpacing: .7,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout(maxWidth: size.width - 40);
+    final text = _label(size.width - 40);
     text.paint(canvas, Offset((size.width - text.width) / 2, 16));
   }
 
   @override
-  bool shouldRepaint(covariant _ThumbPadPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _ThumbPadPainter oldDelegate) =>
+      oldDelegate.enabled != enabled ||
+      oldDelegate.controlPosition != controlPosition ||
+      oldDelegate.contact != contact;
 }

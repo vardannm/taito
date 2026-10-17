@@ -40,25 +40,18 @@ class PlayerProfile {
 
   /// Hint only for a purchasable improvement beyond the gear already owned.
   bool get shopUpgradeAvailable {
-    final strongerBall = BallCosmetic.values.any(
-      (ball) =>
-          !ball.purchaseOnly &&
-          !ownedBalls.contains(ball) &&
-          canAfford(ball.cost) &&
-          (ownedBalls.every((owned) => owned.scoreBonus < ball.scoreBonus) ||
-              ownedBalls.every(
-                (owned) => owned.magnetRadius < ball.magnetRadius,
-              )),
-    );
-    final strongerPlatform = PlatformStyle.values.any(
-      (platform) =>
-          !platform.purchaseOnly &&
-          !ownedPlatforms.contains(platform) &&
-          canAfford(platform.cost) &&
-          ownedPlatforms.every(
-            (owned) => owned.scoreBonus < platform.scoreBonus,
-          ),
-    );
+    // Only gear ranked above the strongest owned piece is worth suggesting;
+    // a cheaper ball after buying a better one would be a downgrade.
+    int strongest<T>(List<T> order, Set<T> owned) =>
+        owned.map(order.indexOf).fold(0, (a, b) => a > b ? a : b);
+    final ballRank = strongest(ballShopOrder, ownedBalls);
+    final strongerBall = ballShopOrder
+        .skip(ballRank + 1)
+        .any((ball) => !ball.purchaseOnly && canAfford(ball.cost));
+    final platformRank = strongest(platformShopOrder, ownedPlatforms);
+    final strongerPlatform = platformShopOrder
+        .skip(platformRank + 1)
+        .any((platform) => !platform.purchaseOnly && canAfford(platform.cost));
     return strongerBall ||
         strongerPlatform ||
         SurvivalUpgrade.values.any(
@@ -112,6 +105,16 @@ class PlayerProfile {
 
   bool achievementClaimed(Achievement achievement) =>
       _claimedAchievements.contains(achievement);
+
+  Set<Achievement> get claimedAchievements =>
+      Set.unmodifiable(_claimedAchievements);
+
+  /// Restores claim history with a backup, so its rewards are not paid twice.
+  void replaceClaimedAchievements(Iterable<Achievement> claimed) {
+    _claimedAchievements
+      ..clear()
+      ..addAll(claimed);
+  }
 
   int achievementProgress(Achievement achievement) {
     if (achievementClaimed(achievement)) return achievement.target;
@@ -283,6 +286,7 @@ class PlayerProfile {
   }
 
   Future<void> saveEconomy() {
+    if (_loadFailed) return _economyWrites;
     // Snapshot and serialize wallet transactions; an older save cannot undo a purchase.
     final data = jsonEncode({
       'wallet': wallet,
@@ -293,7 +297,9 @@ class PlayerProfile {
       'claimedAchievements': _claimedAchievements.map((a) => a.name).toList(),
       'owned': ownedBalls.map((b) => b.name).toList(),
       'selected': selectedBall.name,
-      'bestScore': infiniteBestScore,
+      'bestScore': infiniteBestScore > _pendingBestScore
+          ? infiniteBestScore
+          : _pendingBestScore,
       'platforms': ownedPlatforms.map((p) => p.name).toList(),
       'platform': selectedPlatform.name,
     });
@@ -355,6 +361,12 @@ class PlayerProfile {
   int mergeBest = 0, mergeHighest = 2, mergeRuns = 0;
   bool sound = true, music = true, haptics = true;
   bool available = true;
+
+  /// A failed read leaves defaults in memory; writing them would erase the
+  /// player's real save, so this session keeps its progress in memory only.
+  bool _loadFailed = false;
+
+  void resumeSavingAfterRestore() => _loadFailed = false;
   bool tutorialSeen = false;
   TutorialProgress tutorial = TutorialProgress();
   Future<void> _tutorialWrites = Future<void>.value();
@@ -427,6 +439,7 @@ class PlayerProfile {
     tutorialSeen = true;
     tutorial.step = TutorialStep.completed;
     await saveTutorial();
+    if (_loadFailed) return;
     try {
       await storage.setBool('gilt.tutorial.v1.seen', true);
     } catch (_) {
@@ -435,6 +448,7 @@ class PlayerProfile {
   }
 
   Future<void> saveTutorial() {
+    if (_loadFailed) return _tutorialWrites;
     final snapshot = jsonEncode(tutorial.toJson());
     _tutorialWrites = _tutorialWrites.then((_) async {
       try {
@@ -450,6 +464,24 @@ class PlayerProfile {
     tutorialSeen = false;
     tutorial = TutorialProgress();
     return saveTutorial();
+  }
+
+  /// A finished Infinite run still waiting on the revive offer. Saves count
+  /// it, so a process kill in the background cannot lose a new best; the
+  /// final [recordResult] supersedes it.
+  int _pendingRuns = 0, _pendingBestScore = 0, _pendingBest = 0;
+
+  Future<void> saveProvisionalInfinite(BalanceGame game) {
+    if (game.infinite &&
+        game.finished &&
+        !game.practice &&
+        _recordedRuns[game] != game.runSerial) {
+      bankCoins(game);
+      _pendingRuns = 1;
+      if (game.score > _pendingBestScore) _pendingBestScore = game.score;
+      if (game.metres > _pendingBest) _pendingBest = game.metres;
+    }
+    return save();
   }
 
   bool recordResult(BalanceGame game) {
@@ -469,6 +501,7 @@ class PlayerProfile {
       return false;
     _recordedRuns[game] = game.runSerial;
     if (game.infinite) {
+      _pendingRuns = 0;
       infiniteRuns++;
       final improved = game.score > infiniteBestScore;
       if (improved) infiniteBestScore = game.score;
@@ -554,10 +587,10 @@ class PlayerProfile {
       final analog = await storage.getDouble('gilt.analogSensitivity');
       final direct = await storage.getDouble('gilt.twoFingerSensitivity');
       analogSensitivity = analog != null && analog.isFinite
-          ? analog.clamp(0.0, 1.0)
+          ? analog.clamp(minSensitivity, 1.0)
           : 1;
       twoFingerSensitivity = direct != null && direct.isFinite
-          ? direct.clamp(0.0, 1.0)
+          ? direct.clamp(minSensitivity, 1.0)
           : 1;
       final savedMode = await storage.getString('gilt.controlMode');
       controlMode =
@@ -605,10 +638,12 @@ class PlayerProfile {
       }
     } catch (_) {
       available = false;
+      _loadFailed = true;
     }
   }
 
   Future<void> save() async {
+    if (_loadFailed) return;
     await saveEconomy();
     try {
       await storage.setInt('gilt.merge.best', mergeBest);
@@ -616,8 +651,11 @@ class PlayerProfile {
       await storage.setInt('gilt.merge.runs', mergeRuns);
       await storage.setInt('gilt.best', best);
       await storage.setInt('gilt.runs', runs);
-      await storage.setInt('gilt.ascent.best', infiniteBest);
-      await storage.setInt('gilt.ascent.runs', infiniteRuns);
+      await storage.setInt(
+        'gilt.ascent.best',
+        infiniteBest > _pendingBest ? infiniteBest : _pendingBest,
+      );
+      await storage.setInt('gilt.ascent.runs', infiniteRuns + _pendingRuns);
       await storage.setBool('gilt.ascent.fastStart', infiniteFastStart);
       await storage.setBool('gilt.sound', sound);
       await storage.setBool('gilt.music', music);
@@ -651,7 +689,8 @@ class GameFeedback {
   GameFeedback({MusicOutput Function()? musicOutput})
     : _musicFactory = musicOutput ?? AudioMusicOutput.new;
   final MusicOutput Function() _musicFactory;
-  AudioPlayer? _player;
+  // One low-latency player per effect, so a coin cannot cut off a target.
+  final _players = <String, AudioPlayer>{};
   final _enemyAudio = EnemyAudio();
   void setEnemyEffectsEnabled(bool enabled) => _enemyAudio.setEnabled(enabled);
   Future<void> playEnemy(EnemyCue cue) => _enemyAudio.play(cue);
@@ -665,11 +704,7 @@ class GameFeedback {
     if (_sharedContext) return;
     _sharedContext = true;
     try {
-      await AudioPlayer.global.setAudioContext(
-        AudioContextConfig(
-          focus: AudioContextConfigFocus.mixWithOthers,
-        ).build(),
-      );
+      await AudioPlayer.global.setAudioContext(gameAudioContext());
     } catch (_) {
       /* An unavailable audio platform must never interrupt a run. */
     }
@@ -686,14 +721,18 @@ class GameFeedback {
     if (!profile.sound) return;
     try {
       await _shareAudioFocus();
-      await (_player ??= AudioPlayer()).play(
-        AssetSource(
-          'audio/${event == GameEvent.merge
-              ? 'target'
-              : event == GameEvent.coin
-              ? 'target'
-              : event.name}.wav',
-        ),
+      final sound = switch (event) {
+        GameEvent.merge || GameEvent.coin => 'target',
+        _ => event.name,
+      };
+      final key = '$sound:${event == GameEvent.coin}';
+      var player = _players[key];
+      if (player == null) {
+        player = _players[key] = AudioPlayer();
+        await player.setPlayerMode(PlayerMode.lowLatency);
+      }
+      await player.play(
+        AssetSource('audio/$sound.wav'),
         volume: event == GameEvent.coin ? .25 : .55,
       );
     } catch (_) {
@@ -820,7 +859,10 @@ class GameFeedback {
   void dispose() {
     _disposed = true;
     _enemyAudio.dispose();
-    _player?.dispose();
+    for (final player in _players.values) {
+      player.dispose();
+    }
+    _players.clear();
     _music?.dispose();
   }
 }

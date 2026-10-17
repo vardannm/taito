@@ -82,11 +82,17 @@ void main() {
       final profile = PlayerProfile();
       await profile.load();
       expect(profile.controlMode, ControlMode.oneFinger);
-      profile.controlMode = ControlMode.analog;
+      profile.controlMode = ControlMode.twoFinger;
       await profile.save();
       final restored = PlayerProfile();
       await restored.load();
-      expect(restored.controlMode, ControlMode.analog);
+      expect(restored.controlMode, ControlMode.twoFinger);
+      // Retired analog saves migrate to the one-finger default.
+      restored.controlMode = ControlMode.analog;
+      await restored.save();
+      final migrated = PlayerProfile();
+      await migrated.load();
+      expect(migrated.controlMode, ControlMode.oneFinger);
     },
   );
   testWidgets(

@@ -329,7 +329,7 @@ class _ClubScreenState extends State<ClubScreen> {
                         tooltip: 'Play this challenge',
                         icon: const Icon(Icons.play_arrow),
                         onPressed: () {
-                          profile.controlMode = friend.control;
+                          profile.controlMode = friend.control.supportedMode;
                           play(
                             GameMode.daily,
                             15,

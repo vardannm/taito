@@ -87,6 +87,8 @@ void paintNumberOrb(
       textDirection: TextDirection.ltr,
     )..layout();
     warning.paint(canvas, center + Offset(-warning.width / 2, -radius - 19));
+    // Release the native paragraph now instead of waiting for GC.
+    warning.dispose();
   }
   if (match)
     canvas.drawCircle(
@@ -129,6 +131,7 @@ void paintNumberOrb(
   final scale = math.min(1.0, radius * 1.7 / text.width);
   canvas.scale(scale);
   text.paint(canvas, Offset(-text.width / 2, -text.height / 2));
+  text.dispose();
   canvas.restore();
 }
 
