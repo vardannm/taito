@@ -44,43 +44,64 @@ def electrical_noise(rng, count, low, high):
     return signal / max(np.sqrt(np.mean(signal ** 2)), .001)
 
 
-def electricity(t, firing):
-    """Transformer buzz, unstable arcs and a hard capacitor discharge."""
-    # Local seeds keep every unrelated cue unchanged when lasers are rebuilt.
+def band_limited_saw(phase, frequency, ceiling=12000):
+    """Sawtooth from harmonics below [ceiling], so pitch sweeps never alias."""
+    signal = np.zeros_like(phase)
+    for k in range(1, 40):
+        audible = (k * frequency) < ceiling
+        signal += np.where(audible, np.sin(k * phase) / k, 0)
+    return signal * (2 / np.pi)
+
+
+def lowpass(signal, cutoff):
+    """Gentle fixed low-pass: a second-order roll-off applied in frequency."""
+    frequencies = np.fft.rfftfreq(len(signal), 1 / RATE)
+    shape = 1 / np.sqrt(1 + (frequencies / cutoff) ** 4)
+    return np.fft.irfft(np.fft.rfft(signal) * shape, n=len(signal))
+
+
+def laser(t, firing):
+    """Classic sci-fi beam: a rising whine that charges, then a zap and a
+    humming, shimmering beam that holds and fades."""
     rng = np.random.default_rng(901 if firing else 900)
     duration = len(t) / RATE
     progress = t / duration
-    corona = electrical_noise(rng, len(t), 850, 6500)
-    body = electrical_noise(rng, len(t), 140, 1800)
-    drift = np.interp(t, np.linspace(0, duration, 45), rng.uniform(.35, 1, 45))
-    frequency = 112 + (18 * progress if firing else 45 * progress ** 2)
-    phase = 2 * np.pi * np.cumsum(frequency) / RATE
-    buzz = np.tanh(2.8 * (np.sin(phase) + .32 * np.sin(phase * 3.03)))
-    buzz += .22 * np.sin(2 * np.pi * 60 * t)
-    sputter = .45 + .55 * np.maximum(0, np.sin(phase * 1.51)) ** 2
+    sizzle = electrical_noise(rng, len(t), 2200, 7500)
 
-    if firing:
-        # The beam stays electrically alive after the opening crack; it does
-        # not collapse into the old pitched, descending arcade "pew".
-        sustain = np.minimum(1, t / .006) * np.exp(-t / .38)
-        signal = sustain * (.44 * buzz * sputter + .27 * corona * drift + .13 * body)
-        signal += .9 * corona * decay(t, .013, .0004)
-        signal += .45 * sweep(t, 105, 48, duration) * decay(t, .065, .001)
-        starts = np.array([.0, .018, .057, .11, .17, .25, .34, .43, .54, .63])
-    else:
-        rise = (.12 + .88 * progress ** 1.5) * np.minimum(1, t / .015)
-        signal = rise * (.38 * buzz * sputter + .22 * corona * drift + .1 * body)
-        starts = np.sort(rng.uniform(.07, duration - .04, 23))
+    if not firing:
+        # Pitch climbs faster near the end while its tremolo speeds up, so the
+        # warning tightens into the shot.
+        frequency = 220 * 6.5 ** (progress ** 1.6)
+        phase = 2 * np.pi * np.cumsum(frequency) / RATE
+        tone = (.6 * np.sin(phase) + .25 * np.sin(2 * phase)
+                + .12 * np.sin(3 * phase))
+        tone += .35 * np.sin(phase * 1.006)  # A second voice for chorus.
+        rate = 6 + 26 * progress
+        tremolo = .7 + .3 * np.sin(2 * np.pi * np.cumsum(rate) / RATE)
+        level = (.25 + .75 * progress ** 1.3) * np.minimum(1, t / .02)
+        return np.tanh(1.2 * level * (tremolo * tone + .1 * progress * sizzle))
 
-    for start in starts:
-        age = t - start
-        live = age >= 0
-        length = rng.uniform(.002, .011)
-        envelope = np.where(live, np.exp(-np.maximum(age, 0) / length), 0)
-        envelope *= np.minimum(1, np.maximum(age, 0) / .00035)
-        strength = (.65 * np.exp(-start / .5) if firing else .1 + .45 * start / duration)
-        signal += strength * corona * envelope
-    return np.tanh(signal * 1.3)
+    # The zap: a fast, dispersive downward chirp at the moment of firing.
+    zap_frequency = 300 + 3900 * np.exp(-t / .018)
+    zap_phase = 2 * np.pi * np.cumsum(zap_frequency) / RATE
+    zap = np.sin(zap_phase) * decay(t, .05, .0005)
+
+    # The beam: two detuned saws beat against each other under a pulsing
+    # electric hum, with a high whine riding on top.
+    base = 165 - 15 * progress
+    beam_phase = 2 * np.pi * np.cumsum(base) / RATE
+    beam = band_limited_saw(beam_phase, base)
+    beam += band_limited_saw(beam_phase * 1.012, base * 1.012)
+    beam = lowpass(beam, 2500)
+    beam += .35 * np.sin(beam_phase / 2)
+    beam *= .75 + .25 * np.sin(2 * np.pi * 48 * t)
+    whine_phase = 2 * np.pi * np.cumsum(
+        2350 * (1 + .015 * np.sin(2 * np.pi * 9 * t))) / RATE
+    beam += .5 * np.sin(whine_phase)
+    beam += .25 * sizzle
+    hold = np.where(t < .4, 1, np.exp(-np.maximum(t - .4, 0) / .12))
+    envelope = np.minimum(1, t / .008) * hold
+    return np.tanh(1.4 * (.55 * zap + .45 * beam * envelope))
 
 
 def synth(name, duration):
@@ -102,7 +123,7 @@ def synth(name, duration):
                      for i, ratio in enumerate([1, 1.5, 2.01])) * decay(t, .075, .009)
         signal += .18 * soft * np.sin(np.pi * t / duration) ** 2
     elif name == "laserCharge":
-        signal = electricity(t, firing=False)
+        signal = laser(t, firing=False)
     elif name in ("mineCharge", "cometCharge"):
         start = 180 if name == "mineCharge" else 330
         end = 1000 if name == "mineCharge" else 1450
@@ -113,7 +134,7 @@ def synth(name, duration):
         if name == "cometCharge":
             signal += .3 * np.sin(2 * np.pi * 1568 * t) * rise
     elif name == "laserFire":
-        signal = electricity(t, firing=True)
+        signal = laser(t, firing=True)
     elif name in ("mineFire", "colossusArrival"):
         signal = .8 * sweep(t, 150, 38, duration) * decay(t, .17)
         signal += .4 * soft * decay(t, .12)

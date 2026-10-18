@@ -146,7 +146,7 @@ class _ControlOptionsState extends State<ControlOptions>
                                   ? 'Try a larger gold thumb grip with a visible movement ring. Same one-finger tilt and lift; your progress is shared.'
                                   : switch (mode) {
                                       ControlMode.twoFinger =>
-                                        'Drag the handles below the platform to keep the ball visible. Lift together, or tilt independently.',
+                                        'Drag up or down on either half of the board. Lift together, or tilt independently.',
                                       ControlMode.oneFinger =>
                                         'Use the thumb area below the board. Drag sideways to tilt, up or down to move.',
                                       ControlMode.analog =>

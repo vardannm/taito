@@ -87,8 +87,8 @@ void main() {
       expect(game.left, left);
       expect(game.cameraOffset, camera);
       expect(game.board, holes);
-      // Board Tilt intentionally starts anywhere on the board.
-      if (!game.boardTilt) {
+      // Board Tilt and Two-finger intentionally start anywhere on the board.
+      if (!game.boardTilt && game.controlMode != ControlMode.twoFinger) {
         await tester.tapAt(tester.getCenter(find.byType(PivotBoard)));
         expect(game.waitingForInput, isTrue);
       }

@@ -39,13 +39,16 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
-    'build bundles the chosen Infinite track and keeps sound effects',
+    'music is left out of the build while sound effects stay',
     () async {
-      expect(InfiniteMusic.bundled, isTrue);
-      expect(
-        (await rootBundle.load('assets/${InfiniteMusic.asset}')).lengthInBytes,
-        greaterThan(0),
-      );
+      expect(InfiniteMusic.bundled, isFalse);
+      Object? missing;
+      try {
+        await rootBundle.load('assets/${InfiniteMusic.asset}');
+      } catch (error) {
+        missing = error;
+      }
+      expect(missing, isNotNull);
       for (final asset in [
         'target.wav',
         'miss.wav',

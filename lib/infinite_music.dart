@@ -3,7 +3,9 @@
 abstract final class InfiniteMusic {
   // The Complex keeps its recorded opening and build; use a modest tempo ramp
   // so the synths retain their character while pressure grows with the climb.
-  static const bundled = true;
+  // Music is switched off: the track is not bundled, so runs stay quiet and
+  // Settings hides the Music switch and credits. Sound effects still play.
+  static const bundled = false;
   static const asset = 'audio/theme_infinite_complex.mp3';
   static const sourceBpm = 104.0;
   static const openingRate = 1.0, maximumRate = 1.12;

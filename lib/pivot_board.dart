@@ -109,10 +109,8 @@ class _PivotBoardState extends State<PivotBoard> {
             game.boardTilt)
           return;
         final viewport = viewportNow();
-        // Handles may sit in the strip below the board.
-        if (!viewport.gripArea.contains(event.localPosition)) return;
         final side = event.localPosition.dx < viewport.rect.center.dx ? 0 : 1;
-        if (!viewport.hitsGrip(event.localPosition, game, side) ||
+        if (!viewport.controlsSide(event.localPosition, side) ||
             pointers.containsValue(side))
           return;
         pointers[event.pointer] = side;
@@ -149,7 +147,7 @@ class _PivotBoardState extends State<PivotBoard> {
                 ? 'Use the bottom left and right vertical joysticks to move the platform ends'
                 : game.oneFinger
                 ? 'Use the thumb area below the board to tilt and lift'
-                : 'Drag the offset left and right handles up or down to move the platform ends'),
+                : 'Drag up or down on the left or right half of the board to move that end of the platform'),
         child: Stack(
           fit: StackFit.expand,
           children: [

@@ -22,8 +22,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/privacy/policy.json
-    - assets/audio/theme_infinite_complex.mp3
-    # Previous WAV soundtracks remain archived on disk and outside the bundle.
+    # Music is off; every soundtrack stays archived on disk, outside the bundle.
     - assets/audio/complete.wav
     - assets/audio/enemy_bombThrow.wav
     - assets/audio/enemy_bounce.wav

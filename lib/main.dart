@@ -1111,7 +1111,7 @@ class _GameScreenState extends State<GameScreen>
       TutorialStep.controls =>
         game.oneFinger
             ? 'Drag the thumb pad: sideways to tilt, up or down to lift. Hold still to keep the height.'
-            : 'Drag either offset handle up or down. Move both handles to lift; move one to tilt.',
+            : 'Drag up or down on the left or right side. Move both sides to lift; move one to tilt.',
       TutorialStep.heartsHoles => 'Avoid holes. A fall costs 1 heart.',
       TutorialStep.heartsFeedback =>
         game.misses > 0
@@ -1138,7 +1138,7 @@ class _GameScreenState extends State<GameScreen>
       TutorialStep.classicPlay =>
         game.oneFinger
             ? 'Same thumb-pad controls. Lift to glowing holes in order, 1–10. Avoid dark holes. Drag to begin.'
-            : 'Reach glowing holes in order, 1–10. Avoid dark holes. Drag an offset handle to begin.',
+            : 'Reach glowing holes in order, 1–10. Avoid dark holes. Drag on either side to begin.',
       TutorialStep.dailyChallenge =>
         'Daily Challenge: a new board each day. Earn stars and beat your best.',
       _ => '',
@@ -1627,7 +1627,7 @@ class _GameScreenState extends State<GameScreen>
     ControlMode.tiltLift => 'Drag sideways to play',
     ControlMode.boardTilt => 'Drag on the board to tilt',
     ControlMode.oneFinger => 'Drag the thumb area to play',
-    ControlMode.twoFinger => 'Move a handle to play',
+    ControlMode.twoFinger => 'Drag either side to play',
   };
 
   bool playArmed = false;
@@ -1658,15 +1658,15 @@ class _GameScreenState extends State<GameScreen>
     if (game.oneFinger)
       return point.dy < board.size.height - OneFingerControls.heightFor(game);
     if (game.bottomControls) return true;
-    // The same layout the board paints with, so a touch on a drawn handle
-    // is never mistaken for a world swipe.
+    // The same layout the board paints with: once armed, a touch on either
+    // half controls the platform rather than swiping worlds.
     final viewport = BoardViewport.forGame(
       board.size,
       game,
       fillWidth: expansion,
     );
     for (final side in [0, 1]) {
-      if (viewport.hitsGrip(point, game, side)) return false;
+      if (viewport.controlsSide(point, side)) return false;
     }
     return true;
   }
@@ -3211,7 +3211,7 @@ class _GameScreenState extends State<GameScreen>
               guideRow(
                 '02',
                 'Prefer two fingers?',
-                'Choose One-finger or Two-finger in Options. With two fingers, drag the handles below the platform up or down. Each handle moves its connected end, keeping your fingers clear of the ball. Move both together to lift, or one to tilt and roll. Release to hold the platform. Options also adjusts two-finger sensitivity.',
+                'Choose One-finger or Two-finger in Options. With two fingers, drag up or down anywhere on the left or right half of the board. Each side moves its end of the platform, so keep your thumbs low and clear of the ball. Move both together to lift, or one to tilt and roll. Release to hold the platform. Options also adjusts two-finger sensitivity.',
               ),
               guideRow(
                 '03',

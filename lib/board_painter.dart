@@ -138,12 +138,11 @@ class BoardViewport {
     );
   }
 
-  bool hitsGrip(Offset point, BalanceGame game, int side) {
-    final grip = gripCenter(game, side);
-    return gripArea.contains(point) &&
-        (point.dx - grip.dx).abs() <= 44 &&
-        (point.dy - grip.dy).abs() <= 24;
-  }
+  /// Two-finger control: a touch anywhere on a half of the board, or the
+  /// strip below it, drives that half's end. The drawn handles only mark the
+  /// ends, so a thumb never has to find a small target mid-run.
+  bool controlsSide(Offset point, int side) =>
+      gripArea.contains(point) && (point.dx < rect.center.dx ? 0 : 1) == side;
 
   Rect get rect =>
       (offset - Offset(0, topExtension * scale)) &
