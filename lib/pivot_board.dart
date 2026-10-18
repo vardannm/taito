@@ -89,6 +89,7 @@ class _PivotBoardState extends State<PivotBoard> {
       fillWidth: widget.fillWidth,
     );
     game.visibleTop = -viewportNow().topExtension;
+    game.visibleBottom = viewportNow().paintBottom;
     void release(PointerEvent event) {
       synchronize();
       final side = pointers.remove(event.pointer);

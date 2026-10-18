@@ -21,39 +21,46 @@ Color numberColor(int value) {
 }
 
 class MergeStatus extends StatelessWidget {
-  const MergeStatus({super.key, required this.run});
+  const MergeStatus({super.key, required this.run, this.color = menuText});
   final MergeRun run;
 
+  /// Matches the HUD ink, which adapts to the board behind it.
+  final Color color;
+
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
-    child: Semantics(
+  Widget build(BuildContext context) {
+    final danger = !run.ended && run.head <= run.upcomingGateValue;
+    final style = TextStyle(
+      color: color,
+      fontSize: 11,
+      fontWeight: FontWeight.w700,
+    );
+    return Semantics(
       label:
           'Snake from largest at the top to smallest at the bottom: ${run.segments.join(', ')}. '
           'Next gate requires more than ${run.upcomingGateValue}. '
           'Collect equal or smaller numbers with the solid head ball. Larger numbers are fatal.',
       excludeSemantics: true,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            run.ended ? 'RUN ENDED' : 'GATE > ${run.upcomingGateValue}',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              color: run.head <= run.upcomingGateValue
-                  ? const Color(0xFFCD542F)
-                  : const Color(0xFF163D3B),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('MATCH ${formatMergeNumber(run.tail)}', style: style),
+            Text('  ·  ', style: style.copyWith(color: color.withAlpha(140))),
+            Text(
+              run.ended ? 'RUN ENDED' : 'GATE > ${run.upcomingGateValue}',
+              style: style.copyWith(
+                // A gate the head cannot pass yet is the one real warning.
+                color: danger ? const Color(0xFFEF6958) : color,
+                fontWeight: FontWeight.w800,
+              ),
             ),
-          ),
-          Text(
-            'MATCH ${formatMergeNumber(run.tail)}',
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 void paintNumberOrb(

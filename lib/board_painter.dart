@@ -79,6 +79,11 @@ class BoardViewport {
               0.0,
             ),
     );
+    // A two-finger board is drawn down through its handle strip, so the
+    // screen stays full while the play area keeps one-finger's position.
+    bottomExtension = bottomInset > 0
+        ? math.max(0.0, (full.height - (offset.dy + height)) / scale)
+        : 0.0;
   }
 
   /// For a board widget of [size]. Two-finger keeps its handle strip inside
@@ -96,6 +101,10 @@ class BoardViewport {
   );
   late final double scale;
   late final double topExtension;
+
+  /// World units painted below the board's bottom edge (y 560).
+  late final double bottomExtension;
+  double get paintBottom => BalanceGame.height + bottomExtension;
   late Offset offset;
   late final Rect bounds;
 
@@ -209,8 +218,9 @@ class BoardPainter extends CustomPainter {
     canvas.translate(viewport.offset.dx, viewport.offset.dy);
     canvas.scale(viewport.scale);
     final top = -viewport.topExtension;
+    final bottom = viewport.paintBottom;
     final outer = RRect.fromRectAndRadius(
-      Rect.fromLTRB(0, top, 360, 560),
+      Rect.fromLTRB(0, top, 360, bottom),
       const Radius.circular(22),
     );
     canvas.drawRRect(outer, Paint()..color = palette.frame);
@@ -222,7 +232,7 @@ class BoardPainter extends CustomPainter {
         ..strokeWidth = 1,
     );
     final field = RRect.fromRectAndRadius(
-      Rect.fromLTRB(10, top + 10, 350, 550),
+      Rect.fromLTRB(10, top + 10, 350, bottom - 10),
       const Radius.circular(15),
     );
     canvas.drawRRect(
@@ -425,7 +435,7 @@ class BoardPainter extends CustomPainter {
       text(
         canvas,
         'PRECISION IS EVERYTHING',
-        const Offset(180, 545),
+        Offset(180, bottom - 15),
         6.5,
         game.infinite
             ? infiniteBoardInk(game, const Offset(180, 545))
@@ -458,9 +468,11 @@ class BoardPainter extends CustomPainter {
           );
         }
       }
-      final top = game.screenY(game.dangerY).clamp(10.0, 550.0);
+      final top = game.screenY(game.dangerY).clamp(10.0, bottom - 10);
+      // Waiting below the play area, the floor stays hidden even where a
+      // two-finger board is drawn further down.
       if (top < 550) {
-        final danger = Rect.fromLTRB(10, top, 350, 550);
+        final danger = Rect.fromLTRB(10, top, 350, bottom - 10);
         canvas.drawRect(
           danger,
           Paint()
@@ -598,7 +610,7 @@ class BoardPainter extends CustomPainter {
     final blink = recoveryOpacity < 1;
     if (blink) {
       canvas.saveLayer(
-        const Rect.fromLTWH(0, 0, 360, 560),
+        Rect.fromLTRB(0, top, 360, bottom),
         Paint()..color = Colors.white.withValues(alpha: recoveryOpacity),
       );
     }
@@ -609,8 +621,9 @@ class BoardPainter extends CustomPainter {
       canvas.clipPath(
         Path.combine(
           PathOperation.difference,
-          Path()..addRect(const Rect.fromLTWH(0, 0, 360, 560)),
-          Path()..addRect(Rect.fromLTRB(gap.gapLeft, 0, gap.gapRight, 560)),
+          Path()..addRect(Rect.fromLTRB(0, top, 360, bottom)),
+          Path()
+            ..addRect(Rect.fromLTRB(gap.gapLeft, top, gap.gapRight, bottom)),
         ),
       );
     }
@@ -853,8 +866,8 @@ class BoardPainter extends CustomPainter {
     for (final p in [
       Offset(7, top + 20),
       Offset(353, top + 20),
-      const Offset(7, 540),
-      const Offset(353, 540),
+      Offset(7, bottom - 20),
+      Offset(353, bottom - 20),
     ]) {
       canvas.drawCircle(p, 2.3, Paint()..color = brass);
       canvas.drawLine(

@@ -85,7 +85,12 @@ List<Color> boardFieldColors(BalanceGame game) {
 /// Match the playfield gradient so foreground colors follow the visible fade,
 /// including transitions back to x1 after a hit, rather than the target combo.
 Color infiniteFieldColor(BalanceGame game, Offset point) {
-  final area = Rect.fromLTRB(10, game.visibleTop + 10, 350, 550);
+  final area = Rect.fromLTRB(
+    10,
+    game.visibleTop + 10,
+    350,
+    game.visibleBottom - 10,
+  );
   final delta = point - area.topLeft;
   final t =
       ((delta.dx * area.width + delta.dy * area.height) /
@@ -232,7 +237,9 @@ void paintInfiniteItems(Canvas c, BalanceGame game, bool reducedMotion) {
   if (!game.infinite) return;
   for (final item in game.survival.items) {
     final p = Offset(item.x, game.screenY(item.y));
-    if (p.dy < game.visibleTop - 14 || p.dy > 574) continue;
+    if (p.dy < game.visibleTop - 14 || p.dy > game.visibleBottom + 14) {
+      continue;
+    }
     // Each pickup bobs on its own phase, so a row of them never pulses as one.
     final phase = item.x * .07;
     final bob = reducedMotion ? 0.0 : math.sin(game.clock * 2.2 + phase) * 1.4;
@@ -378,7 +385,7 @@ void paintInfiniteMagnet(Canvas c, BalanceGame game, bool reducedMotion) {
   const tint = Color(0xFF8655CF);
   final radius = game.magnetRadius;
   c.save();
-  c.clipRect(Rect.fromLTRB(20, game.visibleTop, 340, 574));
+  c.clipRect(Rect.fromLTRB(20, game.visibleTop, 340, game.visibleBottom + 14));
   c.drawCircle(
     p,
     radius,
@@ -551,7 +558,9 @@ void paintMazeGates(Canvas c, BalanceGame game, bool reducedMotion) {
   final beams = Path(), posts = Path();
   var brightest = 0.0;
   for (final gate in game.mazeGates) {
-    if (gate.y < game.visibleTop - 20 || gate.y > 580) continue;
+    if (gate.y < game.visibleTop - 20 || gate.y > game.visibleBottom + 20) {
+      continue;
+    }
     final lit = gate.intensity;
     brightest = math.max(brightest, lit);
     beams

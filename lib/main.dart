@@ -1453,210 +1453,26 @@ class _GameScreenState extends State<GameScreen>
             final color = game.infinite
                 ? infiniteBoardInk(game, const Offset(110, 60))
                 : chromeInk;
-            if (game.infinite) {
-              return LayoutBuilder(
-                builder: (context, constraints) {
-                  final sideWidth = math.min(72.0, constraints.maxWidth * .25);
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(
-                        key: tutorialHeartsKey,
-                        width: sideWidth,
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 10),
-                          child: Semantics(
-                            key: const ValueKey('board-hearts'),
-                            label:
-                                '${game.lives} of ${game.heartCapacity} hearts remaining',
-                            excludeSemantics: true,
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  for (var i = 0; i < game.heartCapacity; i++)
-                                    Icon(
-                                      i < game.lives
-                                          ? Icons.favorite_rounded
-                                          : Icons.favorite_border_rounded,
-                                      key: ValueKey('board-heart-$i'),
-                                      size: 20,
-                                      color: i < game.lives
-                                          ? const Color(0xFFEF6958)
-                                          : color.withAlpha(130),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: IgnorePointer(
-                          key: tutorialScoreKey,
-                          child: Column(
-                            key: const ValueKey('board-hud'),
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  '${game.score}',
-                                  key: const ValueKey('infinite-score'),
-                                  style: TextStyle(
-                                    color: color,
-                                    fontSize: 30,
-                                    height: 1.15,
-                                    fontWeight: FontWeight.w800,
-                                    fontFamily: 'monospace',
-                                  ),
-                                ),
-                              ),
-                              Text(
-                                '${game.survival.combo}×${game.survival.combo == InfiniteTuning.maxCombo ? ' MAX' : ''}',
-                                style: TextStyle(
-                                  color: color,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              if (game.survival.noticeTime > 0)
-                                Text(
-                                  game.survival.notice,
-                                  key: const ValueKey('infinite-pickup-notice'),
-                                  textAlign: TextAlign.center,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: color,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              if (game.survival.protected)
-                                Text(
-                                  game.survival.shield > 0
-                                      ? 'SHIELD ${game.survival.shield.ceil()}s'
-                                      : 'RECOVERY ${game.survival.recovery.ceil()}s',
-                                  key: const ValueKey('protection-status'),
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(color: color, fontSize: 10),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      SizedBox(
-                        width: sideWidth,
-                        child: Align(
-                          alignment: Alignment.topRight,
-                          child: IconButton.filledTonal(
-                            key: const ValueKey('board-pause'),
-                            tooltip: game.paused ? 'Resume' : 'Pause',
-                            onPressed: pause,
-                            style: IconButton.styleFrom(
-                              backgroundColor: color.withAlpha(24),
-                              foregroundColor: color,
-                            ),
-                            icon: Icon(
-                              game.paused
-                                  ? Icons.play_arrow_rounded
-                                  : Icons.pause_rounded,
-                              size: 22,
-                              color: color,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              );
-            }
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: IgnorePointer(
-                    child: Container(
-                      key: const ValueKey('board-hud'),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 7,
-                      ),
-                      decoration: BoxDecoration(
-                        color:
-                            (color == Colors.white
-                                    ? Colors.black
-                                    : Colors.white)
-                                .withAlpha(45),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  '${game.score}',
-                                  maxLines: 1,
-                                  style: TextStyle(
-                                    color: color,
-                                    fontSize: 21,
-                                    height: 1,
-                                    fontWeight: FontWeight.w800,
-                                    fontFamily: 'monospace',
-                                  ),
-                                ),
-                              ),
-                              Flexible(
-                                child: Text(
-                                  game.scrolling
-                                      ? '${game.metres}m'
-                                      : game.merging
-                                      ? 'TOP ${formatMergeNumber(game.mergeRun.highest)}'
-                                      : formatRunTime(game.elapsed),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: color,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            game.infinite
-                                ? 'PACE ${game.paceLevel} · ${game.survival.combo}×${game.survival.combo == InfiniteTuning.maxCombo ? ' MAX' : ''}'
-                                : game.merging
-                                ? 'MERGE'
-                                : game.practice
-                                ? 'PRACTICE'
-                                : 'L${game.level} · TARGET ${game.target.clamp(1, 10)}/10',
-                            style: TextStyle(
-                              color: color.withAlpha(210),
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          if (game.merging)
-                            FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: SizedBox(
-                                width: 240,
-                                child: MergeStatus(run: game.mergeRun),
-                              ),
-                            ),
-                          if (!game.practice)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
+            // Every mode shares one layout: hearts left, the score large in
+            // the middle with its details under it, and pause on the right.
+            final detail = TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            );
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final sideWidth = math.min(72.0, constraints.maxWidth * .25);
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      key: tutorialHeartsKey,
+                      width: sideWidth,
+                      child: game.practice
+                          ? null
+                          : Padding(
+                              padding: const EdgeInsets.only(top: 10),
                               child: Semantics(
                                 key: const ValueKey('board-hearts'),
                                 label:
@@ -1673,57 +1489,114 @@ class _GameScreenState extends State<GameScreen>
                                         i < game.heartCapacity;
                                         i++
                                       )
-                                        Padding(
-                                          padding: const EdgeInsets.only(
-                                            right: 4,
-                                          ),
-                                          child: Icon(
-                                            i < game.lives
-                                                ? Icons.favorite_rounded
-                                                : Icons.favorite_border_rounded,
-                                            key: ValueKey('board-heart-$i'),
-                                            size: 20,
-                                            color: i < game.lives
-                                                ? const Color(0xFFEF6958)
-                                                : color.withAlpha(130),
-                                          ),
+                                        Icon(
+                                          i < game.lives
+                                              ? Icons.favorite_rounded
+                                              : Icons.favorite_border_rounded,
+                                          key: ValueKey('board-heart-$i'),
+                                          size: 20,
+                                          color: i < game.lives
+                                              ? const Color(0xFFEF6958)
+                                              : color.withAlpha(130),
                                         ),
                                     ],
                                   ),
                                 ),
                               ),
                             ),
-                          if (game.infinite && game.survival.protected)
-                            Text(
-                              game.survival.shield > 0
-                                  ? 'SHIELD ${game.survival.shield.ceil()}s'
-                                  : 'RECOVERY ${game.survival.recovery.ceil()}s',
-                              key: const ValueKey('protection-status'),
-                              style: TextStyle(color: color, fontSize: 10),
+                    ),
+                    Expanded(
+                      child: IgnorePointer(
+                        key: tutorialScoreKey,
+                        child: Column(
+                          key: const ValueKey('board-hud'),
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                '${game.score}',
+                                key: game.infinite
+                                    ? const ValueKey('infinite-score')
+                                    : null,
+                                style: TextStyle(
+                                  color: color,
+                                  fontSize: 30,
+                                  height: 1.15,
+                                  fontWeight: FontWeight.w800,
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
                             ),
-                        ],
+                            if (game.infinite)
+                              Text(
+                                '${game.survival.combo}×${game.survival.combo == InfiniteTuning.maxCombo ? ' MAX' : ''}',
+                                style: detail,
+                              )
+                            else if (game.merging) ...[
+                              Text(
+                                'TOP ${formatMergeNumber(game.mergeRun.highest)}',
+                                style: detail,
+                              ),
+                              MergeStatus(run: game.mergeRun, color: color),
+                            ] else
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  game.practice
+                                      ? 'PRACTICE · ${formatRunTime(game.elapsed)}'
+                                      : 'L${game.level} · TARGET ${game.target.clamp(1, 10)}/10 · ${formatRunTime(game.elapsed)}',
+                                  maxLines: 1,
+                                  style: detail,
+                                ),
+                              ),
+                            if (game.infinite && game.survival.noticeTime > 0)
+                              Text(
+                                game.survival.notice,
+                                key: const ValueKey('infinite-pickup-notice'),
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: detail.copyWith(fontSize: 10),
+                              ),
+                            if (game.infinite && game.survival.protected)
+                              Text(
+                                game.survival.shield > 0
+                                    ? 'SHIELD ${game.survival.shield.ceil()}s'
+                                    : 'RECOVERY ${game.survival.recovery.ceil()}s',
+                                key: const ValueKey('protection-status'),
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: color, fontSize: 10),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filledTonal(
-                  key: const ValueKey('board-pause'),
-                  tooltip: game.paused ? 'Resume' : 'Pause',
-                  onPressed: pause,
-                  style: IconButton.styleFrom(
-                    backgroundColor: color.withAlpha(24),
-                    foregroundColor: color,
-                  ),
-                  icon: Icon(
-                    game.paused
-                        ? Icons.play_arrow_rounded
-                        : Icons.pause_rounded,
-                    size: 22,
-                    color: color,
-                  ),
-                ),
-              ],
+                    SizedBox(
+                      width: sideWidth,
+                      child: Align(
+                        alignment: Alignment.topRight,
+                        child: IconButton.filledTonal(
+                          key: const ValueKey('board-pause'),
+                          tooltip: game.paused ? 'Resume' : 'Pause',
+                          onPressed: pause,
+                          style: IconButton.styleFrom(
+                            backgroundColor: color.withAlpha(24),
+                            foregroundColor: color,
+                          ),
+                          icon: Icon(
+                            game.paused
+                                ? Icons.play_arrow_rounded
+                                : Icons.pause_rounded,
+                            size: 22,
+                            color: color,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             );
           },
         ),

@@ -366,6 +366,10 @@ class BalanceGame {
   static const infiniteStart = 440.0;
   // Logical top of the expanded portrait viewport, in board coordinates.
   double visibleTop = 0;
+
+  /// Lowest visible world y; below 560 when a two-finger board is drawn
+  /// down through its handle strip.
+  double visibleBottom = height;
   static const firstRow = 300.0;
 
   static double difficultyAt(double progress) {

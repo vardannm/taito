@@ -138,7 +138,10 @@ void paintLateEnemy(Canvas canvas, BalanceGame game, bool reducedMotion) {
       continue;
     }
     final p = _offset(shot.position);
-    if (p.dx < 12 || p.dx > 348 || p.dy < game.visibleTop - 30 || p.dy > 575)
+    if (p.dx < 12 ||
+        p.dx > 348 ||
+        p.dy < game.visibleTop - 30 ||
+        p.dy > game.visibleBottom + 15)
       continue;
     final shotInk = infiniteBoardInk(game, p);
     final color = _enemyAccent(enemy.kind, shotInk == Colors.white);

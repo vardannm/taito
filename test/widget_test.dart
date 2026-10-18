@@ -45,7 +45,7 @@ void main() {
       await tester.tap(find.text('TRY PRACTICE'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
-      expect(find.text('PRACTICE'), findsOneWidget);
+      expect(find.textContaining('PRACTICE · '), findsOneWidget);
       expect(find.byType(PivotBoard), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
