@@ -259,22 +259,25 @@ class BoardPainter extends CustomPainter {
       ..color = ink.withAlpha(50)
       ..strokeWidth = .6;
     final railTop = game.infinite ? game.screenY(game.minPivot) : top + 26;
+    // Rails run to the board's bottom edge, including a two-finger board
+    // drawn down through its strip, so they never stop mid-screen.
+    final railBottom = bottom - 26;
     for (final x in [20.0, 340.0]) {
       canvas.drawLine(
         Offset(x, railTop),
-        Offset(x, 534),
+        Offset(x, railBottom),
         Paint()
           ..color = const Color(0xFF574A31)
           ..strokeWidth = 5,
       );
       canvas.drawLine(
         Offset(x - 1, railTop),
-        Offset(x - 1, 534),
+        Offset(x - 1, railBottom),
         Paint()
           ..color = const Color(0xFFEEE7CC)
           ..strokeWidth = 1,
       );
-      for (double y = railTop + 6; y < 530; y += 10) {
+      for (double y = railTop + 6; y < railBottom - 4; y += 10) {
         canvas.drawLine(
           Offset(x == 20 ? 26 : 329, y),
           Offset(x == 20 ? 30 : 333, y),
