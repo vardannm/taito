@@ -143,7 +143,7 @@ class _ControlOptionsState extends State<ControlOptions>
                           Expanded(
                             child: Text(
                               halo
-                                  ? 'Try a larger gold thumb grip with a visible movement ring. Same one-finger tilt and lift; your progress is shared.'
+                                  ? 'Touch anywhere on the board. A translucent Halo appears under your finger and hides on release. Same one-finger tilt and lift.'
                                   : switch (mode) {
                                       ControlMode.twoFinger =>
                                         'Drag up or down on either half of the board. Lift together, or tilt independently.',

@@ -195,7 +195,21 @@ Infinite coin bonus: after losing with more than 10 collected coins, supported m
 
 ## One-finger thumb area (0.11.1)
 
-One-finger controls now sit in a 96-pixel area below the board, keeping the ball above your finger. Touch anywhere in the area and drag sideways to tilt, up/down to move vertically. Release and re-grab wherever comfortable; touching a new point does not jump the platform. Movement stops at the area's edges, so lift and re-touch to continue a long climb. A second pointer is ignored and pause/cancel clears the active touch. This shared control appears in gameplay and the tutorial. Two-finger and Vertical Analog controls are unchanged.
+### Floating Halo joystick trial
+
+Options > Choose your controls now includes **Halo Joystick** as the third choice,
+alongside the original One-Finger and Two-Finger controls. Tap Play, then touch
+anywhere on the board and drag sideways to tilt or vertically to lift/lower.
+The Halo appears at that touch point at 42% opacity and disappears on release,
+cancel or pause. It has no fixed bottom pad. Re-grabbing starts at the new touch
+point without jumping the platform; holding still does not create extra lift.
+The original one-finger option remains the default and can be selected again.
+The trial preference saves locally and travels with progress backups; it shares
+the original one-finger physics, stars and score records.
+
+### Original thumb pad
+
+One-finger controls sit in a 96-pixel area below the board, keeping the ball above your finger. Touch anywhere in the area and drag sideways to tilt, up/down to move vertically. Release and re-grab wherever comfortable; touching a new point does not jump the platform. Vertical dragging can continue beyond the visible pad. A second pointer is ignored and pause/cancel clears the active touch. This shared control appears in gameplay and the tutorial. Two-finger controls are unchanged.
 
 ### Lightweight carousel previews
 

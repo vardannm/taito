@@ -1110,7 +1110,9 @@ class _GameScreenState extends State<GameScreen>
     final message = switch (step) {
       TutorialStep.controls =>
         game.oneFinger
-            ? 'Drag the thumb pad: sideways to tilt, up or down to lift. Hold still to keep the height.'
+            ? game.haloJoystick
+                  ? 'Touch anywhere on the board. Drag sideways to tilt, up or down to lift. The Halo hides when you release.'
+                  : 'Drag the thumb pad: sideways to tilt, up or down to lift. Hold still to keep the height.'
             : 'Drag up or down on the left or right side. Move both sides to lift; move one to tilt.',
       TutorialStep.heartsHoles => 'Avoid holes. A fall costs 1 heart.',
       TutorialStep.heartsFeedback =>
@@ -1137,7 +1139,9 @@ class _GameScreenState extends State<GameScreen>
       TutorialStep.level1 => 'Open Levels, then choose Level 1.',
       TutorialStep.classicPlay =>
         game.oneFinger
-            ? 'Same thumb-pad controls. Lift to glowing holes in order, 1–10. Avoid dark holes. Drag to begin.'
+            ? game.haloJoystick
+                  ? 'Same floating Halo controls. Lift to glowing holes in order, 1–10. Avoid dark holes. Drag anywhere to begin.'
+                  : 'Same thumb-pad controls. Lift to glowing holes in order, 1–10. Avoid dark holes. Drag to begin.'
             : 'Reach glowing holes in order, 1–10. Avoid dark holes. Drag on either side to begin.',
       TutorialStep.dailyChallenge =>
         'Daily Challenge: a new board each day. Earn stars and beat your best.',
@@ -1199,6 +1203,11 @@ class _GameScreenState extends State<GameScreen>
           }
           if (board == null || !board.hasSize) return;
           if (game.oneFinger) {
+            if (game.haloJoystick) {
+              final top = layer.globalToLocal(board.localToGlobal(Offset.zero));
+              result.add(top & board.size);
+              return;
+            }
             final top = layer.globalToLocal(
               board.localToGlobal(
                 Offset(
@@ -1626,7 +1635,10 @@ class _GameScreenState extends State<GameScreen>
     ControlMode.analog => 'Touch a joystick to play',
     ControlMode.tiltLift => 'Drag sideways to play',
     ControlMode.boardTilt => 'Drag on the board to tilt',
-    ControlMode.oneFinger => 'Drag the thumb area to play',
+    ControlMode.oneFinger =>
+      game.haloJoystick
+          ? 'Drag anywhere to play'
+          : 'Drag the thumb area to play',
     ControlMode.twoFinger => 'Drag either side to play',
   };
 
@@ -1655,6 +1667,7 @@ class _GameScreenState extends State<GameScreen>
     final point = board.globalToLocal(global);
     if (!(Offset.zero & board.size).contains(point)) return true;
     if (game.boardTilt) return false;
+    if (game.oneFinger && game.haloJoystick) return false;
     if (game.oneFinger)
       return point.dy < board.size.height - OneFingerControls.heightFor(game);
     if (game.bottomControls) return true;
@@ -1688,6 +1701,7 @@ class _GameScreenState extends State<GameScreen>
       ..cosmetic = profile.selectedBall
       ..cabinet = profile.cabinet
       ..platformStyle = profile.selectedPlatform
+      ..haloJoystick = profile.haloJoystick
       ..setControlMode(controlForMode(arcadeModes[index]))
       ..start(
         gameMode: arcadeModes[index],
@@ -3376,6 +3390,11 @@ class _GameScreenState extends State<GameScreen>
                 const SizedBox(height: 12),
                 ControlOptions(
                   value: profile.controlMode,
+                  haloJoystick: profile.haloJoystick,
+                  onHaloChanged: (halo) {
+                    profile.haloJoystick = halo;
+                    game.haloJoystick = halo;
+                  },
                   onChanged: (mode) {
                     update(() => profile.controlMode = mode);
                     setState(() {

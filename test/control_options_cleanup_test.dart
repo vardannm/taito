@@ -49,7 +49,7 @@ void main() {
   );
 
   testWidgets(
-    'Options offers two controls and one default sensitivity, without Shop',
+    'Options offers two original controls and Halo, with one default sensitivity',
     (tester) async {
       await launch(tester, ControlMode.oneFinger);
       await tester.tap(find.byTooltip('Settings'));
@@ -59,6 +59,10 @@ void main() {
       expect(find.byType(ControlOptions), findsOneWidget);
       expect(find.byKey(const ValueKey('control-oneFinger')), findsOneWidget);
       expect(find.byKey(const ValueKey('control-twoFinger')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('control-haloJoystick')),
+        findsOneWidget,
+      );
       for (final mode in [
         ControlMode.analog,
         ControlMode.tiltLift,

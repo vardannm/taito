@@ -42,7 +42,9 @@ class _PivotBoardState extends State<PivotBoard> {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, bounds) {
-      if (!widget.game.oneFinger) return buildBoard(context, bounds);
+      if (!widget.game.oneFinger || widget.game.haloJoystick) {
+        return buildBoard(context, bounds);
+      }
       final boardHeight =
           (bounds.maxHeight - OneFingerControls.heightFor(widget.game)).clamp(
             1.0,
@@ -146,7 +148,9 @@ class _PivotBoardState extends State<PivotBoard> {
                 : game.analog
                 ? 'Use the bottom left and right vertical joysticks to move the platform ends'
                 : game.oneFinger
-                ? 'Use the thumb area below the board to tilt and lift'
+                ? game.haloJoystick
+                      ? 'Touch anywhere on the board to tilt and lift with the floating Halo joystick'
+                      : 'Use the thumb area below the board to tilt and lift'
                 : 'Drag up or down on the left or right half of the board to move that end of the platform'),
         child: Stack(
           fit: StackFit.expand,
@@ -179,6 +183,13 @@ class _PivotBoardState extends State<PivotBoard> {
                     ),
                   ),
                 ),
+              ),
+            if (game.oneFinger && game.haloJoystick)
+              OneFingerControls(
+                key: const ValueKey('halo-joystick'),
+                game: game,
+                frame: widget.frame,
+                boardScale: viewportNow().scale,
               ),
             if (widget.showHint &&
                 !game.bottomControls &&

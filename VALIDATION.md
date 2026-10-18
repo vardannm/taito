@@ -635,3 +635,23 @@ Not verified here: native iOS compilation/signing, iPhone audio/haptic feel, sus
 - Logs: artifacts/rollrise-regression.log, artifacts/rollrise-analysis.log,
   artifacts/app-store-rollrise.log, artifacts/rollrise-store-validation.log,
   artifacts/rollrise-release-preflight.log.
+
+## Floating Halo joystick trial — 2026-10-18
+
+- Completed the Halo Joystick choice as the third control option, preserving the
+  original one-finger pad and two-finger controls. It shares one-finger physics
+  and records. The existing persisted trial preference and backup field are used.
+- Halo has no fixed pad or reserved bottom strip. It appears at the active touch
+  point on the board at 42% opacity and hides on release, cancel, pause or reset.
+  Relative input, second-pointer rejection and held-touch resize behaviour are
+  preserved. Controls/HUD and the Play-then-input flow remain available.
+- Retained the user's latest committed rail/visible-bottom and menu-flow changes.
+  Updated the tutorial target area and copy for the floating control surface.
+- All 663 regression tests pass. Static analysis and git diff --check pass.
+  Tests cover preference/backup compatibility, shared records, all five game
+  modes, touch anchors, dragging, second touches, release/cancel/pause, entry
+  expansion, third-choice activation and returning to the original pad.
+- Actual Flutter idle/left-touch/right-touch frames are in artifacts/halo-*.png.
+  Contact sheet: artifacts/halo-floating-preview.png. Logs: halo-regression.log,
+  halo-focused.log, halo-analysis-final.log and halo-render.log in artifacts/.
+  No native release binaries were built or published.
