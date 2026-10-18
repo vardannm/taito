@@ -2,7 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- GILT's app-owned preferences and records; SDK manifests remain separate. -->
+    <!-- Rollrise's app-owned preferences and records; SDK manifests remain separate. -->
     <key>NSPrivacyAccessedAPITypes</key>
     <array>
         <dict>

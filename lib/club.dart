@@ -105,7 +105,7 @@ class _ClubScreenState extends State<ClubScreen> {
   Future<void> importFriend() async {
     final raw = await textInput(
       'Add a friend challenge',
-      'Paste their GILT1 challenge code',
+      'Paste their challenge code',
     );
     if (raw == null || !mounted) return;
     try {
@@ -170,7 +170,7 @@ class _ClubScreenState extends State<ClubScreen> {
   Future<void> restore() async {
     final raw = await textInput(
       'Restore progress',
-      'Paste your saved GILT progress backup',
+      'Paste your saved Rollrise progress backup',
       max: ProgressBackup.maxLength,
     );
     if (raw == null || !mounted) return;

@@ -48,6 +48,10 @@ class MergeRun {
     assert(
       MergeDifficulty.dangerChance >= 0 && MergeDifficulty.dangerChance <= 1,
     );
+    assert(
+      MergeDifficulty.matchingChance >= 0 &&
+          MergeDifficulty.matchingChance <= 1,
+    );
     assert(MergeDifficulty.gateInterval > 0);
     assert(MergeDifficulty.gateSpeedBonus >= 0);
     assert(MergeDifficulty.gateCooldownSeconds >= 0);
@@ -92,6 +96,9 @@ class MergeRun {
               (highest.bitLength - 2) * MergeDifficulty.speedPerDoubling)
           .clamp(MergeDifficulty.startSpeed, MergeDifficulty.maxSpeed);
   double get gateSpeed => speed + MergeDifficulty.gateSpeedBonus;
+  double get dangerProbability =>
+      MergeDifficulty.dangerChance *
+      ((highest.bitLength - 3) / 4).clamp(0.0, 1.0);
   int get gateScoreGap => math.max(gateInterval, head);
   int get upcomingGateValue => gates.isNotEmpty
       ? gates.first.requiredValue
@@ -192,8 +199,8 @@ class MergeRun {
   }
 
   void _row(double y) {
-    // Two safe choices and a configurable chance of a dangerous third. Keep the
-    // matching pickup reachable and separate the danger so it can be dodged.
+    // Two safe choices and a gradually increasing chance of a dangerous third.
+    // Keep the matching pickup reachable and the danger separated.
     final safeX = minHeadX + random.nextDouble() * (maxHeadX - minHeadX);
     final xs = <double>[safeX];
     for (var i = 1; i < 3; i++) {
@@ -209,10 +216,10 @@ class MergeRun {
     for (var i = 0; i < xs.length; i++) {
       final value = i == 0
           ? tail
-          : i == 2 &&
-                (MergeDifficulty.dangerChance == 1 ||
-                    random.nextDouble() < MergeDifficulty.dangerChance)
+          : i == 2 && random.nextDouble() < dangerProbability
           ? head * (random.nextBool() ? 2 : 4)
+          : i == 1 && random.nextDouble() < MergeDifficulty.matchingChance
+          ? segments[random.nextInt(segments.length)]
           : math
                 .pow(2, 1 + random.nextInt(math.max(1, head.bitLength - 1)))
                 .toInt();
@@ -252,7 +259,9 @@ class MergeRun {
     if (ended || !dt.isFinite || dt <= 0) return;
     _follow(dt, ax, bx);
     flash = math.max(0, flash - dt);
-    final travel = speed * dt;
+    final fallingSpeed = speed;
+    final waveInterval = MergeDifficulty.waveSpacing / fallingSpeed;
+    final travel = fallingSpeed * dt;
     final contacts = <(double, NumberOrb?, MergeGate?)>[];
     for (final orb in orbs) {
       final contact = _contact(
@@ -290,6 +299,7 @@ class MergeRun {
       return a.$3 != null ? -1 : 1;
     });
     var clearedGate = false;
+    double? gateClearAt;
     for (final contact in contacts) {
       if (contact.$3 != null) {
         final gate = contact.$3!;
@@ -303,6 +313,7 @@ class MergeRun {
         gatesPassed++;
         clearedGate = true;
         gateCooldown = MergeDifficulty.gateCooldownSeconds;
+        gateClearAt = contact.$1;
         flash = .8;
         notice = 'GATE ${gate.requiredValue} CLEARED';
         continue;
@@ -315,16 +326,19 @@ class MergeRun {
     // Score gained while a gate was approaching is not a queue of old gates.
     // Start the next milestone after all pickups in this tick have resolved.
     if (clearedGate) nextGateScore = score + gateScoreGap;
-    gateCooldown = math.max(0, gateCooldown - dt);
+    gateCooldown = math.max(0, gateCooldown - dt * (1 - (gateClearAt ?? 0)));
     if (score >= nextGateScore && gates.isEmpty && gateCooldown == 0) {
       lastGateValue = upcomingGateValue;
       gates.add(MergeGate(lastGateValue, scoreAt: score));
       nextGateScore = score + gateScoreGap;
     }
     spawnTime += dt;
-    if (spawnTime >= MergeDifficulty.waveSpacing / speed) {
-      spawnTime = 0;
-      _row(42);
+    while (spawnTime >= waveInterval) {
+      spawnTime -= waveInterval;
+      // Retain fractional progress and move waves by their actual age, so
+      // splitting the same elapsed time into different frames does not drift.
+      _row(42 + spawnTime * fallingSpeed);
     }
+    orbs.removeWhere((orb) => orb.y > 580);
   }
 }

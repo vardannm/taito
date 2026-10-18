@@ -371,6 +371,7 @@ class PlayerProfile {
   TutorialProgress tutorial = TutorialProgress();
   Future<void> _tutorialWrites = Future<void>.value();
   ControlMode _controlMode = ControlMode.oneFinger;
+  bool haloJoystick = false;
   bool _needsInitialControlDefault = false;
   ControlMode get controlMode => _controlMode;
   set controlMode(ControlMode value) {
@@ -581,6 +582,7 @@ class PlayerProfile {
     try {
       tutorialSeen = await storage.getBool('gilt.tutorial.v1.seen') ?? false;
       final savedOneFinger = await storage.getBool('gilt.oneFinger');
+      haloJoystick = await storage.getBool('gilt.haloJoystick') ?? false;
       controlMode = savedOneFinger == false
           ? ControlMode.twoFinger
           : ControlMode.oneFinger;
@@ -665,6 +667,7 @@ class PlayerProfile {
         controlMode == ControlMode.oneFinger,
       );
       await storage.setString('gilt.controlMode', controlMode.name);
+      await storage.setBool('gilt.haloJoystick', haloJoystick);
       await storage.setDouble('gilt.analogSensitivity', analogSensitivity);
       await storage.setDouble(
         'gilt.twoFingerSensitivity',

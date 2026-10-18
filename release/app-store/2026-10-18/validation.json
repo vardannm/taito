@@ -1,0 +1,524 @@
+{
+  "status": "passed",
+  "date": "2026-10-18",
+  "screenshotCount": 30,
+  "sourceCaptureCount": 30,
+  "checks": [
+    "exact Apple display dimensions",
+    "RGB PNG without alpha or tRNS",
+    "valid PNG CRCs",
+    "complete decoded pixels",
+    "six screenshots per display",
+    "metadata character limits"
+  ],
+  "fields": {
+    "name": {
+      "characters": 22,
+      "limit": 30
+    },
+    "subtitle": {
+      "characters": 29,
+      "limit": 30
+    },
+    "promotional_text": {
+      "characters": 147,
+      "limit": 170
+    },
+    "keywords": {
+      "characters": 85,
+      "limit": 100,
+      "utf8Bytes": 85,
+      "limitUnit": "bytes"
+    },
+    "description": {
+      "characters": 1401,
+      "limit": 4000
+    },
+    "whats_new": {
+      "characters": 160,
+      "limit": 4000
+    }
+  },
+  "images": [
+    {
+      "file": "screenshots/iphone-6-3/01-precision.png",
+      "width": 1206,
+      "height": 2622,
+      "pngColorType": 2,
+      "bytes": 917549,
+      "sha256": "f02dfa8e34b339e676a70df53d1c9920209bc0b44b7fdaa50ef91b1d3ee7d559"
+    },
+    {
+      "file": "screenshots/iphone-6-3/02-infinite.png",
+      "width": 1206,
+      "height": 2622,
+      "pngColorType": 2,
+      "bytes": 941087,
+      "sha256": "b25348c34a18ba3b07ec430b024dcec977eac860b599374700ba9edb1de538f0"
+    },
+    {
+      "file": "screenshots/iphone-6-3/03-classic.png",
+      "width": 1206,
+      "height": 2622,
+      "pngColorType": 2,
+      "bytes": 1005531,
+      "sha256": "595b88dc31e707275c628cc96cbdc9fb1bd762012e45a49ffe40d4179ebb3ad5"
+    },
+    {
+      "file": "screenshots/iphone-6-3/04-boss.png",
+      "width": 1206,
+      "height": 2622,
+      "pngColorType": 2,
+      "bytes": 817911,
+      "sha256": "664c668792641a76330902d28b6178da914e3f7601b5f85518e035e71cd477f0"
+    },
+    {
+      "file": "screenshots/iphone-6-3/05-merge.png",
+      "width": 1206,
+      "height": 2622,
+      "pngColorType": 2,
+      "bytes": 810078,
+      "sha256": "07acc59415bc8546236a771374f9a0509e8ba17d0c92f907f4b74fed750b1512"
+    },
+    {
+      "file": "screenshots/iphone-6-3/06-gear.png",
+      "width": 1206,
+      "height": 2622,
+      "pngColorType": 2,
+      "bytes": 828674,
+      "sha256": "8cfc1935f1115da09b8bf7fd318a8d4e37403ed5b67c1c81644587acef989d07"
+    },
+    {
+      "file": "source-ui/iphone-6-3/01-precision.png",
+      "width": 1206,
+      "height": 2622,
+      "pngColorType": 2,
+      "bytes": 738840,
+      "sha256": "7a263daea1c6fe6a28b0a3beb80c676dfcb24dc268833fdd67bc281dd96348df"
+    },
+    {
+      "file": "source-ui/iphone-6-3/02-infinite.png",
+      "width": 1206,
+      "height": 2622,
+      "pngColorType": 2,
+      "bytes": 786574,
+      "sha256": "217b37f29fe10072c00fef4cf8d53ce456ec504834128421992e280439d50ff1"
+    },
+    {
+      "file": "source-ui/iphone-6-3/03-classic.png",
+      "width": 1206,
+      "height": 2622,
+      "pngColorType": 2,
+      "bytes": 839065,
+      "sha256": "89a24221f692314f0f002a0cf0c08ac89b49761253f6c84e6ae9f56887fdb4bf"
+    },
+    {
+      "file": "source-ui/iphone-6-3/04-boss.png",
+      "width": 1206,
+      "height": 2622,
+      "pngColorType": 2,
+      "bytes": 547729,
+      "sha256": "81d07a1a05aaa1ce8a4407805f7c1adcb035330858e926d7971dfd06ea609718"
+    },
+    {
+      "file": "source-ui/iphone-6-3/05-merge.png",
+      "width": 1206,
+      "height": 2622,
+      "pngColorType": 2,
+      "bytes": 592213,
+      "sha256": "5a23b682dfda17a8cbb0d1ae4a9f8f605bcf2f49ddd95d72af5a87f057d860b7"
+    },
+    {
+      "file": "source-ui/iphone-6-3/06-gear.png",
+      "width": 1206,
+      "height": 2622,
+      "pngColorType": 2,
+      "bytes": 692483,
+      "sha256": "a72d16be5d658192cda5ed5a60c752d9292c9716260e3eddbefbf5532ef4af95"
+    },
+    {
+      "file": "screenshots/iphone-6-9/01-precision.png",
+      "width": 1320,
+      "height": 2868,
+      "pngColorType": 2,
+      "bytes": 1055026,
+      "sha256": "14c38b6f63692ba1a32d64d24d6ea36d503b79d4c48ff2d524aeadf2f7b20753"
+    },
+    {
+      "file": "screenshots/iphone-6-9/02-infinite.png",
+      "width": 1320,
+      "height": 2868,
+      "pngColorType": 2,
+      "bytes": 1075069,
+      "sha256": "e4d1cd99ab28bca177e3f7055e10564535a0eea0648d25580a80cbf485c6e68c"
+    },
+    {
+      "file": "screenshots/iphone-6-9/03-classic.png",
+      "width": 1320,
+      "height": 2868,
+      "pngColorType": 2,
+      "bytes": 1153581,
+      "sha256": "b27ac4c10ed16f8c1d70887262359e94aee04657bb412d6aab830c5846c658a3"
+    },
+    {
+      "file": "screenshots/iphone-6-9/04-boss.png",
+      "width": 1320,
+      "height": 2868,
+      "pngColorType": 2,
+      "bytes": 927578,
+      "sha256": "f807bbba4ac12723fdf7fbd4db2b066e67c2b199cb23b067e78a432397e807b6"
+    },
+    {
+      "file": "screenshots/iphone-6-9/05-merge.png",
+      "width": 1320,
+      "height": 2868,
+      "pngColorType": 2,
+      "bytes": 930484,
+      "sha256": "ce3f9bd9ec5e9033fa5dd54a582c9357214668f0ea5cb3f39526fcb80754f620"
+    },
+    {
+      "file": "screenshots/iphone-6-9/06-gear.png",
+      "width": 1320,
+      "height": 2868,
+      "pngColorType": 2,
+      "bytes": 906439,
+      "sha256": "bec9a9b44efb41c8f5ad7c2462e066971fa3a60334c0f5112b443bccf39bd4be"
+    },
+    {
+      "file": "source-ui/iphone-6-9/01-precision.png",
+      "width": 1320,
+      "height": 2868,
+      "pngColorType": 2,
+      "bytes": 837698,
+      "sha256": "78fe16680172fd7c223274b8474d059263456fab02cbd6fb2daeab1a043749b1"
+    },
+    {
+      "file": "source-ui/iphone-6-9/02-infinite.png",
+      "width": 1320,
+      "height": 2868,
+      "pngColorType": 2,
+      "bytes": 883542,
+      "sha256": "13f3e1156a9c549d57c72ed2e58eb31f88939e954b7b5d0c5573ff040c32c208"
+    },
+    {
+      "file": "source-ui/iphone-6-9/03-classic.png",
+      "width": 1320,
+      "height": 2868,
+      "pngColorType": 2,
+      "bytes": 960900,
+      "sha256": "039ae9723528c7aad8904f1d7b233659c03f820e5008b0ea44601a61619aea05"
+    },
+    {
+      "file": "source-ui/iphone-6-9/04-boss.png",
+      "width": 1320,
+      "height": 2868,
+      "pngColorType": 2,
+      "bytes": 616680,
+      "sha256": "b8b44baceafaffa6ca9746730790dd3ac87c32258aabbb4780c82fef63525e55"
+    },
+    {
+      "file": "source-ui/iphone-6-9/05-merge.png",
+      "width": 1320,
+      "height": 2868,
+      "pngColorType": 2,
+      "bytes": 673460,
+      "sha256": "ba70c8b27a05a6e53cf7bd75af6c736d2dcc0a85c2b63ad7828bb70cf0b9ebac"
+    },
+    {
+      "file": "source-ui/iphone-6-9/06-gear.png",
+      "width": 1320,
+      "height": 2868,
+      "pngColorType": 2,
+      "bytes": 734612,
+      "sha256": "62976ac1a0635f290a23b6f6247cc611cb2e17e58ff67c1430c999c0b81d10c6"
+    },
+    {
+      "file": "screenshots/ipad-13/01-precision.png",
+      "width": 2064,
+      "height": 2752,
+      "pngColorType": 2,
+      "bytes": 1780466,
+      "sha256": "ea5b3b2fa4d642821701307c896c7932b8897546385c18a5cef768d16aa7f98e"
+    },
+    {
+      "file": "screenshots/ipad-13/02-infinite.png",
+      "width": 2064,
+      "height": 2752,
+      "pngColorType": 2,
+      "bytes": 1724144,
+      "sha256": "cf56e978628da918212be6efaa90c3143d882df77b4be9c2b6c11195ed83e410"
+    },
+    {
+      "file": "screenshots/ipad-13/03-classic.png",
+      "width": 2064,
+      "height": 2752,
+      "pngColorType": 2,
+      "bytes": 1882436,
+      "sha256": "843c73b78b0646d25fbcb5703f743a394bac7a08dedc81c5d862768242537ab0"
+    },
+    {
+      "file": "screenshots/ipad-13/04-boss.png",
+      "width": 2064,
+      "height": 2752,
+      "pngColorType": 2,
+      "bytes": 1668827,
+      "sha256": "585f1ce6d8f655b3222bef82ae18ffcc4cd210fb74c5405105176823c6483e8b"
+    },
+    {
+      "file": "screenshots/ipad-13/05-merge.png",
+      "width": 2064,
+      "height": 2752,
+      "pngColorType": 2,
+      "bytes": 1633600,
+      "sha256": "bd137bd109095c9bff99acabc157f904f6335cd9b37246498e31ef48e6efbd99"
+    },
+    {
+      "file": "screenshots/ipad-13/06-gear.png",
+      "width": 2064,
+      "height": 2752,
+      "pngColorType": 2,
+      "bytes": 1260073,
+      "sha256": "db84060b7e2cbb70fd50f7a9b97f685ef46e2377a592db72ff46635d9b9ba22f"
+    },
+    {
+      "file": "source-ui/ipad-13/01-precision.png",
+      "width": 2064,
+      "height": 2752,
+      "pngColorType": 2,
+      "bytes": 1259985,
+      "sha256": "efc5ad9fbb681b823244856fad898a196ffa14852d87f34a240e6b24c73e57f0"
+    },
+    {
+      "file": "source-ui/ipad-13/02-infinite.png",
+      "width": 2064,
+      "height": 2752,
+      "pngColorType": 2,
+      "bytes": 1234102,
+      "sha256": "fa80bcca6f3fa14ef516c853314ff9ffb82fb8fe42ef2aba3e699d48cf734a3c"
+    },
+    {
+      "file": "source-ui/ipad-13/03-classic.png",
+      "width": 2064,
+      "height": 2752,
+      "pngColorType": 2,
+      "bytes": 1396954,
+      "sha256": "509307e78cbbf7976a3687030b1d6b9a18b0e74866b3f090a5d725ded5b43895"
+    },
+    {
+      "file": "source-ui/ipad-13/04-boss.png",
+      "width": 2064,
+      "height": 2752,
+      "pngColorType": 2,
+      "bytes": 1031629,
+      "sha256": "77e83f48b62e1067cfa66790aaa77bfbda10720300f8c0beed23280be2d4e648"
+    },
+    {
+      "file": "source-ui/ipad-13/05-merge.png",
+      "width": 2064,
+      "height": 2752,
+      "pngColorType": 2,
+      "bytes": 1054013,
+      "sha256": "a777b59761884d20cf03624a7f67c2a36c3e4a24c8cdeaf216eef391b79ccdfa"
+    },
+    {
+      "file": "source-ui/ipad-13/06-gear.png",
+      "width": 2064,
+      "height": 2752,
+      "pngColorType": 2,
+      "bytes": 862760,
+      "sha256": "b988fb306d07b97ecd245e44e2a9bf872b648aed2fb462c0d2627d3163e3e20e"
+    },
+    {
+      "file": "screenshots/duo-outer/01-precision.png",
+      "width": 1398,
+      "height": 2034,
+      "pngColorType": 2,
+      "bytes": 887624,
+      "sha256": "32ea7c1c38ef28a9e8b7d3555503c0b6fb720252e7dbebd327d061e56f2e83f9"
+    },
+    {
+      "file": "screenshots/duo-outer/02-infinite.png",
+      "width": 1398,
+      "height": 2034,
+      "pngColorType": 2,
+      "bytes": 894968,
+      "sha256": "a518770f670e6603a4ccce129e8c0515910453b5418382ceaa47f1da5e3ec589"
+    },
+    {
+      "file": "screenshots/duo-outer/03-classic.png",
+      "width": 1398,
+      "height": 2034,
+      "pngColorType": 2,
+      "bytes": 946366,
+      "sha256": "cf975f77a80a7a3b6ef11c4c4034940d0b5c5b9094c031e93bec075b3e4aab1f"
+    },
+    {
+      "file": "screenshots/duo-outer/04-boss.png",
+      "width": 1398,
+      "height": 2034,
+      "pngColorType": 2,
+      "bytes": 872966,
+      "sha256": "3e7dbc946c8df6a7f9d169a6d8f456ea9a1448ba5017eed29d1beaf41dfcb44e"
+    },
+    {
+      "file": "screenshots/duo-outer/05-merge.png",
+      "width": 1398,
+      "height": 2034,
+      "pngColorType": 2,
+      "bytes": 774105,
+      "sha256": "75d7008bf0e7e2cb7096dc557a5e37b6d58d0c2f90c8098144701c1d84bf4dca"
+    },
+    {
+      "file": "screenshots/duo-outer/06-gear.png",
+      "width": 1398,
+      "height": 2034,
+      "pngColorType": 2,
+      "bytes": 760212,
+      "sha256": "0424acd559b7d2da548ea913406843b53271de62f24d2940b0f4bf6d52197f92"
+    },
+    {
+      "file": "source-ui/duo-outer/01-precision.png",
+      "width": 1398,
+      "height": 2034,
+      "pngColorType": 2,
+      "bytes": 652966,
+      "sha256": "07e9406eba305e302398cfac948e7a1ca7b33a908009bf47eb9fd4a471e8d816"
+    },
+    {
+      "file": "source-ui/duo-outer/02-infinite.png",
+      "width": 1398,
+      "height": 2034,
+      "pngColorType": 2,
+      "bytes": 658438,
+      "sha256": "5ce44c6ccd2cf6c7f2f7ddbaf562fa73366c5dfbb891a12720c585930761f8b7"
+    },
+    {
+      "file": "source-ui/duo-outer/03-classic.png",
+      "width": 1398,
+      "height": 2034,
+      "pngColorType": 2,
+      "bytes": 723489,
+      "sha256": "75b531dede832752508c4a9c1654ba4122b9693a7b368e91e3fa94093daca6aa"
+    },
+    {
+      "file": "source-ui/duo-outer/04-boss.png",
+      "width": 1398,
+      "height": 2034,
+      "pngColorType": 2,
+      "bytes": 572304,
+      "sha256": "44530a210f9079c5f71aea8cd5f4f16470f5e6246d012c176a9eef1ce09e0b78"
+    },
+    {
+      "file": "source-ui/duo-outer/05-merge.png",
+      "width": 1398,
+      "height": 2034,
+      "pngColorType": 2,
+      "bytes": 497062,
+      "sha256": "0559bcce505c4adb497bc5730099c0b75ee13b4bd56e78855a6d8ebcc2059489"
+    },
+    {
+      "file": "source-ui/duo-outer/06-gear.png",
+      "width": 1398,
+      "height": 2034,
+      "pngColorType": 2,
+      "bytes": 554016,
+      "sha256": "fd867787f8e9ef4a8fd4794b329d50f72047f6e2e8c3269e953d1f251dc2e559"
+    },
+    {
+      "file": "screenshots/duo-inner/01-precision.png",
+      "width": 2853,
+      "height": 2007,
+      "pngColorType": 2,
+      "bytes": 1733306,
+      "sha256": "2012a5ba3eb09e7842dce4949fb3ab5d35512e5c3825fcdd698628759f8cb56c"
+    },
+    {
+      "file": "screenshots/duo-inner/02-infinite.png",
+      "width": 2853,
+      "height": 2007,
+      "pngColorType": 2,
+      "bytes": 1700384,
+      "sha256": "244b8247610841f155c6a3daff9bc4f05f7c1e60bacf32db3bfd18c92eab68dd"
+    },
+    {
+      "file": "screenshots/duo-inner/03-classic.png",
+      "width": 2853,
+      "height": 2007,
+      "pngColorType": 2,
+      "bytes": 1800603,
+      "sha256": "646cb652934d0fdaf0226f4a4c185dff46d80c52da16790a6662f87be7672f38"
+    },
+    {
+      "file": "screenshots/duo-inner/04-boss.png",
+      "width": 2853,
+      "height": 2007,
+      "pngColorType": 2,
+      "bytes": 1711923,
+      "sha256": "eb32fccfa9538ccc2acd20bd21999c6abdeee9d4f4f168369a4a9eb200864100"
+    },
+    {
+      "file": "screenshots/duo-inner/05-merge.png",
+      "width": 2853,
+      "height": 2007,
+      "pngColorType": 2,
+      "bytes": 1445397,
+      "sha256": "de515341b1b504f9110bee9933f52159f228557a8102e7b19e6d628aa0ca736b"
+    },
+    {
+      "file": "screenshots/duo-inner/06-gear.png",
+      "width": 2853,
+      "height": 2007,
+      "pngColorType": 2,
+      "bytes": 1268042,
+      "sha256": "0d569a1544a7799c372ff965d2735535c3b96165e491f8cf36916b4916155231"
+    },
+    {
+      "file": "source-ui/duo-inner/01-precision.png",
+      "width": 2853,
+      "height": 2007,
+      "pngColorType": 2,
+      "bytes": 1168120,
+      "sha256": "b4ed8589653049f19bc8003a506e9c9e0d38d80619ebc0bbd8546c10c462461e"
+    },
+    {
+      "file": "source-ui/duo-inner/02-infinite.png",
+      "width": 2853,
+      "height": 2007,
+      "pngColorType": 2,
+      "bytes": 1150777,
+      "sha256": "716588636907b8dabf4ffb6659f28dc652d99eba540750e2e920ef92e8e5f4de"
+    },
+    {
+      "file": "source-ui/duo-inner/03-classic.png",
+      "width": 2853,
+      "height": 2007,
+      "pngColorType": 2,
+      "bytes": 1261035,
+      "sha256": "cc0c39bfa460dbbc3711cb5b9816e69d354675686258f19f6d57ba6d7649a550"
+    },
+    {
+      "file": "source-ui/duo-inner/04-boss.png",
+      "width": 2853,
+      "height": 2007,
+      "pngColorType": 2,
+      "bytes": 1135204,
+      "sha256": "4916c2771f03d168bf6002b38e0360583ccf8c9a6c4dbf4cc073debb923c4081"
+    },
+    {
+      "file": "source-ui/duo-inner/05-merge.png",
+      "width": 2853,
+      "height": 2007,
+      "pngColorType": 2,
+      "bytes": 745102,
+      "sha256": "e054aa37a659bc7acc6118104cc07a44da2bc079140120fd8d7ec0d37187441e"
+    },
+    {
+      "file": "source-ui/duo-inner/06-gear.png",
+      "width": 2853,
+      "height": 2007,
+      "pngColorType": 2,
+      "bytes": 732465,
+      "sha256": "6e12f86de52fda6e080b96a80dd695a3f80381a55849f6f8abd5ceca7aa0c215"
+    }
+  ]
+}

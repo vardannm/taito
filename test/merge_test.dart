@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/merge.dart';
+import 'package:balance_arcade/merge_difficulty.dart';
+import 'dart:math' as math;
 import 'package:balance_arcade/board_painter.dart';
 import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/profile.dart';
@@ -277,26 +279,150 @@ void main() {
       expect(formatMergeNumber(entry.key), entry.value);
     }
   });
-  test('each wave has reachable food and a separated larger hazard', () {
-    for (var seed = 0; seed < 40; seed++) {
-      final run = MergeRun(seed: seed);
-      expect(run.orbs.length, 9);
-      for (var row = 0; row < 3; row++) {
-        final wave = run.orbs.skip(row * 3).take(3).toList();
-        expect(wave[0].value, run.tail);
-        expect(wave[1].value, lessThanOrEqualTo(run.head));
-        expect(wave[2].value, greaterThan(run.head));
-        expect(wave[0].x, inInclusiveRange(run.minHeadX, run.maxHeadX));
-        for (var a = 0; a < 3; a++) {
-          for (var b = a + 1; b < 3; b++) {
-            expect((wave[a].x - wave[b].x).abs(), greaterThanOrEqualTo(60));
+  test(
+    'opening waves are safe, separated and have reachable matching food',
+    () {
+      for (var seed = 0; seed < 40; seed++) {
+        final run = MergeRun(seed: seed);
+        expect(run.orbs.length, 9);
+        for (var row = 0; row < 3; row++) {
+          final wave = run.orbs.skip(row * 3).take(3).toList();
+          expect(wave[0].value, run.tail);
+          expect(wave[1].value, lessThanOrEqualTo(run.head));
+          expect(wave[2].value, lessThanOrEqualTo(run.head));
+          expect(wave[0].x, inInclusiveRange(run.minHeadX, run.maxHeadX));
+          for (var a = 0; a < 3; a++) {
+            for (var b = a + 1; b < 3; b++) {
+              expect((wave[a].x - wave[b].x).abs(), greaterThanOrEqualTo(60));
+            }
           }
         }
+        for (var i = 0; i < 200; i++) run.step(.1, -100, -100, -100, -100);
+        expect(run.ended, false);
+        expect(run.orbs.length, lessThan(22));
       }
-      for (var i = 0; i < 200; i++) run.step(.1, -100, -100, -100, -100);
-      expect(run.ended, false);
-      expect(run.orbs.length, lessThan(22));
+    },
+  );
+  test('danger grows gradually while every wave retains two safe choices', () {
+    for (final head in [2, 4, 8, 16, 32, 64, 1024]) {
+      final run = emptyRun(seed: head)
+        ..highest = head
+        ..segments[0] = head;
+      var dangerous = 0;
+      const waves = 600;
+      for (var i = 0; i < waves; i++) {
+        run.orbs.clear();
+        run.step(
+          MergeDifficulty.waveSpacing / run.speed + 1e-8,
+          -1000,
+          -1000,
+          -1000,
+          -1000,
+        );
+        expect(run.orbs, hasLength(3));
+        expect(run.orbs[0].value, run.tail);
+        expect(run.orbs[1].value, lessThanOrEqualTo(head));
+        if (run.orbs[2].value > head) dangerous++;
+      }
+      final expected = switch (head) {
+        2 || 4 => 0.0,
+        8 => .25,
+        16 => .5,
+        32 => .75,
+        _ => 1.0,
+      };
+      expect(dangerous / waves, closeTo(expected, .07), reason: 'head $head');
     }
+  });
+  test(
+    'secondary food favours real matches but still offers missing powers',
+    () {
+      final run = emptyRun(seed: 81)..highest = 2048;
+      run.segments
+        ..clear()
+        ..addAll([2048, 128, 8, 2]);
+      var matches = 0;
+      for (var i = 0; i < 600; i++) {
+        run.orbs.clear();
+        run.step(
+          MergeDifficulty.waveSpacing / run.speed + 1e-8,
+          -1000,
+          -1000,
+          -1000,
+          -1000,
+        );
+        expect(run.orbs.first.value, 2);
+        final food = run.orbs[1].value;
+        expect(food, lessThanOrEqualTo(run.head));
+        if (run.canMerge(food)) matches++;
+      }
+      expect(matches / 600, inExclusiveRange(.6, .9));
+    },
+  );
+  test(
+    'random merge sequences conserve value and leave unique descending powers',
+    () {
+      final random = math.Random(741);
+      for (var seed = 0; seed < 50; seed++) {
+        final run = emptyRun(seed: seed);
+        for (var pickup = 0; pickup < 200; pickup++) {
+          final value =
+              1 << (1 + random.nextInt(math.min(16, run.head.bitLength - 1)));
+          final before = run.segments.fold<int>(0, (sum, v) => sum + v);
+          final oldScore = run.score;
+          run.collect(value);
+          expect(run.ended, isFalse);
+          expect(
+            run.segments.fold<int>(0, (sum, v) => sum + v),
+            before + value,
+          );
+          expect(run.score - oldScore, run.lastMergeScore);
+          expect(run.segments.toSet().length, run.segments.length);
+          for (var i = 0; i < run.segments.length; i++) {
+            final v = run.segments[i];
+            expect(v & (v - 1), 0);
+            if (i > 0) expect(v, lessThan(run.segments[i - 1]));
+          }
+        }
+        final before = List<int>.of(run.segments), score = run.score;
+        run.collect(run.head * 2);
+        expect(run.ended, isTrue);
+        expect(run.segments, before);
+        expect(run.score, score);
+      }
+    },
+  );
+  test(
+    'wave timing and positions do not drift with different frame partitions',
+    () {
+      final runs = <MergeRun>[];
+      for (final dt in [.01, .1, 1.0, 20.0]) {
+        final run = emptyRun(seed: 91)
+          ..highest = 128
+          ..segments[0] = 128;
+        for (var i = 0; i < (20 / dt).round(); i++) {
+          run.step(dt, -1000, -1000, -1000, -1000);
+        }
+        runs.add(run);
+      }
+      final expected = runs.first;
+      for (final run in runs.skip(1)) {
+        expect(run.orbs.length, expected.orbs.length);
+        expect(run.spawnTime, closeTo(expected.spawnTime, 1e-7));
+        for (var i = 0; i < run.orbs.length; i++) {
+          expect(run.orbs[i].value, expected.orbs[i].value);
+          expect(run.orbs[i].x, expected.orbs[i].x);
+          expect(run.orbs[i].y, closeTo(expected.orbs[i].y, 1e-7));
+        }
+      }
+    },
+  );
+  test('gate cooldown begins at swept contact, not at the frame start', () {
+    final run = emptyRun()..segments[0] = 64;
+    run.gates.add(MergeGate(32, y: 253.5));
+    run.step(1, 180, 300, 180, 300);
+    expect(run.gatesPassed, 1);
+    expect(run.gateCooldown, closeTo(3.75, 1e-9));
   });
   test('only the head collects; tail passes through dangerous numbers', () {
     final g = BalanceGame()..start(gameMode: GameMode.merge2048);

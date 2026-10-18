@@ -47,7 +47,7 @@ void main() {
       await tester.pump();
       expect(find.text('Your game data'), findsOneWidget);
       expect(
-        find.textContaining('not automatically uploaded to a GILT server'),
+        find.textContaining('not automatically uploaded to a Rollrise server'),
         findsOneWidget,
       );
       expect(tester.takeException(), isNull);

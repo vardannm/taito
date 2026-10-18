@@ -167,7 +167,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pump();
     await selectWorld(tester, 2);
-    expect(find.text('2048 Merge'), findsOneWidget);
+    expect(find.text('Number Merge'), findsOneWidget);
     await startWorld(tester);
     expect(game.mode, GameMode.merge2048);
     expect(game.waitingForInput, isFalse);

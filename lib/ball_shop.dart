@@ -361,7 +361,7 @@ class _BallShopState extends State<BallShop>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'GILT / COLLECTION',
+                                'ROLLRISE / COLLECTION',
                                 style: TextStyle(
                                   color: menuGold,
                                   fontSize: 8,

@@ -1,17 +1,17 @@
 {
-  "title": "GILT Privacy Policy",
-  "updated": "2026-10-12",
+  "title": "Rollrise Privacy Policy",
+  "updated": "2026-10-18",
   "publisher": "",
   "contactEmail": "",
   "publicUrl": "",
   "sections": [
     {
       "title": "Your game data",
-      "body": "GILT stores progress, scores, earned coins, equipment, achievements, tutorial progress, settings, and saved friend challenges on your device. These records support gameplay and are not automatically uploaded to a GILT server. GILT does not require an account. Your operating system may include app data in device backups, depending on your backup settings."
+      "body": "Rollrise stores progress, scores, earned coins, equipment, achievements, tutorial progress, settings, and saved friend challenges on your device. These records support gameplay and are not automatically uploaded to a Rollrise server. Rollrise does not require an account. Your operating system may include app data in device backups, depending on your backup settings."
     },
     {
       "title": "Backups, challenges, and playtests",
-      "body": "When you choose to copy a progress backup, friend challenge, or playtest report, GILT writes that content to your clipboard. A friend challenge includes the name you enter and your challenge result. Imports use text you paste into the app. The optional playtest recorder keeps gameplay observations in memory until the app closes or another recording starts. GILT does not upload these exports automatically. If you send them to another person or service, that recipient controls its copy."
+      "body": "When you choose to copy a progress backup, friend challenge, or playtest report, Rollrise writes that content to your clipboard. A friend challenge includes the name you enter and your challenge result. Imports use text you paste into the app. The optional playtest recorder keeps gameplay observations in memory until the app closes or another recording starts. Rollrise does not upload these exports automatically. If you send them to another person or service, that recipient controls its copy."
     },
     {
       "title": "Optional rewarded ads",
@@ -19,27 +19,33 @@
     },
     {
       "title": "Analytics",
-      "body": "On Android and iOS, GILT uses Google Analytics for Firebase to understand how the game is used and improve it. It sends mode selections, run starts and finishes, shop opens, control scheme, level, practice status, score, outcome, and run duration to Google. The SDK also collects standard app-usage events, app and device information, and installation or device identifiers. We do not attach your challenge name, email, or a custom user ID to gameplay events. Google processes and retains analytics data under its policies and the project's analytics settings. Advertising services may separately process measurement data when you request an ad."
+      "body": "On Android and iOS, Rollrise uses Google Analytics for Firebase to understand how the game is used and improve it. It sends mode selections, run starts and finishes, shop opens, control scheme, level, practice status, score, outcome, and run duration to Google. The SDK also collects standard app-usage events, app and device information, and installation or device identifiers. We do not attach your challenge name, email, or a custom user ID to gameplay events. Google processes and retains analytics data under its policies and the project's analytics settings. Advertising services may separately process measurement data when you request an ad."
     },
     {
       "title": "Permissions and access",
-      "body": "GILT does not request access to your contacts, photos, camera, microphone, or precise location. Control gestures stay within the game. Clipboard exports occur when you choose to copy content, and imports use the text you provide."
+      "body": "Rollrise does not request access to your contacts, photos, camera, microphone, or precise location. Control gestures stay within the game. Clipboard exports occur when you choose to copy content, and imports use the text you provide."
     },
     {
       "title": "Retention and your choices",
-      "body": "Local progress remains in app storage until that storage is removed. On iOS, deleting the app removes its local app storage; offloading the app can retain it. Exported copies and device backups may remain separately, so manage those copies too. Google controls retention of data processed by its advertising services under its policies. Skipping rewarded ads avoids new ad requests from GILT."
+      "body": "Local progress remains in app storage until that storage is removed. On iOS, deleting the app removes its local app storage; offloading the app can retain it. Exported copies and device backups may remain separately, so manage those copies too. Google controls retention of data processed by its advertising services under its policies. Skipping rewarded ads avoids new ad requests from Rollrise."
     },
     {
       "title": "Children",
-      "body": "GILT does not ask players to provide their age or create an account. Parents and guardians should supervise any sharing of challenge names, backups, or reports, and use device controls to manage access to advertising."
+      "body": "Rollrise does not ask players to provide their age or create an account. Parents and guardians should supervise any sharing of challenge names, backups, or reports, and use device controls to manage access to advertising."
     },
     {
       "title": "Policy updates",
-      "body": "We will update this policy when GILT's data practices change. The date above identifies the version included with this app."
+      "body": "We will update this policy when Rollrise's data practices change. The date above identifies the version included with this app."
     }
   ],
   "references": [
-    { "title": "Google Privacy Policy", "url": "https://policies.google.com/privacy" },
-    { "title": "How Google uses information from apps", "url": "https://policies.google.com/technologies/partner-sites" }
+    {
+      "title": "Google Privacy Policy",
+      "url": "https://policies.google.com/privacy"
+    },
+    {
+      "title": "How Google uses information from apps",
+      "url": "https://policies.google.com/technologies/partner-sites"
+    }
   ]
 }

@@ -30,6 +30,7 @@ const brass = Color(0xFFD9AE65);
 /// or the strip where two-finger handles sit under the platform. Both modes
 /// share it, so the board and ball sit at the same place on screen.
 const controlStripHeight = 96.0;
+const haloControlStripHeight = 140.0;
 
 /// The strip a full-size board widget lays its board out above. One-finger
 /// places its pad outside the board widget instead, so it needs none here.
@@ -37,8 +38,9 @@ double handleStrip(BalanceGame game) =>
     game.controlMode == ControlMode.twoFinger ? controlStripHeight : 0;
 
 /// The strip below the board across the whole play area, pad or handles.
-double controlStrip(BalanceGame game) =>
-    game.oneFinger || game.controlMode == ControlMode.twoFinger
+double controlStrip(BalanceGame game) => game.oneFinger && game.haloJoystick
+    ? haloControlStripHeight
+    : game.oneFinger || game.controlMode == ControlMode.twoFinger
     ? controlStripHeight
     : 0;
 

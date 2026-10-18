@@ -143,7 +143,7 @@ class _GiltIntroState extends State<GiltIntro>
 
   @override
   Widget build(BuildContext context) => Semantics(
-    label: 'GILT',
+    label: 'ROLLRISE',
     container: true,
     child: GestureDetector(
       behavior: HitTestBehavior.opaque,

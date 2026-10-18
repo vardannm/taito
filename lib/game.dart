@@ -26,6 +26,8 @@ enum GamePhase { playing, sinking, returning, over }
 
 enum GameEvent { target, miss, complete, coin, merge }
 
+// Preserve mode identifiers for saved data and analytics. The displayed name
+// of merge2048 is Number Merge.
 enum GameMode { classic, infinite, practice, daily, merge2048 }
 
 enum ControlMode { twoFinger, oneFinger, analog, tiltLift, boardTilt }
@@ -70,6 +72,8 @@ class BalanceGame {
       1 + cosmetic.scoreBonus + platformStyle.scoreBonus;
   ControlMode controlMode = ControlMode.twoFinger;
   ControlMode preferredControlMode = ControlMode.twoFinger;
+  // A visual alternative to the original one-finger pad, with identical input.
+  bool haloJoystick = false;
   bool get analog => controlMode == ControlMode.analog;
   final analogInputs = [0.0, 0.0];
   void setAnalogInput(int side, double value) {

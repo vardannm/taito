@@ -1,4 +1,4 @@
-# GILT privacy release preparation
+# Rollrise privacy release preparation
 
 Status: policy draft and app manifest prepared locally. Public publishing, App Store Connect answers, and the final iOS archive Privacy Report are NOT completed.
 
@@ -47,7 +47,7 @@ Firebase Analytics is now configured. Review its automatically collected device/
 
 ## App and dependency manifests
 
-`ios/Runner/PrivacyInfo.xcprivacy` is included in the Runner Resources build phase. It declares UserDefaults reason **CA92.1**, for GILT's app-owned records/settings. It deliberately does not assert an app-wide `NSPrivacyTracking=false` or replace Google/Firebase collection declarations with empty arrays. A required-reason declaration is not a privacy label or consent mechanism.
+`ios/Runner/PrivacyInfo.xcprivacy` is included in the Runner Resources build phase. It declares UserDefaults reason **CA92.1**, for Rollrise's app-owned records/settings. It deliberately does not assert an app-wide `NSPrivacyTracking=false` or replace Google/Firebase collection declarations with empty arrays. A required-reason declaration is not a privacy label or consent mechanism.
 
 The cached `shared_preferences_foundation` 2.5.7 package includes its own manifest and Swift Package resource declaration. Google Mobile Ads and Firebase use native packages resolved on the Mac; their complete built manifests cannot be verified from this Windows source tree. Flutter/framework manifests and transitive SDKs must also remain in the final app.
 

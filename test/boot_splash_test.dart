@@ -19,7 +19,7 @@ void main() {
     await tester.pumpWidget(gate());
     expect(find.byType(GiltIntro), findsOneWidget);
     // Nothing is written on screen; the intro still names itself to screen readers.
-    expect(find.bySemanticsLabel('GILT'), findsOneWidget);
+    expect(find.bySemanticsLabel('ROLLRISE'), findsOneWidget);
 
     await tester.pump(const Duration(milliseconds: 1500));
     expect(find.byType(GiltIntro), findsOneWidget);

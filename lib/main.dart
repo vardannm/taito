@@ -88,7 +88,7 @@ class ArcadeApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
-    title: 'GILT • Precision Arcade',
+    title: 'Rollrise: Ball Balance',
     theme: arcadeMenuTheme(),
     // Wrapping the navigator keeps the intro above anything the menu opens.
     builder: intro
@@ -309,7 +309,8 @@ class _GameScreenState extends State<GameScreen>
         // the two-finger handle strip itself.
         math.max(
           1,
-          board.size.height - (game.oneFinger ? OneFingerControls.height : 0),
+          board.size.height -
+              (game.oneFinger ? OneFingerControls.heightFor(game) : 0),
         ),
       ),
       game,
@@ -610,6 +611,7 @@ class _GameScreenState extends State<GameScreen>
     game.cabinet = profile.cabinet;
     game.analogSensitivity = profile.analogSensitivity;
     game.twoFingerSensitivity = profile.twoFingerSensitivity;
+    game.haloJoystick = profile.haloJoystick;
     profile.applyInfiniteStart(game, tutorial: tutorialActive);
     game.start(
       gameMode: mode,
@@ -707,7 +709,7 @@ class _GameScreenState extends State<GameScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                '2048 / MERGE',
+                'NUMBER MERGE',
                 style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 16),
@@ -721,7 +723,7 @@ class _GameScreenState extends State<GameScreen>
                       ),
                       const SizedBox(height: 16),
                       const Text(
-                        'Collect equal or smaller numbers with the head ball. Touching a larger number ends the run: dodge the red rings! The first gate arrives at ${MergeRun.gateInterval} score. After clearing it, earn at least ${MergeRun.gateInterval} fresh points for the next; this gap grows with your main ball. Gates scale with your ball and at least double each time. Your main ball must be strictly greater than its number to pass. Matching values merge anywhere in the snake. Play continues beyond 2048.',
+                        'Collect equal or smaller numbers with the head ball. Touching a larger number ends the run: dodge the red rings! The first gate arrives at ${MergeRun.gateInterval} score. After clearing it, earn at least ${MergeRun.gateInterval} fresh points for the next; this gap grows with your main ball. Gates scale with your ball and at least double each time. Your main ball must be strictly greater than its number to pass. Matching values merge anywhere in the snake. Keep merging to reach higher numbers.',
                       ),
                       const SizedBox(height: 16),
                       Text(
@@ -740,7 +742,7 @@ class _GameScreenState extends State<GameScreen>
                     Navigator.pop(context);
                     start(GameMode.merge2048);
                   },
-                  child: const Text('PLAY 2048'),
+                  child: const Text('PLAY MERGE'),
                 ),
               ),
             ],
@@ -953,6 +955,7 @@ class _GameScreenState extends State<GameScreen>
     game.cabinet = profile.cabinet;
     game.analogSensitivity = profile.analogSensitivity;
     game.twoFingerSensitivity = profile.twoFingerSensitivity;
+    game.haloJoystick = profile.haloJoystick;
     profile.applyInfiniteStart(game, tutorial: tutorialActive);
     game.start(
       gameMode: arcadeModes[index],
@@ -1147,7 +1150,7 @@ class _GameScreenState extends State<GameScreen>
       listenable: frame,
       blockOutside: menu && !objective,
       bottomInset: guidedPlay || objective
-          ? OneFingerControls.height + 12
+          ? OneFingerControls.heightFor(game) + 12
           : 100,
       messageTop: guidedPlay || objective
           ? MediaQuery.paddingOf(context).top + 118
@@ -1171,7 +1174,7 @@ class _GameScreenState extends State<GameScreen>
               math.max(
                 1,
                 board.size.height -
-                    (game.oneFinger ? OneFingerControls.height : 0),
+                    (game.oneFinger ? OneFingerControls.heightFor(game) : 0),
               ),
             ),
             game,
@@ -1198,11 +1201,18 @@ class _GameScreenState extends State<GameScreen>
           if (game.oneFinger) {
             final top = layer.globalToLocal(
               board.localToGlobal(
-                Offset(12, board.size.height - OneFingerControls.height + 10),
+                Offset(
+                  12,
+                  board.size.height - OneFingerControls.heightFor(game) + 10,
+                ),
               ),
             );
             result.add(
-              top & Size(board.size.width - 24, OneFingerControls.height - 20),
+              top &
+                  Size(
+                    board.size.width - 24,
+                    OneFingerControls.heightFor(game) - 20,
+                  ),
             );
           } else {
             worldPoint(20, game.left, 28);
@@ -1290,7 +1300,7 @@ class _GameScreenState extends State<GameScreen>
               children: [
                 const MenuHeading(
                   'Your arcade',
-                  eyebrow: 'EXPLORE GILT',
+                  eyebrow: 'EXPLORE ROLLRISE',
                   subtitle: 'A new challenge. Your next personal best.',
                 ),
                 choice(
@@ -1730,7 +1740,7 @@ class _GameScreenState extends State<GameScreen>
   String worldTitle(int index) => switch (index) {
     0 => 'Infinite',
     1 => 'Classic',
-    _ => '2048 Merge',
+    _ => 'Number Merge',
   };
 
   String worldSubtitle(int index) => switch (index) {
@@ -1773,7 +1783,7 @@ class _GameScreenState extends State<GameScreen>
     if (!(Offset.zero & board.size).contains(point)) return true;
     if (game.boardTilt) return false;
     if (game.oneFinger)
-      return point.dy < board.size.height - OneFingerControls.height;
+      return point.dy < board.size.height - OneFingerControls.heightFor(game);
     if (game.bottomControls) return true;
     // The same layout the board paints with, so a touch on a drawn handle
     // is never mistaken for a world swipe.
@@ -1798,6 +1808,7 @@ class _GameScreenState extends State<GameScreen>
         existing.cosmetic == profile.selectedBall &&
         existing.cabinet == profile.cabinet &&
         existing.controlMode == controlForMode(arcadeModes[index]) &&
+        existing.haloJoystick == profile.haloJoystick &&
         existing.platformStyle == profile.selectedPlatform)
       return existing;
     return _themedPreviews[index] = BalanceGame(seed: index + 1)
@@ -1982,7 +1993,7 @@ class _GameScreenState extends State<GameScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'GILT',
+                      'ROLLRISE',
                       style: TextStyle(
                         color: menuText,
                         fontSize: 23,
@@ -2176,7 +2187,7 @@ class _GameScreenState extends State<GameScreen>
                             child: FittedBox(
                               fit: BoxFit.scaleDown,
                               child: Text(
-                                ['Infinite', 'Classic', '2048'][index],
+                                ['Infinite', 'Classic', 'Merge'][index],
                                 style: TextStyle(
                                   color: selectedMode == index
                                       ? menuGold
@@ -2317,12 +2328,12 @@ class _GameScreenState extends State<GameScreen>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'GILT',
+                    'ROLLRISE',
                     style: TextStyle(
                       fontFamily: 'sans-serif',
                       color: menuText,
-                      fontSize: 37,
-                      letterSpacing: 9,
+                      fontSize: 30,
+                      letterSpacing: 4,
                       fontWeight: FontWeight.w300,
                       height: 1.15,
                     ),
@@ -3105,7 +3116,7 @@ class _GameScreenState extends State<GameScreen>
                             ? 'Take a breath.'
                             : game.won
                             ? (game.merging
-                                  ? '2048. You made it.'
+                                  ? 'A brilliant chain.'
                                   : 'Pure precision.')
                             : 'So close.\nGo again.',
                         textAlign: TextAlign.center,
@@ -3356,7 +3367,7 @@ class _GameScreenState extends State<GameScreen>
               guideRow(
                 '07',
                 'Merge: grow your number.',
-                'Swipe to 2048 Merge before starting. Collect numbers equal to or smaller than your head and dodge larger numbers. Matching values merge and grow your chain. Build enough value to pass each numbered gate. Use the same tilt and lift controls to line up your next catch.',
+                'Swipe to Number Merge before starting. Collect numbers equal to or smaller than your head and dodge larger numbers. Matching values merge and grow your chain. Build enough value to pass each numbered gate. Use the same tilt and lift controls to line up your next catch.',
               ),
               guideRow(
                 '08',
@@ -3371,7 +3382,7 @@ class _GameScreenState extends State<GameScreen>
               guideRow(
                 '10',
                 'Choose your next run.',
-                'Swipe between Infinite, Levels and 2048 Merge, tap Play, then touch your controls to begin. Arcade opens Daily, Practice and How to Play. Daily changes at midnight UTC; retry the same board to improve your record. Replay Tutorial in Options walks you through the controls, pickups and shop again.',
+                'Swipe between Infinite, Levels and Number Merge, tap Play, then touch your controls to begin. Arcade opens Daily, Practice and How to Play. Daily changes at midnight UTC; retry the same board to improve your record. Replay Tutorial in Options walks you through the controls, pickups and shop again.',
               ),
               primary('TRY PRACTICE', () {
                 Navigator.pop(context);
@@ -3479,7 +3490,7 @@ class _GameScreenState extends State<GameScreen>
                 MenuAction(
                   key: const ValueKey('privacy-policy'),
                   title: 'Privacy Policy',
-                  subtitle: 'How GILT handles your data',
+                  subtitle: 'How Rollrise handles your data',
                   icon: Icons.privacy_tip_outlined,
                   onTap: () => Navigator.of(context).push<void>(
                     MaterialPageRoute(
@@ -3628,7 +3639,7 @@ class _GameScreenState extends State<GameScreen>
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'GILT / No rush. Just precision.',
+                  'Rollrise / No rush. Just precision.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 11, color: menuMuted),
                 ),

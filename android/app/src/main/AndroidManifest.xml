@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
     <application
-        android:label="GILT"
+        android:label="Rollrise"
         android:name="${applicationName}"
         android:icon="@drawable/gilt_icon">
         <!-- Google sample app ID: test ads only until production IDs are configured. -->

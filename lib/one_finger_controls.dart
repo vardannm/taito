@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 import 'board_painter.dart';
 import 'game.dart';
 
@@ -11,6 +12,8 @@ class OneFingerControls extends StatefulWidget {
     required this.boardScale,
   });
   static const height = controlStripHeight;
+  static double heightFor(BalanceGame game) =>
+      game.haloJoystick ? haloControlStripHeight : height;
   final BalanceGame game;
   final Listenable frame;
   final double boardScale;
@@ -70,7 +73,7 @@ class _OneFingerControlsState extends State<OneFingerControls> {
           );
           return Semantics(
             label:
-                'One-finger thumb area below the board. Drag sideways to tilt, up to lift, down to lower. Keep dragging beyond the area to move further.',
+                '${game.haloJoystick ? 'Halo joystick' : 'One-finger thumb area'} below the board. Drag sideways to tilt, up to lift, down to lower. Keep dragging beyond the area to move further.',
             child: GestureDetector(
               onPanUpdate:
                   (_) {}, // Keep tutorial page scrolling out of control drags.
@@ -124,7 +127,11 @@ class _OneFingerControlsState extends State<OneFingerControls> {
                   });
                 },
                 child: CustomPaint(
-                  painter: _ThumbPadPainter(game, contact),
+                  painter: game.haloJoystick
+                      ? HaloJoystickPainter(
+                          contact == null ? null : contact! - origin,
+                        )
+                      : _ThumbPadPainter(game, contact),
                   child: const SizedBox.expand(),
                 ),
               ),
@@ -134,6 +141,140 @@ class _OneFingerControlsState extends State<OneFingerControls> {
       );
     },
   );
+}
+
+/// Larger, high-contrast trial artwork; it shares the original input listener.
+class HaloJoystickPainter extends CustomPainter {
+  HaloJoystickPainter(this.displacement);
+  final Offset? displacement;
+  static const _gold = Color(0xFFE9C47C);
+  static final _labels = <String, TextPainter>{};
+
+  void label(
+    Canvas canvas,
+    String text,
+    Offset at, {
+    bool centered = false,
+    bool right = false,
+  }) {
+    final painter = _labels.putIfAbsent(
+      text,
+      () => TextPainter(
+        text: TextSpan(
+          text: text,
+          style: const TextStyle(
+            fontFamily: 'sans-serif',
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFFD4E4DC),
+            letterSpacing: .3,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout(),
+    );
+    painter.paint(
+      canvas,
+      at -
+          Offset(
+            right
+                ? painter.width
+                : centered
+                ? painter.width / 2
+                : 0,
+            painter.height / 2,
+          ),
+    );
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Rect.fromLTWH(12, 6, size.width - 24, size.height - 12);
+    final area = RRect.fromRectAndRadius(rect, const Radius.circular(22));
+    canvas.drawRRect(
+      area,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1C4145), Color(0xFF102D33)],
+        ).createShader(rect),
+    );
+    canvas.drawRRect(
+      area,
+      Paint()
+        ..color = displacement == null ? const Color(0xFF577573) : _gold
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2,
+    );
+    final center = Offset(size.width / 2, size.height * .53);
+    canvas.drawCircle(center, 45, Paint()..color = const Color(0xFF09252A));
+    canvas.drawCircle(
+      center,
+      40,
+      Paint()
+        ..color = _gold.withAlpha(160)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
+    final delta = displacement ?? Offset.zero;
+    final offset = delta / math.max(1.0, delta.distance / 22);
+    final knob = center + offset;
+    if (displacement != null)
+      canvas.drawLine(
+        center,
+        knob,
+        Paint()
+          ..color = _gold
+          ..strokeWidth = 2.5,
+      );
+    canvas.drawCircle(
+      knob + const Offset(0, 4),
+      27,
+      Paint()..color = const Color(0xFF081F24),
+    );
+    canvas.drawCircle(
+      knob,
+      26,
+      Paint()
+        ..shader = const RadialGradient(
+          center: Alignment(-.4, -.5),
+          radius: 1.1,
+          colors: [Color(0xFFFFF0BB), _gold, Color(0xFFAD803E)],
+          stops: [0, .55, 1],
+        ).createShader(Rect.fromCircle(center: knob, radius: 26)),
+    );
+    canvas.drawCircle(
+      knob,
+      25,
+      Paint()
+        ..color = const Color(0xFFF9E1A1)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
+    for (final x in [-6.0, 0.0, 6.0]) {
+      for (final y in [-6.0, 0.0, 6.0]) {
+        canvas.drawCircle(
+          knob + Offset(x, y),
+          1.5,
+          Paint()..color = const Color(0xFF244747),
+        );
+      }
+    }
+    label(canvas, '↑ LIFT', Offset(center.dx, 18), centered: true);
+    label(
+      canvas,
+      '↓ LOWER',
+      Offset(center.dx, size.height - 16),
+      centered: true,
+    );
+    label(canvas, '← TILT', Offset(26, center.dy));
+    label(canvas, 'TILT →', Offset(size.width - 26, center.dy), right: true);
+  }
+
+  @override
+  bool shouldRepaint(covariant HaloJoystickPainter oldDelegate) =>
+      oldDelegate.displacement != displacement;
 }
 
 class _ThumbPadPainter extends CustomPainter {

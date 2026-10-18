@@ -36,6 +36,7 @@ class ProgressBackup {
       p.wallet,
     ],
     'control': p.controlMode.name,
+    'haloJoystick': p.haloJoystick,
     'level': p.classicLevel,
     'maze': 1, // Reserved for version 1 readers.
     'sound': p.sound,
@@ -70,12 +71,12 @@ class ProgressBackup {
     try {
       decoded = jsonDecode(raw);
     } catch (_) {
-      throw const FormatException('Paste a complete GILT backup.');
+      throw const FormatException('Paste a complete Rollrise backup.');
     }
     if (decoded is! Map<String, dynamic> ||
         decoded['format'] != 'gilt-progress' ||
         decoded['version'] != 1) {
-      throw const FormatException('This is not a supported GILT backup.');
+      throw const FormatException('This is not a supported Rollrise backup.');
     }
     final d = decoded;
     Never invalid() => throw const FormatException(
@@ -119,6 +120,7 @@ class ProgressBackup {
       ..tutorialSeen = flag('tutorial');
     // Older backups predate the music switch; music followed sound then.
     p.music = d['music'] != null ? flag('music') : p.sound;
+    p.haloJoystick = d['haloJoystick'] != null ? flag('haloJoystick') : false;
     if (d['fastStart'] != null) p.infiniteFastStart = flag('fastStart');
     final upgrades = d['survivalUpgrades'];
     if (upgrades != null) {
@@ -258,6 +260,7 @@ class ProgressBackup {
       ..wallet = source.wallet
       ..dailyPrizes = DailyPrizes.fromJson(source.dailyPrizes.toJson())
       ..controlMode = source.controlMode.supportedMode
+      ..haloJoystick = source.haloJoystick
       ..classicLevel = source.classicLevel
       ..sound = source.sound
       ..music = source.music

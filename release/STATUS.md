@@ -1,31 +1,27 @@
-# GILT 0.11.0 (15) — delivery status
+# Rollrise: Ball Balance — release status
 
-## Implemented
+Updated 18 October 2026. Source version: 0.13.6+24. Nothing has been submitted.
 
-- Interactive tutorial for Two-finger, One-finger and Vertical Analog.
-- Next-goal guidance and cabinet unlock progress.
-- Daily friend challenge codes with local comparisons.
-- Manual, validated progress backup/restore across devices.
-- Local opt-in playtest recorder and five-player study kit.
-- Normal wallet persistence, with separate unlimited-purchase test builds.
-- Compact-phone layout fixes and Android signing configuration template.
+## Current source
 
-## Verified
+- Public app/store name: Rollrise: Ball Balance; launcher name: Rollrise.
+- 80 authored Classic levels, Infinite, Number Merge, Daily and Practice.
+- Progress, coins, gear, achievements and settings are stored on the device.
+- Manual progress export/import and friend challenge codes exist.
+- Firebase Analytics is configured for Android/iOS. Real-device event delivery
+  still needs verification. Accounts and cloud saves are not implemented.
+- Store copy and Flutter UI screenshots are prepared. Verify them against the
+  final native build, including Duo inner landscape orientation support.
 
-- 211 automated tests passed; static analysis has no issues.
-- Actual Flutter phone renders reviewed; all three lessons completed by simulated gestures for every control mode.
-- Web release build succeeded in `build/web`.
-- Android playtest APK built: `build/app/outputs/flutter-apk/app-release.apk`.
-- Package metadata: versionName 0.11.0, versionCode 15.
-- APK SHA-256: `8B20A3994702996814AB68202D95725F23D2F38145B4D334CC163173E8C91C92`.
-- Development signing; not a Play Store upload candidate.
+## Publishing work
 
-## External work still needed
+Read [PUBLISHING_CHECKLIST.md](PUBLISHING_CHECKLIST.md) for the current launch
+checklist, Firebase explanation, optional cloud-save scope and official sources.
 
-- Backend selection and account setup for online rankings and automatic cloud sync. See ONLINE_SCOPE.md. These services are not live.
-- Five real-player sessions. Use `playtest/NEXT_SESSION.md`; RESULTS.md remains unfilled.
-- Android upload keystore; iOS signing team and Mac/iPhone build.
-- Physical Android/iPhone performance, battery, audio and interruption checks. No Android phone was attached here.
-- Publisher/support details, final store screenshots and owner review of STORE_COPY.md.
+Local preflight currently identifies missing policy publisher/contact/URL,
+Android upload signing and the Apple signing team. Ads use sample IDs; consent,
+final SDK disclosures, real-device testing and store setup also need completion.
 
-Run `python scripts/release_check.py` before preparing store artifacts. See DEVICE_QA.md for both platforms. The current APK is for playtesting; nothing has been submitted or published.
+This source rename does not rebuild or rename previously generated APKs/web
+builds. Existing old playtest binaries are not the new branded release candidate.
+Build and sign the final release after completing the checklist.

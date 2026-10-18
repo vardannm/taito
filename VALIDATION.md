@@ -556,3 +556,82 @@ Not verified here: native iOS compilation/signing, iPhone audio/haptic feel, sus
 - Documented units, supported ranges, hot-restart workflow and an easier example. Debug assertions reject unsupported settings before generating a run.
 - 53 Merge and mode-carousel regression tests passed. A separate Dart smoke check on copied sources changed every setting and verified alternate speeds, spawn cadence, 100 seeded safe-wave layouts, gate milestones, requirements and cooldown. Production defaults were not changed by that check.
 - Logs: artifacts/merge-difficulty-tests.log and artifacts/merge-difficulty-analysis.log. No release build or deployment.
+
+## Classic campaign progression review — 2026-10-18
+
+- Reviewed all 80 boards and revised levels 2–80, keeping the onboarding board,
+  names, permanent IDs, earned records and star gates stable. Early steering
+  grows gradually; static routes use slaloms, staggered gates, paired bays and
+  alternate passages. Familiar light gates and roaming holes return between
+  introductions, and later chapters recombine them with territories and orbits.
+- New patterns allow six seconds before the first warning and at least 2.8
+  seconds of warning. All authored waves have at least 2.4 seconds of warning,
+  32 units of target clearance and 1.2 seconds of quiet after expiration.
+  The existing one-wave-at-a-time simulation is unchanged.
+- All 800 targets are reachable from launch in a four-unit grid search with
+  16-unit hole clearance and 12 units beyond the marked spider territories.
+  Route segments also pass actual swept-contact checks. Complete hazard cycles
+  stay in bounds and clear their assigned targets. These checks do not measure
+  human dexterity or establish that difficulty feels comfortable.
+- All 651 regression tests pass; analysis of lib, test and the new review tools
+  reports no issues. Two old timing assertions now read the authored timing.
+  git diff --check passes. Logs: artifacts/classic-progression-regression-final.log,
+  artifacts/classic-progression-analysis-final.log, and
+  artifacts/classic-progression-guards.log.
+- Regenerated all 80 tracked Classic preview assets. The preview bake and
+  campaign renderer pass. Inspected actual renders for all 80 boards plus
+  representative warning and active states. Images are in
+  artifacts/classic-progression; reproduce with tool/render_classic_progression.dart.
+  CLASSIC_PROGRESSION.md records every board's intent and the next phone
+  playtest checkpoints. No release binary rebuild, deployment or human phone
+  playtest was performed.
+
+## Remove obsolete preview assets — 2026-10-18
+
+- Removed the 82 unused mode-preview PNGs (3,385,154 bytes), their baker and the
+  unused asset-path helper. The app draws frozen previews from current level data.
+- Level registration no longer invokes the removed baker; documentation now
+  reflects the direct rendering workflow. App Store screenshots are retained.
+- Analysis of lib, test and the level registration tool reports no issues.
+  The PowerShell registration script passes syntax parsing. No remaining source
+  references to the removed assets or tooling were found.
+
+## Number Merge naming and progression — 2026-10-18
+
+- Renamed visible mode branding, help, achievement titles and store materials to
+  Number Merge / Merge. Preserved saved identifiers and numerical milestones.
+- Opening waves are safe; danger ramps from 25% at 8 to full strength at 64.
+  The second safe pickup now favours existing segments while retaining gap fillers.
+- Preserved wave timing remainders and age through frame partitions. Gate cooldown
+  starts at swept contact. Cascading arithmetic and ordered collisions are retained.
+- All 656 regression tests pass. New checks cover 10,000 value-conserving pickups,
+  difficulty rates, useful food, frame partitioning and exact gate cooldown timing.
+  Static analysis reports no issues. Logs: artifacts/number-merge-regression.log,
+  artifacts/number-merge-focused.log, artifacts/number-merge-analysis.log.
+- Regenerated all five Merge store cards and their source UI images, preserving
+  landscape Duo inner and the later shop designs. All 60 deliverable PNGs pass
+  dimension, RGB/no-alpha and integrity checks. No native iOS build was produced.
+
+## Rollrise branding and publishing audit — 2026-10-18
+
+- Renamed public app/store branding to Rollrise: Ball Balance (launcher name:
+  Rollrise), including native labels, web metadata, app UI, policy and store copy.
+  Package/Firebase identifiers and saved-data formats remain compatible.
+- All 656 regression tests pass; static analysis of lib, test and the store
+  rendering tools reports no issues. Native plist/Android XML, web manifest,
+  store-name length and policy branding checks pass.
+- Regenerated all 30 branded App Store cards and 30 plain UI renders. Final
+  RGB/no-alpha, dimensions, PNG integrity and metadata checks pass. Later shop
+  designs and landscape Duo inner frames are retained. These are Flutter renders.
+- Firebase is Analytics-only; there is no implemented restorable cloud player
+  profile, authentication or online leaderboard. Live analytics delivery remains
+  unverified. release/PUBLISHING_CHECKLIST.md records launch requirements and
+  optional cloud-save work without claiming a backend has been deployed.
+- Read-only release preflight reports missing publisher/contact/policy URL,
+  Android upload signing and the iOS signing team. Ads use sample IDs and have no
+  UMP/ATT flow. Native orientation currently requests portrait despite landscape
+  Duo inner screenshot targets; native support/testing must resolve this before
+  submission. No release binaries, live Firebase settings or listings changed.
+- Logs: artifacts/rollrise-regression.log, artifacts/rollrise-analysis.log,
+  artifacts/app-store-rollrise.log, artifacts/rollrise-store-validation.log,
+  artifacts/rollrise-release-preflight.log.

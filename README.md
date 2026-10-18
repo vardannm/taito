@@ -1,6 +1,9 @@
-# GILT â€” Precision Arcade
+# Rollrise: Ball Balance
 
-A Flutter game built around the mechanical ball-and-bar challenge: two independently controlled ends, a rolling steel ball, ten numbered targets, and three chances. GILT is the current working title.
+A Flutter game built around the mechanical ball-and-bar challenge: two independently controlled ends, a rolling steel ball, ten numbered targets, and three chances. The public name is Rollrise: Ball Balance.
+
+For launch requirements and the current Firebase/local-save status, see
+[the publishing checklist](release/PUBLISHING_CHECKLIST.md).
 
 ## Play on this Windows computer
 
@@ -16,7 +19,7 @@ Controls: drag the left or right handle up and down. Two-finger handles sit 64 s
 
 Settings offers illustrated, animated cards for **One-Finger Control** (default for compact windows), **Two-Finger Control**, and **Vertical Analog Control**. Vertical Analog and Two-Finger each have a saved sensitivity slider from 0 to 1: 0 disables touch movement and 1 preserves full response. Scaling is immediate and independent; keyboard movement is unchanged. Vertical analog places two independent joysticks at the bottom inside the safe area. Drag up to raise that platform end, down to lower it; the platform follows directly with about 19% less sensitivity. There is no dead zone. Horizontal movement is ignored. Release centers the knob and holds the final platform position; grab again to continue moving. One finger drags the lower handle left/right to set tilt and up/down to raise or lower both ends. Once held, vertical dragging continues beyond the thumb area and reverses immediately, without a pad-edge movement cap. The visible pad and knob keep the same design; the knob stays drawn within the pad. Holding the handle pauses the control mode’s automatic lift in Classic; release resumes it. Infinite’s continuous board ascent remains active. Classic automatically lifts at 20 world units/second and waits at the current target height, so a target cannot be left behind. All three modes share ball physics. All touch targets are consumed on the next 120 Hz physics tick without smoothing or an added delay. Keyboard motor easing remains. Ball acceleration and its speed cap increased by about 8%.
 
-Swipe to Classic to continue the saved level directly. The small arcade icon → Classic levels opens a winding road with only five levels around the furthest unlocked level. The window moves forward as stars unlock new levels; distant levels and chapter counts stay hidden. Normal builds enforce star requirements; the developer level bypass is off by default and disabled in release builds. Each board retains ten targets, three lives and the existing scoring. Level 1 is open initially; level N requires `2 × (N − 1)` total Classic stars (level 2: 2, level 10: 18, level 50: 98). Stars are permanent, not spent, and each distinct objective counts once across control methods. Daily stars do not unlock Classic boards. Locked cards show the earned/required count. Winning offers **NEXT LEVEL** when its requirement is met, or **EARN MORE STARS** and replay options otherwise; the selected level is remembered. Deterministic scattered layouts vary target positions, heights, and numbering so targets no longer follow a single route. Trap density increases through the original 30 boards. Practice retains its original board and unlimited attempts.
+Swipe to Classic to continue the saved level directly. The small arcade icon → Classic levels opens a winding road with only five levels around the furthest unlocked level. The window moves forward as stars unlock new levels; distant levels and chapter counts stay hidden. Normal builds enforce star requirements; the developer level bypass is off by default and disabled in release builds. Each board retains ten targets, three lives and the existing scoring. Level 1 is open initially; level N requires `2 × (N − 1)` total Classic stars (level 2: 2, level 10: 18, level 50: 98). Stars are permanent, not spent, and each distinct objective counts once across control methods. Daily stars do not unlock Classic boards. Locked cards show the earned/required count. Winning offers **NEXT LEVEL** when its requirement is met, or **EARN MORE STARS** and replay options otherwise; the selected level is remembered. Deterministic scattered layouts vary target positions, heights, and numbering so targets no longer follow a single route. Trap layouts develop through wider steering, slaloms, gates and alternate routes, easing when a new hazard appears. Practice retains its original board and unlimited attempts.
 
 Levels 31â€“50 form **The web**: one slow patrolling spider at first, two from level 36, and three from level 43. Dashed circles and background webs mark their territories. Crossing a boundary starts a persistent chase; physical contact instantly ends the run and removes the ball, without an eating animation. Territories and spiders turn red during pursuit. Spider patrols and chases continue while the ball sinks and the platform returns. Only starting or replaying the whole level resets them; pause freezes them. Territory placement keeps target holes clear and checks connected space from the launch area to every target. Human difficulty still needs playtesting.
 
@@ -28,7 +31,7 @@ Active time excludes pauses, capture animations, and the bar returning to launch
 
 Optional brass coins sit beside traps in Classic and Daily, clear of hole centers and spider territories. Each adds 250 points, can be collected once per run, and stays collected across ball resets. Collectibles are optional and do not change the three star objectives. Infinite and Laser Endless spawn random coins ahead of the climb, with a separate in-run coin counter so height records remain in metres. Coins stay clear of holes and beams and disappear after scrolling below the board. Practice has no collectibles or progression rewards.
 
-Every tenth Classic board is a finale. Level 10 introduces a warned laser lane; level 20 a warned roaming hole; level 30 alternates them; level 40 has a larger spider keeper; level 50 combines the keeper with laser lanes. A briefing pauses the simulation until the player starts. Finale lasers/roaming holes cost one ball, while spider contact ends the run. Laser and roaming-hole warnings last 2.4 seconds. Their movement, warning/live phases and wave schedule continue through target captures and ball returns; only a new level run resets them. The hidden ball takes no damage during its return, and an enemy already overlapping the respawn point cannot hit it until they separate.
+Milestone Classic boards introduce or combine mechanics; learned hazards also return between milestones. Level 10 introduces a warned laser lane; level 20 a warned roaming hole; level 30 alternates them; level 40 has a larger spider keeper; level 50 combines the keepers with alternating laser lanes and roaming holes. A briefing pauses the simulation until the player starts. Finale lasers/roaming holes cost one ball, while spider contact ends the run. Warnings last at least 2.4 seconds; first introductions allow longer warnings and a six-second opening. Their movement, warning/live phases and wave schedule continue through target captures and ball returns; only a new level run resets them. The hidden ball takes no damage during its return, and an enemy already overlapping the respawn point cannot hit it until they separate.
 
 **Daily** uses a fixed board generated from the UTC date with an explicit integer random generator, consistent across web and native platforms. The date is pinned for an ongoing run and its retry, even across midnight; opening Daily again selects the current day. Records are local and separate from Classic, with 32 days of history retained for all control modes. No online leaderboard or account service is connected.
 
@@ -61,7 +64,7 @@ On first launch without a saved control preference, the app selects **Two-Finger
 
 New players begin inside Infinite with the selected control. A short, interactive course highlights the controls, one avoidable hole and hearts, a coin, a shield, score, and a combo crystal. Real input and swept contacts advance the lessons; missed pickups return, and an accidental hit costs one heart without resetting the run. Afterward, 45 seconds of active, ordinary Infinite play run without overlays, or a natural run ending finishes that section. Guidance resumes only back at the menu.
 
-The Shop introduces one free ball and platform through actual Equip actions, then allows normal browsing. Levels highlights Level 1, whose gradual target route and three simple hazards form the final gameplay test. Winning Level 1 completes gameplay onboarding. Daily is introduced only on the subsequent menu visit. 2048 receives no onboarding in this flow.
+The Shop introduces one free ball and platform through actual Equip actions, then allows normal browsing. Levels highlights Level 1, whose gradual target route and three simple hazards form the final gameplay test. Winning Level 1 completes gameplay onboarding. Daily is introduced only on the subsequent menu visit. Number Merge receives no onboarding in this flow.
 
 Spotlights follow live board and widget coordinates, with short tooltips, pulsing outlines, reduced-motion support, and Skip Tutorial. Settings → Replay Tutorial restarts only onboarding and selects One-Finger; coins, owned gear, records, and stars are retained. Existing saved control preferences are respected on normal launch, and legacy profiles with play history bypass automatic onboarding.
 
@@ -69,7 +72,7 @@ Spotlights follow live board and widget coordinates, with short tooltips, pulsin
 
 ## Infinite mode
 
-The app opens directly onto the Infinite board, including on first launch. The board waits without advancing physics, timers or score. Touch the selected joystick, thumb area or platform grip to begin; the same held gesture immediately controls movement. W/S or the arrow keys also start the run and move the platform. Swipe across the environment, header or free space to select three worlds: Infinite, Classic Continue, and 2048 Merge. Classic shows its saved level (level 1 for a new profile); Classic still respects star locks. All three prepared boards start on their selected controller or movement keys, without a Play button. Page edges, parallax, scale, title fades and a three-position indicator guide navigation. Swipes snap one world at a time and never claim touches in the actual control areas. Once a run begins, swipe recognition is removed. The selected scene expands from an 88%-width carousel viewport into the full gameplay area over 437 ms; neighboring previews fade away. The remaining selector chrome fades out during the final 123 ms. The same board and controllers stay mounted and preserve the starting touch as their layout grows. Returning home freezes the run and reverses this animation before preparing the current world; a normal application opening always selects Infinite. The arcade icon retains level picker, Daily, Practice, Gear Shop, goals and the guide. Settings offers Replay Tutorial. Start with three hearts. Holes, live lasers, moving holes, platform gaps and the rising red floor cost one heart. A hit resets combo to x1 and removes combo effects. When hearts remain, the ball and platform stay on their current trajectory with the same tilt, momentum and held controls. A small heart appears above the platform, floats upward and fades out over 0.85 seconds; this independent effect never changes input or life state. They blink gently during 2.5 seconds of protection so the player can steer away; there is no relocation, platform reset or touch reset. The camera, holes, hazards, rising floor and generation progress continue normally. Reduced motion uses a steady protection ring. The third loss ends the run. Pausing freezes all gameplay and power-up timers.
+The app opens directly onto the Infinite board, including on first launch. The board waits without advancing physics, timers or score. Touch the selected joystick, thumb area or platform grip to begin; the same held gesture immediately controls movement. W/S or the arrow keys also start the run and move the platform. Swipe across the environment, header or free space to select three worlds: Infinite, Classic Continue, and Number Merge. Classic shows its saved level (level 1 for a new profile); Classic still respects star locks. All three prepared boards start on their selected controller or movement keys, without a Play button. Page edges, parallax, scale, title fades and a three-position indicator guide navigation. Swipes snap one world at a time and never claim touches in the actual control areas. Once a run begins, swipe recognition is removed. The selected scene expands from an 88%-width carousel viewport into the full gameplay area over 437 ms; neighboring previews fade away. The remaining selector chrome fades out during the final 123 ms. The same board and controllers stay mounted and preserve the starting touch as their layout grows. Returning home freezes the run and reverses this animation before preparing the current world; a normal application opening always selects Infinite. The arcade icon retains level picker, Daily, Practice, Gear Shop, goals and the guide. Settings offers Replay Tutorial. Start with three hearts. Holes, live lasers, moving holes, platform gaps and the rising red floor cost one heart. A hit resets combo to x1 and removes combo effects. When hearts remain, the ball and platform stay on their current trajectory with the same tilt, momentum and held controls. A small heart appears above the platform, floats upward and fades out over 0.85 seconds; this independent effect never changes input or life state. They blink gently during 2.5 seconds of protection so the player can steer away; there is no relocation, platform reset or touch reset. The camera, holes, hazards, rising floor and generation progress continue normally. Reduced motion uses a steady protection ring. The third loss ends the run. Pausing freezes all gameplay and power-up timers.
 
 **Pace x1–x5** advances continuously by one level per 600m. Every run starts at 68 world units/second. Base speed uses a smoothstep curve over 2,400m (previously 900m), with the same 216-unit extreme cap including pace bonuses. Hole density takes the lower of the 60,000-point curve and distance difficulty, so high-tier gear and combos cannot skip the opening. Initial spacing is 210–240 units, tightening toward the existing dense patterns later. Distance points still count only new peak height.
 
@@ -79,7 +82,7 @@ Shield pickup, refresh and expiration preserve active touch ownership, drag posi
 
 Coins appear more often than crystals; shields and hearts are much rarer. Offscreen pickups are pruned and the extra collectible list is capped at 12. Each 360m cycle has a rush and recovery; encounter time grows gradually after 600m to its full share at 2,400m. Special hazards unlock at 450m (forming holes), 900m (moving holes), 1,500m (lasers), and 2,250m (platform gaps). Warnings begin farther apart, reaching the same minimum spacing late in a run. Complex sweeping/zigzag variants gradually become common from 2,400m to 4,200m. Spider encounters begin later and closer spacing develops with distance. Only one special hazard runs at once, with harmless warnings before activation. Once a forming hole opens, its world coordinates are fixed and it remains until it scrolls off-screen. Camera movement from manual lifting is included in both rendering and collision. Moving-hole types retain their intended movement. Off-screen pruning happens after swept collisions, so a fast camera lift cannot skip a hole. A winding clear route and hole separation remain. After three seconds without steering the red floor rises; deliberate steering stops its active rise.
 
-**GEAR SHOP** in the Modes menu spends Infinite and Laser Endless coins. It contains **11 balls and 6 platforms**, each with a permanent point bonus displayed before purchase. The active gear multiplier is `1 + ball bonus + platform bonus`, up to x5. Gear multiplies Normal Infinite distance and combo points; other modes retain their scoring rules. Physics, collision size and platform handling stay the same. Existing owned balls automatically receive their new bonus; no repurchase is needed. Coins and gear ownership save locally without an account. The 2048 mode retains its numbered ball for readability. Cabinet styles remain in Settings.
+**GEAR SHOP** in the Modes menu spends Infinite and Laser Endless coins. It contains **11 balls and 6 platforms**, each with a permanent point bonus displayed before purchase. The active gear multiplier is `1 + ball bonus + platform bonus`, up to x5. Gear multiplies Normal Infinite distance and combo points; other modes retain their scoring rules. Physics, collision size and platform handling stay the same. Existing owned balls automatically receive their new bonus; no repurchase is needed. Coins and gear ownership save locally without an account. The Number Merge mode retains its numbered ball for readability. Cabinet styles remain in Settings.
 
 Tune lives, durations, starting speed, pace levels, the 60,000-point density threshold, collectible spacing, coin spacing and visual intensity in `lib/infinite_progress.dart`. Survival integration is in `lib/infinite_gameplay.dart`; visuals are in `lib/infinite_painter.dart`. Economy saves use ordered snapshots to prevent an older coin save from undoing a purchase. This is device-local progress, with no account sync.
 
@@ -142,15 +145,15 @@ This is a playable, tested game build, not an App Store submission or a revenue 
 
 Infinite hard encounters: from 2,400m, encounter sections increasingly alternate sideways sweeping lasers and top-entry zigzag holes. Both warn for two seconds; only one special hazard is present at a time. Lasers sweep 65 units either side of their origin for 3.5 seconds. Zigzag holes cross a 250-unit horizontal range and descend at 1.35 times board speed plus 35 units/second. Tune these in lib/hazards.dart and scheduling in lib/game.dart.
 
-## 2048 / Merge
+## Number Merge
 
-Choose **2048 / MERGE** from the home screen. Steer the solid middle ball into descending numbers. The largest value stays in the middle of a translucent snake, with smaller values arranged on both sides and the smallest at an outer end. The snake moves along the platform and follows its tilt. Values are sorted largest to smallest internally, and each pair of outer positions fills on opposite sides. This produces the layout **2, 16, 32, 8, 4**. Collecting another 2 combines all five matching powers into **64**.
+Choose **NUMBER MERGE** from the home screen. Steer the solid head ball into descending numbers. The largest value stays at the head of a translucent snake, with smaller values trailing downward. Values are sorted largest to smallest. Collecting another 2 with **32, 16, 8, 4, 2** combines all five matching powers into **64**.
 
-Matching values combine anywhere in the snake, including across opposite sides. Every intermediate merged value adds to score. Glowing rings mark numbers that match any current segment. The solid middle ball collects numbers; faint segments pass through numbers.
+Matching values combine anywhere in the snake. Every intermediate merged value adds to score. Glowing rings mark numbers that match any current segment. The solid head ball collects numbers; faint segments pass through numbers.
 
 The snake trails downward from the main ball, which retains its full horizontal travel range. Growing or merging the tail never lifts the platform or shifts the camera; at the bottom of the board, the tail can extend off-screen. A matching pickup can collapse the chain into a larger number, and longer chains compress their spacing. Length does not end a run. The next gate requirement and matching number stay above the board.
 
-Each wave contains **two safe numbers and one larger number to dodge**, separated across the board with a reachable matching pickup. The solid middle ball can collect only values equal to or below its current value. Touching a larger value ends the run immediately; a red ring and an exclamation mark identify it. Ghost segments pass through pickups. Danger is evaluated at contact, so an earlier merge can make a later number safe.
+Opening waves contain only safe numbers. Dangerous third pickups begin at an 8 head with a 25% chance, rising to 50% at 16, 75% at 32, and the configured maximum at 64. Every wave has a reachable tail match and a second safe pickup, which has a 65% chance to target an existing segment; other values can fill gaps for later chains. Pickups stay separated across the board. The solid middle ball can collect only values equal to or below its current value. Touching a larger value ends the run immediately; a red ring and an exclamation mark identify it. Ghost segments pass through pickups. Danger is evaluated at contact, so an earlier merge can make a later number safe.
 
 The first horizontal gate arrives at **1,200 merge score**. After each clear, the next gate needs fresh score equal to the greater of **1,200 or the current main-ball value**, plus a **4-second minimum cooldown**. Score earned while a gate approaches does not queue old gates. Each new gate displays at least half the current main-ball value and at least double the previous gate, fixed when it spawns. An 8,192 head therefore receives at least a 4,096 gate. The main ball must be **strictly greater** than the displayed number to pass. Only one gate appears at a time. Fast swipes resolve pickups and gates in contact order; pause freezes both streams and replay resets the run.
 
@@ -198,27 +201,32 @@ One-finger controls now sit in a 96-pixel area below the board, keeping the ball
 
 Only the snapped page owns a live `BalanceGame` environment. Inactive pages use frozen previews with the selected ball’s world. The live world changes only after the snap finishes; there is one simulation ticker, stopped during selection, pause and return. Merge resources are created only when needed and released when leaving the mode.
 
-Regenerate preview assets after changing board artwork or built-in routes:
-
-```powershell
-.\scripts\flutter.ps1 test --no-pub tool/bake_mode_previews.dart
-```
+Previews are drawn from the current level data and equipped ball. No per-level
+PNG assets or preview-generation step are required.
 
 Use `tool/render_mode_transitions.dart` for expansion, full-game, floating-heart and reverse-animation frames. Reduced motion switches layouts immediately and uses a stationary heart fade. The analog control artwork is unchanged.
 While a mode waits for its first input, a touch-transparent finger icon demonstrates the selected controls: two vertical drags over the platform grips or analog sticks, or a diagonal tilt/lift drag over the one-finger pad. The hint stops immediately on input, hides during a carousel swipe or return transition, and reappears when selection is ready again. Reduced motion shows a stationary finger. This uses a separate, disposable visual animation; the waiting game simulation remains stopped and analog artwork is unchanged.
 ## Editing individual Classic levels
 
-Levels 51–55 introduce circular moving-hole paths, 56–60 oval paths,
-61–65 moving vertical lasers, 66–70 moving horizontal lasers, and 71–80
-mixed patterns. Every movement center, radius, period, orientation and target
-assignment is editable in its level file or the developer builder.
+The 80-level campaign follows an introduction, practice, variation and mastery
+rhythm. Levels 2–9 widen steering and mix target heights gradually. Light gates
+introduced at 10 and roaming holes introduced at 20 return between milestones.
+The web introduces one, two and three keepers with breathing room, then recalls
+the learned hazards. Levels 51–55 introduce circles, 56–60 ovals, 61–65 moving
+vertical lasers and 66–70 moving horizontal lasers, recombining earlier skills
+between introductions. Levels 71–80 change wave order and return to territories;
+80 combines all four motion types with three keepers. See
+[the complete level review](CLASSIC_PROGRESSION.md) for each board's intent,
+threat counts, safety checks and playtest checkpoints. Every movement center,
+radius, period, orientation and target assignment remains editable in its file
+or the developer builder.
 
 The 80 Classic layouts live in `lib/classic_levels/level_01.dart` through
 `lib/classic_levels/level_80.dart`. Each file contains the level name, hole coordinates, spider patrol centers,
 and laser/moving-hole spawn positions and timing. `lib/classic_levels.dart` registers them in saved-progress order;
 `lib/levels.dart` loads them and retains the shared gameplay rules and Daily generator.
-See `lib/classic_levels/README.md` for editing instructions. The split preserves
-all previous Classic names and hole coordinates exactly.
+See `lib/classic_levels/README.md` for editing and audit instructions. Level IDs
+and names stay stable so earned progress remains attached to the same boards.
 
 ## Developer-only level builder
 
@@ -389,14 +397,15 @@ Warning dashes and insect legs use batched paths with no blur or extra layers.
 
 Debug and release launches both use the normal saved wallet with no automatic testing credits. Existing balances are preserved; old test grants are not subtracted from wallets that may also include earned coins.
 
-### 2048 difficulty configuration
+### Number Merge difficulty configuration
 
 Edit `lib/merge_difficulty.dart`, just like `lib/infinite_difficulty.dart`, then hot restart and begin a fresh Merge run. The defaults retain the current balance.
 
 - `startSpeed`, `speedPerDoubling`, `maxSpeed`: falling-ball speed and its growth.
 - `waveSpacing`: distance between waves; higher values give more time to react.
 - `initialRowSpacing`, `orbSeparation`, `rowJitter`: opening layout and spacing within waves.
-- `dangerChance`: chance the third ball is larger than the head (0 to 1).
+- `dangerChance`: maximum chance the third ball is larger than the head (0 to 1), reached at a 64 head.
+- `matchingChance`: chance the second safe pickup targets an existing segment (0 to 1).
 - `gateInterval`: minimum fresh score between gates; the actual gap grows with the main ball.
 - `gateSpeedBonus`, `gateCooldownSeconds`: gate travel speed and minimum pause after a gate clear.
 - `gateValueOffset`: power-of-two adjustment to the head-based requirement; -1 halves it, +1 doubles it. Each gate still at least doubles the previous gate. The head still needs to be strictly greater than the gate.

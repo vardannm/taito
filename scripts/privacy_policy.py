@@ -56,7 +56,7 @@ def render():
     blocks.append(f'<section><h2>Learn more</h2><ul>{links}</ul></section>')
     document = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>GILT Privacy Policy</title><style>
+<title>Rollrise Privacy Policy</title><style>
 body{margin:0;background:#102b2b;color:#f1eedf;font:17px/1.65 system-ui,sans-serif}
 main{max-width:760px;margin:auto;padding:48px 24px}h1{font-size:36px;line-height:1.2}
 h2{font-size:23px;color:#d5ad63;margin-top:32px}a{color:#9edbc6;overflow-wrap:anywhere}

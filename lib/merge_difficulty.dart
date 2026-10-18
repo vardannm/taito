@@ -1,6 +1,6 @@
-/// Edit these values, then hot restart and start a fresh 2048 / Merge run.
+/// Edit these values, then hot restart and start a fresh Number Merge run.
 /// Speeds and distances use board units (the board is 360 units wide).
-/// Defaults preserve the current game. See README.md for an easier example.
+/// See README.md for an easier example.
 abstract final class MergeDifficulty {
   // Falling balls: speed = startSpeed + speedPerDoubling for every doubling
   // of the highest ball above 2, capped at maxSpeed.
@@ -23,11 +23,16 @@ abstract final class MergeDifficulty {
   // Random vertical offset within each row, from 0 up to this value (0..30).
   static const rowJitter = 18.0;
 
-  // Probability (0..1) that the third ball in a wave is dangerous.
+  // Maximum probability (0..1) that the third ball in a wave is dangerous.
   // 1 = every wave, 0.5 = roughly half, 0 = no dangerous balls.
+  // Danger ramps from zero below an 8 head to this maximum at a 64 head.
   // The first ball always matches the tail; the second is always safe.
   // A dangerous ball is randomly 2x or 4x the head when it spawns.
   static const dangerChance = 1.0;
+
+  // Chance the second safe ball matches an existing segment (0..1).
+  // Otherwise it can fill a missing power, setting up a later chain.
+  static const matchingChance = .65;
 
   // Minimum fresh score between gates. Later gaps grow to the head value.
   static const gateInterval = 1200;

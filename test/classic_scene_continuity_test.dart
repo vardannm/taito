@@ -1,5 +1,6 @@
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/hazards.dart';
+import 'package:balance_arcade/levels.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'game_test.dart' show advance, placeAt;
@@ -61,7 +62,7 @@ void main() {
           const Hole(260, 200, target: 2),
         ]);
       game.coins.clear();
-      advance(game, 2.8);
+      advance(game, ClassicLevels.definition(10).firstHazardAfter - .2);
       expect(game.specialHazards, isEmpty);
       placeAt(game, game.activeHole!);
       advance(game, .4);
@@ -72,7 +73,7 @@ void main() {
       expect(game.phase, GamePhase.playing);
       expect(game.specialHazards.single, same(laser));
       expect(laser.age, greaterThan(1));
-      advance(game, 1.4);
+      advance(game, laser.warningSeconds - laser.age + .05);
       expect(laser.active, isTrue);
       expect(game.lives, 3);
     },

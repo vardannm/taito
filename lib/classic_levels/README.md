@@ -42,6 +42,24 @@ does not take damage. An empty list means no hazards. If you move a target hole,
 update its hazard positions yourself to
 maintain safe clearance. `finaleTitle` and `finaleRule` set the optional briefing.
 
-The initial coordinates preserve the previous generated Classic layouts exactly.
-After changing artwork or hole positions, regenerate the mode previews with
-`tool/bake_mode_previews.dart` using the instructions in the main README.
+The October 2026 progression pass keeps level IDs and names stable, reauthors
+levels 2–9, and replaces density-only trap growth with slaloms, offset gates,
+paired bays and broken central routes. Known hazards return between milestone
+introductions and combine again in the final chapters. See
+`../../CLASSIC_PROGRESSION.md` for the full level-by-level review.
+
+Run the campaign audit with the project-local Dart SDK:
+
+```powershell
+.\.tools\flutter\bin\cache\dart-sdk\bin\dart.exe tool/audit_classic_levels.dart
+.\scripts\flutter.ps1 test --no-pub test/classic_progression_test.dart
+.\scripts\flutter.ps1 test --no-pub tool/render_classic_progression.dart
+```
+
+The audit writes `artifacts/classic-levels.json` with real definitions, trap
+clearance, route detours and unreachable targets, and exits nonzero if any
+target has no buffered route from launch. The test also samples complete
+hazard cycles and verifies quiet intervals. These spatial checks do not measure
+human completion times or guarantee that a route feels comfortable on a phone.
+
+Mode previews draw the current level data directly; no PNG regeneration is needed.

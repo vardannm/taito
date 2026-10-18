@@ -62,13 +62,13 @@ enum Achievement {
     250,
   ),
   merge2048(
-    'The namesake',
+    'Double the thousand',
     'Make a 2,048 ball in Merge and finish the run.',
     2048,
     350,
   ),
   merge4096(
-    'Beyond 2048',
+    'Higher powers',
     'Make a 4,096 ball in Merge and finish the run.',
     4096,
     500,

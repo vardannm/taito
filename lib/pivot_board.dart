@@ -43,10 +43,11 @@ class _PivotBoardState extends State<PivotBoard> {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, bounds) {
       if (!widget.game.oneFinger) return buildBoard(context, bounds);
-      final boardHeight = (bounds.maxHeight - OneFingerControls.height).clamp(
-        1.0,
-        double.infinity,
-      );
+      final boardHeight =
+          (bounds.maxHeight - OneFingerControls.heightFor(widget.game)).clamp(
+            1.0,
+            double.infinity,
+          );
       final scale = BoardViewport.forGame(
         Size(bounds.maxWidth, boardHeight),
         widget.game,
@@ -56,7 +57,7 @@ class _PivotBoardState extends State<PivotBoard> {
         children: [
           Expanded(child: LayoutBuilder(builder: buildBoard)),
           SizedBox(
-            height: OneFingerControls.height,
+            height: OneFingerControls.heightFor(widget.game),
             child: Stack(
               fit: StackFit.expand,
               children: [

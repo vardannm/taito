@@ -49,5 +49,5 @@ Validation checks structure, numeric bounds, targets and spacing. It does not
 prove every route is playable; use actual gameplay to verify difficulty and hazards.
 
 For a non-Windows machine with Dart/Flutter on PATH, run `dart tool/level_builder.dart`.
-Registration is `dart tool/register_classic_levels.dart`, followed by
-`flutter test --no-pub tool/bake_mode_previews.dart`.
+Registration is `dart tool/register_classic_levels.dart`. Mode previews draw
+the current level data directly; no PNG regeneration is needed.

@@ -9,15 +9,22 @@ class ControlOptions extends StatefulWidget {
     super.key,
     required this.value,
     required this.onChanged,
+    this.haloJoystick = false,
+    this.onHaloChanged,
   });
   final ControlMode value;
   final ValueChanged<ControlMode> onChanged;
+  final bool haloJoystick;
+  final ValueChanged<bool>? onHaloChanged;
   @override
   State<ControlOptions> createState() => _ControlOptionsState();
 }
 
 class _ControlOptionsState extends State<ControlOptions>
     with SingleTickerProviderStateMixin {
+  bool selected(ControlMode mode, bool halo) =>
+      widget.value == mode &&
+      (mode != ControlMode.oneFinger || widget.haloJoystick == halo);
   late final AnimationController demo = AnimationController(
     vsync: this,
     duration: const Duration(seconds: 3),
@@ -42,24 +49,32 @@ class _ControlOptionsState extends State<ControlOptions>
   @override
   Widget build(BuildContext context) => Column(
     children: [
-      for (final mode in selectableControlModes)
+      for (final (mode, halo) in [
+        for (final mode in selectableControlModes) (mode, false),
+        (ControlMode.oneFinger, true),
+      ])
         Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: Material(
-            color: widget.value == mode ? const Color(0xFF2C4140) : menuPanel,
+            color: selected(mode, halo) ? const Color(0xFF2C4140) : menuPanel,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
               side: BorderSide(
-                color: widget.value == mode ? menuGold : menuLine,
-                width: widget.value == mode ? 2 : 1,
+                color: selected(mode, halo) ? menuGold : menuLine,
+                width: selected(mode, halo) ? 2 : 1,
               ),
             ),
             clipBehavior: Clip.antiAlias,
             child: Semantics(
-              selected: widget.value == mode,
+              selected: selected(mode, halo),
               child: InkWell(
-                key: ValueKey('control-${mode.name}'),
-                onTap: () => widget.onChanged(mode),
+                key: halo
+                    ? const ValueKey('control-haloJoystick')
+                    : ValueKey('control-${mode.name}'),
+                onTap: () {
+                  widget.onHaloChanged?.call(halo);
+                  widget.onChanged(mode);
+                },
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Column(
@@ -68,33 +83,40 @@ class _ControlOptionsState extends State<ControlOptions>
                       Row(
                         children: [
                           Icon(
-                            switch (mode) {
-                              ControlMode.twoFinger => Icons.touch_app,
-                              ControlMode.oneFinger => Icons.pan_tool_alt,
-                              ControlMode.analog => Icons.swap_vert,
-                              ControlMode.tiltLift => Icons.open_with,
-                              ControlMode.boardTilt => Icons.swipe,
-                            },
+                            halo
+                                ? Icons.sports_esports_outlined
+                                : switch (mode) {
+                                    ControlMode.twoFinger => Icons.touch_app,
+                                    ControlMode.oneFinger => Icons.pan_tool_alt,
+                                    ControlMode.analog => Icons.swap_vert,
+                                    ControlMode.tiltLift => Icons.open_with,
+                                    ControlMode.boardTilt => Icons.swipe,
+                                  },
                             size: 22,
                             color: menuGold,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              switch (mode) {
-                                ControlMode.twoFinger => 'Two-Finger Control',
-                                ControlMode.oneFinger => 'One-Finger Control',
-                                ControlMode.analog => 'Vertical Analog Control',
-                                ControlMode.tiltLift => 'Tilt Only',
-                                ControlMode.boardTilt => 'Board Tilt',
-                              },
+                              halo
+                                  ? 'Halo Joystick'
+                                  : switch (mode) {
+                                      ControlMode.twoFinger =>
+                                        'Two-Finger Control',
+                                      ControlMode.oneFinger =>
+                                        'One-Finger Control',
+                                      ControlMode.analog =>
+                                        'Vertical Analog Control',
+                                      ControlMode.tiltLift => 'Tilt Only',
+                                      ControlMode.boardTilt => 'Board Tilt',
+                                    },
                               style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
                           ),
-                          if (widget.value == mode)
+                          if (selected(mode, halo))
                             const Icon(
                               Icons.check_circle,
                               color: menuMint,
@@ -109,25 +131,31 @@ class _ControlOptionsState extends State<ControlOptions>
                             height: 83,
                             child: RepaintBoundary(
                               child: CustomPaint(
-                                painter: _ControlDemo(mode, demo),
+                                painter: _ControlDemo(
+                                  mode,
+                                  demo,
+                                  haloJoystick: halo,
+                                ),
                               ),
                             ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              switch (mode) {
-                                ControlMode.twoFinger =>
-                                  'Drag the handles below the platform to keep the ball visible. Lift together, or tilt independently.',
-                                ControlMode.oneFinger =>
-                                  'Use the thumb area below the board. Drag sideways to tilt, up or down to move.',
-                                ControlMode.analog =>
-                                  'Slide the two bottom controls vertically. Release to hold position.',
-                                ControlMode.tiltLift =>
-                                  'Drag sideways to tilt. Release to keep the angle. No manual lift in this test mode.',
-                                ControlMode.boardTilt =>
-                                  'Tilt anywhere on the board. The guide appears under your finger, then hides on release. No lift or bottom slider.',
-                              },
+                              halo
+                                  ? 'Try a larger gold thumb grip with a visible movement ring. Same one-finger tilt and lift; your progress is shared.'
+                                  : switch (mode) {
+                                      ControlMode.twoFinger =>
+                                        'Drag the handles below the platform to keep the ball visible. Lift together, or tilt independently.',
+                                      ControlMode.oneFinger =>
+                                        'Use the thumb area below the board. Drag sideways to tilt, up or down to move.',
+                                      ControlMode.analog =>
+                                        'Slide the two bottom controls vertically. Release to hold position.',
+                                      ControlMode.tiltLift =>
+                                        'Drag sideways to tilt. Release to keep the angle. No manual lift in this test mode.',
+                                      ControlMode.boardTilt =>
+                                        'Tilt anywhere on the board. The guide appears under your finger, then hides on release. No lift or bottom slider.',
+                                    },
                               style: const TextStyle(
                                 fontSize: 12,
                                 height: 1.4,
@@ -196,9 +224,11 @@ class SensitivitySetting extends StatelessWidget {
 }
 
 class _ControlDemo extends CustomPainter {
-  _ControlDemo(this.mode, this.demo) : super(repaint: demo);
+  _ControlDemo(this.mode, this.demo, {this.haloJoystick = false})
+    : super(repaint: demo);
   final ControlMode mode;
   final Animation<double> demo;
+  final bool haloJoystick;
   @override
   void paint(Canvas c, Size size) {
     final t = demo.value * math.pi * 2;
@@ -257,6 +287,24 @@ class _ControlDemo extends CustomPainter {
       finger(p);
     }
     if (mode == ControlMode.oneFinger) {
+      if (haloJoystick) {
+        const center = Offset(53, 64);
+        c.drawCircle(center, 15, Paint()..color = ink);
+        c.drawCircle(
+          center,
+          14,
+          Paint()
+            ..color = menuGold
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5,
+        );
+        c.drawCircle(
+          center + Offset(math.sin(t) * 5, math.cos(t) * 3),
+          7,
+          Paint()..color = menuGold,
+        );
+        return;
+      }
       final p = Offset(53 + math.sin(t) * 20, 65 + math.cos(t) * 3);
       c.drawLine(
         const Offset(20, 65),

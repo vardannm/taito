@@ -304,7 +304,7 @@ void main() {
         ..add(const Hole(300, 450, target: 1));
       g.coins.clear();
       g.ballX = 30;
-      advance(g, 3.1);
+      advance(g, ClassicLevels.definition(10).firstHazardAfter + .1);
       expect(g.specialHazards.length, 1);
       final h = g.specialHazards.first;
       expect(h.warning, isTrue);
@@ -317,7 +317,7 @@ void main() {
       g.left = g.right = 400;
       advance(g, 1);
       expect(g.lives, 3);
-      advance(g, 1.5);
+      advance(g, h.warningSeconds - h.age + .05);
       expect(g.lives, 2);
       expect(g.phase, GamePhase.sinking);
       final ageAtHit = h.age;
