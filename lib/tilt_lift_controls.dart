@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'board_painter.dart';
 import 'game.dart';
+import 'infinite_painter.dart';
 
 /// Temporary tilt-only trial; the lift axis is intentionally not mounted.
 class TiltLiftControls extends StatelessWidget {
@@ -117,6 +117,10 @@ class _TiltLiftAxisState extends State<TiltLiftAxis> {
               onPointerCancel: release,
               child: CustomPaint(
                 painter: _AxisPainter(
+                  color: infiniteBoardInk(
+                    game,
+                    Offset(180, game.visibleBottom - 30),
+                  ),
                   tilt: tilt,
                   value: tilt
                       ? ((game.right - game.left) / 140).clamp(-1.0, 1.0)
@@ -137,6 +141,7 @@ class _TiltLiftAxisState extends State<TiltLiftAxis> {
 
 class _AxisPainter extends CustomPainter {
   const _AxisPainter({
+    required this.color,
     required this.tilt,
     required this.value,
     required this.held,
@@ -144,15 +149,16 @@ class _AxisPainter extends CustomPainter {
     required this.travel,
   });
   final bool tilt, held, enabled;
+  final Color color;
   final double value, travel;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final color = enabled ? ink : ink.withAlpha(85);
+    final color = this.color.withAlpha(enabled ? 230 : 120);
     final center = Offset(size.width / 2, size.height / 2 + 7);
     final axis = tilt ? Offset(travel, 0) : Offset(0, travel);
     final track = Paint()
-      ..color = brass.withAlpha(90)
+      ..color = color.withAlpha(55)
       ..strokeWidth = 8
       ..strokeCap = StrokeCap.round;
     canvas.drawLine(center - axis, center + axis, track);
@@ -161,7 +167,7 @@ class _AxisPainter extends CustomPainter {
     canvas.drawCircle(
       knob,
       19,
-      Paint()..color = held ? orange.withAlpha(70) : const Color(0xFFEAE3D0),
+      Paint()..color = color.withAlpha(held ? 45 : 26),
     );
     canvas.drawCircle(
       knob,
@@ -198,6 +204,7 @@ class _AxisPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_AxisPainter oldDelegate) =>
+      color != oldDelegate.color ||
       oldDelegate.value != value ||
       oldDelegate.held != held ||
       oldDelegate.enabled != enabled ||

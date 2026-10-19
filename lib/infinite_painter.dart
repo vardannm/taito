@@ -85,12 +85,7 @@ List<Color> boardFieldColors(BalanceGame game) {
 /// Match the playfield gradient so foreground colors follow the visible fade,
 /// including transitions back to x1 after a hit, rather than the target combo.
 Color infiniteFieldColor(BalanceGame game, Offset point) {
-  final area = Rect.fromLTRB(
-    10,
-    game.visibleTop + 10,
-    350,
-    game.visibleBottom - 10,
-  );
+  final area = Rect.fromLTRB(0, game.visibleTop, 360, game.visibleBottom);
   final delta = point - area.topLeft;
   final t =
       ((delta.dx * area.width + delta.dy * area.height) /

@@ -26,13 +26,12 @@ const ink = Color(0xFF163D3B);
 const orange = Color(0xFFCD542F);
 const brass = Color(0xFFD9AE65);
 
-/// Height kept below the board for the controls: the one-finger thumb pad,
-/// or the strip where two-finger handles sit under the platform. Both modes
-/// share it, so the board and ball sit at the same place on screen.
+/// Space below the platform reserved for thumb controls. Scenery continues
+/// underneath the controls, with matching platform placement for both modes.
 const controlStripHeight = 96.0;
 
-/// The strip a full-size board widget lays its board out above. One-finger
-/// places its pad outside the board widget instead, so it needs none here.
+/// Default viewport inset for two-finger handles. PivotBoard explicitly adds
+/// its one-finger pad and any safe-area inset when laying out an overlay.
 double handleStrip(BalanceGame game) =>
     game.controlMode == ControlMode.twoFinger ? controlStripHeight : 0;
 
@@ -160,6 +159,7 @@ class BoardPainter extends CustomPainter {
     this.game, {
     this.reducedMotion = false,
     this.fillWidth = 0,
+    this.bottomInset,
     this.showHud = true,
     this.gripOffsets = const {},
     Listenable? repaint,
@@ -169,6 +169,7 @@ class BoardPainter extends CustomPainter {
   final BallWorld world;
   final bool reducedMotion;
   final double fillWidth;
+  final double? bottomInset;
   final bool showHud;
   final Map<int, double> gripOffsets;
 
@@ -212,26 +213,19 @@ class BoardPainter extends CustomPainter {
         brass = palette.trim;
     canvas.save();
     canvas.clipRect(Offset.zero & size);
-    final viewport = BoardViewport.forGame(size, game, fillWidth: fillWidth);
+    final viewport = BoardViewport.forGame(
+      size,
+      game,
+      fillWidth: fillWidth,
+      bottomInset: bottomInset,
+    );
     canvas.translate(viewport.offset.dx, viewport.offset.dy);
     canvas.scale(viewport.scale);
     final top = -viewport.topExtension;
     final bottom = viewport.paintBottom;
-    final outer = RRect.fromRectAndRadius(
-      Rect.fromLTRB(0, top, 360, bottom),
-      const Radius.circular(22),
-    );
-    canvas.drawRRect(outer, Paint()..color = palette.frame);
-    canvas.drawRRect(
-      outer.deflate(2),
-      Paint()
-        ..color = brass
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1,
-    );
     final field = RRect.fromRectAndRadius(
-      Rect.fromLTRB(10, top + 10, 350, bottom - 10),
-      const Radius.circular(15),
+      Rect.fromLTRB(0, top, 360, bottom),
+      Radius.zero,
     );
     canvas.drawRRect(
       field,
@@ -254,33 +248,47 @@ class BoardPainter extends CustomPainter {
       reducedMotion: reducedMotion,
       energy: game.infinite ? game.survival.visualCombo : 0,
     );
-    final grain = Paint()
-      ..color = ink.withAlpha(50)
-      ..strokeWidth = .6;
     final railTop = game.infinite ? game.screenY(game.minPivot) : top + 26;
-    // Rails run to the board's bottom edge, including a two-finger board
-    // drawn down through its strip, so they never stop mid-screen.
-    final railBottom = bottom - 26;
+    final fadeRails =
+        game.oneFinger && !game.haloJoystick || game.bottomControls;
+    // Finish the rails before the glass panel, with a screen-space fade that
+    // keeps the same softness at every board scale.
+    final railBottom = fadeRails
+        ? math.min(
+            bottom - 26,
+            (viewport.bounds.bottom - viewport.offset.dy - 12) / viewport.scale,
+          )
+        : bottom - 26;
+    final railFadeStart = railBottom - 48 / viewport.scale;
+    Paint railPaint(Color color, double width) {
+      final paint = Paint()
+        ..color = color
+        ..strokeWidth = width;
+      if (fadeRails) {
+        paint.shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [color, color.withAlpha(0)],
+        ).createShader(Rect.fromLTRB(0, railFadeStart, 360, railBottom));
+      }
+      return paint;
+    }
+
+    final railBody = railPaint(const Color(0xFF574A31), 5);
+    final railHighlight = railPaint(const Color(0xFFEEE7CC), 1);
+    final grain = railPaint(ink.withAlpha(75), .6);
     for (final x in [20.0, 340.0]) {
-      canvas.drawLine(
-        Offset(x, railTop),
-        Offset(x, railBottom),
-        Paint()
-          ..color = const Color(0xFF574A31)
-          ..strokeWidth = 5,
-      );
+      canvas.drawLine(Offset(x, railTop), Offset(x, railBottom), railBody);
       canvas.drawLine(
         Offset(x - 1, railTop),
         Offset(x - 1, railBottom),
-        Paint()
-          ..color = const Color(0xFFEEE7CC)
-          ..strokeWidth = 1,
+        railHighlight,
       );
       for (double y = railTop + 6; y < railBottom - 4; y += 10) {
         canvas.drawLine(
           Offset(x == 20 ? 26 : 329, y),
           Offset(x == 20 ? 30 : 333, y),
-          grain..color = ink.withAlpha(75),
+          grain,
         );
       }
       if (game.infinite) {
@@ -864,21 +872,6 @@ class BoardPainter extends CustomPainter {
     }
     canvas.restore();
     if (grips) paintEnds();
-    for (final p in [
-      Offset(7, top + 20),
-      Offset(353, top + 20),
-      Offset(7, bottom - 20),
-      Offset(353, bottom - 20),
-    ]) {
-      canvas.drawCircle(p, 2.3, Paint()..color = brass);
-      canvas.drawLine(
-        p - const Offset(1.4, 0),
-        p + const Offset(1.4, 0),
-        Paint()
-          ..color = ink
-          ..strokeWidth = .8,
-      );
-    }
     canvas.restore();
   }
 
@@ -888,5 +881,6 @@ class BoardPainter extends CustomPainter {
       oldDelegate.game != game ||
       reducedMotion != oldDelegate.reducedMotion ||
       showHud != oldDelegate.showHud ||
-      fillWidth != oldDelegate.fillWidth;
+      fillWidth != oldDelegate.fillWidth ||
+      bottomInset != oldDelegate.bottomInset;
 }

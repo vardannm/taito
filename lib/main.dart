@@ -43,6 +43,7 @@ import 'mode_carousel.dart';
 import 'mode_world_preview.dart';
 import 'heart_loss_effect.dart';
 import 'control_hint.dart';
+import 'control_glass.dart';
 import 'one_finger_controls.dart';
 import 'boot_splash.dart';
 
@@ -210,6 +211,16 @@ class _GameScreenState extends State<GameScreen>
   double get chromeOpacity => entrance.isCompleted
       ? 0
       : 1 - ((entrance.value - .78) / .22).clamp(0.0, 1.0);
+  double bottomControlHeight(BuildContext context) => game.bottomControls
+      ? (MediaQuery.sizeOf(context).height * .19).clamp(104.0, 140.0)
+      : 0;
+
+  BoardViewport boardViewport(Size size) => BoardViewport.forGame(
+    size,
+    game,
+    fillWidth: expansion,
+    bottomInset: (boardKey.currentWidget as PivotBoard?)?.bottomInset,
+  );
   int selectedMode = 0;
   bool carouselMoving = false;
   PlayerProfile get profile => widget.profile;
@@ -302,20 +313,7 @@ class _GameScreenState extends State<GameScreen>
     final layer = effectsKey.currentContext?.findRenderObject() as RenderBox?;
     if (board == null || layer == null || !board.hasSize || !layer.hasSize)
       return;
-    final viewport = BoardViewport.forGame(
-      Size(
-        board.size.width,
-        // Only one-finger's pad lies outside the board here; forGame keeps
-        // the two-finger handle strip itself.
-        math.max(
-          1,
-          board.size.height -
-              (game.oneFinger ? OneFingerControls.heightFor(game) : 0),
-        ),
-      ),
-      game,
-      fillWidth: expansion,
-    );
+    final viewport = boardViewport(board.size);
     final point = viewport.project(
       Offset(game.ballX, game.screenY(game.platformY(game.ballX))),
     );
@@ -1170,20 +1168,7 @@ class _GameScreenState extends State<GameScreen>
         final board = boardKey.currentContext?.findRenderObject() as RenderBox?;
         void worldPoint(double x, double y, [double radius = 22]) {
           if (board == null || !board.hasSize) return;
-          final viewport = BoardViewport.forGame(
-            Size(
-              board.size.width,
-              // Only one-finger's pad lies outside the board here; forGame keeps
-              // the two-finger handle strip itself.
-              math.max(
-                1,
-                board.size.height -
-                    (game.oneFinger ? OneFingerControls.heightFor(game) : 0),
-              ),
-            ),
-            game,
-            fillWidth: expansion,
-          );
+          final viewport = boardViewport(board.size);
           final point = layer.globalToLocal(
             board.localToGlobal(viewport.project(Offset(x, game.screenY(y)))),
           );
@@ -1212,7 +1197,11 @@ class _GameScreenState extends State<GameScreen>
               board.localToGlobal(
                 Offset(
                   12,
-                  board.size.height - OneFingerControls.heightFor(game) + 10,
+                  board.size.height -
+                      OneFingerControls.heightFor(game) -
+                      ((boardKey.currentWidget as PivotBoard?)?.bottomPadding ??
+                          0) +
+                      10,
                 ),
               ),
             );
@@ -1673,11 +1662,7 @@ class _GameScreenState extends State<GameScreen>
     if (game.bottomControls) return true;
     // The same layout the board paints with: once armed, a touch on either
     // half controls the platform rather than swiping worlds.
-    final viewport = BoardViewport.forGame(
-      board.size,
-      game,
-      fillWidth: expansion,
-    );
+    final viewport = boardViewport(board.size);
     for (final side in [0, 1]) {
       if (viewport.controlsSide(point, side)) return false;
     }
@@ -1727,6 +1712,12 @@ class _GameScreenState extends State<GameScreen>
               game: game,
               frame: frame,
               fillWidth: expansion,
+              bottomInset:
+                  controlStrip(game) +
+                  bottomControlHeight(context) *
+                      (tutorialActive ? 1 : expansion) +
+                  MediaQuery.paddingOf(context).bottom * expansion,
+              bottomPadding: MediaQuery.paddingOf(context).bottom * expansion,
               overlay: Padding(
                 // The board extends behind the status bar; its HUD stays below it.
                 padding: EdgeInsets.only(
@@ -2143,10 +2134,14 @@ class _GameScreenState extends State<GameScreen>
           builder: (context, bounds) => Stack(
             fit: StackFit.expand,
             children: [
-              if (game.tiltLift)
-                TiltLiftControls(game: game, frame: frame)
-              else
-                AnalogControls(game: game, frame: frame),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+                child: ControlGlass(
+                  child: game.tiltLift
+                      ? TiltLiftControls(game: game, frame: frame)
+                      : AnalogControls(game: game, frame: frame),
+                ),
+              ),
               if ((tutorialActive && ready ||
                       playArmed && game.waitingForInput) &&
                   !carouselMoving)
@@ -2513,9 +2508,7 @@ class _GameScreenState extends State<GameScreen>
               ? 284.0
               : 310.0;
           final menuGap = !tutorialActive && compactMenu ? 4.0 : 12.0;
-          final controlHeight = game.bottomControls
-              ? (MediaQuery.sizeOf(context).height * .19).clamp(104.0, 140.0)
-              : 0.0;
+          final controlHeight = bottomControlHeight(context);
           final stageBackground = Color.lerp(
             background,
             menuBackground,
@@ -2575,8 +2568,12 @@ class _GameScreenState extends State<GameScreen>
                   SafeArea(
                     key: const ValueKey('arcade-stage'),
                     top: false,
+                    bottom: false,
                     minimum: EdgeInsets.only(
                       top: MediaQuery.paddingOf(context).top * (1 - expansion),
+                      bottom:
+                          MediaQuery.paddingOf(context).bottom *
+                          (1 - expansion),
                     ),
                     child: Stack(
                       fit: StackFit.expand,
@@ -2621,11 +2618,7 @@ class _GameScreenState extends State<GameScreen>
                               child: Padding(
                                 padding: EdgeInsets.only(
                                   top: menuGap * (1 - expansion),
-                                  bottom:
-                                      menuGap * (1 - expansion) +
-                                      (tutorialActive
-                                          ? 0
-                                          : controlHeight * expansion),
+                                  bottom: menuGap * (1 - expansion),
                                 ),
                                 child: worlds,
                               ),
@@ -2654,17 +2647,18 @@ class _GameScreenState extends State<GameScreen>
                                 ),
                               ),
                             ),
-                            if (tutorialActive && game.bottomControls)
-                              SizedBox(height: controlHeight),
                           ],
                         ),
                         if (game.bottomControls)
                           Positioned(
                             left: 0,
                             right: 0,
-                            bottom: tutorialActive
-                                ? 0
-                                : menuFooterHeight * (1 - expansion),
+                            bottom:
+                                MediaQuery.paddingOf(context).bottom *
+                                    expansion +
+                                (tutorialActive
+                                    ? 0
+                                    : menuFooterHeight * (1 - expansion)),
                             child: bottomInput(ready, controlHeight),
                           ),
                       ],

@@ -12,6 +12,8 @@ class PivotBoard extends StatefulWidget {
     required this.game,
     required this.frame,
     this.fillWidth = 0,
+    this.bottomInset,
+    this.bottomPadding = 0,
     this.showHint = false,
     this.dimUntilInput = false,
     this.overlay,
@@ -19,6 +21,12 @@ class PivotBoard extends StatefulWidget {
   final BalanceGame game;
   final Listenable frame;
   final double fillWidth;
+
+  /// Keeps gameplay above the controls while scenery fills the whole widget.
+  final double? bottomInset;
+
+  /// Keeps the thumb pad clear of the device's home indicator.
+  final double bottomPadding;
   final bool showHint;
   final bool dimUntilInput;
   final Widget? overlay;
@@ -27,6 +35,7 @@ class PivotBoard extends StatefulWidget {
 }
 
 class _PivotBoardState extends State<PivotBoard> {
+  double get bottomInset => widget.bottomInset ?? controlStrip(widget.game);
   final pointers = <int, int>{};
   final gripOffsets = <int, double>{};
   int epoch = -1;
@@ -45,20 +54,20 @@ class _PivotBoardState extends State<PivotBoard> {
       if (!widget.game.oneFinger || widget.game.haloJoystick) {
         return buildBoard(context, bounds);
       }
-      final boardHeight =
-          (bounds.maxHeight - OneFingerControls.heightFor(widget.game)).clamp(
-            1.0,
-            double.infinity,
-          );
       final scale = BoardViewport.forGame(
-        Size(bounds.maxWidth, boardHeight),
+        bounds.biggest,
         widget.game,
         fillWidth: widget.fillWidth,
+        bottomInset: bottomInset,
       ).scale;
-      return Column(
+      return Stack(
+        fit: StackFit.expand,
         children: [
-          Expanded(child: LayoutBuilder(builder: buildBoard)),
-          SizedBox(
+          LayoutBuilder(builder: buildBoard),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: widget.bottomPadding,
             height: OneFingerControls.heightFor(widget.game),
             child: Stack(
               fit: StackFit.expand,
@@ -89,6 +98,7 @@ class _PivotBoardState extends State<PivotBoard> {
       bounds.biggest,
       game,
       fillWidth: widget.fillWidth,
+      bottomInset: bottomInset,
     );
     game.visibleTop = -viewportNow().topExtension;
     game.visibleBottom = viewportNow().paintBottom;
@@ -162,6 +172,7 @@ class _PivotBoardState extends State<PivotBoard> {
                   repaint: widget.frame,
                   reducedMotion: MediaQuery.of(context).disableAnimations,
                   fillWidth: widget.fillWidth,
+                  bottomInset: bottomInset,
                   showHud: widget.overlay == null,
                   gripOffsets: gripOffsets,
                 ),
@@ -170,6 +181,7 @@ class _PivotBoardState extends State<PivotBoard> {
             ),
             if (widget.dimUntilInput)
               Positioned.fill(
+                bottom: game.oneFinger && !game.haloJoystick ? bottomInset : 0,
                 child: IgnorePointer(
                   child: ExcludeSemantics(
                     child: AnimatedBuilder(

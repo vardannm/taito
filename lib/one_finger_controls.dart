@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'board_painter.dart';
 import 'game.dart';
+import 'infinite_painter.dart';
 
 /// Shared relative input for the original pad and the floating Halo trial.
 class OneFingerControls extends StatefulWidget {
@@ -76,7 +78,7 @@ class _OneFingerControlsState extends State<OneFingerControls> {
           return Semantics(
             label: game.haloJoystick
                 ? 'Floating Halo joystick. Touch anywhere on the board and drag sideways to tilt, up to lift, down to lower. The guide appears only while touching.'
-                : 'One-finger thumb area below the board. Drag sideways to tilt, up to lift, down to lower. Keep dragging beyond the area to move further.',
+                : 'One-finger thumb area at the bottom of the board. Drag sideways to tilt, up to lift, down to lower. Keep dragging beyond the area to move further.',
             child: GestureDetector(
               onPanUpdate:
                   (_) {}, // Keep tutorial page scrolling out of control drags.
@@ -131,9 +133,9 @@ class _OneFingerControlsState extends State<OneFingerControls> {
                     contact = null;
                   });
                 },
-                child: CustomPaint(
-                  painter: game.haloJoystick
-                      ? HaloJoystickPainter(
+                child: game.haloJoystick
+                    ? CustomPaint(
+                        painter: HaloJoystickPainter(
                           anchor: contact == null || visualAnchor == null
                               ? null
                               : (this.context.findRenderObject() as RenderBox?)
@@ -142,10 +144,19 @@ class _OneFingerControlsState extends State<OneFingerControls> {
                               visualAnchor == null || visualPosition == null
                               ? Offset.zero
                               : visualPosition! - visualAnchor!,
-                        )
-                      : _ThumbPadPainter(game, contact),
-                  child: const SizedBox.expand(),
-                ),
+                        ),
+                        child: const SizedBox.expand(),
+                      )
+                    : ClipRRect(
+                        clipper: const _ThumbPadClipper(),
+                        child: BackdropFilter(
+                          filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                          child: CustomPaint(
+                            painter: _ThumbPadPainter(game, contact),
+                            child: const SizedBox.expand(),
+                          ),
+                        ),
+                      ),
               ),
             ),
           );
@@ -247,16 +258,33 @@ class HaloJoystickPainter extends CustomPainter {
       oldDelegate.anchor != anchor || oldDelegate.displacement != displacement;
 }
 
+RRect _thumbPadArea(Size size) => RRect.fromRectAndRadius(
+  Rect.fromLTWH(12, 8, size.width - 24, size.height - 14),
+  const Radius.circular(22),
+);
+
+class _ThumbPadClipper extends CustomClipper<RRect> {
+  const _ThumbPadClipper();
+
+  @override
+  RRect getClip(Size size) => _thumbPadArea(size);
+
+  @override
+  bool shouldReclip(_ThumbPadClipper oldClipper) => false;
+}
+
 class _ThumbPadPainter extends CustomPainter {
   _ThumbPadPainter(BalanceGame game, this.contact)
     : enabled = game.canControl,
-      controlPosition = game.controlPosition;
+      controlPosition = game.controlPosition,
+      color = infiniteBoardInk(game, Offset(180, game.visibleBottom - 30));
   final bool enabled;
+  final Color color;
   final double controlPosition;
   final Offset? contact;
 
   // The pad repaints every frame; lay its label out once per state instead.
-  static final _labels = <bool, TextPainter>{};
+  static final _labels = <(bool, Color), TextPainter>{};
   static double _labelWidth = 0;
 
   TextPainter _label(double maxWidth) {
@@ -267,11 +295,11 @@ class _ThumbPadPainter extends CustomPainter {
       _labels.clear();
       _labelWidth = maxWidth;
     }
-    return _labels[enabled] ??= TextPainter(
+    return _labels[(enabled, color)] ??= TextPainter(
       text: TextSpan(
         text: 'TILT LEFT/RIGHT  ·  LIFT UP/DOWN',
         style: TextStyle(
-          color: ink.withAlpha(enabled ? 210 : 100),
+          color: color.withAlpha(enabled ? 220 : 130),
           fontSize: 10,
           fontFamily: 'sans-serif',
           letterSpacing: .7,
@@ -283,15 +311,20 @@ class _ThumbPadPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final area = RRect.fromRectAndRadius(
-      Rect.fromLTWH(12, 8, size.width - 24, size.height - 14),
-      const Radius.circular(22),
-    );
-    canvas.drawRRect(area, Paint()..color = cream);
+    final area = _thumbPadArea(size);
     canvas.drawRRect(
       area,
       Paint()
-        ..color = ink.withAlpha(enabled ? 65 : 25)
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.white.withAlpha(40), Colors.white.withAlpha(12)],
+        ).createShader(area.outerRect),
+    );
+    canvas.drawRRect(
+      area,
+      Paint()
+        ..color = Colors.white.withAlpha(enabled ? 95 : 50)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1,
     );
@@ -300,7 +333,7 @@ class _ThumbPadPainter extends CustomPainter {
       Offset(40, center.dy),
       Offset(size.width - 40, center.dy),
       Paint()
-        ..color = ink.withAlpha(45)
+        ..color = color.withAlpha(55)
         ..strokeWidth = 2,
     );
     final knob = contact == null
@@ -312,13 +345,13 @@ class _ThumbPadPainter extends CustomPainter {
     canvas.drawCircle(
       knob,
       22,
-      Paint()..color = ink.withAlpha(enabled ? 255 : 90),
+      Paint()..color = color.withAlpha(enabled ? 26 : 14),
     );
     canvas.drawCircle(
       knob,
       19,
       Paint()
-        ..color = brass
+        ..color = color.withAlpha(enabled ? 160 : 80)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.2,
     );
@@ -327,7 +360,7 @@ class _ThumbPadPainter extends CustomPainter {
         knob + Offset(-7, dy),
         knob + Offset(7, dy),
         Paint()
-          ..color = brass
+          ..color = color.withAlpha(enabled ? 230 : 120)
           ..strokeWidth = 2,
       );
     }
@@ -338,6 +371,7 @@ class _ThumbPadPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _ThumbPadPainter oldDelegate) =>
       oldDelegate.enabled != enabled ||
+      oldDelegate.color != color ||
       oldDelegate.controlPosition != controlPosition ||
       oldDelegate.contact != contact;
 }

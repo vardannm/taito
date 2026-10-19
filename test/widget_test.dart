@@ -5,6 +5,7 @@ import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/profile.dart';
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/board_painter.dart';
+import 'package:balance_arcade/one_finger_controls.dart';
 
 void main() {
   for (final size in [
@@ -94,7 +95,7 @@ void main() {
     },
   );
 
-  testWidgets('board fills to the top while HUD respects tablet safe area', (
+  testWidgets('board fills the screen while HUD and pad respect safe area', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(800, 1200);
@@ -110,6 +111,7 @@ void main() {
       ArcadeApp(
         profile: PlayerProfile()
           ..tutorialSeen = true
+          ..controlMode = ControlMode.oneFinger
           ..sound = false
           ..haptics = false,
       ),
@@ -123,7 +125,11 @@ void main() {
     final rect = tester.getRect(find.byType(PivotBoard));
     expect(rect.left, greaterThanOrEqualTo(12 - .001));
     expect(rect.right, lessThanOrEqualTo(788 + .001));
-    expect(rect.bottom, lessThanOrEqualTo(1166 + .001));
+    expect(rect.bottom, closeTo(1200, .001));
+    expect(
+      tester.getRect(find.byType(OneFingerControls)).bottom,
+      closeTo(1166, .001),
+    );
     expect(rect.top, closeTo(0, .001));
     expect(
       tester.getTopLeft(find.byKey(const ValueKey('board-hud'))).dy,

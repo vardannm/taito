@@ -60,7 +60,7 @@ void main() {
     });
   }
   testWidgets(
-    'thumb pad is below the board; re-grabbing anywhere preserves the platform',
+    'thumb pad overlays the board; re-grabbing anywhere preserves the platform',
     (tester) async {
       tester.view.physicalSize = const Size(400, 800);
       tester.view.devicePixelRatio = 1;
@@ -87,7 +87,7 @@ void main() {
       );
       expect(
         tester.getRect(board).bottom,
-        lessThanOrEqualTo(tester.getRect(pad).top),
+        closeTo(tester.getRect(pad).bottom, .001),
       );
       expect(tester.getSize(pad).height, 96);
       // Touching the playfield cannot take ownership of the one-finger control.
