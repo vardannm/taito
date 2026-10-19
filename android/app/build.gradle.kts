@@ -65,7 +65,7 @@ android {
 // never be signed with it.
 gradle.taskGraph.whenReady {
     if (!releaseKeyFile.exists() &&
-        allTasks.any { it.name.startsWith("bundle") && it.name.endsWith("Release") }
+        allTasks.any { it.project == project && it.name == "bundleRelease" }
     ) {
         throw GradleException(
             "android/key.properties is missing. Store bundles need the upload key; " +
