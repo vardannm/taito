@@ -94,7 +94,9 @@ void main() {
     },
   );
 
-  testWidgets('gameplay viewport respects tablet safe area', (tester) async {
+  testWidgets('board fills to the top while HUD respects tablet safe area', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(800, 1200);
     tester.view.devicePixelRatio = 1;
     tester.view.padding = FakeViewPadding(
@@ -122,7 +124,19 @@ void main() {
     expect(rect.left, greaterThanOrEqualTo(12 - .001));
     expect(rect.right, lessThanOrEqualTo(788 + .001));
     expect(rect.bottom, lessThanOrEqualTo(1166 + .001));
-    expect(rect.top, greaterThanOrEqualTo(44 - .001));
+    expect(rect.top, closeTo(0, .001));
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('board-hud'))).dy,
+      closeTo(56, .001),
+    );
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('board-pause'))).dy,
+      closeTo(56, .001),
+    );
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('board-hearts'))).dy,
+      closeTo(66, .001),
+    );
     expect(rect.height, greaterThan(850));
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());

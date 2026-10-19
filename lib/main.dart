@@ -1727,7 +1727,13 @@ class _GameScreenState extends State<GameScreen>
               game: game,
               frame: frame,
               fillWidth: expansion,
-              overlay: boardChrome(),
+              overlay: Padding(
+                // The board extends behind the status bar; its HUD stays below it.
+                padding: EdgeInsets.only(
+                  top: MediaQuery.paddingOf(context).top * expansion,
+                ),
+                child: boardChrome(),
+              ),
               dimUntilInput:
                   game.infinite &&
                   game.waitingForInput &&
@@ -2568,6 +2574,10 @@ class _GameScreenState extends State<GameScreen>
                     ),
                   SafeArea(
                     key: const ValueKey('arcade-stage'),
+                    top: false,
+                    minimum: EdgeInsets.only(
+                      top: MediaQuery.paddingOf(context).top * (1 - expansion),
+                    ),
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
