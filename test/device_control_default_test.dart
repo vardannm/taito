@@ -48,7 +48,7 @@ void main() {
         expect(reloaded.controlMode, expected);
       });
 
-      // Folding/unfolding during play preserves the controls and active input.
+      // Expanding hides the original pad; an unchanged control keeps its input.
       game.beginInput();
       game.grabPivot(0);
       game.dragPivot(0, -10);
@@ -58,14 +58,23 @@ void main() {
           ? const Size(1640, 2360)
           : const Size(780, 1688);
       await tester.pump();
+      expect(game.controlMode, ControlMode.twoFinger);
+      expect(profile.preferredControlMode, expected);
+      if (expected == ControlMode.oneFinger) {
+        expect(game.inputEpoch, greaterThan(epoch));
+        expect(game.pivotTargets[0], isNull);
+      } else {
+        expect(game.inputEpoch, epoch);
+        expect(game.pivotTargets[0], target);
+      }
+      tester.view.physicalSize = size * 2;
+      await tester.pump();
       expect(game.controlMode, expected);
-      expect(game.inputEpoch, epoch);
-      expect(game.pivotTargets[0], target);
     });
   }
 
   test(
-    'saved modern and legacy control preferences override screen size',
+    'saved modern and legacy preferences bypass the first-install default',
     () async {
       final storage = SharedPreferencesAsync();
       for (final mode in [ControlMode.oneFinger, ControlMode.twoFinger]) {

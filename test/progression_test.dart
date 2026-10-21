@@ -94,10 +94,13 @@ void main() {
     expect(g.level, 50);
     expect(g.oneFinger, isTrue);
     expect(g.lives, 3);
-    expect(find.descendant(
-      of: find.byKey(const ValueKey('board-hud')),
-      matching: find.textContaining('LEVEL 50'),
-    ), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('board-hud')),
+        matching: find.textContaining('LEVEL 50'),
+      ),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

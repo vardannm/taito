@@ -52,6 +52,10 @@ class MergeRun {
       MergeDifficulty.matchingChance >= 0 &&
           MergeDifficulty.matchingChance <= 1,
     );
+    assert(
+      MergeDifficulty.secondaryDangerChance >= 0 &&
+          MergeDifficulty.secondaryDangerChance <= 1,
+    );
     assert(MergeDifficulty.gateInterval > 0);
     assert(MergeDifficulty.gateSpeedBonus >= 0);
     assert(MergeDifficulty.gateCooldownSeconds >= 0);
@@ -98,7 +102,10 @@ class MergeRun {
   double get gateSpeed => speed + MergeDifficulty.gateSpeedBonus;
   double get dangerProbability =>
       MergeDifficulty.dangerChance *
-      ((highest.bitLength - 3) / 4).clamp(0.0, 1.0);
+      ((highest.bitLength - 2) / 3).clamp(0.0, 1.0);
+  double get secondaryDangerProbability =>
+      MergeDifficulty.secondaryDangerChance *
+      ((highest.bitLength - 6) / 3).clamp(0.0, 1.0);
   int get gateScoreGap => math.max(gateInterval, head);
   int get upcomingGateValue => gates.isNotEmpty
       ? gates.first.requiredValue
@@ -199,8 +206,8 @@ class MergeRun {
   }
 
   void _row(double y) {
-    // Two safe choices and a gradually increasing chance of a dangerous third.
-    // Keep the matching pickup reachable and the danger separated.
+    // One guaranteed tail match; two dangerous choices become possible later.
+    // Keep the matching pickup reachable and all choices separated.
     final safeX = minHeadX + random.nextDouble() * (maxHeadX - minHeadX);
     final xs = <double>[safeX];
     for (var i = 1; i < 3; i++) {
@@ -214,9 +221,12 @@ class MergeRun {
       xs.add(choices[random.nextInt(choices.length)]);
     }
     for (var i = 0; i < xs.length; i++) {
+      final dangerous = i == 2
+          ? random.nextDouble() < dangerProbability
+          : i == 1 && random.nextDouble() < secondaryDangerProbability;
       final value = i == 0
           ? tail
-          : i == 2 && random.nextDouble() < dangerProbability
+          : dangerous
           ? head * (random.nextBool() ? 2 : 4)
           : i == 1 && random.nextDouble() < MergeDifficulty.matchingChance
           ? segments[random.nextInt(segments.length)]

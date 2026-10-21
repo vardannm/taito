@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'game.dart';
+import 'control_layout.dart';
 import 'board_painter.dart';
 import 'menu_design.dart';
 
@@ -22,8 +23,14 @@ class ControlOptions extends StatefulWidget {
 
 class _ControlOptionsState extends State<ControlOptions>
     with SingleTickerProviderStateMixin {
+  ControlMode get effectiveValue =>
+      !allowsOneFingerPad(MediaQuery.sizeOf(context).shortestSide) &&
+          widget.value == ControlMode.oneFinger &&
+          !widget.haloJoystick
+      ? ControlMode.twoFinger
+      : widget.value;
   bool selected(ControlMode mode, bool halo) =>
-      widget.value == mode &&
+      effectiveValue == mode &&
       (mode != ControlMode.oneFinger || widget.haloJoystick == halo);
   late final AnimationController demo = AnimationController(
     vsync: this,
@@ -50,7 +57,10 @@ class _ControlOptionsState extends State<ControlOptions>
   Widget build(BuildContext context) => Column(
     children: [
       for (final (mode, halo) in [
-        for (final mode in selectableControlModes) (mode, false),
+        for (final mode in selectableControlModes)
+          if (mode != ControlMode.oneFinger ||
+              allowsOneFingerPad(MediaQuery.sizeOf(context).shortestSide))
+            (mode, false),
         (ControlMode.oneFinger, true),
       ])
         Padding(

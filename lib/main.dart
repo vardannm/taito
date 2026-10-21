@@ -163,8 +163,8 @@ class _GameScreenState extends State<GameScreen>
     if (mounted) setState(() {});
   }
 
-  /// The player's own control choice, set aside while a replayed tutorial
-  /// teaches One-finger.
+  /// Keep the player's choice while the replay picks its starting controls.
+  /// The current layout's control availability still applies.
   ControlMode? controlBeforeReplay;
 
   void restoreReplayControl() {
@@ -194,7 +194,7 @@ class _GameScreenState extends State<GameScreen>
 
   void replayTutorial() {
     unawaited(profile.replayTutorial());
-    controlBeforeReplay ??= profile.controlMode;
+    controlBeforeReplay ??= profile.preferredControlMode;
     profile.controlMode = ControlMode.oneFinger;
     unawaited(profile.save());
     setState(() {
@@ -291,11 +291,17 @@ class _GameScreenState extends State<GameScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    profile.applyControlLayout(
+      shortestSide: MediaQuery.sizeOf(context).shortestSide,
+    );
     if (profile.applyInitialControlDefault(
       shortestSide: MediaQuery.sizeOf(context).shortestSide,
     )) {
-      game.setControlMode(profile.controlMode);
       unawaited(profile.save());
+    }
+    if (game.controlMode != profile.controlMode) {
+      clearControls();
+      game.setControlMode(profile.controlMode);
     }
   }
 
@@ -662,7 +668,8 @@ class _GameScreenState extends State<GameScreen>
             selected: profile.classicLevel,
             totalStars: profile.totalStars,
             allLevelsUnlocked: profile.temporaryLevelAccess,
-            controlMode: profile.controlMode,
+            controlMode: profile.preferredControlMode,
+            haloJoystick: profile.haloJoystick,
             recordForControl: (number, mode) =>
                 profile.levelRecord(number, mode),
             onControlChanged: (choice) {
@@ -670,8 +677,13 @@ class _GameScreenState extends State<GameScreen>
                   ? choice
                   : choice.supportedMode;
               setState(() {
+                if (mode == ControlMode.oneFinger &&
+                    !profile.oneFingerPadAvailable) {
+                  profile.haloJoystick = true;
+                }
                 profile.controlMode = mode;
-                game.setControlMode(mode);
+                game.haloJoystick = profile.haloJoystick;
+                game.setControlMode(profile.controlMode);
               });
               unawaited(profile.save());
             },
@@ -1564,29 +1576,32 @@ class _GameScreenState extends State<GameScreen>
                                 ),
                               ),
                             if (game.mode == GameMode.classic)
-                              Row(
-                                key: const ValueKey(
-                                  'classic-bonus-star-status',
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Row(
+                                  key: const ValueKey(
+                                    'classic-bonus-star-status',
+                                  ),
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      game.levelStarAlreadyOwned ||
+                                              game.levelStarCollected
+                                          ? Icons.star_rounded
+                                          : Icons.star_outline_rounded,
+                                      size: 16,
+                                      color: const Color(0xFFE9B853),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      game.levelStarAlreadyOwned ||
+                                              game.levelStarCollected
+                                          ? 'COLLECTED'
+                                          : 'BONUS STAR',
+                                      style: detail.copyWith(fontSize: 10),
+                                    ),
+                                  ],
                                 ),
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    game.levelStarAlreadyOwned ||
-                                            game.levelStarCollected
-                                        ? Icons.star_rounded
-                                        : Icons.star_outline_rounded,
-                                    size: 16,
-                                    color: const Color(0xFFE9B853),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    game.levelStarAlreadyOwned ||
-                                            game.levelStarCollected
-                                        ? 'COLLECTED'
-                                        : 'BONUS STAR',
-                                    style: detail.copyWith(fontSize: 10),
-                                  ),
-                                ],
                               ),
                             if (game.infinite && game.survival.noticeTime > 0)
                               Text(
@@ -3487,7 +3502,7 @@ class _GameScreenState extends State<GameScreen>
                 const MenuSection('Choose your controls'),
                 const SizedBox(height: 12),
                 ControlOptions(
-                  value: profile.controlMode,
+                  value: profile.preferredControlMode,
                   haloJoystick: profile.haloJoystick,
                   onHaloChanged: (halo) {
                     profile.haloJoystick = halo;

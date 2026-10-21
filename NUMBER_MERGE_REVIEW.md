@@ -11,6 +11,26 @@ Existing save identifiers, achievements, records and mode order are preserved.
 
 ## Improvements
 
+### Harder balance — 22 October 2026
+
+- Falling speed starts at 42 instead of 30, gains 8 per doubling instead of 5,
+  and caps at 112 instead of 66. Wave spacing is 96 instead of 110 board units.
+- The third pickup's danger chance is 0 at head 2, one-third at 4, two-thirds
+  at 8 and full at 16. From head 64, the second pickup can also be dangerous:
+  15% at 64, 30% at 128 and 45% from 256. The first always matches the tail.
+- A safe second pickup explicitly favours an existing segment 40% of the time
+  instead of 65%; remaining safe values can fill gaps in the snake.
+- Gates start at 900 fresh points instead of 1,200, move 22 units/second faster
+  than the stream instead of 12, and have a three-second cooldown instead of
+  four. Each new gate starts at the current head value, so passing needs growth
+  before contact. Visible gate requirements stay fixed and still rise at least
+  twofold between gates. Opening rows remain safe, and gate approach time
+  allows multiple new waves at every tested progression stage.
+- This is a provisional play balance change. Automated checks establish safe
+  options, contact ordering and reaction windows; human difficulty needs play.
+
+### Earlier implementation notes (superseded balance values)
+
 - Opening rows contain safe numbers. The dangerous third pickup has a 25% chance
   at an 8 head, 50% at 16, 75% at 32 and the configured maximum at 64. Red warning
   rings continue to mark dangerous pickups, evaluated against the current head.

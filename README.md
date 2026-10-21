@@ -35,7 +35,7 @@ Milestone Classic boards introduce or combine mechanics; learned hazards also re
 
 **Daily** uses a fixed board generated from the UTC date with an explicit integer random generator, consistent across web and native platforms. The date is pinned for an ongoing run and its retry, even across midnight; opening Daily again selects the current day. Records are local and separate from Classic, with 32 days of history retained for all control modes. No online leaderboard or account service is connected.
 
-**Shop → Cabinet Styles** offers Original brass plus Jade garden (3 Classic stars), Porcelain club (12), and Ember forge (30). Each style changes the cabinet finish, ball and platform colors with identical physics and hitboxes. Stars earned with either control count toward each board's three unlock stars; Daily stars do not unlock Classic cosmetics. The equipped style persists. Existing global records and preferences are retained.
+**Shop → Cabinet Styles** offers Original brass plus Jade garden (3 Classic stars), Porcelain club (12), and Ember forge (30). Each style changes the cabinet finish, ball and platform colors with identical physics and hitboxes. Stars earned with either control count toward each board's four unlock stars; Daily stars do not unlock Classic cosmetics. The equipped style persists. Existing global records and preferences are retained.
 
 **Tilt Only** is the temporary fourth control option in Settings. Drag the bottom slider sideways to set the angle; release to keep it. The lift control is hidden for this trial, so there is no manual lifting.
 
@@ -60,7 +60,7 @@ Daily and Practice scoring: (target number * 100 + max(0, 35 - climb seconds) * 
 
 ## First-time onboarding
 
-On first launch without a saved control preference, the app selects **Two-Finger Control** when the app window's shortest side is at least 600 logical pixels, otherwise **One-Finger Control**. This uses logical size rather than pixel resolution or device model names: compact folded screens and narrow split-screen windows get One-Finger; tablet-sized unfolded windows get Two-Finger. The initial selection is saved. Folding, rotating, resizing, and subsequent launches preserve it, and Settings can change it at any time. Existing preferences, including legacy saves, take priority.
+On first launch without a saved control preference, the app selects **Two-Finger Control** when the app window's shortest side is at least 600 logical pixels, otherwise **One-Finger Control**. Compact layouts, including a closed Duo, offer One-Finger, Two-Finger and Halo Joystick. Expanded Duo and other large layouts hide the original One-Finger pad and offer Two-Finger and Halo. The same rule applies in Settings and the level picker. A saved pad preference temporarily uses Two-Finger while expanded, then returns when compact again; an explicit new choice remains saved. Rotating a compact phone does not make it a large layout. Saves and backups preserve the preferred control, rather than the temporary fallback. Folding only clears held input when the effective control changes, without restarting the run.
 
 New players begin inside Infinite with the selected control. A short, interactive course highlights the controls, one avoidable hole and hearts, a coin, a shield, score, and a combo crystal. Real input and swept contacts advance the lessons; missed pickups return, and an accidental hit costs one heart without resetting the run. Afterward, 45 seconds of active, ordinary Infinite play run without overlays, or a natural run ending finishes that section. Guidance resumes only back at the menu.
 
@@ -153,9 +153,9 @@ Matching values combine anywhere in the snake. Every intermediate merged value a
 
 The snake trails downward from the main ball, which retains its full horizontal travel range. Growing or merging the tail never lifts the platform or shifts the camera; at the bottom of the board, the tail can extend off-screen. A matching pickup can collapse the chain into a larger number, and longer chains compress their spacing. Length does not end a run. The next gate requirement and matching number stay above the board.
 
-Opening waves contain only safe numbers. Dangerous third pickups begin at an 8 head with a 25% chance, rising to 50% at 16, 75% at 32, and the configured maximum at 64. Every wave has a reachable tail match and a second safe pickup, which has a 65% chance to target an existing segment; other values can fill gaps for later chains. Pickups stay separated across the board. The solid middle ball can collect only values equal to or below its current value. Touching a larger value ends the run immediately; a red ring and an exclamation mark identify it. Ghost segments pass through pickups. Danger is evaluated at contact, so an earlier merge can make a later number safe.
+Opening waves contain only safe numbers. Dangerous third pickups begin at a 4 head with a one-third chance, rise to two-thirds at 8, and appear every wave from 16. From head 64, the second pickup can also be dangerous: 15% at 64, 30% at 128 and 45% from 256. Every wave retains one reachable tail match; safe second pickups explicitly target an existing segment 40% of the time, with other values filling gaps. Pickups stay separated across the board. The solid middle ball can collect only values equal to or below its current value. Touching a larger value ends the run immediately; a red ring and an exclamation mark identify it. Ghost segments pass through pickups. Danger is evaluated at contact, so an earlier merge can make a later number safe.
 
-The first horizontal gate arrives at **1,200 merge score**. After each clear, the next gate needs fresh score equal to the greater of **1,200 or the current main-ball value**, plus a **4-second minimum cooldown**. Score earned while a gate approaches does not queue old gates. Each new gate displays at least half the current main-ball value and at least double the previous gate, fixed when it spawns. An 8,192 head therefore receives at least a 4,096 gate. The main ball must be **strictly greater** than the displayed number to pass. Only one gate appears at a time. Fast swipes resolve pickups and gates in contact order; pause freezes both streams and replay resets the run.
+The first horizontal gate arrives at **900 merge score**. After each clear, the next gate needs fresh score equal to the greater of **900 or the current main-ball value**, plus a **3-second minimum cooldown**. Score earned while a gate approaches does not queue old gates. Each new gate displays at least the current main-ball value and at least double the previous gate, fixed when it spawns. An 8,192 head therefore receives at least an 8,192 gate and must grow to pass. The main ball must be **strictly greater** than the displayed number. Only one gate appears at a time. Fast swipes resolve pickups and gates in contact order; pause freezes both streams and replay resets the run.
 
 Play continues automatically through 2048 and beyond, without a win screen or confirmation. Number labels use 1024 = **1k**, 2048 = **2k**, 1,048,576 = **1m**, and 2,097,152 = **2m**; underlying values and merge scores remain exact. Records are local and separate from other modes, and the run is recorded when it ends.
 
@@ -426,15 +426,16 @@ Debug and release launches both use the normal saved wallet with no automatic te
 
 ### Number Merge difficulty configuration
 
-Edit `lib/merge_difficulty.dart`, just like `lib/infinite_difficulty.dart`, then hot restart and begin a fresh Merge run. The defaults retain the current balance.
+Edit `lib/merge_difficulty.dart`, just like `lib/infinite_difficulty.dart`, then hot restart and begin a fresh Merge run. The 22 October harder defaults start at 42 units/second, add 8 per doubling, cap at 112, and space waves 96 units apart.
 
 - `startSpeed`, `speedPerDoubling`, `maxSpeed`: falling-ball speed and its growth.
 - `waveSpacing`: distance between waves; higher values give more time to react.
 - `initialRowSpacing`, `orbSeparation`, `rowJitter`: opening layout and spacing within waves.
-- `dangerChance`: maximum chance the third ball is larger than the head (0 to 1), reached at a 64 head.
+- `dangerChance`: maximum chance the third ball is larger than the head (0 to 1), reached at a 16 head.
+- `secondaryDangerChance`: maximum second-ball danger chance, ramping from head 64 to the maximum at 256.
 - `matchingChance`: chance the second safe pickup targets an existing segment (0 to 1).
 - `gateInterval`: minimum fresh score between gates; the actual gap grows with the main ball.
 - `gateSpeedBonus`, `gateCooldownSeconds`: gate travel speed and minimum pause after a gate clear.
-- `gateValueOffset`: power-of-two adjustment to the head-based requirement; -1 halves it, +1 doubles it. Each gate still at least doubles the previous gate. The head still needs to be strictly greater than the gate.
+- `gateValueOffset`: power-of-two adjustment to the head-based requirement; 0 uses half the head, 1 uses the head (the current default), and 2 doubles it. Each gate still at least doubles the previous gate. The head still needs to be strictly greater than the gate.
 
 For an easier starting point, try `startSpeed = 24.0`, `speedPerDoubling = 2.0`, `maxSpeed = 50.0`, `waveSpacing = 140.0`, `dangerChance = 0.5`, and `gateValueOffset = -1`. Increasing `gateInterval` raises the minimum score gap; gate numbers follow the main ball independently. Supported ranges are documented beside each setting and checked by assertions in debug/test builds.

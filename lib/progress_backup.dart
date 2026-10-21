@@ -35,7 +35,7 @@ class ProgressBackup {
       0,
       p.wallet,
     ],
-    'control': p.controlMode.name,
+    'control': p.preferredControlMode.name,
     'haloJoystick': p.haloJoystick,
     'level': p.classicLevel,
     'maze': 1, // Reserved for version 1 readers.
@@ -252,7 +252,7 @@ class ProgressBackup {
       ..mergeRuns = source.mergeRuns
       ..wallet = source.wallet
       ..dailyPrizes = DailyPrizes.fromJson(source.dailyPrizes.toJson())
-      ..controlMode = source.controlMode.supportedMode
+      ..controlMode = source.preferredControlMode.supportedMode
       ..haloJoystick = source.haloJoystick
       ..classicLevel = source.classicLevel
       ..sound = source.sound

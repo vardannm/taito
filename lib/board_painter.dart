@@ -567,7 +567,7 @@ class BoardPainter extends CustomPainter {
               (reducedMotion ? 0 : game.lastStarAge * 18),
         ),
         12,
-        ink,
+        world.ink,
       );
     }
     for (final coin in game.coins.where((c) => !c.collected)) {

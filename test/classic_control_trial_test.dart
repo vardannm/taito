@@ -15,6 +15,9 @@ void main() {
   testWidgets(
     'Classic uses the selected control through settings and retries',
     (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       final profile = PlayerProfile()
         ..tutorialSeen = true
         ..sound = false

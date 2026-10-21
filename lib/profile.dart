@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:async';
 import 'ball_cosmetics.dart';
+import 'control_layout.dart';
 import 'platforms.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/services.dart';
@@ -374,24 +375,37 @@ class PlayerProfile {
   Future<void> _tutorialWrites = Future<void>.value();
   ControlMode _controlMode = ControlMode.oneFinger;
   bool haloJoystick = false;
+  bool _oneFingerPadAvailable = true;
+  bool get oneFingerPadAvailable => _oneFingerPadAvailable;
   bool _needsInitialControlDefault = false;
-  ControlMode get controlMode => _controlMode;
+  ControlMode get preferredControlMode => _controlMode;
+  ControlMode get controlMode =>
+      !_oneFingerPadAvailable &&
+          _controlMode == ControlMode.oneFinger &&
+          !haloJoystick
+      ? ControlMode.twoFinger
+      : _controlMode;
   set controlMode(ControlMode value) {
     _controlMode = value;
     _needsInitialControlDefault = false;
   }
 
+  /// Layout fallback is temporary; save/export the player's actual choice.
+  void applyControlLayout({required double shortestSide}) {
+    if (!shortestSide.isFinite || shortestSide <= 0) return;
+    _oneFingerPadAvailable = allowsOneFingerPad(shortestSide);
+  }
+
   /// Choose once from the first usable app window, including foldable screens.
-  /// Resizing later must never replace the player's controls or held input.
   bool applyInitialControlDefault({required double shortestSide}) {
     if (!_needsInitialControlDefault ||
         !shortestSide.isFinite ||
         shortestSide <= 0) {
       return false;
     }
-    controlMode = shortestSide >= 600
-        ? ControlMode.twoFinger
-        : ControlMode.oneFinger;
+    controlMode = allowsOneFingerPad(shortestSide)
+        ? ControlMode.oneFinger
+        : ControlMode.twoFinger;
     return true;
   }
 
@@ -612,7 +626,7 @@ class PlayerProfile {
       final savedMode = await storage.getString('gilt.controlMode');
       controlMode =
           (ControlMode.values.where((m) => m.name == savedMode).firstOrNull ??
-                  controlMode)
+                  _controlMode)
               .supportedMode;
       _needsInitialControlDefault = savedMode == null && savedOneFinger == null;
       classicLevel = (await storage.getInt('gilt.classicLevel') ?? 1).clamp(
@@ -679,9 +693,9 @@ class PlayerProfile {
       await storage.setBool('gilt.haptics', haptics);
       await storage.setBool(
         'gilt.oneFinger',
-        controlMode == ControlMode.oneFinger,
+        _controlMode == ControlMode.oneFinger,
       );
-      await storage.setString('gilt.controlMode', controlMode.name);
+      await storage.setString('gilt.controlMode', _controlMode.name);
       await storage.setBool('gilt.haloJoystick', haloJoystick);
       await storage.setDouble('gilt.analogSensitivity', analogSensitivity);
       await storage.setDouble(

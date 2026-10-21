@@ -6,6 +6,7 @@ import 'levels.dart';
 import 'rewards.dart';
 import 'mastery_widgets.dart';
 import 'game.dart';
+import 'control_layout.dart';
 
 class LevelPicker extends StatefulWidget {
   const LevelPicker({
@@ -21,9 +22,11 @@ class LevelPicker extends StatefulWidget {
     this.controlMode,
     this.onControlChanged,
     this.recordForControl,
+    this.haloJoystick = false,
   });
   final bool tutorial;
   final bool allLevelsUnlocked;
+  final bool haloJoystick;
   final ControlMode? controlMode;
   final ValueChanged<ControlMode>? onControlChanged;
   final LevelRecord Function(int, ControlMode)? recordForControl;
@@ -39,11 +42,25 @@ class LevelPicker extends StatefulWidget {
 class _LevelPickerState extends State<LevelPicker> {
   final firstLevelKey = GlobalKey();
   bool skipped = false;
-  late ControlMode? control = widget.controlMode;
+  late ControlMode? _preferredControl = widget.controlMode;
+  late bool _haloJoystick = widget.haloJoystick;
+  bool get wideControls =>
+      !allowsOneFingerPad(MediaQuery.sizeOf(context).shortestSide);
+  ControlMode? get control =>
+      wideControls &&
+          _preferredControl == ControlMode.oneFinger &&
+          !_haloJoystick
+      ? ControlMode.twoFinger
+      : _preferredControl;
   int get selected => widget.selected;
   int get totalStars => widget.totalStars;
   Map<int, LevelRecord> get records => widget.records;
-  String get controlLabel => control?.label ?? widget.controlLabel;
+  String controlName(ControlMode mode) =>
+      mode == ControlMode.oneFinger && (wideControls || _haloJoystick)
+      ? 'Halo Joystick'
+      : mode.label;
+  String get controlLabel =>
+      control == null ? widget.controlLabel : controlName(control!);
   bool unlocked(int number) =>
       widget.allLevelsUnlocked || ClassicLevels.isUnlocked(number, totalStars);
   int get visibleCount => widget.allLevelsUnlocked
@@ -294,7 +311,7 @@ class _LevelPickerState extends State<LevelPicker> {
                             ChoiceChip(
                               key: ValueKey('level-control-${mode.name}'),
                               label: Text(
-                                mode.label,
+                                controlName(mode),
                                 style: TextStyle(
                                   color: control == mode
                                       ? menuBackground
@@ -303,7 +320,13 @@ class _LevelPickerState extends State<LevelPicker> {
                               ),
                               selected: control == mode,
                               onSelected: (_) {
-                                setState(() => control = mode);
+                                setState(() {
+                                  _preferredControl = mode;
+                                  if (wideControls &&
+                                      mode == ControlMode.oneFinger) {
+                                    _haloJoystick = true;
+                                  }
+                                });
                                 widget.onControlChanged?.call(mode);
                               },
                             ),

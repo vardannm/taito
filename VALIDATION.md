@@ -698,3 +698,76 @@ Not verified here: native iOS compilation/signing, iPhone audio/haptic feel, sus
   artifacts/settings-fixed-390.png, settings-fixed-320.png,
   revive-coins-390.png and revive-coins-320.png. Reproduce with
   tool/render_settings_and_coins.dart. No native binary rebuilt or deployed.
+
+## Classic collectible stars and score removal — 2026-10-22
+
+- Removed Classic points from target rewards, HUD, result screens, level-road
+  personal bests and Settings. The HUD now shows targets completed and time.
+  Daily, Practice, Infinite and Number Merge retain their own scoring rules.
+- Each of the 80 Classic levels has one gold star instead of coins. A swept
+  pickup immediately saves a permanent fourth star, even before finishing the
+  run. Ball resets, retries and changing controls cannot award it again. Owned
+  stars disappear from gameplay and frozen carousel previews. Wallet coins are
+  unaffected. Four-star progress appears in results, the road, goals and totals.
+- New records accept the fourth star bit; existing three-star records remain
+  intact, and backups round-trip both formats. The collected star is shared
+  across controls. Star placement is deterministic, cached and checked against
+  connected space, holes and spider territories on every authored level.
+- Six dedicated tests pass, including all 80 placements, actual swept pickup,
+  saving before run completion, failure/replay, cross-control deduplication,
+  legacy backups, live HUD/results and unaffected modes. The final combined
+  81-test run also passes tutorial large-text checks and existing progression.
+- Inspected actual 390×844 and 320×568 phone renders of gameplay, collection,
+  four-star results and the level road. Reproduce with
+  tool/render_classic_stars.dart; images are artifacts/classic-star-*.png.
+  Existing App Store Classic screenshots are marked for regeneration.
+
+## Harder Number Merge — 2026-10-22
+
+- Start speed 30 → 42, growth per doubling 5 → 8, cap 66 → 112 and wave
+  spacing 110 → 96. The third pickup becomes dangerous earlier, reaching full
+  probability at head 16. Second-pickup danger rises from 15% at head 64 to
+  45% at 256. Every wave retains one safe tail match and separated choices.
+- Safe secondary food explicitly favours existing segments 40% of the time.
+  Gates start at 900 points, move 22 units/second faster than the stream, and
+  have a three-second cooldown. New gates require growth beyond the current
+  head; their visible number stays fixed. Gate reaction-window checks allow
+  more than three seconds and multiple new waves at tested stages.
+- All 45 Merge tests pass: safe openings, 600-wave danger distributions at
+  nine head sizes, useful safe food, value conservation, contact order, frame
+  partitioning, gates, saves, controls and UI. New balance remains provisional
+  until human playtesting. NUMBER_MERGE_REVIEW.md records exact values.
+- The combined final run of Merge, Classic stars, tutorials, progression and
+  experience tests passes all 81 checks. Static analysis of lib, test and the
+  Classic renderer reports no issues. Diff whitespace checks pass. Logs:
+  artifacts/merge-harder-and-classic-tests.log and merge-harder-analysis.log.
+- The earlier full-suite run reported 670 passes and 12 failures. The final
+  focused run resolves four of those (the shop price fixture, a Classic HUD
+  finder, and two large-text tutorial overflows). Eight movement/hazard cases
+  remain unresolved: ascent_test, classic_placements_test,
+  infinite_systems_test, infinite_test, late_enemies_test, porcupines_test,
+  snakes_test and spider_web_test. These involve the lift-limit and hazard
+  code with local changes already present at the start of this work; no source
+  repair for those cases is claimed. Full log: artifacts/classic-star-regression.log.
+- No native binary was rebuilt or deployed.
+
+## Adaptive Duo and large-screen controls — 2026-10-22
+
+- Compact windows, including a closed Duo, offer One-Finger Control,
+  Two-Finger Control and Halo Joystick. Windows with a shortest side of at
+  least 600 logical pixels offer Two-Finger and Halo in Settings and the level
+  picker. Rotating a compact phone does not remove One-Finger Control.
+- Expanding while using the original One-Finger pad temporarily activates
+  Two-Finger controls and releases held input without restarting the run.
+  Folding back restores the saved compact preference unless the player has
+  explicitly selected another control. Saves and backups preserve that
+  preference; Halo remains available in either layout.
+- All 49 focused tests and render checks pass, covering live resizing,
+  initial defaults, saves/backups, Halo, level selection, tutorial replay and
+  existing control flows. Static analysis of lib, test and the adaptive render
+  tool reports no issues. Logs: artifacts/adaptive-controls-tests.log and
+  artifacts/adaptive-controls-analysis.log.
+- Inspected Flutter renders at 540×720 (closed Duo), 1114×720 (expanded Duo)
+  and 820×1180 (tablet). Reproduce with tool/render_adaptive_controls.dart;
+  images are artifacts/controls-duo-closed.png, controls-duo-expanded.png and
+  controls-tablet.png. No physical Duo posture test or native build was run.

@@ -5,13 +5,13 @@ abstract final class MergeDifficulty {
   // Falling balls: speed = startSpeed + speedPerDoubling for every doubling
   // of the highest ball above 2, capped at maxSpeed.
   // startSpeed > 0; speedPerDoubling >= 0; maxSpeed >= startSpeed.
-  static const startSpeed = 30.0;
-  static const speedPerDoubling = 5.0;
-  static const maxSpeed = 66.0;
+  static const startSpeed = 42.0;
+  static const speedPerDoubling = 8.0;
+  static const maxSpeed = 112.0;
 
   // Distance between new waves (> 0). Larger means more breathing room.
   // Time between waves is waveSpacing / current falling speed.
-  static const waveSpacing = 110.0;
+  static const waveSpacing = 96.0;
 
   // Opening: three rows starting at y=90. Spacing must be > 0 and <= 140
   // so all three rows start above the player's launch position.
@@ -25,25 +25,27 @@ abstract final class MergeDifficulty {
 
   // Maximum probability (0..1) that the third ball in a wave is dangerous.
   // 1 = every wave, 0.5 = roughly half, 0 = no dangerous balls.
-  // Danger ramps from zero below an 8 head to this maximum at a 64 head.
-  // The first ball always matches the tail; the second is always safe.
+  // The third ball becomes dangerous from a 4 head, reaching the maximum at 16.
+  // The first ball always matches the tail. A second danger joins from 64.
   // A dangerous ball is randomly 2x or 4x the head when it spawns.
   static const dangerChance = 1.0;
+  // Second-ball danger reaches this maximum at 256; one safe match always remains.
+  static const secondaryDangerChance = .45;
 
   // Chance the second safe ball matches an existing segment (0..1).
   // Otherwise it can fill a missing power, setting up a later chain.
-  static const matchingChance = .65;
+  static const matchingChance = .4;
 
   // Minimum fresh score between gates. Later gaps grow to the head value.
-  static const gateInterval = 1200;
+  static const gateInterval = 900;
   // Gate speed is falling speed + this nonnegative bonus.
-  static const gateSpeedBonus = 12.0;
+  static const gateSpeedBonus = 22.0;
   // Minimum seconds after clearing a gate before another can spawn (>= 0).
-  static const gateCooldownSeconds = 4.0;
+  static const gateCooldownSeconds = 3.0;
 
   // Integer power-of-two adjustment to gate requirements (-8..8).
   // 0 = half the head value, -1 = quarter, +1 = equal to the head.
   // Requirements never fall below 2. The head must be STRICTLY greater.
   // Each gate also requires at least double the previous gate's value.
-  static const gateValueOffset = 0;
+  static const gateValueOffset = 1;
 }
