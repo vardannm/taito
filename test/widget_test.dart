@@ -52,6 +52,48 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     });
   }
+  testWidgets('guide closes and side arrows switch modes', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final profile = PlayerProfile()
+      ..tutorialSeen = true
+      ..sound = false
+      ..haptics = false;
+    await tester.pumpWidget(ArcadeApp(profile: profile));
+    String title() => tester
+        .widget<Text>(find.byKey(const ValueKey('selected-mode-title')))
+        .data!;
+    expect(title(), 'Infinite');
+    Future<void> tapArrow(String key) async {
+      await tester.tap(find.byKey(ValueKey(key)));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump();
+    }
+
+    await tapArrow('mode-next');
+    expect(title(), isNot('Infinite'));
+    await tapArrow('mode-previous');
+    expect(title(), 'Infinite');
+
+    await tester.tap(find.byTooltip('Modes'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.ensureVisible(find.text('HOW TO PLAY'));
+    await tester.tap(find.text('HOW TO PLAY'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('A game of balance.'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('guide-close')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('A game of balance.'), findsNothing);
+    expect(find.textContaining('PRACTICE · '), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
   testWidgets(
     'pivot drags are independent, cancel safely and do not jump on grab',
     (tester) async {

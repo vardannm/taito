@@ -264,6 +264,32 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
+  for (final step in [TutorialStep.controls, TutorialStep.classicPlay]) {
+    testWidgets('skipping $step before moving returns to the menu', (
+      tester,
+    ) async {
+      final p = profileAt(step);
+      await launch(tester, p);
+      expect(
+        find.byKey(const ValueKey('menu-play')).hitTestable(),
+        findsNothing,
+      );
+      await tester.tap(find.byKey(const ValueKey('skip-tutorial')));
+      await frames(tester, 40);
+      expect(p.tutorial.step, TutorialStep.completed);
+      expect(currentGame(tester).tutorialCourse, isFalse);
+      final play = find.byKey(const ValueKey('menu-play')).hitTestable();
+      expect(play, findsOneWidget);
+      await tester.tap(play);
+      await frames(tester, 40);
+      expect(
+        find.byKey(const ValueKey('start-control-prompt')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
   testWidgets(
     'shop actions, Level 1 completion, and delayed Daily introduction',
     (tester) async {
