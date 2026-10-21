@@ -125,7 +125,8 @@ void main() {
   testWidgets('shop includes cabinets and new premium gear persists', (
     tester,
   ) async {
-    final profile = PlayerProfile()..wallet = 10000;
+    final profile = PlayerProfile()
+      ..wallet = BallCosmetic.singularity.cost + PlatformStyle.sovereign.cost;
     expect(BallCosmetic.values.length, 23);
     expect(PlatformStyle.values.length, 16);
     expect(profile.selectBall(BallCosmetic.singularity), true);

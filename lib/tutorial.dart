@@ -14,15 +14,12 @@ class FirstPlayTutorial extends StatefulWidget {
     this.onControlChanged,
     this.onLessonComplete,
     this.onExit,
-    this.analogSensitivity = 1,
-    this.twoFingerSensitivity = 1,
   });
   final VoidCallback onDone;
   final ControlMode control;
   final ValueChanged<ControlMode>? onControlChanged;
   final ValueChanged<int>? onLessonComplete;
   final ValueChanged<bool>? onExit;
-  final double analogSensitivity, twoFingerSensitivity;
   @override
   State<FirstPlayTutorial> createState() => _FirstPlayTutorialState();
 }
@@ -49,9 +46,6 @@ class _FirstPlayTutorialState extends State<FirstPlayTutorial>
   void reset(ControlMode control) {
     game.setControlMode(control.supportedMode);
     game.start(gameMode: GameMode.practice);
-    // A zero sensitivity would make the lesson impossible. Applies only here.
-    game.analogSensitivity = math.max(.25, widget.analogSensitivity);
-    game.twoFingerSensitivity = math.max(.25, widget.twoFingerSensitivity);
     game.board.clear();
     game.left = game.right = lesson == 0 ? 440 : 370;
     initialHeight = (game.left + game.right) / 2;

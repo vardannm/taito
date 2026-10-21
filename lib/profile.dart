@@ -217,7 +217,9 @@ class PlayerProfile {
   }
 
   BallCosmetic selectedBall = BallCosmetic.steel;
-  double analogSensitivity = 1, twoFingerSensitivity = 1;
+  // Retain the legacy backup fields at full response for older app versions.
+  double get analogSensitivity => 1.0;
+  double get twoFingerSensitivity => 1.0;
   PlatformStyle selectedPlatform = PlatformStyle.classic;
   final ownedPlatforms = <PlatformStyle>{PlatformStyle.classic};
   double get equipmentMultiplier =>
@@ -399,9 +401,29 @@ class PlayerProfile {
   final dailyRecords = <String, LevelRecord>{};
   final _recordedRuns = Expando<int>();
   String recordKey(int level, ControlMode control) => '${control.name}:$level';
-  LevelRecord levelRecord(int level, [ControlMode? control]) =>
-      levelRecords[recordKey(level, control ?? controlMode)] ??
-      const LevelRecord();
+  bool hasCollectedLevelStar(int level) => ControlMode.values.any(
+    (mode) => ((levelRecords[recordKey(level, mode)]?.starMask ?? 0) & 8) != 0,
+  );
+  LevelRecord levelRecord(int level, [ControlMode? control]) {
+    final record =
+        levelRecords[recordKey(level, control ?? controlMode)] ??
+        const LevelRecord();
+    return hasCollectedLevelStar(level) ? record.withCollectedStar() : record;
+  }
+
+  /// Persist the bonus immediately, independently of winning or losing the run.
+  bool bankLevelStar(BalanceGame game) {
+    if (game.mode != GameMode.classic ||
+        !game.levelStarCollected ||
+        hasCollectedLevelStar(game.level))
+      return false;
+    final key = recordKey(game.level, game.controlMode);
+    levelRecords[key] = (levelRecords[key] ?? const LevelRecord())
+        .withCollectedStar();
+    unawaited(save());
+    return true;
+  }
+
   LevelRecord dailyRecord(String date, [ControlMode? control]) =>
       dailyRecords['${(control ?? controlMode).name}:$date'] ??
       const LevelRecord();
@@ -486,6 +508,7 @@ class PlayerProfile {
   }
 
   bool recordResult(BalanceGame game) {
+    bankLevelStar(game);
     bankCoins(game);
     if (game.merging && game.finished) {
       final improved = game.score > mergeBest;
@@ -516,7 +539,7 @@ class PlayerProfile {
     final previous = records[key] ?? const LevelRecord();
     records[key] = previous.withRun(
       mask: game.earnedStarMask,
-      score: game.score,
+      score: game.mode == GameMode.classic ? 0 : game.score,
       seconds: game.elapsed,
       won: game.won,
     );
@@ -530,9 +553,9 @@ class PlayerProfile {
       dailyRecords.removeWhere((k, _) => expired.contains(k.split(':').last));
     } else {
       runs++;
-      if (game.score > best) best = game.score;
+      if (game.mode != GameMode.classic && game.score > best) best = game.score;
     }
-    return game.score > previous.bestScore;
+    return game.mode != GameMode.classic && game.score > previous.bestScore;
   }
 
   void _loadRecords(String? raw) {
@@ -586,14 +609,6 @@ class PlayerProfile {
       controlMode = savedOneFinger == false
           ? ControlMode.twoFinger
           : ControlMode.oneFinger;
-      final analog = await storage.getDouble('gilt.analogSensitivity');
-      final direct = await storage.getDouble('gilt.twoFingerSensitivity');
-      analogSensitivity = analog != null && analog.isFinite
-          ? analog.clamp(minSensitivity, 1.0)
-          : 1;
-      twoFingerSensitivity = direct != null && direct.isFinite
-          ? direct.clamp(minSensitivity, 1.0)
-          : 1;
       final savedMode = await storage.getString('gilt.controlMode');
       controlMode =
           (ControlMode.values.where((m) => m.name == savedMode).firstOrNull ??
@@ -725,7 +740,7 @@ class GameFeedback {
     try {
       await _shareAudioFocus();
       final sound = switch (event) {
-        GameEvent.merge || GameEvent.coin => 'target',
+        GameEvent.merge || GameEvent.coin || GameEvent.star => 'target',
         _ => event.name,
       };
       final key = '$sound:${event == GameEvent.coin}';

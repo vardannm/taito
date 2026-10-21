@@ -655,3 +655,46 @@ Not verified here: native iOS compilation/signing, iPhone audio/haptic feel, sus
   Contact sheet: artifacts/halo-floating-preview.png. Logs: halo-regression.log,
   halo-focused.log, halo-analysis-final.log and halo-render.log in artifacts/.
   No native release binaries were built or published.
+## Ball price balance — 2026-10-21
+
+- Raised every paid coin ball price, with smaller early increases and larger
+  late increases: Coral 35 → 60, Nova 700 → 6,200, and Singularity (Black Hole)
+  2,400 → 13,500. Existing gear ownership, wallets, earning rates, daily gifts,
+  platform prices and store-only items retain their current behavior.
+- Updated existing purchase and affordability fixtures to use catalog prices.
+  The focused eight-file run reports 75 passing tests and one failure:
+  `infinite_systems_test.dart`: `fast swipe resolves shield after hole in travel
+  order`, at line 183 (the later shield is not collected). That case exercises
+  swept gameplay movement with the default ball; it does not buy gear or read
+  prices. Gameplay files already had local edits before this pricing change
+  and were not changed by this pass.
+- Static analysis of the changed Dart files reports no issues; diff whitespace
+  checks pass. Logs: artifacts/ball-pricing-tests.log and
+  artifacts/ball-pricing-analysis.log. No release binary was rebuilt. Human
+  unlock-time balancing still needs playtesting against the new curve.
+- Follow-up price adjustment: Black Hole is 13,500 coins per the owner's
+  request; Comet is 11,500 and Quasar is 12,500 to retain their order below it.
+  This numeric-only adjustment passes diff whitespace checks; the test results
+  above were recorded before this follow-up. No binary was rebuilt.
+
+## Fixed controls, Settings dismissal and run coins — 2026-10-21
+
+- Removed movement fine-tuning. Touch input uses full response with no
+  adjustable multiplier; old save preferences and imported backup settings
+  cannot lower it. Legacy backup slots and stored values export/save as 1.0.
+- Settings has a pinned X and closes on a deliberate right swipe. Vertical
+  gestures scroll the content; dragging the sheet down is disabled.
+- The revive offer places a gold total-wallet / mint run-coins summary with a
+  coin icon above the heart and hides the floating gameplay badge. The total
+  includes the run coins; counting, banking, rewards and purchases are intact.
+  Small-screen spacing keeps the primary actions accessible; larger text and
+  longer content can scroll. Removed the Daily Prizes reset-time footer.
+- All 68 focused tests pass across controls, settings, save migration, backup,
+  tutorial, daily gifts, revive and coin doubling. Static analysis of lib, test
+  and the changed render tools reports no issues. Diff whitespace checks pass.
+  Logs: artifacts/settings-coins-tests.log, settings-coins-layout-tests.log and
+  settings-coins-analysis.log. The separate render check also passes.
+- Inspected actual 390×844 and 320×568 Flutter renders in
+  artifacts/settings-fixed-390.png, settings-fixed-320.png,
+  revive-coins-390.png and revive-coins-320.png. Reproduce with
+  tool/render_settings_and_coins.dart. No native binary rebuilt or deployed.

@@ -26,7 +26,13 @@ class LevelRecord {
   final double? bestTime;
   int get stars => starCount(starMask);
   static int starCount(int mask) =>
-      (mask & 1) + ((mask >> 1) & 1) + ((mask >> 2) & 1);
+      (mask & 1) + ((mask >> 1) & 1) + ((mask >> 2) & 1) + ((mask >> 3) & 1);
+  LevelRecord withCollectedStar() => LevelRecord(
+    starMask: starMask | 8,
+    bestScore: bestScore,
+    bestTime: bestTime,
+    attempts: attempts,
+  );
   LevelRecord withRun({
     required int mask,
     required int score,
@@ -49,7 +55,7 @@ class LevelRecord {
         json[key] is num ? math.max(0, (json[key] as num).toInt()) : 0;
     final time = json['time'];
     return LevelRecord(
-      starMask: nonnegative('stars') & 7,
+      starMask: nonnegative('stars') & 15,
       bestScore: nonnegative('score'),
       attempts: nonnegative('attempts'),
       bestTime: time is num && time.isFinite && time > 0
@@ -62,6 +68,12 @@ class LevelRecord {
 class BrassCoin {
   BrassCoin(this.x, this.y);
   double x, y;
+  bool collected = false;
+}
+
+class LevelStar {
+  LevelStar(this.x, this.y);
+  final double x, y;
   bool collected = false;
 }
 

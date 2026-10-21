@@ -33,7 +33,7 @@ void main() {
     }
     expect(NextGoal.forProfile(p).title, contains('without a miss'));
     for (var i = 1; i <= ClassicLevels.count; i++) {
-      p.levelRecords['twoFinger:$i'] = const LevelRecord(starMask: 7);
+      p.levelRecords['twoFinger:$i'] = const LevelRecord(starMask: 15);
     }
     expect(NextGoal.forProfile(p).mode, GameMode.daily);
     p.controlMode = ControlMode.oneFinger;

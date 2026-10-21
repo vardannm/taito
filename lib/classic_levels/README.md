@@ -22,7 +22,13 @@ radius, initial patrol phase, chase speed and body radius. A spider initially
 stands 12 units from its center at the given phase, then patrols around it.
 An empty list means no spiders. No runtime placement generator is used.
 
-`hazards` contains waves of lasers or moving holes. Each wave lists exact spawn
+`hazards` contains waves of lasers or moving holes. Moving-hole waves each create
+one permanent hole at their target-1 position when the level loads. They move
+immediately, including while waiting for the first input, and retain their path
+and phase between targets. Pause freezes them; replay resets them. Their warning
+and live durations do not apply in Classic mode.
+
+For timed laser waves, each wave lists exact spawn
 coordinates tagged with the numbered `target` during which they are used.
 Waves repeat in file order; the wave counter selects among that target's listed
 positions in order using modulo. With `motion: HazardMotion.legacy`, moving
@@ -30,8 +36,8 @@ holes move from their listed spawn point as in the original levels.
 For `circle` and `oval`, positions are orbit centers; `radiusX`, `radiusY`,
 `period` (seconds per cycle), and `phase` (radians) control their path.
 Circles use `radiusX` for both axes. `horizontal` and `vertical` use sinusoidal
-movement along one axis; `stationary` stays at its center. Motion starts after
-the warning ends. `orientation: LaserOrientation.horizontal` makes a horizontal
+movement along one axis; `stationary` stays at its center. Timed laser motion
+starts after the warning ends. `orientation: LaserOrientation.horizontal` makes a horizontal
 laser beam; the default is vertical. Orientation and movement are independent.
 Keep the entire movement envelope inside the board and clear of the active target.
 Edit `warningSeconds`, `liveSeconds`, `firstHazardAfter`, and `hazardInterval`

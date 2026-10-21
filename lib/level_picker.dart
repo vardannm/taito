@@ -48,12 +48,7 @@ class _LevelPickerState extends State<LevelPicker> {
       widget.allLevelsUnlocked || ClassicLevels.isUnlocked(number, totalStars);
   int get visibleCount => widget.allLevelsUnlocked
       ? ClassicLevels.count
-      : math.min(5, ClassicLevels.count);
-  int get firstVisibleLevel {
-    if (widget.allLevelsUnlocked) return 1;
-    final frontier = (totalStars ~/ 2 + 1).clamp(1, ClassicLevels.count);
-    return (frontier - 2).clamp(1, ClassicLevels.count - visibleCount + 1);
-  }
+      : math.min(totalStars ~/ 2 + 4, ClassicLevels.count);
 
   ValueChanged<int> get onSelected => widget.onSelected;
   @override
@@ -226,6 +221,7 @@ class _LevelPickerState extends State<LevelPicker> {
                                           color: menuBackground,
                                           child: StarRow(
                                             record.starMask,
+                                            count: 4,
                                             size: 15,
                                             dark: true,
                                           ),
@@ -236,8 +232,9 @@ class _LevelPickerState extends State<LevelPicker> {
                                         child: Text(
                                           !open
                                               ? '$totalStars / $required STARS'
-                                              : record.bestScore > 0
-                                              ? 'PB ${record.bestScore}'
+                                              : record.stars > 0 ||
+                                                    record.attempts > 0
+                                              ? '${record.stars}/4 STARS'
                                               : number % 10 == 0
                                               ? 'FINALE'
                                               : 'UNPLAYED',
@@ -314,7 +311,7 @@ class _LevelPickerState extends State<LevelPicker> {
                       ),
                     ),
                   ),
-                road(firstVisibleLevel, visibleCount),
+                road(1, visibleCount),
               ],
             );
           },

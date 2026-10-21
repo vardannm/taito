@@ -154,14 +154,7 @@ class ProgressBackup {
         sensitivity.length != 2 ||
         sensitivity.any((v) => v is! num || !v.isFinite || v < 0 || v > 1))
       invalid();
-    p.analogSensitivity = (sensitivity[0] as num).toDouble().clamp(
-      minSensitivity,
-      1.0,
-    );
-    p.twoFingerSensitivity = (sensitivity[1] as num).toDouble().clamp(
-      minSensitivity,
-      1.0,
-    );
+    // Validate old exports, but movement now always uses full response.
     void records(String name, Map<String, LevelRecord> target, RegExp key) {
       final source = d[name];
       final maxRecords = name == 'levels' ? ClassicLevels.count * 3 : 160;
@@ -173,7 +166,7 @@ class ProgressBackup {
         if (name == 'levels' &&
             int.parse(entry.key.split(':').last) > ClassicLevels.count)
           invalid();
-        integer(v['stars'], 7);
+        integer(v['stars'], name == 'levels' ? 15 : 7);
         integer(v['score']);
         integer(v['attempts']);
         final t = v['time'];
@@ -268,8 +261,6 @@ class ProgressBackup {
       ..haptics = source.haptics
       ..tutorialSeen = source.tutorialSeen
       ..tutorial = TutorialProgress.fromJson(source.tutorial.toJson())
-      ..analogSensitivity = source.analogSensitivity
-      ..twoFingerSensitivity = source.twoFingerSensitivity
       ..cabinet = source.cabinet
       ..selectedBall = source.selectedBall
       ..selectedPlatform = source.selectedPlatform;

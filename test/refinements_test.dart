@@ -72,7 +72,10 @@ void main() {
       expect(g.board.map((h) => (h.x, h.y)), positions);
       expect(g.specialHazards, contains(same(warning)));
       expect(warning.age, closeTo(1 / 120, 1e-8));
-      expect(g.cameraOffset - camera, closeTo(InfiniteTuning.startSpeed / 120, 1e-7));
+      expect(
+        g.cameraOffset - camera,
+        closeTo(InfiniteTuning.startSpeed / 120, 1e-7),
+      );
       expect(g.survival.recovery, 2.5);
       expect(g.screenY(g.ballY), inInclusiveRange(390, 460));
     },
@@ -128,7 +131,10 @@ void main() {
       g.dragPivot(1, -100);
       g.step(1 / 120);
       // Three ticks of automatic ascent only; the manual lift adds nothing.
-      expect(g.cameraOffset, lessThan(3 * InfiniteTuning.startSpeed / 120 + .01));
+      expect(
+        g.cameraOffset,
+        lessThan(3 * InfiniteTuning.startSpeed / 120 + .01),
+      );
       expect(h.worldY, y);
       expect(h.y - g.cameraOffset, closeTo(y!, 1e-6));
     },
@@ -219,48 +225,42 @@ void main() {
     },
   );
   for (final mode in [ControlMode.analog, ControlMode.twoFinger]) {
-    for (final sensitivity in [0.0, .25, .5, 1.0]) {
-      test(
-        '$mode sensitivity $sensitivity scales both axes immediately and holds on release',
-        () {
-          final g = BalanceGame()
-            ..setControlMode(mode)
-            ..start(gameMode: GameMode.practice);
-          g.analogSensitivity = g.twoFingerSensitivity = sensitivity;
-          final initial = g.left;
-          g.grabPivot(0);
-          g.grabPivot(1);
-          g.dragPivot(0, -40);
-          g.dragPivot(1, -20);
-          g.step(1 / 120);
-          expect(g.left, closeTo(initial - 40 * sensitivity, 1e-7));
-          expect(g.right, closeTo(initial - 20 * sensitivity, 1e-7));
-          g.releasePivot(0);
-          g.releasePivot(1);
-          g.step(.1);
-          expect(g.left, closeTo(initial - 40 * sensitivity, 1e-7));
-        },
-      );
-    }
+    test('$mode always follows both axes fully and holds on release', () {
+      final g = BalanceGame()
+        ..setControlMode(mode)
+        ..start(gameMode: GameMode.practice);
+      final initial = g.left;
+      g.grabPivot(0);
+      g.grabPivot(1);
+      g.dragPivot(0, -40);
+      g.dragPivot(1, -20);
+      g.step(1 / 120);
+      expect(g.left, closeTo(initial - 40, 1e-7));
+      expect(g.right, closeTo(initial - 20, 1e-7));
+      g.releasePivot(0);
+      g.releasePivot(1);
+      g.step(.1);
+      expect(g.left, closeTo(initial - 40, 1e-7));
+    });
   }
-  test(
-    'sensitivity preferences default to full response and persist independently',
-    () async {
-      final p = PlayerProfile();
-      await p.load();
-      expect(p.analogSensitivity, 1);
-      expect(p.twoFingerSensitivity, 1);
-      p.analogSensitivity = .35;
-      p.twoFingerSensitivity = .8;
-      await p.save();
-      final restored = PlayerProfile();
-      await restored.load();
-      expect(restored.analogSensitivity, .35);
-      expect(restored.twoFingerSensitivity, .8);
-    },
-  );
+  test('old sensitivity preferences load and save at full response', () async {
+    final storage = SharedPreferencesAsync();
+    await storage.setDouble('gilt.analogSensitivity', .35);
+    await storage.setDouble('gilt.twoFingerSensitivity', .8);
+    final p = PlayerProfile();
+    await p.load();
+    expect(p.analogSensitivity, 1);
+    expect(p.twoFingerSensitivity, 1);
+    await p.save();
+    final restored = PlayerProfile();
+    await restored.load();
+    expect(restored.analogSensitivity, 1);
+    expect(restored.twoFingerSensitivity, 1);
+    expect(await storage.getDouble('gilt.analogSensitivity'), 1);
+    expect(await storage.getDouble('gilt.twoFingerSensitivity'), 1);
+  });
   testWidgets(
-    'control cards explain and select modes; sliders fit a small phone',
+    'control cards select modes without sensitivity sliders on a small phone',
     (tester) async {
       tester.view.physicalSize = const Size(320, 568);
       tester.view.devicePixelRatio = 1;
@@ -281,17 +281,9 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('control-twoFinger')));
       await tester.pump();
       expect(p.controlMode, ControlMode.twoFinger);
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('two-finger-sensitivity')),
-      );
-      await tester.pump();
-      final slider = tester.widget<Slider>(
-        find.byKey(const ValueKey('two-finger-sensitivity')),
-      );
-      slider.onChanged!(.4);
-      slider.onChangeEnd!(.4);
-      await tester.pump();
-      expect(p.twoFingerSensitivity, .4);
+      expect(find.byType(Slider), findsNothing);
+      expect(find.text('Fine tune your movement'), findsNothing);
+      expect(p.twoFingerSensitivity, 1);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
     },

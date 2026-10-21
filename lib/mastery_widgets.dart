@@ -7,17 +7,24 @@ import 'profile.dart';
 import 'rewards.dart';
 
 class StarRow extends StatelessWidget {
-  const StarRow(this.mask, {super.key, this.size = 18, this.dark = false});
-  final int mask;
+  const StarRow(
+    this.mask, {
+    super.key,
+    this.size = 18,
+    this.dark = false,
+    this.count = 3,
+  });
+  final int mask, count;
   final double size;
   final bool dark;
   @override
   Widget build(BuildContext context) => Semantics(
-    label: '${LevelRecord.starCount(mask)} of 3 stars',
+    label:
+        '${LevelRecord.starCount(mask & ((1 << count) - 1))} of $count stars',
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        for (var i = 0; i < 3; i++)
+        for (var i = 0; i < count; i++)
           Icon(
             (mask & (1 << i)) != 0
                 ? Icons.star_rounded
@@ -46,12 +53,24 @@ class MasteryResult extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     children: [
       const SizedBox(height: 14),
-      StarRow(game.earnedStarMask, size: 34, dark: true),
+      StarRow(
+        game.earnedStarMask | (record.starMask & 8),
+        size: 34,
+        dark: true,
+        count: game.mode == GameMode.classic ? 4 : 3,
+      ),
       const SizedBox(height: 8),
       for (final (bit, label) in [
         (1, 'Finish the board'),
         (2, 'Finish without a miss'),
         (4, 'Finish in ${formatRunTime(game.targetTime)} active time'),
+        if (game.mode == GameMode.classic)
+          (
+            8,
+            game.levelStarAlreadyOwned
+                ? 'Bonus star already collected'
+                : 'Collect the bonus star',
+          ),
       ])
         Padding(
           padding: const EdgeInsets.only(bottom: 3),
@@ -59,11 +78,12 @@ class MasteryResult extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                (game.earnedStarMask & bit) != 0
+                ((game.earnedStarMask | (record.starMask & 8)) & bit) != 0
                     ? Icons.star_rounded
                     : Icons.star_outline_rounded,
                 size: 15,
-                color: (game.earnedStarMask & bit) != 0
+                color:
+                    ((game.earnedStarMask | (record.starMask & 8)) & bit) != 0
                     ? brass
                     : const Color(0xFFB5C5BB),
               ),
@@ -74,7 +94,9 @@ class MasteryResult extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,
-                    color: (game.earnedStarMask & bit) != 0
+                    color:
+                        ((game.earnedStarMask | (record.starMask & 8)) & bit) !=
+                            0
                         ? brass
                         : const Color(0xFFB5C5BB),
                   ),
@@ -85,13 +107,19 @@ class MasteryResult extends StatelessWidget {
         ),
       const SizedBox(height: 10),
       Text(
-        '${formatRunTime(game.elapsed)} active time  ·  ${game.coinsCollected}/${game.coins.length} coins',
+        '${formatRunTime(game.elapsed)} active time' +
+            (game.mode == GameMode.classic
+                ? ''
+                : '  ·  ${game.coinsCollected}/${game.coins.length} coins'),
         textAlign: TextAlign.center,
         style: const TextStyle(fontSize: 12, color: cream),
       ),
       const SizedBox(height: 5),
       Text(
-        'Saved: ${record.stars}/3 stars  ·  Best ${record.bestScore}' +
+        'Saved: ${record.stars}/${game.mode == GameMode.classic ? 4 : 3} stars' +
+            (game.mode == GameMode.classic
+                ? ''
+                : '  ·  Best ${record.bestScore}') +
             (record.bestTime == null
                 ? ''
                 : '  ·  ${formatRunTime(record.bestTime!)}'),
@@ -208,7 +236,7 @@ class CabinetPicker extends StatelessWidget {
       const MenuHeading('Make it yours.', eyebrow: 'CABINET STYLES'),
       const SizedBox(height: 6),
       Text(
-        '${profile.totalStars} / ${ClassicLevels.count * 3} Classic stars · identical handling in every style',
+        '${profile.totalStars} / ${ClassicLevels.count * 4} Classic stars · identical handling in every style',
         style: TextStyle(fontSize: 12, color: menuMuted),
       ),
       const SizedBox(height: 16),

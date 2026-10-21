@@ -18,16 +18,16 @@ void main() {
   test(
     'hint starts at the exact affordable price and clears after purchase',
     () {
-      final p = PlayerProfile()..wallet = 34;
+      final p = PlayerProfile()..wallet = BallCosmetic.coral.cost - 1;
       expect(p.shopUpgradeAvailable, isFalse);
-      p.wallet = 35;
+      p.wallet = BallCosmetic.coral.cost;
       expect(p.shopUpgradeAvailable, isTrue);
       p.selectBall(BallCosmetic.coral);
       expect(p.wallet, 0);
       expect(p.shopUpgradeAvailable, isFalse);
-      p.wallet = 35;
+      p.wallet = BallCosmetic.coral.cost;
       expect(p.shopUpgradeAvailable, isFalse); // Already owned.
-      p.wallet = 65;
+      p.wallet = BallCosmetic.circuit.cost;
       expect(p.shopUpgradeAvailable, isTrue);
     },
   );
@@ -99,7 +99,7 @@ void main() {
       ..sound = false
       ..music = false
       ..haptics = false
-      ..wallet = 35;
+      ..wallet = BallCosmetic.coral.cost;
     await tester.pumpWidget(ArcadeApp(profile: p));
     await tester.pump(const Duration(milliseconds: 700));
     expect(find.byKey(const ValueKey('shop-upgrade-hint')), findsOneWidget);

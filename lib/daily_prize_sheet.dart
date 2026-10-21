@@ -160,12 +160,6 @@ class _DailyPrizeSheetState extends State<DailyPrizeSheet> {
                 '${p.wallet} coins in your wallet',
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Resets at midnight UTC. A new five-day track starts after Day 5. Equip prizes in the Gear Shop.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12),
-              ),
             ],
           ),
         ),

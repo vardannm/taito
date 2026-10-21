@@ -277,7 +277,47 @@ class BoardPainter extends CustomPainter {
     final railBody = railPaint(const Color(0xFF574A31), 5);
     final railHighlight = railPaint(const Color(0xFFEEE7CC), 1);
     final grain = railPaint(ink.withAlpha(75), .6);
-    for (final x in [20.0, 340.0]) {
+    for (final x in [
+      BalanceGame.sideRailX,
+      BalanceGame.width - BalanceGame.sideRailX,
+    ]) {
+      if (game.laserSideRails) {
+        final start = Offset(x, railTop), end = Offset(x, railBottom);
+        const laserRed = Color(0xFFE34336);
+        canvas.drawLine(
+          start,
+          end,
+          Paint()
+            ..color = laserRed.withAlpha(160)
+            ..strokeWidth = 14
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+        );
+        canvas.drawLine(
+          start,
+          end,
+          Paint()
+            ..color = laserRed
+            ..strokeWidth = BalanceGame.sideLaserWidth,
+        );
+        canvas.drawLine(
+          start,
+          end,
+          Paint()
+            ..color = const Color(0xFFFFF1D6)
+            ..strokeWidth = 2,
+        );
+        for (final point in [start, end]) {
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(
+              Rect.fromCenter(center: point, width: 16, height: 10),
+              const Radius.circular(3),
+            ),
+            Paint()..color = const Color(0xFF163D3B),
+          );
+          canvas.drawCircle(point, 3, Paint()..color = laserRed);
+        }
+        continue;
+      }
       canvas.drawLine(Offset(x, railTop), Offset(x, railBottom), railBody);
       canvas.drawLine(
         Offset(x - 1, railTop),
@@ -507,6 +547,28 @@ class BoardPainter extends CustomPainter {
           spacing: 2,
         );
       }
+    }
+    final levelStar = game.levelStar;
+    if (levelStar != null && !levelStar.collected) {
+      paintLevelStar(
+        canvas,
+        Offset(levelStar.x, game.screenY(levelStar.y)),
+        reducedMotion ? .5 : (math.sin(game.clock * 2.4) + 1) / 2,
+      );
+    }
+    if (levelStar != null && game.lastStarAge < 1.2) {
+      text(
+        canvas,
+        '+1 STAR',
+        Offset(
+          levelStar.x,
+          game.screenY(levelStar.y) -
+              18 -
+              (reducedMotion ? 0 : game.lastStarAge * 18),
+        ),
+        12,
+        ink,
+      );
     }
     for (final coin in game.coins.where((c) => !c.collected)) {
       final p = Offset(coin.x, game.screenY(coin.y));

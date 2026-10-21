@@ -8,6 +8,8 @@ export 'pivot_board.dart';
 import 'pivot_board.dart';
 import 'club.dart';
 import 'control_options.dart';
+import 'settings_sheet.dart';
+import 'run_coin_summary.dart';
 import 'infinite_painter.dart';
 import 'ball_shop.dart';
 import 'ball_world.dart';
@@ -355,6 +357,7 @@ class _GameScreenState extends State<GameScreen>
       touch.fillRange(0, 2, 0);
       keyboard.fillRange(0, 2, 0);
     }
+    profile.bankLevelStar(game);
     profile.bankCoins(game);
     if (game.event != null) {
       playtest.record(game.event!.name, {
@@ -384,6 +387,7 @@ class _GameScreenState extends State<GameScreen>
       game.survival.recovery.ceil(),
       game.coinsCollected,
       game.coins.length,
+      game.levelStarCollected,
       game.merging ? game.mergeRun.highest : 0,
     );
     backdrop.value = (game.survival.visualCombo * 64).round();
@@ -607,9 +611,10 @@ class _GameScreenState extends State<GameScreen>
     game.cosmetic = profile.selectedBall;
     game.platformStyle = profile.selectedPlatform;
     game.cabinet = profile.cabinet;
-    game.analogSensitivity = profile.analogSensitivity;
-    game.twoFingerSensitivity = profile.twoFingerSensitivity;
     game.haloJoystick = profile.haloJoystick;
+    game.levelStarAlreadyOwned = profile.hasCollectedLevelStar(
+      profile.classicLevel,
+    );
     profile.applyInfiniteStart(game, tutorial: tutorialActive);
     game.start(
       gameMode: mode,
@@ -951,9 +956,10 @@ class _GameScreenState extends State<GameScreen>
     game.cosmetic = profile.selectedBall;
     game.platformStyle = profile.selectedPlatform;
     game.cabinet = profile.cabinet;
-    game.analogSensitivity = profile.analogSensitivity;
-    game.twoFingerSensitivity = profile.twoFingerSensitivity;
     game.haloJoystick = profile.haloJoystick;
+    game.levelStarAlreadyOwned = profile.hasCollectedLevelStar(
+      worldLevel(index),
+    );
     profile.applyInfiniteStart(game, tutorial: tutorialActive);
     game.start(
       gameMode: arcadeModes[index],
@@ -973,6 +979,7 @@ class _GameScreenState extends State<GameScreen>
   Future<void> home() async {
     if (returning || adBusy) return;
     if (game.finished) recordFinalResult();
+    profile.bankLevelStar(game);
     profile.bankCoins(game);
     final index = arcadeModes.indexOf(game.mode);
     setState(() {
@@ -1032,6 +1039,7 @@ class _GameScreenState extends State<GameScreen>
     game.onInputStarted = null;
     if (game.infinite && game.finished) recordFinalResult();
     reviveAds.dispose();
+    profile.bankLevelStar(game);
     profile.bankCoins(game);
     unawaited(profile.saveTutorial());
     WidgetsBinding.instance.removeObserver(this);
@@ -1451,8 +1459,7 @@ class _GameScreenState extends State<GameScreen>
             final color = game.infinite
                 ? infiniteBoardInk(game, const Offset(110, 60))
                 : chromeInk;
-            // Every mode shares one layout: hearts left, the score large in
-            // the middle with its details under it, and pause on the right.
+            // Classic shows target progress; score-based modes keep their score.
             final detail = TextStyle(
               color: color,
               fontSize: 11,
@@ -1513,7 +1520,9 @@ class _GameScreenState extends State<GameScreen>
                             FittedBox(
                               fit: BoxFit.scaleDown,
                               child: Text(
-                                '${game.score}',
+                                game.mode == GameMode.classic
+                                    ? '${game.completed}/10'
+                                    : '${game.score}',
                                 key: game.infinite
                                     ? const ValueKey('infinite-score')
                                     : null,
@@ -1541,12 +1550,39 @@ class _GameScreenState extends State<GameScreen>
                               FittedBox(
                                 fit: BoxFit.scaleDown,
                                 child: Text(
-                                  game.practice
+                                  game.mode == GameMode.classic
+                                      ? 'LEVEL ${game.level} · ${formatRunTime(game.elapsed)}'
+                                      : game.practice
                                       ? 'PRACTICE · ${formatRunTime(game.elapsed)}'
                                       : 'L${game.level} · TARGET ${game.target.clamp(1, 10)}/10 · ${formatRunTime(game.elapsed)}',
                                   maxLines: 1,
                                   style: detail,
                                 ),
+                              ),
+                            if (game.mode == GameMode.classic)
+                              Row(
+                                key: const ValueKey(
+                                  'classic-bonus-star-status',
+                                ),
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    game.levelStarAlreadyOwned ||
+                                            game.levelStarCollected
+                                        ? Icons.star_rounded
+                                        : Icons.star_outline_rounded,
+                                    size: 16,
+                                    color: const Color(0xFFE9B853),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    game.levelStarAlreadyOwned ||
+                                            game.levelStarCollected
+                                        ? 'COLLECTED'
+                                        : 'BONUS STAR',
+                                    style: detail.copyWith(fontSize: 10),
+                                  ),
+                                ],
                               ),
                             if (game.infinite && game.survival.noticeTime > 0)
                               Text(
@@ -1680,6 +1716,8 @@ class _GameScreenState extends State<GameScreen>
         existing.cabinet == profile.cabinet &&
         existing.controlMode == controlForMode(arcadeModes[index]) &&
         existing.haloJoystick == profile.haloJoystick &&
+        existing.levelStarAlreadyOwned ==
+            profile.hasCollectedLevelStar(worldLevel(index)) &&
         existing.platformStyle == profile.selectedPlatform)
       return existing;
     return _themedPreviews[index] = BalanceGame(seed: index + 1)
@@ -1687,6 +1725,7 @@ class _GameScreenState extends State<GameScreen>
       ..cabinet = profile.cabinet
       ..platformStyle = profile.selectedPlatform
       ..haloJoystick = profile.haloJoystick
+      ..levelStarAlreadyOwned = profile.hasCollectedLevelStar(worldLevel(index))
       ..setControlMode(controlForMode(arcadeModes[index]))
       ..start(
         gameMode: arcadeModes[index],
@@ -2701,7 +2740,9 @@ class _GameScreenState extends State<GameScreen>
                         ],
                       ),
                     ),
-                  if (game.infinite && !game.waitingForInput ||
+                  if (!offeringRevive &&
+                          game.infinite &&
+                          !game.waitingForInput ||
                       tutorialActive && tutorialStep.inInfinite)
                     Positioned(
                       top: MediaQuery.paddingOf(context).top + 70,
@@ -2709,42 +2750,20 @@ class _GameScreenState extends State<GameScreen>
                       child: IgnorePointer(
                         child: AnimatedBuilder(
                           animation: hud,
-                          builder: (context, _) => Container(
+                          builder: (context, _) => ConstrainedBox(
                             key: tutorialCoinsKey,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
+                            constraints: BoxConstraints(
+                              maxWidth: MediaQuery.sizeOf(context).width - 48,
                             ),
-                            decoration: BoxDecoration(
-                              color: cream.withAlpha(220),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.toll, size: 15, color: orange),
-                                const SizedBox(width: 4),
-                                AnimatedSwitcher(
-                                  key: const ValueKey('run-coins'),
-                                  duration:
-                                      MediaQuery.disableAnimationsOf(context)
-                                      ? Duration.zero
-                                      : const Duration(milliseconds: 260),
-                                  transitionBuilder: (child, animation) =>
-                                      ScaleTransition(
-                                        scale: animation,
-                                        child: child,
-                                      ),
-                                  child: Text(
-                                    '${profile.wallet}',
-                                    key: ValueKey(profile.wallet),
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: ink,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: RunCoinSummary(
+                                key: const ValueKey('run-coins'),
+                                wallet: profile.wallet,
+                                collected: game.coinsCollected,
+                                unlimited: profile.unlimitedCoins,
+                                compact: true,
+                              ),
                             ),
                           ),
                         ),
@@ -2843,7 +2862,7 @@ class _GameScreenState extends State<GameScreen>
           const SizedBox(height: 8),
           Text(
             '${offeringRevive ? 'End this run and watch an ad' : 'Watch an ad'}: '
-            '${game.coinsCollected} → ${game.coinsCollected * 2} coins.\n'
+            '${game.coinsCollected} to ${game.coinsCollected * 2} coins.\n'
             'Your collected coins are already saved.',
             textAlign: TextAlign.center,
             style: const TextStyle(color: menuText, fontSize: 12, height: 1.5),
@@ -2884,85 +2903,103 @@ class _GameScreenState extends State<GameScreen>
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: menuLine),
       ),
-      child: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(25),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.favorite_rounded, color: orange, size: 52),
-              const SizedBox(height: 16),
-              const Text(
-                'One more chance?',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: cream,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '${game.score} points · ${game.metres}m',
-                style: label(brass),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Watch an ad to get 1 heart and continue this run.\nOne revive per run.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: cream, height: 1.5),
-              ),
-              if (reviveError != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 16),
-                  child: Text(
-                    reviveError!,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: brass, fontSize: 12),
+      child: LayoutBuilder(
+        builder: (context, bounds) {
+          final compact = bounds.maxHeight < 640;
+          return Center(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.all(compact ? 16 : 25),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  RunCoinSummary(
+                    key: const ValueKey('revive-coin-summary'),
+                    wallet: profile.wallet,
+                    collected: game.coinsCollected,
+                    unlimited: profile.unlimitedCoins,
                   ),
-                ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  key: const ValueKey('watch-revive-ad'),
-                  onPressed: adBusy ? null : watchReviveAd,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: brass,
-                    foregroundColor: ink,
-                    disabledBackgroundColor: brass.withAlpha(120),
-                    disabledForegroundColor: cream,
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 15,
-                      horizontal: 12,
+                  SizedBox(height: compact ? 12 : 28),
+                  Icon(
+                    Icons.favorite_rounded,
+                    color: orange,
+                    size: compact ? 36 : 52,
+                  ),
+                  SizedBox(height: compact ? 8 : 16),
+                  Text(
+                    'One more chance?',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: cream,
+                      fontSize: compact ? 23 : 28,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                  icon: adBusy
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: cream,
-                          ),
-                        )
-                      : const Icon(Icons.play_circle_outline),
-                  label: Text(adBusy ? 'Opening ad…' : 'Watch ad · +1 heart'),
-                ),
+                  SizedBox(height: compact ? 8 : 12),
+                  Text(
+                    '${game.score} points · ${game.metres}m',
+                    style: label(brass),
+                  ),
+                  SizedBox(height: compact ? 10 : 16),
+                  const Text(
+                    'Watch an ad to continue with 1 heart.\nOne revive per run.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: cream, height: 1.5),
+                  ),
+                  if (reviveError != null)
+                    Padding(
+                      padding: EdgeInsets.only(top: compact ? 8 : 16),
+                      child: Text(
+                        reviveError!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: brass, fontSize: 12),
+                      ),
+                    ),
+                  SizedBox(height: compact ? 14 : 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      key: const ValueKey('watch-revive-ad'),
+                      onPressed: adBusy ? null : watchReviveAd,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: brass,
+                        foregroundColor: ink,
+                        disabledBackgroundColor: brass.withAlpha(120),
+                        disabledForegroundColor: cream,
+                        padding: EdgeInsets.symmetric(
+                          vertical: compact ? 12 : 15,
+                          horizontal: 12,
+                        ),
+                      ),
+                      icon: adBusy
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: cream,
+                              ),
+                            )
+                          : const Icon(Icons.play_circle_outline),
+                      label: Text(
+                        adBusy ? 'Opening ad…' : 'Watch ad · +1 heart',
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: compact ? 4 : 10),
+                  TextButton(
+                    key: const ValueKey('decline-revive'),
+                    onPressed: adBusy ? null : declineRevive,
+                    child: const Text(
+                      'No thanks · End run',
+                      style: TextStyle(color: cream),
+                    ),
+                  ),
+                  if (offeringCoinDouble) coinDoubleOffer(),
+                ],
               ),
-              const SizedBox(height: 10),
-              TextButton(
-                key: const ValueKey('decline-revive'),
-                onPressed: adBusy ? null : declineRevive,
-                child: const Text(
-                  'No thanks · End run',
-                  style: TextStyle(color: cream),
-                ),
-              ),
-              if (offeringCoinDouble) coinDoubleOffer(),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     ),
   );
@@ -3022,7 +3059,11 @@ class _GameScreenState extends State<GameScreen>
                       const SizedBox(height: 12),
                       if (game.finished) ...[
                         Text(
-                          newBest
+                          game.mode == GameMode.classic
+                              ? game.won
+                                    ? 'LEVEL COMPLETE'
+                                    : 'TRY AGAIN'
+                              : newBest
                               ? 'NEW PERSONAL BEST'
                               : game.practice
                               ? 'PRACTICE COMPLETE'
@@ -3032,14 +3073,15 @@ class _GameScreenState extends State<GameScreen>
                           style: label(brass),
                         ),
                         const SizedBox(height: 8),
-                        Text(
-                          '${game.score}',
-                          style: const TextStyle(
-                            fontSize: 42,
-                            fontFamily: 'monospace',
-                            color: cream,
+                        if (game.mode != GameMode.classic)
+                          Text(
+                            '${game.score}',
+                            style: const TextStyle(
+                              fontSize: 42,
+                              fontFamily: 'monospace',
+                              color: cream,
+                            ),
                           ),
-                        ),
                         Text(
                           !game.won || game.merging
                               ? (game.infinite
@@ -3229,7 +3271,7 @@ class _GameScreenState extends State<GameScreen>
               guideRow(
                 '02',
                 'Prefer two fingers?',
-                'Choose One-finger or Two-finger in Options. With two fingers, drag up or down anywhere on the left or right half of the board. Each side moves its end of the platform, so keep your thumbs low and clear of the ball. Move both together to lift, or one to tilt and roll. Release to hold the platform. Options also adjusts two-finger sensitivity.',
+                'Choose One-finger or Two-finger in Options. With two fingers, drag up or down anywhere on the left or right half of the board. Each side moves its end of the platform, so keep your thumbs low and clear of the ball. Move both together to lift, or one to tilt and roll. Release to hold the platform.',
               ),
               guideRow(
                 '03',
@@ -3263,7 +3305,7 @@ class _GameScreenState extends State<GameScreen>
               guideRow(
                 '08',
                 'Three ways to master it.',
-                'Earn a star for finishing, one for a finish without misses, and one for beating the active-time target in the HUD. Pauses and ball resets do not count. Stars earned with either control contribute to the same board; best scores and times are tracked for each control.',
+                'Earn a star for finishing, one for a finish without misses, and one for beating the active-time target in the HUD. Classic also has one gold star to collect on each board: it adds a permanent star immediately, even if the run ends later. Each bonus star can only be earned once across all controls. Pauses and ball resets do not count toward active time.',
               ),
               guideRow(
                 '09',
@@ -3344,7 +3386,8 @@ class _GameScreenState extends State<GameScreen>
   Future<void> showSettings() => showModalBottomSheet<void>(
     context: context,
     backgroundColor: menuBackground,
-    showDragHandle: true,
+    showDragHandle: false,
+    enableDrag: false,
     isScrollControlled: true,
     useSafeArea: true,
     constraints: BoxConstraints(
@@ -3352,21 +3395,12 @@ class _GameScreenState extends State<GameScreen>
     ),
     builder: (context) => StatefulBuilder(
       builder: (context, update) => MenuSurface(
-        child: SafeArea(
+        child: SettingsSheet(
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(22, 0, 22, 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                MenuHeading(
-                  'Options',
-                  eyebrow: 'YOUR ARCADE. YOUR WAY.',
-                  trailing: MenuIconButton(
-                    icon: Icons.close,
-                    tooltip: 'Close settings',
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ),
                 MenuAction(
                   key: const ValueKey('replay-tutorial'),
                   title: 'Replay Tutorial',
@@ -3406,34 +3440,6 @@ class _GameScreenState extends State<GameScreen>
                     });
                     unawaited(profile.save());
                   },
-                ),
-                const SizedBox(height: 14),
-                const MenuSection('Fine tune your movement'),
-                const SizedBox(height: 12),
-                MenuPanel(
-                  child: Column(
-                    children: [
-                      SensitivitySetting(
-                        id: 'two-finger-sensitivity',
-                        title: 'Two-Finger sensitivity',
-                        value: profile.twoFingerSensitivity,
-                        onChanged: (value) {
-                          update(() => profile.twoFingerSensitivity = value);
-                          game.twoFingerSensitivity = value;
-                          game.clearInput();
-                        },
-                        onChangeEnd: () => unawaited(profile.save()),
-                      ),
-                      const Text(
-                        'Two-Finger control: 1.0 follows your fingers fully. Lower values make smaller movements. Default: 1.0.',
-                        style: TextStyle(
-                          fontSize: 11,
-                          height: 1.4,
-                          color: menuMuted,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
                 if (profile.infiniteBestScore >
                     InfiniteTuning.fastStartUnlockScore) ...[
@@ -3509,7 +3515,7 @@ class _GameScreenState extends State<GameScreen>
                       const MenuSection('Your records'),
                       const SizedBox(height: 10),
                       Text(
-                        'Classic best ${profile.best}  •  ${profile.runs} runs',
+                        '${profile.totalStars} Classic stars  •  ${profile.runs} runs',
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 6),

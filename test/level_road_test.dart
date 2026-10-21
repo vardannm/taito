@@ -11,53 +11,58 @@ import 'start_flow_test.dart' show launch;
 import 'support/mode_navigation.dart';
 
 void main() {
-  for (final (stars, first) in [
-    (0, 1),
-    (18, 8),
-    (60, 29),
-    (156, 76),
-    (240, 76),
+  for (final (stars, last) in [
+    (0, 4),
+    (18, 13),
+    (60, 34),
+    (156, 80),
+    (240, 80),
   ]) {
-    testWidgets('only five nearby levels exist in the road at $stars stars', (
-      tester,
-    ) async {
-      tester.view.physicalSize = const Size(390, 844);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: LevelPicker(
-              selected: (stars ~/ 2 + 1).clamp(1, ClassicLevels.count),
-              totalStars: stars,
-              onSelected: (_) {},
+    testWidgets(
+      'road keeps previous levels and at most three ahead at $stars stars',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: LevelPicker(
+                selected: (stars ~/ 2 + 1).clamp(1, ClassicLevels.count),
+                totalStars: stars,
+                onSelected: (_) {},
+              ),
             ),
           ),
-        ),
-      );
-      final road = tester.widget<SliverList>(find.byType(SliverList));
-      expect(road.delegate.estimatedChildCount, 5);
-      expect(find.byKey(ValueKey('level-$first')), findsOneWidget);
-      final scrollable = find.descendant(
-        of: find.byType(CustomScrollView),
-        matching: find.byType(Scrollable),
-      );
-      await tester.scrollUntilVisible(
-        find.byKey(ValueKey('level-${first + 4}')),
-        300,
-        scrollable: scrollable,
-      );
-      await tester.drag(find.byType(CustomScrollView), const Offset(0, -2000));
-      await tester.pumpAndSettle();
-      expect(find.byKey(ValueKey('level-${first + 5}')), findsNothing);
-      final position = tester.state<ScrollableState>(scrollable).position;
-      expect(position.pixels, closeTo(position.maxScrollExtent, 1));
-      expect(find.textContaining('31–50'), findsNothing);
-      expect(find.textContaining('51–80'), findsNothing);
-      expect(find.textContaining('80 levels'), findsNothing);
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox());
-    });
+        );
+        final road = tester.widget<SliverList>(find.byType(SliverList));
+        expect(road.delegate.estimatedChildCount, last);
+        expect(find.byKey(const ValueKey('level-1')), findsOneWidget);
+        final scrollable = find.descendant(
+          of: find.byType(CustomScrollView),
+          matching: find.byType(Scrollable),
+        );
+        await tester.scrollUntilVisible(
+          find.byKey(ValueKey('level-$last')),
+          500,
+          scrollable: scrollable,
+          maxScrolls: 100,
+        );
+        await tester.drag(
+          find.byType(CustomScrollView),
+          const Offset(0, -2000),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byKey(ValueKey('level-${last + 1}')), findsNothing);
+        final position = tester.state<ScrollableState>(scrollable).position;
+        expect(position.pixels, closeTo(position.maxScrollExtent, 1));
+        expect(find.textContaining('31–50'), findsNothing);
+        expect(find.textContaining('51–80'), findsNothing);
+        expect(find.textContaining('80 levels'), findsNothing);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
   }
 
   testWidgets('road winds between stops and reaches the final level', (

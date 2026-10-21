@@ -9,6 +9,42 @@ import 'package:flutter/material.dart';
 const _coinEdge = Color(0xFF6B4A1E), _coinRim = Color(0xFFC9973E);
 const _coinFace = Color(0xFFFFE9A8), _coinDeep = Color(0xFFE0A93F);
 
+/// Five points and a steady cream edge distinguish progression from currency.
+void paintLevelStar(Canvas c, Offset p, double pulse) {
+  c.drawCircle(p, 19 + pulse * 2, Paint()..color = const Color(0x33FFD66E));
+  c.drawCircle(p, 15, Paint()..color = const Color(0x22FFFFFF));
+  final path = Path();
+  for (var i = 0; i < 10; i++) {
+    final angle = -math.pi / 2 + i * math.pi / 5;
+    final radius = i.isEven ? 12.0 : 5.6;
+    final x = p.dx + math.cos(angle) * radius;
+    final y = p.dy + math.sin(angle) * radius;
+    if (i == 0) {
+      path.moveTo(x, y);
+    } else {
+      path.lineTo(x, y);
+    }
+  }
+  path.close();
+  c.drawPath(
+    path,
+    Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFFFFF4BB), Color(0xFFFFD35F), Color(0xFFD99A2A)],
+      ).createShader(Rect.fromCircle(center: p, radius: 12)),
+  );
+  c.drawPath(
+    path,
+    Paint()
+      ..color = const Color(0xFFFFF5D4)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.3
+      ..strokeJoin = StrokeJoin.round,
+  );
+}
+
 /// A minted coin, turning slowly on its axis. [spin] is the cosine of its
 /// angle. The turn is deliberately shallow: at thirteen pixels across, a coin
 /// edge-on is an unreadable sliver, so it never narrows past half its face.

@@ -39,22 +39,25 @@ void main() {
     advance(left, .1);
     expect(left.ballX, greaterThan(previous));
   });
-  test('target sinks, scores once, returns and rearms controls', () {
-    final game = BalanceGame()..start();
-    placeAt(game, game.activeHole!);
-    final score = game.score;
-    expect(game.phase, GamePhase.sinking);
-    expect(game.target, 2);
-    expect(game.completed, 1);
-    expect(score, greaterThanOrEqualTo(100));
-    advance(game, .5);
-    expect(game.score, score);
-    advance(game, 1);
-    expect(game.canControl, isTrue);
-    expect(game.left, BalanceGame.launchHeight);
-    expect(game.ballX, 180);
-    expect(game.leftInput, 0);
-  });
+  test(
+    'Classic target advances once without score, returns and rearms controls',
+    () {
+      final game = BalanceGame()..start();
+      placeAt(game, game.activeHole!);
+      final score = game.score;
+      expect(game.phase, GamePhase.sinking);
+      expect(game.target, 2);
+      expect(game.completed, 1);
+      expect(score, 0);
+      advance(game, .5);
+      expect(game.score, score);
+      advance(game, 1);
+      expect(game.canControl, isTrue);
+      expect(game.left, BalanceGame.launchHeight);
+      expect(game.ballX, 180);
+      expect(game.leftInput, 0);
+    },
+  );
   test('three misses end classic, practice has unlimited attempts', () {
     for (final practice in [false, true]) {
       final game = BalanceGame()

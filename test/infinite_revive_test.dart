@@ -260,6 +260,45 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  for (final textScale in [1.0, 1.6]) {
+    testWidgets(
+      'revive shows exact total and run coins above the heart at text scale $textScale',
+      (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = textScale;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        profile.wallet = 785;
+        final game = await launchRevive(tester, profile, ads);
+        game.coinsCollected = 37;
+        await loseLastHeart(tester, game);
+        expect(profile.wallet, 822);
+        final summary = find.byKey(const ValueKey('revive-coin-summary'));
+        expect(summary, findsOneWidget);
+        expect(find.byKey(const ValueKey('run-coins')), findsNothing);
+        expect(
+          tester
+              .widget<Text>(find.byKey(const ValueKey('run-wallet-total')))
+              .data,
+          '822',
+        );
+        expect(
+          tester
+              .widget<Text>(find.byKey(const ValueKey('run-coins-collected')))
+              .data,
+          '+37',
+        );
+        expect(
+          tester.getBottomLeft(summary).dy,
+          lessThan(tester.getTopLeft(find.byIcon(Icons.favorite_rounded)).dy),
+        );
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('decline-revive')),
+        );
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
+  }
+
   testWidgets('late reward after disposal does not revive or double-record', (
     tester,
   ) async {

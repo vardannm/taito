@@ -317,14 +317,14 @@ void main() {
     'wallet deposits are idempotent across frames and runs and purchases persist',
     () async {
       final p = PlayerProfile();
-      final g = run()..coinsCollected = 100;
+      final g = run()..coinsCollected = BallCosmetic.neon.cost;
       expect(p.bankCoins(g), true);
       expect(p.bankCoins(g), false);
-      expect(p.wallet, 100);
+      expect(p.wallet, BallCosmetic.neon.cost);
       expect(p.selectBall(BallCosmetic.neon), true);
       expect(p.wallet, 0);
       expect(p.selectBall(BallCosmetic.reactor), false);
-      g.coinsCollected = 105;
+      g.coinsCollected = BallCosmetic.neon.cost + 5;
       p.bankCoins(g);
       expect(p.wallet, 5);
       p.selectBall(BallCosmetic.steel);
@@ -381,7 +381,7 @@ void main() {
       tester.view.physicalSize = const Size(320, 568);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
-      final p = PlayerProfile()..wallet = 40;
+      final p = PlayerProfile()..wallet = BallCosmetic.coral.cost + 5;
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(body: BallShop(profile: p)),

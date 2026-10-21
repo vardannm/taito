@@ -176,53 +176,6 @@ class _ControlOptionsState extends State<ControlOptions>
   );
 }
 
-class SensitivitySetting extends StatelessWidget {
-  const SensitivitySetting({
-    super.key,
-    required this.title,
-    required this.value,
-    required this.onChanged,
-    required this.id,
-    this.onChangeEnd,
-  });
-  final VoidCallback? onChangeEnd;
-  final String title, id;
-  final double value;
-  final ValueChanged<double> onChanged;
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-            ),
-          ),
-          Text(
-            value.toStringAsFixed(1),
-            style: const TextStyle(
-              fontFeatures: [FontFeature.tabularFigures()],
-            ),
-          ),
-        ],
-      ),
-      Slider(
-        key: ValueKey(id),
-        value: value.clamp(minSensitivity, 1.0),
-        min: minSensitivity,
-        max: 1,
-        divisions: 15,
-        label: value.toStringAsFixed(1),
-        onChanged: onChanged,
-        onChangeEnd: (_) => onChangeEnd?.call(),
-      ),
-    ],
-  );
-}
-
 class _ControlDemo extends CustomPainter {
   _ControlDemo(this.mode, this.demo, {this.haloJoystick = false})
     : super(repaint: demo);

@@ -94,7 +94,10 @@ void main() {
     expect(g.level, 50);
     expect(g.oneFinger, isTrue);
     expect(g.lives, 3);
-    expect(find.textContaining('L50'), findsOneWidget);
+    expect(find.descendant(
+      of: find.byKey(const ValueKey('board-hud')),
+      matching: find.textContaining('LEVEL 50'),
+    ), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });
@@ -214,7 +217,7 @@ void main() {
           expect(g.finished, isTrue);
           expect(g.completed, 10);
           expect(g.lives, 3);
-          expect(g.score, greaterThan(0));
+          expect(g.score, 0);
         }
         // Flood-fill actual layouts; every target needs a ball-width route.
         for (final target in board.where((h) => h.target > 0)) {

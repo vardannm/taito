@@ -75,12 +75,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       await capture('controls-cards-${width.toInt()}');
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('two-finger-sensitivity')),
-      );
-      await tester.pump();
-      await capture('controls-sensitivity-${width.toInt()}');
-      Navigator.of(tester.element(find.text('Make yourself at home.'))).pop();
+      await tester.tap(find.byTooltip('Close settings'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(find.byTooltip('Modes'));

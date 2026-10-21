@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:balance_arcade/control_options.dart';
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/profile.dart';
@@ -17,16 +19,14 @@ void main() {
   );
 
   test(
-    'legacy settings and backups migrate without losing earned stars or sensitivity',
+    'legacy settings and backups retain stars and use full sensitivity',
     () async {
       for (final mode in [
         ControlMode.analog,
         ControlMode.tiltLift,
         ControlMode.boardTilt,
       ]) {
-        final old = PlayerProfile()
-          ..controlMode = mode
-          ..twoFingerSensitivity = .6;
+        final old = PlayerProfile()..controlMode = mode;
         old.levelRecords[old.recordKey(1, mode)] = const LevelRecord(
           starMask: 7,
         );
@@ -35,21 +35,26 @@ void main() {
         await loaded.load();
         expect(loaded.controlMode, ControlMode.oneFinger);
         expect(loaded.totalStars, 3);
-        expect(loaded.twoFingerSensitivity, .6);
+        expect(loaded.twoFingerSensitivity, 1);
+        final legacy =
+            jsonDecode(ProgressBackup.encode(old)) as Map<String, dynamic>;
+        legacy['sensitivity'] = [.35, .6];
         final restored = PlayerProfile();
         await ProgressBackup.restore(
           restored,
-          ProgressBackup.decode(ProgressBackup.encode(old), testEconomy: false),
+          ProgressBackup.decode(jsonEncode(legacy), testEconomy: false),
         );
         expect(restored.controlMode, ControlMode.oneFinger);
         expect(restored.totalStars, 3);
+        expect(restored.twoFingerSensitivity, 1);
+        expect(restored.analogSensitivity, 1);
         expect(restored.levelRecord(1, mode).starMask, 7);
       }
     },
   );
 
   testWidgets(
-    'Options offers two original controls and Halo, with one default sensitivity',
+    'Options offers two original controls and Halo without sensitivity controls',
     (tester) async {
       await launch(tester, ControlMode.oneFinger);
       await tester.tap(find.byTooltip('Settings'));
@@ -75,10 +80,47 @@ void main() {
         findsNothing,
       );
       expect(find.byKey(const ValueKey('analog-sensitivity')), findsNothing);
-      final slider = find.byKey(const ValueKey('two-finger-sensitivity'));
-      await tester.ensureVisible(slider);
+      expect(
+        find.byKey(const ValueKey('two-finger-sensitivity')),
+        findsNothing,
+      );
+      expect(find.byType(Slider), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+  testWidgets(
+    'Settings closes with X or a right swipe while vertical scroll stays open',
+    (tester) async {
+      await launch(tester, ControlMode.oneFinger);
+      Future<void> open() async {
+        await tester.tap(find.byTooltip('Settings'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+      }
+
+      await open();
+      expect(
+        tester.widget<BottomSheet>(find.byType(BottomSheet)).enableDrag,
+        isFalse,
+      );
+      final sheet = find.byKey(const ValueKey('settings-sheet'));
+      await tester.drag(sheet, const Offset(-180, 0));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(sheet, findsOneWidget);
+      await tester.drag(find.byType(ControlOptions), const Offset(0, -240));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(sheet, findsOneWidget);
+      expect(find.byTooltip('Close settings').hitTestable(), findsOneWidget);
+      await tester.drag(sheet, const Offset(180, 0));
       await tester.pump();
-      expect(tester.widget<Slider>(slider).value, 1.0);
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(sheet, findsNothing);
+      await open();
+      await tester.tap(find.byTooltip('Close settings'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(sheet, findsNothing);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
     },

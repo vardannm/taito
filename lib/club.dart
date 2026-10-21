@@ -275,10 +275,10 @@ class _ClubScreenState extends State<ClubScreen> {
                   Text(goal.detail),
                   const SizedBox(height: 10),
                   LinearProgressIndicator(
-                    value: profile.totalStars / (ClassicLevels.count * 3),
+                    value: profile.totalStars / (ClassicLevels.count * 4),
                   ),
                   Text(
-                    '${profile.totalStars}/${ClassicLevels.count * 3} Classic stars',
+                    '${profile.totalStars}/${ClassicLevels.count * 4} Classic stars',
                   ),
                   if (nextCabinet != null)
                     Text(

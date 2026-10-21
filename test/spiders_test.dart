@@ -137,7 +137,7 @@ void main() {
   });
   for (final width in [320.0, 430.0, 800.0]) {
     testWidgets(
-      'five-level road reaches nearby level 50 at width $width with large text',
+      'road reaches level 50 at width $width with large text',
       (tester) async {
         tester.view.physicalSize = Size(width, 700);
         tester.view.devicePixelRatio = 1;
@@ -165,7 +165,7 @@ void main() {
           find.byKey(const ValueKey('level-50')),
           300,
           scrollable: find.byType(Scrollable).last,
-          maxScrolls: 35,
+          maxScrolls: 100,
         );
         await tester.pump(const Duration(milliseconds: 200));
         await Scrollable.ensureVisible(
