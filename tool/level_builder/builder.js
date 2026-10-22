@@ -4,7 +4,14 @@
   const canvas = $('board'), ctx = canvas.getContext('2d');
   let presets = [], draft, selection = null, tool = 'target', waveIndex = -1, filter = 0;
   let undo = [], redo = [], drag = null, toastTimer;
-  const storageKey = 'gilt-developer-level-builder-v1';
+  // viewing: number of a level shown read-only; stash keeps the real draft meanwhile.
+  // baseline: {source, snapshot} of the draft as last opened or saved, for unsaved-change checks.
+  let viewing = null, stash = null, baseline = null;
+  const storageKey = 'gilt-developer-level-builder-v1', baselineKey = `${storageKey}-baseline`;
+  const icons = {
+    eye: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+    pencil: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/><path d="M14.5 5.5l3 3"/></svg>',
+  };
   try {
     const response = await fetch('/api/levels');
     if (!response.ok) throw Error('Could not load built-in levels.');
@@ -13,7 +20,20 @@
   const nextNumber = () => Math.max(0, ...presets.map(p => p.number)) + 1;
   try { draft = M.parseDraft(localStorage.getItem(storageKey)); }
   catch (_) { draft = M.blank(nextNumber()); }
+  try { baseline = JSON.parse(localStorage.getItem(baselineKey)); } catch (_) {}
   if (draft.hazards.length) waveIndex = 0;
+  // Key-sorted JSON with wave defaults filled, so the inspector's default-filling doesn't count as an edit.
+  const snapshot = d => JSON.stringify({...d, hazards: d.hazards.map(w => ({...M.waveDefaults, ...w}))},
+    (_, v) => v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map(k => [k, v[k]])) : v);
+  const working = () => viewing ? stash.draft : draft;
+  function unsaved() {
+    const d = working();
+    return d.holes.length + d.spiders.length + d.hazards.length > 0 && snapshot(d) !== baseline?.snapshot;
+  }
+  function markClean(source = baseline?.source ?? null) {
+    baseline = {source, snapshot: snapshot(draft)};
+    try { localStorage.setItem(baselineKey, JSON.stringify(baseline)); } catch (_) {}
+  }
 
   const tools = [['select', '↖', 'Select'], ['target', '①', 'Target'], ['trap', '●', 'Trap hole'],
     ['spider', '✳', 'Spider'], ['laser', '↕', 'Laser'], ['movingHole', '↔', 'Moving hole'], ['erase', '×', 'Erase']];
@@ -35,7 +55,38 @@
     other.push(M.clone(draft)); draft = stack.pop(); selection = null;
     waveIndex = Math.min(waveIndex, draft.hazards.length - 1); render();
   }
-  function replaceDraft(next) { remember(); draft = next; selection = null; waveIndex = draft.hazards.length ? 0 : -1; filter = 0; $('filter').value = '0'; render(); }
+  function replaceDraft(next, source = null) { remember(); draft = next; selection = null; waveIndex = draft.hazards.length ? 0 : -1; filter = 0; $('filter').value = '0'; markClean(source); render(); }
+  function view(level) {
+    if (!viewing) stash = {draft, waveIndex, selection};
+    viewing = level.number; draft = M.clone(level); selection = null; waveIndex = draft.hazards.length ? 0 : -1;
+    $('open-dialog').close(); render();
+  }
+  function leaveView() {
+    if (!viewing) return;
+    ({draft, waveIndex, selection} = stash); viewing = null; stash = null; render();
+  }
+  function edit(level) {
+    $('open-dialog').close();
+    if (baseline?.source === level.number && working().number === level.number) { leaveView(); toast(`Already editing level ${level.number}`); return; }
+    if (unsaved() && !confirm(`Your draft (level ${working().number}) has unsaved changes. Discard them and edit level ${level.number}?`)) return;
+    leaveView(); replaceDraft(M.clone(level), level.number); toast(`Editing level ${level.number}`);
+  }
+  function levelList() {
+    $('level-list').replaceChildren();
+    for (const p of presets) {
+      const row = document.createElement('div'), name = document.createElement('span');
+      const editing = !viewing && baseline?.source === p.number && draft.number === p.number;
+      row.className = 'level-row'; row.classList.toggle('viewing', viewing === p.number); row.classList.toggle('editing', editing);
+      name.className = 'level-name'; name.textContent = `${String(p.number).padStart(2, '0')} · ${p.name}`;
+      if (viewing === p.number || editing) { const badge = document.createElement('em'); badge.textContent = editing ? 'Editing' : 'Viewing'; name.append(badge); }
+      row.append(name);
+      for (const [icon, label, action] of [['eye', 'View', view], ['pencil', 'Edit', edit]]) {
+        const button = document.createElement('button'); button.className = 'icon'; button.innerHTML = icons[icon];
+        button.title = `${label} level ${p.number}`; button.setAttribute('aria-label', button.title); button.onclick = () => action(p); row.append(button);
+      }
+      $('level-list').append(row);
+    }
+  }
   function selectedObject() {
     if (!selection) return null;
     if (selection.type === 'hole') return draft.holes[selection.index];
@@ -66,8 +117,8 @@
     });
   }
   function refreshTools() {
-    for (const button of $('tools').children) button.classList.toggle('active', button.dataset.tool === tool);
-    canvas.style.cursor = tool === 'select' ? 'default' : 'crosshair';
+    for (const button of $('tools').children) { button.classList.toggle('active', !viewing && button.dataset.tool === tool); button.disabled = !!viewing; }
+    canvas.style.cursor = viewing || tool === 'select' ? 'default' : 'crosshair';
   }
   function field(container, label, key, object, options = {}) {
     const wrap = document.createElement('label'); wrap.textContent = label;
@@ -120,6 +171,7 @@
       field(panel, 'Warning time (seconds)', 'warningSeconds', wave, {min: .1});
       field(panel, 'Active time (seconds)', 'liveSeconds', wave, {min: .1});
     }
+    if (viewing) for (const control of panel.querySelectorAll('input,select')) control.disabled = true;
   }
   function validation() {
     const result = M.validate(draft); const box = $('validation'); box.replaceChildren();
@@ -132,18 +184,21 @@
       card.append(title, list); box.append(card);
     }
     if (!result.errors.length) { const card = document.createElement('div'); card.className = 'status'; card.textContent = '✓ Ready to export'; box.prepend(card); }
-    if (presets.some(p => p.number === draft.number)) {
+    if (!viewing && presets.some(p => p.number === draft.number)) {
       const warning = document.createElement('p'); warning.className = 'hint'; warning.textContent = `Level ${draft.number} already exists. Use ${nextNumber()} to add a new level.`; box.append(warning);
     }
   }
   function render() {
     for (const key of ['number', 'name', 'finaleTitle', 'finaleRule', 'firstHazardAfter', 'hazardInterval']) $(key).value = draft[key];
     $('file-name').textContent = `level_${String(draft.number).padStart(2, '0')}.dart`;
-    $('undo').disabled = !undo.length; $('redo').disabled = !redo.length;
+    $('undo').disabled = viewing || !undo.length; $('redo').disabled = viewing || !redo.length;
+    for (const id of ['number', 'name', 'finaleTitle', 'finaleRule', 'firstHazardAfter', 'hazardInterval', 'snap', 'add-wave', 'delete', 'new', 'import', 'save', 'save-game']) $(id).disabled = !!viewing;
+    document.body.classList.toggle('viewing', !!viewing); $('view-banner').hidden = !viewing;
+    if (viewing) $('view-title').textContent = `Level ${viewing} · ${draft.name}`;
     $('wave').replaceChildren();
     if (!draft.hazards.length) $('wave').add(new Option('No waves yet', -1));
     draft.hazards.forEach((w, i) => $('wave').add(new Option(`${i + 1}. ${w.kind === 'laser' ? 'Laser' : 'Moving hole'} · ${w.positions.length} positions`, i)));
-    $('wave').value = String(waveIndex); $('wave-up').disabled = waveIndex <= 0; $('delete-wave').disabled = waveIndex < 0;
+    $('wave').value = String(waveIndex); $('wave-up').disabled = viewing || waveIndex <= 0; $('delete-wave').disabled = viewing || waveIndex < 0;
     const all = objects(); $('objects').replaceChildren(); $('object-count').textContent = `(${all.length})`;
     for (const ref of all) {
       const button = document.createElement('button'); button.className = 'object-item'; button.classList.toggle('selected', !!same(selection, ref));
@@ -153,7 +208,8 @@
       $('objects').append(button);
     }
     $('counts').textContent = `${draft.holes.filter(h => h.target).length}/10 targets · ${draft.holes.filter(h => !h.target).length} traps · ${draft.spiders.length} spiders`;
-    try { localStorage.setItem(storageKey, JSON.stringify(draft)); $('autosave').textContent = 'Draft saved in this browser'; }
+    if (viewing) $('autosave').textContent = 'Read-only preview · your draft is untouched';
+    else try { localStorage.setItem(storageKey, JSON.stringify(draft)); $('autosave').textContent = unsaved() ? 'Unsaved changes · autosaved in this browser' : 'No unsaved changes'; }
     catch (_) { $('autosave').textContent = 'Autosave unavailable — use Save draft'; }
     refreshTools(); inspector(); validation(); draw();
   }
@@ -243,7 +299,7 @@
     });
   }
   canvas.onpointerdown=e=>{
-    if(e.button!==0)return;
+    if(e.button!==0||viewing)return;
     const p=point(e),found=hit(p);
     if(tool==='erase'){selection=found||null;deleteSelection();return;}
     if(found){selection=found;if(found.type==='hazard')waveIndex=found.wave;remember();drag={id:e.pointerId,start:point(e),x:found.o.x,y:found.o.y};canvas.setPointerCapture(e.pointerId);render();}
@@ -269,19 +325,30 @@
     if(typeof value==='number' && (!Number.isFinite(value)||(key==='number' && (!Number.isInteger(value)||value<1)))){render();return;}
     change(()=>{draft[key]=value;});
   };
-  $('new').onclick=()=>{if(!objects().length||confirm('Start a new draft? Save a JSON draft first if you want to keep this one.'))replaceDraft(M.blank(nextNumber()));};
-  for(const p of presets){const button=document.createElement('button');button.textContent=`${String(p.number).padStart(2,'0')} · ${p.name}`;button.onclick=()=>{
-    if(objects().length&&!confirm('Replace this draft with a copy of the selected level?'))return;
-    const copy=M.clone(p);copy.number=nextNumber();replaceDraft(copy);$('open-dialog').close();toast(`Copied level ${p.number} into level ${copy.number}`);
-  };$('level-list').append(button);}
-  $('load').onclick=()=>$('open-dialog').showModal();
+  $('new').onclick=()=>{if(!unsaved()||confirm('Start a new draft? Your unsaved changes will be lost.'))replaceDraft(M.blank(nextNumber()));};
+  $('load').onclick=()=>{levelList();$('open-dialog').showModal();};
+  $('view-edit').onclick=()=>edit(presets.find(level=>level.number===viewing));
+  $('view-back').onclick=leaveView;
   for(const button of document.querySelectorAll('[data-close]'))button.onclick=()=>$(button.dataset.close).close();
   function download(text,filename,type){const url=URL.createObjectURL(new Blob([text],{type}));const a=document.createElement('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
-  $('save').onclick=()=>download(JSON.stringify(draft,null,2),`level_${String(draft.number).padStart(2,'0')}.draft.json`,'application/json');
+  $('save').onclick=()=>{download(JSON.stringify(draft,null,2),`level_${String(draft.number).padStart(2,'0')}.draft.json`,'application/json');markClean();render();};
+  $('save-game').onclick=async()=>{
+    const button=$('save-game');
+    try {
+      M.exportDart(draft);
+      button.disabled=true;button.textContent='Saving…';
+      const session=await fetch('/api/session').then(r=>r.json());
+      const response=await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json','X-Builder-Token':session.token},body:JSON.stringify(draft)});
+      const result=await response.json();if(!response.ok)throw Error(result.error||'Save failed.');
+      presets=await fetch('/api/levels').then(r=>r.json());
+      markClean(draft.number);render();$('autosave').textContent=`Saved to ${result.file}`;
+      toast(`Saved level ${draft.number} to game. Rebuild the game to play it.`);
+    } catch(e){toast(e.message);} finally {button.disabled=false;button.textContent='Save to game';}
+  };
   $('import').onclick=()=>$('import-file').click();
   $('import-file').onchange=async()=>{const file=$('import-file').files[0];if(!file)return;try{
     if(file.size>2_000_000)throw Error('Draft is too large (maximum 2 MB).');
-    const next=M.parseDraft(await file.text());if(objects().length&&!confirm('Replace this draft with the imported file?'))return;replaceDraft(next);toast('Draft imported');
+    const next=M.parseDraft(await file.text());if(unsaved()&&!confirm('Replace your unsaved draft with the imported file?'))return;replaceDraft(next);toast('Draft imported');
   }catch(e){toast(e.message);}finally{$('import-file').value='';}};
   $('export').onclick=()=>{try{
     $('code').value=M.exportDart(draft);$('export-title').textContent=`Export level_${String(draft.number).padStart(2,'0')}.dart`;
@@ -293,6 +360,7 @@
   $('download').onclick=()=>download($('code').value,`level_${String(draft.number).padStart(2,'0')}.dart`,'text/plain');
   document.addEventListener('keydown',e=>{
     if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)||document.querySelector('dialog[open]'))return;
+    if(viewing){if(e.key==='Escape')leaveView();return;}
     if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?restore(redo,undo):restore(undo,redo);}
     else if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSelection();}
     else if(e.key==='Escape'){selection=null;tool='select';render();}

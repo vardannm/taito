@@ -1,19 +1,20 @@
 # Developer level builder
 
-From the project folder, run:
-
-```powershell
-.\scripts\level_builder.ps1
-```
-
-Open http://127.0.0.1:8765 in a browser. Keep the terminal open; Ctrl+C stops it.
-Use `-Port 8766` if the default port is busy. The editor is served only on loopback.
+Double-click `level_builder.cmd` in the project folder (or run `.\level_builder`
+from a terminal there). The builder opens in your browser when it is ready; if
+it is already running, it just opens the page. Close the window to stop it, or
+run `.\level_builder -Stop` to stop every running builder on any port.
+Use `.\level_builder -Port 8766` if the default port is busy, or `-NoBrowser`
+to skip opening the browser. The editor is served only on loopback.
 No editor files are Flutter assets or imports of the game's entry point; this
 tool is not compiled into the player app. No Firebase account is used here.
 
 ## Create a level
 
-- Start blank, or **Open existing** to copy a level into the next available number.
+- Start blank, or **Open existing**: the eye button previews a level read-only
+  (your draft stays untouched; switch freely between levels), and the pencil
+  button edits that level with its original number. You are only asked to
+  confirm when your current draft has unsaved changes.
 - Place **Target** holes 1–10, **Trap holes**, **Spiders**, **Lasers**, or **Moving holes**.
 - Drag objects, or select them and type exact properties in the inspector.
 - Use **Erase**, Delete, **Undo**, and **Redo**. Snap can be switched off.
@@ -27,7 +28,10 @@ tool is not compiled into the player app. No Firebase account is used here.
 - Add briefing text and timing under **Briefing & timing**.
 - The browser autosaves one current draft. **Save draft** downloads a JSON file
   for durable storage; **Import draft** restores it. Save drafts before replacing them.
-- Resolve blocking level checks, review warnings, then **Export Dart**.
+- Resolve blocking level checks, review warnings, then **Save to game**. This writes
+  the numbered Dart file and updates the registry. Rebuild and playtest afterward.
+  Existing source is backed up under `artifacts/level-builder-backups/`.
+- **Export Dart** remains available for manual downloads.
 
 ## Add level 81 to the game
 
@@ -43,7 +47,10 @@ the suggested next level number.
 Use consecutive numbers and keep existing IDs unchanged. The registration command
 rejects gaps or mismatched constants. It does not overwrite individual levels.
 To edit an existing level, explicitly set its original number before exporting.
-There is no automatic write from the browser to the game source.
+**Save to game** writes directly to that numbered source file. The local server
+requires Node.js on PATH to validate/export with the shared editor model.
+Changing a level number to the next available number creates a new level instead.
+Saving does not rebuild a running game or update its installed release.
 
 Validation checks structure, numeric bounds, targets and spacing. It does not
 prove every route is playable; use actual gameplay to verify difficulty and hazards.

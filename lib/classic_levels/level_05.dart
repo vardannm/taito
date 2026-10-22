@@ -21,11 +21,18 @@ const classicLevel05 = ClassicLevelDefinition(
     Hole(184, 300),
     Hole(184, 256),
     Hole(316, 256),
+    Hole(24, 200),
+    Hole(70, 210),
+    Hole(336, 330),
+    Hole(240, 100),
+    Hole(130, 250),
   ],
-  spiders: [],
+  spiders: [
+  ],
   finaleTitle: "",
   finaleRule: "",
-  hazards: [],
+  hazards: [
+  ],
   firstHazardAfter: 3,
   hazardInterval: 9,
 );

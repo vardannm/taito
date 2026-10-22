@@ -28,10 +28,10 @@ const classicLevel12 = ClassicLevelDefinition(
     Hole(124, 374),
     Hole(164, 374),
   ],
-  spiders: [],
+  spiders: [
+  ],
   finaleTitle: "Crescent",
-  finaleRule:
-      "A marked lane warns before it fires. Cross while the light is dark.",
+  finaleRule: "A marked lane warns before it fires. Cross while the light is dark.",
   hazards: [
     ClassicHazardWave(
       kind: HazardKind.laser,
@@ -54,6 +54,22 @@ const classicLevel12 = ClassicLevelDefinition(
         ClassicHazardPosition(target: 8, x: 248, y: 92.6),
         ClassicHazardPosition(target: 9, x: 88, y: 127.3),
         ClassicHazardPosition(target: 10, x: 136, y: 65),
+      ],
+    ),
+    ClassicHazardWave(
+      kind: HazardKind.laser,
+      motion: HazardMotion.legacy,
+      orientation: LaserOrientation.horizontal,
+      radiusX: 40,
+      radiusY: 25,
+      period: 4,
+      phase: 0,
+      warningSeconds: 2.4,
+      liveSeconds: 1.2,
+      positions: [
+        ClassicHazardPosition(target: 1, x: 320, y: 260),
+        ClassicHazardPosition(target: 1, x: 310, y: 190),
+        ClassicHazardPosition(target: 1, x: 320, y: 400),
       ],
     ),
   ],

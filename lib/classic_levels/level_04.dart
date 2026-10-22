@@ -20,11 +20,16 @@ const classicLevel04 = ClassicLevelDefinition(
     Hole(152, 72),
     Hole(40, 214),
     Hole(324, 54),
+    Hole(330, 230),
+    Hole(310, 340),
+    Hole(130, 370),
   ],
-  spiders: [],
+  spiders: [
+  ],
   finaleTitle: "",
   finaleRule: "",
-  hazards: [],
+  hazards: [
+  ],
   firstHazardAfter: 3,
   hazardInterval: 9,
 );

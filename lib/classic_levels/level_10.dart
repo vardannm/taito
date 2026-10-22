@@ -25,11 +25,14 @@ const classicLevel10 = ClassicLevelDefinition(
     Hole(244, 168),
     Hole(76, 124),
     Hole(84, 80),
+    Hole(336, 310),
+    Hole(24, 300),
+    Hole(336, 180),
   ],
-  spiders: [],
+  spiders: [
+  ],
   finaleTitle: "The light gate",
-  finaleRule:
-      "A marked lane warns before it fires. Cross while the light is dark.",
+  finaleRule: "A marked lane warns before it fires. Cross while the light is dark.",
   hazards: [
     ClassicHazardWave(
       kind: HazardKind.laser,
