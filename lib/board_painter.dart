@@ -22,6 +22,7 @@ import 'heart_loss_effect.dart';
 import 'pickup_painter.dart';
 import 'responsive_layout.dart';
 import 'wide_board_scenery.dart';
+import 'arena_canvas.dart';
 
 const cream = Color(0xFFF2ECDD);
 const ink = Color(0xFF163D3B);
@@ -69,17 +70,22 @@ class BoardViewport {
     );
     // A wide window must show the complete route. Filling its width would
     // enlarge every object and turn ordinary platform movement into camera
-    // panning. Keep the same uniform transform for paint and pointer input.
+    // panning. Fit object sizes vertically, then spread horizontal positions
+    // across the arena using the same transform as pointer input.
     scale = usesWideStage(full)
         ? fit
         : fit +
               (size.width / BalanceGame.width - fit) *
                   fillWidth.clamp(0.0, 1.0);
     final height = BalanceGame.height * scale;
+    horizontalScale =
+        scale +
+        (math.max(scale, full.width * .74 / 320) - scale) *
+            (usesWideStage(full) ? progress : 0);
     topExtension =
         math.max(0, size.height - height) / scale * fillWidth.clamp(0.0, 1.0);
     offset = Offset(
-      (size.width - BalanceGame.width * scale) / 2,
+      (size.width - BalanceGame.width * horizontalScale) / 2,
       // Slack sits above the board during a run so it rests near the control
       // area instead of leaving a gap between the two.
       topInset +
@@ -90,13 +96,8 @@ class BoardViewport {
                   0.0,
                 )),
     );
-    final edgeInset = math.min(24.0, full.width * .035);
-    railLeft = usesWideStage(full)
-        ? 20 + ((edgeInset - offset.dx) / scale - 20) * progress
-        : 20;
-    railRight = usesWideStage(full)
-        ? 340 + ((full.width - edgeInset - offset.dx) / scale - 340) * progress
-        : 340;
+    railLeft = 20;
+    railRight = 340;
     // A two-finger board is drawn down through its handle strip, so the
     // screen stays full while the play area keeps one-finger's position.
     bottomExtension = bottomInset > 0
@@ -118,8 +119,10 @@ class BoardViewport {
     focusY: game.screenY((game.left + game.right) / 2),
   );
   late final double scale;
+  late final double horizontalScale;
+  double get stretch => horizontalScale / scale;
 
-  /// Decorative rails may move outward without relocating collision geometry.
+  /// World positions shared by the supports, platform ends and side hazards.
   late final double railLeft, railRight;
   late final double topExtension;
 
@@ -131,7 +134,8 @@ class BoardViewport {
 
   /// Bottom of the control strip below the board, or 0 when there is none.
   late final double controlBottom;
-  Offset project(Offset point) => offset + point * scale;
+  Offset project(Offset point) =>
+      offset + Offset(point.dx * horizontalScale, point.dy * scale);
 
   /// Screen-space spacing keeps a thumb clear of the ball at every board scale.
   Offset gripCenter(BalanceGame game, int side, {double? heldOffset}) {
@@ -178,7 +182,7 @@ class BoardViewport {
   Rect get rect =>
       (offset - Offset(0, topExtension * scale)) &
       Size(
-        BalanceGame.width * scale,
+        BalanceGame.width * horizontalScale,
         (BalanceGame.height + topExtension) * scale,
       );
 }
@@ -236,7 +240,9 @@ class BoardPainter extends CustomPainter {
     if (_labels.length > 128) {
       _labels.remove(_labels.keys.first)!.dispose();
     }
-    p.paint(c, point - Offset(centered ? p.width / 2 : 0, p.height / 2));
+    final anchor = c is ArenaCanvas ? c.point(point) : point;
+    final surface = c is ArenaCanvas ? c.canvas : c;
+    p.paint(surface, anchor - Offset(centered ? p.width / 2 : 0, p.height / 2));
   }
 
   @override
@@ -261,10 +267,13 @@ class BoardPainter extends CustomPainter {
         sharpArea: viewport.rect,
         worldOffset: viewport.offset,
         worldScale: viewport.scale,
+        reducedMotion: reducedMotion,
       );
     }
     canvas.translate(viewport.offset.dx, viewport.offset.dy);
     canvas.scale(viewport.scale);
+    final plainCanvas = canvas;
+    if (viewport.stretch != 1) canvas = ArenaCanvas(canvas, viewport.stretch);
     final top = -viewport.topExtension;
     final bottom = viewport.paintBottom;
     final field = RRect.fromRectAndRadius(
@@ -283,7 +292,7 @@ class BoardPainter extends CustomPainter {
       );
     canvas.save();
     canvas.clipRRect(field);
-    paintInfiniteAtmosphere(canvas, game, reducedMotion);
+    if (!panoramic) paintInfiniteAtmosphere(canvas, game, reducedMotion);
     if (!panoramic)
       paintBallWorld(
         canvas,
@@ -324,16 +333,14 @@ class BoardPainter extends CustomPainter {
     final railBody = railPaint(const Color(0xFF574A31), 5);
     final railHighlight = railPaint(const Color(0xFFEEE7CC), 1);
     final grain = railPaint(ink.withAlpha(75), .6);
-    for (final (x, laser) in [
-      if (panoramic) ...[
-        (viewport.railLeft, false),
-        (viewport.railRight, false),
-      ],
-      if (!panoramic || game.laserSideRails) ...[
+    for (final (rail, laser) in [
+      ...[
         (BalanceGame.sideRailX, game.laserSideRails),
         (BalanceGame.width - BalanceGame.sideRailX, game.laserSideRails),
       ],
     ]) {
+      final canvas = plainCanvas;
+      final x = rail * viewport.stretch;
       if (laser) {
         final start = Offset(x, railTop), end = Offset(x, railBottom);
         const laserRed = Color(0xFFE34336);
@@ -379,8 +386,8 @@ class BoardPainter extends CustomPainter {
       );
       for (double y = railTop + 6; y < railBottom - 4; y += 10) {
         canvas.drawLine(
-          Offset(x + (x < 180 ? 6 : -11), y),
-          Offset(x + (x < 180 ? 10 : -7), y),
+          Offset(x + (rail < 180 ? 6 : -11), y),
+          Offset(x + (rail < 180 ? 10 : -7), y),
           grain,
         );
       }
@@ -462,8 +469,13 @@ class BoardPainter extends CustomPainter {
     paintSpiderBackdrop(canvas, game);
     final visibleHoles = game.board;
     for (final hole in visibleHoles) {
-      final p = Offset(hole.x, game.screenY(hole.y));
+      var p = Offset(hole.x, game.screenY(hole.y));
       if (p.dy < top - 32 || p.dy > 592) continue;
+      if (canvas is ArenaCanvas) {
+        canvas.save();
+        canvas.translate(p.dx, p.dy);
+        p = Offset.zero;
+      }
       final active = !game.infinite && hole.target == game.target.clamp(1, 10);
       final done = hole.target > 0 && hole.target < game.target;
       if (active) {
@@ -533,6 +545,7 @@ class BoardPainter extends CustomPainter {
           active ? const Color(0xFFE7FFD7) : brass,
           weight: FontWeight.w700,
         );
+      if (canvas is ArenaCanvas) canvas.restore();
     }
     // Keep the maker's mark on previews only.
     if (showHud)
@@ -560,8 +573,8 @@ class BoardPainter extends CustomPainter {
             canvas,
             '${mark * 10}m',
             Offset(315, y),
-            7,
-            infiniteBoardInk(game, Offset(315, y)),
+            panoramic ? 10 : 7,
+            panoramic ? cream : infiniteBoardInk(game, Offset(315, y)),
           );
           canvas.drawLine(
             Offset(30, y),
@@ -622,7 +635,7 @@ class BoardPainter extends CustomPainter {
               (reducedMotion ? 0 : game.lastStarAge * 18),
         ),
         12,
-        world.ink,
+        panoramic ? cream : world.ink,
       );
     }
     for (final coin in game.coins.where((c) => !c.collected)) {
@@ -753,7 +766,21 @@ class BoardPainter extends CustomPainter {
         ),
       );
     }
-    paintInfiniteEnergy(canvas, game, reducedMotion);
+    if (panoramic && game.infinite && game.survival.visualCombo >= .15) {
+      plainCanvas.saveLayer(
+        null,
+        Paint()..color = Colors.white.withValues(alpha: .38),
+      );
+      paintInfiniteEnergy(
+        plainCanvas,
+        game,
+        reducedMotion,
+        horizontalStretch: viewport.stretch,
+      );
+      plainCanvas.restore();
+    } else {
+      paintInfiniteEnergy(canvas, game, reducedMotion);
+    }
     // Short, fading wake behind the ball. This never changes hit geometry.
     if (game.phase == GamePhase.playing && game.started) {
       final energy = (game.motionSpeed / 220).clamp(0.0, 1.0);
@@ -834,9 +861,9 @@ class BoardPainter extends CustomPainter {
         ..strokeWidth = 1.2,
     );
     paintPlatformDetail(
-      canvas,
-      a,
-      b,
+      plainCanvas,
+      Offset(a.dx * viewport.stretch, a.dy),
+      Offset(b.dx * viewport.stretch, b.dy),
       game.platformStyle,
       time: game.clock,
       reducedMotion: reducedMotion,
@@ -855,13 +882,17 @@ class BoardPainter extends CustomPainter {
     void paintEnds() {
       for (final p in [a, b]) {
         final grip = grips
-            ? (viewport.gripCenter(
-                        game,
-                        p == a ? 0 : 1,
-                        heldOffset: gripOffsets[p == a ? 0 : 1],
-                      ) -
-                      viewport.offset) /
-                  viewport.scale
+            ? Offset(
+                p.dx,
+                (viewport.gripCenter(
+                              game,
+                              p == a ? 0 : 1,
+                              heldOffset: gripOffsets[p == a ? 0 : 1],
+                            ) -
+                            viewport.offset)
+                        .dy /
+                    viewport.scale,
+              )
             : p;
         if (grips) {
           canvas.drawLine(
@@ -888,9 +919,10 @@ class BoardPainter extends CustomPainter {
         canvas.drawCircle(grip, 2, Paint()..color = brass);
         if (grips) {
           for (final dy in [-7.0, 7.0]) {
-            canvas.drawLine(
-              grip + Offset(-6, dy) / viewport.scale,
-              grip + Offset(6, dy) / viewport.scale,
+            final anchor = Offset(grip.dx * viewport.stretch, grip.dy);
+            plainCanvas.drawLine(
+              anchor + Offset(-6, dy) / viewport.scale,
+              anchor + Offset(6, dy) / viewport.scale,
               Paint()
                 ..color = brass
                 ..strokeWidth = 1.5,
@@ -989,7 +1021,7 @@ class BoardPainter extends CustomPainter {
     }
     canvas.restore();
     if (grips) paintEnds();
-    canvas.restore();
+    plainCanvas.restore();
   }
 
   @override

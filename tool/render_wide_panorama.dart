@@ -38,6 +38,21 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final key = GlobalKey();
+    Future<void> capture(String name) async {
+      expect(tester.takeException(), isNull, reason: name);
+      final image =
+          await (key.currentContext!.findRenderObject()
+                  as RenderRepaintBoundary)
+              .toImage(pixelRatio: 1);
+      await tester.runAsync(() async {
+        final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+        await File(
+          'artifacts/panorama-$name.png',
+        ).writeAsBytes(bytes!.buffer.asUint8List());
+      });
+      image.dispose();
+    }
+
     for (final (name, size, cosmetic) in [
       ('phone', const Size(390, 844), BallCosmetic.steel),
       ('duo', const Size(1114, 720), BallCosmetic.steel),
@@ -85,17 +100,22 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 600));
         expect(tester.takeException(), isNull, reason: '$name $mode');
-        final image =
-            await (key.currentContext!.findRenderObject()
-                    as RenderRepaintBoundary)
-                .toImage(pixelRatio: 1);
-        await tester.runAsync(() async {
-          final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-          await File(
-            'artifacts/panorama-$name-${mode.name}.png',
-          ).writeAsBytes(bytes!.buffer.asUint8List());
-        });
-        image.dispose();
+        await capture('$name-${mode.name}');
+        if (mode == GameMode.infinite && name != 'phone') {
+          final dynamic state = tester.state(find.byType(GameScreen));
+          final game = tester.widget<PivotBoard>(find.byType(PivotBoard)).game;
+          game.survival.combo = 10;
+          game.survival.visualCombo = 1;
+          game.survival.points = 4201;
+          game.score = 4201;
+          game.survival.announce('LASER MAZE · steer through the gaps');
+          game.left = 440;
+          game.right = 475;
+          state.hud.value = Object();
+          state.frame.value++;
+          await tester.pump();
+          await capture('$name-max-combo');
+        }
         await tester.pumpWidget(const SizedBox());
       }
     }

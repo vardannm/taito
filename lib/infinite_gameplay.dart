@@ -26,10 +26,22 @@ extension InfiniteGameplay on BalanceGame {
     ({double x, double y}) pull(Object reward, double x, double y) {
       before[reward] = (x: x, y: y);
       if (magnetRadius <= 0 ||
-          circleContact(oldX, oldY, ballX, ballY, x, y, magnetRadius) == null)
+          circleContact(
+                oldX,
+                oldY,
+                ballX,
+                ballY,
+                x,
+                y,
+                magnetRadius,
+                xScale: arenaStretch,
+              ) ==
+              null)
         return (x: x, y: y);
       final dx = ballX - x, dy = ballY - y;
-      final distance = math.sqrt(dx * dx + dy * dy);
+      final distance = math.sqrt(
+        dx * dx * arenaStretch * arenaStretch + dy * dy,
+      );
       if (distance == 0) return (x: x, y: y);
       final travel = math.min(
         distance,
@@ -228,8 +240,28 @@ extension InfiniteGameplay on BalanceGame {
     for (final x in [ballX - 70, ballX + 70]) {
       if (x < 40 || x > 320) continue;
       bool blocks(double ox, double oy, double radius) =>
-          circleContact(ballX, ballY, x, turnY, ox, oy, radius) != null ||
-          circleContact(x, turnY, x, landingY, ox, oy, radius) != null;
+          circleContact(
+                ballX,
+                ballY,
+                x,
+                turnY,
+                ox,
+                oy,
+                radius,
+                xScale: arenaStretch,
+              ) !=
+              null ||
+          circleContact(
+                x,
+                turnY,
+                x,
+                landingY,
+                ox,
+                oy,
+                radius,
+                xScale: arenaStretch,
+              ) !=
+              null;
       if (board.any((h) => blocks(h.x, h.y, 24)) ||
           porcupines.any((p) => blocks(p.x, p.y, 30)) ||
           spiders.any((s) => blocks(s.zoneX, s.zoneY, s.zoneRadius + 20)))
@@ -614,6 +646,7 @@ extension InfiniteGameplay on BalanceGame {
     double oldScreenY,
     double dt,
   ) {
+    _syncArenaGeometry();
     final rewardStarts = _pullInfiniteRewards(dt, oldX, oldY);
     final events =
         <
@@ -700,6 +733,7 @@ extension InfiniteGameplay on BalanceGame {
         0,
         0,
         BalanceGame.ballRadius + spider.bodyRadius,
+        xScale: arenaStretch,
       );
       if (t != null)
         events.add((
@@ -714,6 +748,7 @@ extension InfiniteGameplay on BalanceGame {
         ));
     }
     _updatePorcupines(dt);
+    _syncArenaGeometry();
     for (final p in porcupines) {
       final t = circleContact(
         oldX,
@@ -723,6 +758,7 @@ extension InfiniteGameplay on BalanceGame {
         p.x,
         p.y,
         BalanceGame.ballRadius + BoardPorcupine.bodyRadius,
+        xScale: arenaStretch,
       );
       if (t != null)
         events.add((
@@ -751,6 +787,7 @@ extension InfiniteGameplay on BalanceGame {
         ));
     }
     _updateSpiderWebs(dt);
+    _syncArenaGeometry();
     for (final web in webShots) {
       final t = web.contact(oldX, oldY, ballX, ballY);
       if (t != null)
@@ -778,6 +815,7 @@ extension InfiniteGameplay on BalanceGame {
           0,
           0,
           13,
+          xScale: arenaStretch,
         );
         if (t != null)
           events.add((
@@ -801,6 +839,7 @@ extension InfiniteGameplay on BalanceGame {
           0,
           0,
           12,
+          xScale: arenaStretch,
         );
         if (t != null)
           events.add((
@@ -818,7 +857,16 @@ extension InfiniteGameplay on BalanceGame {
 
     queueRewards();
     for (final hole in board) {
-      final t = circleContact(oldX, oldY, ballX, ballY, hole.x, hole.y, 8.5);
+      final t = circleContact(
+        oldX,
+        oldY,
+        ballX,
+        ballY,
+        hole.x,
+        hole.y,
+        8.5,
+        xScale: arenaStretch,
+      );
       if (t != null)
         events.add((
           t: t,

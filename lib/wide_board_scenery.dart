@@ -18,6 +18,7 @@ void paintWideBoardScenery(
   required Rect sharpArea,
   required Offset worldOffset,
   required double worldScale,
+  required bool reducedMotion,
 }) {
   final screen = Offset.zero & size;
   final world = Rect.fromLTRB(
@@ -26,7 +27,9 @@ void paintWideBoardScenery(
     (size.width - worldOffset.dx) / worldScale,
     (size.height - worldOffset.dy) / worldScale,
   );
-  final colors = boardFieldColors(game);
+  final colors = boardFieldColors(
+    game,
+  ).map((color) => Color.lerp(color, const Color(0xFF08151E), .46)!).toList();
   final key = (
     size,
     world,
@@ -59,14 +62,13 @@ void paintWideBoardScenery(
       background: false,
       reducedMotion: true,
     );
+    scene.drawRect(world, Paint()..color = Colors.black.withAlpha(32));
     _cachedScene?.dispose();
     _cachedScene = recorder.endRecording();
     _cachedSceneKey = key;
   }
   final picture = _cachedScene!;
   canvas.drawPicture(picture);
-
-  if (sharpArea.left <= 1 && sharpArea.right >= size.width - 1) return;
 
   // Blend two blur strengths continuously across the gutters. One recorded
   // scenery pass is reused; no gameplay, rails, HUD or input is blurred.
@@ -108,6 +110,18 @@ void paintWideBoardScenery(
     );
     canvas.restore();
   }
+  // Ambient ribbons continue beyond both edges; they have no central clip.
+  canvas.save();
+  canvas.translate(-size.width * .08, worldOffset.dy);
+  canvas.scale(worldScale);
+  paintInfiniteAtmosphere(
+    canvas,
+    game,
+    reducedMotion,
+    subdued: true,
+    horizontalSpread: size.width * 1.16 / (360 * worldScale),
+  );
+  canvas.restore();
 }
 
 /// 0 at the playable center, easing to 1 at either physical window edge.

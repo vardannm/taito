@@ -10,6 +10,7 @@ enum LaserOrientation { vertical, horizontal }
 /// Screen-space hazards keep their full warning visible before activation.
 /// Opened forming holes are anchored in world space, including manual camera movement.
 class SpecialHazard {
+  double arenaStretch = 1;
   SpecialHazard(
     this.kind, {
     required this.x,
@@ -156,15 +157,33 @@ class SpecialHazard {
               ay,
               bx - x,
               by,
-              -10,
-              10,
+              -10 / arenaStretch,
+              10 / arenaStretch,
               laserTop(boardTop),
               537,
             );
     } else if (kind == HazardKind.platformGap) {
-      t = _rectContact(ax, 0, bx, 0, gapLeft + 3, gapRight - 3, -1, 1);
+      t = _rectContact(
+        ax,
+        0,
+        bx,
+        0,
+        gapLeft + 3 / arenaStretch,
+        gapRight - 3 / arenaStretch,
+        -1,
+        1,
+      );
     } else {
-      t = circleContact(ax - _oldX, ay - _oldY, bx - x, by - y, 0, 0, 8.5);
+      t = circleContact(
+        ax - _oldX,
+        ay - _oldY,
+        bx - x,
+        by - y,
+        0,
+        0,
+        8.5,
+        xScale: arenaStretch,
+      );
     }
     return t == null ? null : _from + (_until - _from) * t;
   }

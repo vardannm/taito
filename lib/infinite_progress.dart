@@ -166,9 +166,13 @@ double? circleContact(
   double by,
   double x,
   double y,
-  double radius,
-) {
-  final ox = ax - x, oy = ay - y, dx = bx - ax, dy = by - ay;
+  double radius, {
+  double xScale = 1,
+}) {
+  final ox = (ax - x) * xScale,
+      oy = ay - y,
+      dx = (bx - ax) * xScale,
+      dy = by - ay;
   final c = ox * ox + oy * oy - radius * radius;
   if (c <= 0) return 0;
   final a = dx * dx + dy * dy;

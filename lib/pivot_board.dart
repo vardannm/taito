@@ -101,6 +101,7 @@ class _PivotBoardState extends State<PivotBoard> {
       fillWidth: widget.fillWidth,
       bottomInset: bottomInset,
     );
+    game.arenaStretch = viewportNow().stretch;
     game.visibleTop = -viewportNow().topExtension;
     game.visibleBottom = viewportNow().paintBottom;
     void release(PointerEvent event) {

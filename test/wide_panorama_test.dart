@@ -29,7 +29,7 @@ void main() {
 
   for (final mode in GameMode.values) {
     test(
-      '$mode paints border rails and two scenery blur passes without changing play',
+      '$mode paints a connected arena and two scenery blur passes without changing play',
       () {
         final game = BalanceGame(seed: 41)..start(gameMode: mode);
         final before = (
@@ -46,14 +46,17 @@ void main() {
           final view = BoardViewport.forGame(size, game, fillWidth: 1);
           final canvas = RailCanvas();
           BoardPainter(game, fillWidth: 1, showHud: false).paint(canvas, size);
-          expect(canvas.rails, [view.railLeft, view.railRight]);
+          expect(canvas.rails, [
+            view.railLeft * view.stretch,
+            view.railRight * view.stretch,
+          ]);
           expect(
-            view.project(Offset(canvas.rails.first, 0)).dx,
-            closeTo(24, .001),
+            view.offset.dx + canvas.rails.first * view.scale,
+            closeTo(size.width * .13, .001),
           );
           expect(
-            view.project(Offset(canvas.rails.last, 0)).dx,
-            closeTo(size.width - 24, .001),
+            view.offset.dx + canvas.rails.last * view.scale,
+            closeTo(size.width * .87, .001),
           );
           expect(canvas.layers, 2);
           expect((
@@ -97,8 +100,13 @@ void main() {
       fillWidth: 1,
       showHud: false,
     ).paint(canvas, const Size(1114, 720));
-    expect(canvas.rails.length, 2);
-    expect(canvas.lasers, containsAll([20.0, 340.0]));
+    final view = BoardViewport.forGame(
+      const Size(1114, 720),
+      game,
+      fillWidth: 1,
+    );
+    expect(canvas.rails, isEmpty);
+    expect(canvas.lasers, containsAll([20 * view.stretch, 340 * view.stretch]));
     expect(game.laserSideRails, isTrue);
     expect(BalanceGame.sideLaserContactX, 30);
   });

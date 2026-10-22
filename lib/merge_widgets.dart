@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'arena_canvas.dart';
 import 'package:flutter/material.dart';
 import 'menu_design.dart';
 import 'merge.dart';
@@ -72,6 +73,23 @@ void paintNumberOrb(
   bool danger = false,
   double opacity = 1,
 }) {
+  if (canvas is ArenaCanvas) {
+    final projected = canvas;
+    projected.canvas.save();
+    final p = projected.point(center);
+    projected.canvas.translate(p.dx, p.dy);
+    paintNumberOrb(
+      projected.canvas,
+      Offset.zero,
+      value,
+      radius,
+      match: match,
+      danger: danger,
+      opacity: opacity,
+    );
+    projected.canvas.restore();
+    return;
+  }
   if (danger) {
     canvas.drawCircle(
       center,

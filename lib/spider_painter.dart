@@ -2,9 +2,12 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'game.dart';
 import 'infinite_painter.dart';
+import 'arena_canvas.dart';
 
 void paintSpiderBackdrop(Canvas c, BalanceGame game) {
   if (game.spiders.isEmpty) return;
+  final projection = c is ArenaCanvas ? c : null;
+  if (projection != null) c = projection.canvas;
   final thread = Paint()
     ..color = const Color(0xFF193C38).withAlpha(32)
     ..style = PaintingStyle.stroke
@@ -18,7 +21,8 @@ void paintSpiderBackdrop(Canvas c, BalanceGame game) {
             ]
           : <(Offset, double)>[]) {
     c.save();
-    c.translate(corner.dx, corner.dy);
+    final point = projection?.point(corner) ?? corner;
+    c.translate(point.dx, point.dy);
     c.rotate(rotation);
     for (var spoke = 0; spoke <= 7; spoke++) {
       final a = spoke * math.pi / 14;
@@ -45,7 +49,9 @@ void paintSpiderBackdrop(Canvas c, BalanceGame game) {
   }
   for (final s in game.spiders) {
     final radius = s.zoneRadius;
-    final center = Offset(s.zoneX, game.screenY(s.zoneY));
+    final center =
+        projection?.point(Offset(s.zoneX, game.screenY(s.zoneY))) ??
+        Offset(s.zoneX, game.screenY(s.zoneY));
     if (center.dy + radius + 2 < game.visibleTop ||
         center.dy - radius - 2 > 560)
       continue;

@@ -48,6 +48,7 @@ enum LateShotKind {
 /// scrolling terrain. Acid attaches to the terrain on impact and scrolls away.
 /// Every shot locks its aim when the encounter starts; none homes on the ball.
 class LateEnemyEncounter {
+  double arenaStretch = 1;
   LateEnemyEncounter({
     required this.kind,
     required this.origin,
@@ -220,6 +221,7 @@ class LateEnemyEncounter {
       origin.x,
       origin.y,
       18,
+      xScale: arenaStretch,
     );
     return t == null ? null : from + t * (until - from);
   }
@@ -229,6 +231,7 @@ class LateEnemyEncounter {
 /// exact wall time and samples curves at <= 1/120s, sweeping each segment.
 /// Pending and expired fractions never damage the ball, even on a long frame.
 class LateEnemyShot {
+  double arenaStretch = 1;
   LateEnemyShot({
     required this.kind,
     required this.origin,
@@ -386,6 +389,7 @@ class LateEnemyShot {
         0,
         0,
         7 + radius,
+        xScale: arenaStretch,
       );
       if (t != null) return from + t * (until - from);
     }
@@ -410,8 +414,9 @@ class LateEnemyShot {
       final a = start + (end - start) * i / count;
       final b = start + (end - start) * (i + 1) / count;
       final first = beamAt(a), last = beamAt(b), middle = beamAt((a + b) / 2);
-      double distance(EnemyPoint p, EnemyPoint q) =>
-          math.sqrt(math.pow(p.x - q.x, 2) + math.pow(p.y - q.y, 2));
+      double distance(EnemyPoint p, EnemyPoint q) => math.sqrt(
+        math.pow((p.x - q.x) * arenaStretch, 2) + math.pow(p.y - q.y, 2),
+      );
       final padding = math.max(
         math.max(
           distance(first.start, middle.start),
@@ -446,16 +451,35 @@ class LateEnemyShot {
   }) {
     final start = segment?.start ?? origin;
     final tip = segment?.end ?? beamEnd ?? origin;
-    final dx = tip.x - start.x, dy = tip.y - start.y;
+    final dx = (tip.x - start.x) * arenaStretch, dy = tip.y - start.y;
     final length = math.sqrt(dx * dx + dy * dy);
     final contactRadius = 7 + radius + padding;
-    final near = circleContact(ax, ay, bx, by, start.x, start.y, contactRadius);
+    final near = circleContact(
+      ax,
+      ay,
+      bx,
+      by,
+      start.x,
+      start.y,
+      contactRadius,
+      xScale: arenaStretch,
+    );
     if (length < 1e-9) return near;
-    final far = circleContact(ax, ay, bx, by, tip.x, tip.y, contactRadius);
+    final far = circleContact(
+      ax,
+      ay,
+      bx,
+      by,
+      tip.x,
+      tip.y,
+      contactRadius,
+      xScale: arenaStretch,
+    );
     final ux = dx / length, uy = dy / length;
-    double along(double x, double y) => (x - start.x) * ux + (y - start.y) * uy;
+    double along(double x, double y) =>
+        (x - start.x) * arenaStretch * ux + (y - start.y) * uy;
     double across(double x, double y) =>
-        -(x - start.x) * uy + (y - start.y) * ux;
+        -(x - start.x) * arenaStretch * uy + (y - start.y) * ux;
     var lo = 0.0, hi = 1.0;
     for (final axis in [
       (along(ax, ay), along(bx, by), 0.0, length),

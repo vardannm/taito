@@ -102,7 +102,9 @@ Color contrastInk(Color background) =>
     background.computeLuminance() > .179 ? Colors.black : Colors.white;
 
 Color infiniteBoardInk(BalanceGame game, Offset point) =>
-    contrastInk(infiniteFieldColor(game, point));
+    game.arenaStretch > 1.0001
+    ? Colors.white
+    : contrastInk(infiniteFieldColor(game, point));
 
 /// Paints behind the entire game, including HUD, controls and screen margins.
 class InfiniteBackdropPainter extends CustomPainter {
@@ -142,7 +144,13 @@ class InfiniteBackdropPainter extends CustomPainter {
       old.reducedMotion != reducedMotion;
 }
 
-void paintInfiniteAtmosphere(Canvas c, BalanceGame game, bool reducedMotion) {
+void paintInfiniteAtmosphere(
+  Canvas c,
+  BalanceGame game,
+  bool reducedMotion, {
+  bool subdued = false,
+  double horizontalSpread = 1,
+}) {
   if (!game.infinite) return;
   final power = (game.survival.visualCombo * InfiniteTuning.visualIntensity)
       .clamp(0.0, 1.0);
@@ -155,26 +163,43 @@ void paintInfiniteAtmosphere(Canvas c, BalanceGame game, bool reducedMotion) {
     final drift = math.sin(game.clock * .45 + band * 2) * 45;
     final y = 80.0 + band * 160;
     final path = Path()
-      ..moveTo(10, y + drift)
-      ..cubicTo(115, y - 95, 210, y + 80, 350, y - 35 + drift)
-      ..lineTo(350, y + 30 + drift)
-      ..cubicTo(210, y + 120, 115, y - 50, 10, y + 65 + drift)
+      ..moveTo(10 * horizontalSpread, y + drift)
+      ..cubicTo(
+        115 * horizontalSpread,
+        y - 95,
+        210 * horizontalSpread,
+        y + 80,
+        350 * horizontalSpread,
+        y - 35 + drift,
+      )
+      ..lineTo(350 * horizontalSpread, y + 30 + drift)
+      ..cubicTo(
+        210 * horizontalSpread,
+        y + 120,
+        115 * horizontalSpread,
+        y - 50,
+        10 * horizontalSpread,
+        y + 65 + drift,
+      )
       ..close();
     c.drawPath(
       path,
       Paint()
         ..color = Colors.white.withValues(
-          alpha: (.08 + .05 * power) * (1 - .55 * darkness),
+          alpha:
+              (.08 + .05 * power) * (1 - .55 * darkness) * (subdued ? .35 : 1),
         ),
     );
   }
   // The pale streaks hand their frame budget over to the embers as the board
   // darkens, so the dark tiers cost no more to draw than the bright ones.
   final streakPaint = Paint()
-    ..color = Colors.white.withValues(alpha: .18 + .18 * power)
+    ..color = Colors.white.withValues(
+      alpha: (.18 + .18 * power) * (subdued ? .3 : 1),
+    )
     ..strokeWidth = 1 + power;
   for (var i = 0; i < (12 * power * (1 - darkness)).ceil(); i++) {
-    final x = 28.0 + (i * 83 % 304),
+    final x = (28.0 + (i * 83 % 304)) * horizontalSpread,
         y = 16 + (i * 137 + game.clock * (25 + 75 * power)) % 520;
     c.drawLine(Offset(x, y), Offset(x, y - 3 - 18 * power), streakPaint);
   }
@@ -182,8 +207,9 @@ void paintInfiniteAtmosphere(Canvas c, BalanceGame game, bool reducedMotion) {
     paintComboEmbers(
       c,
       game.clock,
-      darkness * (.25 + .75 * power),
+      darkness * (.25 + .75 * power) * (subdued ? .25 : 1),
       power: power,
+      horizontalSpread: horizontalSpread,
     );
 }
 
@@ -195,6 +221,7 @@ void paintComboEmbers(
   double clock,
   double darkness, {
   double power = 1,
+  double horizontalSpread = 1,
 }) {
   final violet = comboEnergyColor(power);
   const spark = Color(0xFFFFE6B8);
@@ -210,7 +237,7 @@ void paintComboEmbers(
         (life / 90).clamp(0.0, 1.0) * ((600 - life) / 200).clamp(0.0, 1.0);
     if (fade <= .02) continue;
     final sway = math.sin(clock * 1.7 + i * .8) * (5 + i % 4);
-    final p = Offset((i * 97) % 320 + 22.0 + sway, y);
+    final p = Offset(((i * 97) % 320 + 22.0 + sway) * horizontalSpread, y);
     final twinkle = .75 + .25 * math.sin(clock * 4 + i * 1.3);
     final radius = (1.3 + (i % 3) * .55) * twinkle * fade;
     glow.addOval(Rect.fromCircle(center: p, radius: radius * 3.4));
@@ -249,12 +276,17 @@ void paintInfiniteItems(Canvas c, BalanceGame game, bool reducedMotion) {
 
 /// Bounded, blur-free energy: gradients and shared paths avoid a separate
 /// blur render pass for every spark/arc. Cost does not grow with pace/combo.
-void paintInfiniteEnergy(Canvas c, BalanceGame game, bool reducedMotion) {
+void paintInfiniteEnergy(
+  Canvas c,
+  BalanceGame game,
+  bool reducedMotion, {
+  double horizontalStretch = 1,
+}) {
   if (!game.infinite || game.survival.visualCombo < .15) return;
   final power = game.survival.visualCombo.clamp(0.0, 1.0);
   final strength = ((power - .15) / .85).clamp(0.0, 1.0);
-  final a = Offset(20, game.screenY(game.left));
-  final b = Offset(340, game.screenY(game.right));
+  final a = Offset(20 * horizontalStretch, game.screenY(game.left));
+  final b = Offset(340 * horizontalStretch, game.screenY(game.right));
   if (math.max(a.dy, b.dy) < -40 || math.min(a.dy, b.dy) > 610) return;
   final direction = b - a, span = direction.distance;
   if (span <= 0) return;
@@ -361,7 +393,10 @@ void paintInfiniteEnergy(Canvas c, BalanceGame game, bool reducedMotion) {
   );
   c.restore();
   if (game.ballScale > 0) {
-    final ball = Offset(game.visualX, game.screenY(game.visualY));
+    final ball = Offset(
+      game.visualX * horizontalStretch,
+      game.screenY(game.visualY),
+    );
     c.drawCircle(
       ball,
       9 + 6 * strength,

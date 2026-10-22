@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'arena_canvas.dart';
 
 /// Pickup faces: the brass coin and the three Infinite crystals. Every one is
 /// built from flat fills and gradients — no blurs, no layers — so a screenful
@@ -11,6 +12,10 @@ const _coinFace = Color(0xFFFFE9A8), _coinDeep = Color(0xFFE0A93F);
 
 /// Five points and a steady cream edge distinguish progression from currency.
 void paintLevelStar(Canvas c, Offset p, double pulse) {
+  if (c is ArenaCanvas) {
+    c.actor(p, (surface) => paintLevelStar(surface, Offset.zero, pulse));
+    return;
+  }
   c.drawCircle(p, 19 + pulse * 2, Paint()..color = const Color(0x33FFD66E));
   c.drawCircle(p, 15, Paint()..color = const Color(0x22FFFFFF));
   final path = Path();
@@ -50,6 +55,10 @@ void paintLevelStar(Canvas c, Offset p, double pulse) {
 /// edge-on is an unreadable sliver, so it never narrows past half its face.
 /// Purely visual; the collection radius never changes with it.
 void paintBrassCoin(Canvas c, Offset p, double radius, double spin) {
+  if (c is ArenaCanvas) {
+    c.actor(p, (surface) => paintBrassCoin(surface, Offset.zero, radius, spin));
+    return;
+  }
   final turn = .55 + .45 * spin.abs();
   final width = radius * turn;
   final face = Rect.fromCenter(center: p, width: width * 2, height: radius * 2);
@@ -136,6 +145,10 @@ const _faces = {
 
 /// [glint] runs 0..1 and sweeps the highlight; pass 0 for reduced motion.
 void paintPickup(Canvas c, Offset p, PickupFace face, double glint) {
+  if (c is ArenaCanvas) {
+    c.actor(p, (surface) => paintPickup(surface, Offset.zero, face, glint));
+    return;
+  }
   final (light, mid, dark) = _faces[face]!;
   // A cream setting keeps every pickup readable on any board tint.
   c.drawCircle(p, 13.5, Paint()..color = mid.withAlpha(46));

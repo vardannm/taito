@@ -44,14 +44,13 @@ void main() {
             if (fill == 1) {
               expect(view.project(Offset.zero).dy, greaterThanOrEqualTo(96));
             }
-            final center = view.project(const Offset(180, 280));
-            expect(
-              (view.project(const Offset(187, 280)) - center).distance,
-              closeTo(
-                (view.project(const Offset(180, 287)) - center).distance,
-                .00001,
-              ),
-            );
+            expect(view.horizontalScale, greaterThanOrEqualTo(view.scale));
+            if (fill == 1) {
+              final span =
+                  view.project(const Offset(340, 0)).dx -
+                  view.project(const Offset(20, 0)).dx;
+              expect(span, closeTo(size.width * .74, .001));
+            }
             offset ??= view.offset;
             expect(view.offset, offset);
             for (final side in [0, 1]) {

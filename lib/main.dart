@@ -1381,6 +1381,194 @@ class _GameScreenState extends State<GameScreen>
     },
   );
 
+  Widget wideBoardChrome() => Align(
+    alignment: Alignment.topCenter,
+    child: Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: SizedBox(
+        width: math.min(1280, MediaQuery.sizeOf(context).width * .8),
+        height: 80,
+        child: AnimatedBuilder(
+          animation: Listenable.merge([hud, backdrop]),
+          builder: (context, _) {
+            const detail = TextStyle(
+              color: menuText,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            );
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.topLeft,
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          key: tutorialHeartsKey,
+                          child: game.practice
+                              ? null
+                              : Semantics(
+                                  key: const ValueKey('board-hearts'),
+                                  label:
+                                      '${game.lives} of ${game.heartCapacity} hearts remaining',
+                                  excludeSemantics: true,
+                                  child: Row(
+                                    children: [
+                                      for (
+                                        var i = 0;
+                                        i < game.heartCapacity;
+                                        i++
+                                      )
+                                        Icon(
+                                          i < game.lives
+                                              ? Icons.favorite_rounded
+                                              : Icons.favorite_border_rounded,
+                                          key: ValueKey('board-heart-$i'),
+                                          size: 22,
+                                          color: i < game.lives
+                                              ? const Color(0xFFEF6958)
+                                              : menuMuted,
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                        ),
+                        const SizedBox(width: 20),
+                        IgnorePointer(
+                          key: tutorialScoreKey,
+                          child: Column(
+                            key: const ValueKey('board-hud'),
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                game.mode == GameMode.classic
+                                    ? '${game.completed}/10'
+                                    : '${game.score}',
+                                key: game.infinite
+                                    ? const ValueKey('infinite-score')
+                                    : null,
+                                style: const TextStyle(
+                                  color: menuText,
+                                  fontSize: 32,
+                                  height: 1.1,
+                                  fontWeight: FontWeight.w800,
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                              if (game.infinite)
+                                Text(
+                                  '${game.survival.combo}×${game.survival.combo == InfiniteTuning.maxCombo ? ' MAX' : ''}',
+                                  style: detail,
+                                )
+                              else if (game.merging) ...[
+                                Text(
+                                  'TOP ${formatMergeNumber(game.mergeRun.highest)}',
+                                  style: detail,
+                                ),
+                                MergeStatus(
+                                  run: game.mergeRun,
+                                  color: menuText,
+                                ),
+                              ] else
+                                Text(
+                                  game.practice
+                                      ? 'PRACTICE · ${formatRunTime(game.elapsed)}'
+                                      : game.daily
+                                      ? 'L${game.level} · TARGET ${game.target.clamp(1, 10)}/10 · ${formatRunTime(game.elapsed)}'
+                                      : 'LEVEL ${game.level} · ${formatRunTime(game.elapsed)}',
+                                  style: detail,
+                                ),
+                              if (game.mode == GameMode.classic)
+                                Row(
+                                  key: const ValueKey(
+                                    'classic-bonus-star-status',
+                                  ),
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.star_rounded,
+                                      color: menuGold,
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      game.levelStarAlreadyOwned ||
+                                              game.levelStarCollected
+                                          ? 'COLLECTED'
+                                          : 'BONUS STAR',
+                                      style: detail,
+                                    ),
+                                  ],
+                                ),
+                              if (game.infinite && game.survival.noticeTime > 0)
+                                SizedBox(
+                                  width: 330,
+                                  child: Text(
+                                    game.survival.notice,
+                                    key: const ValueKey(
+                                      'infinite-pickup-notice',
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: detail,
+                                  ),
+                                ),
+                              if (game.infinite && game.survival.protected)
+                                Text(
+                                  game.survival.shield > 0
+                                      ? 'SHIELD ${game.survival.shield.ceil()}s'
+                                      : 'RECOVERY ${game.survival.recovery.ceil()}s',
+                                  key: const ValueKey('protection-status'),
+                                  style: detail,
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 24),
+                if (game.infinite && !offeringRevive)
+                  IgnorePointer(
+                    key: tutorialCoinsKey,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 7, right: 14),
+                      child: RunCoinSummary(
+                        key: const ValueKey('run-coins'),
+                        wallet: profile.wallet,
+                        collected: game.coinsCollected,
+                        unlimited: profile.unlimitedCoins,
+                        compact: true,
+                      ),
+                    ),
+                  ),
+                IconButton.filledTonal(
+                  key: const ValueKey('board-pause'),
+                  tooltip: game.paused ? 'Resume' : 'Pause',
+                  onPressed: pause,
+                  style: IconButton.styleFrom(
+                    backgroundColor: menuRaised,
+                    foregroundColor: menuText,
+                  ),
+                  icon: Icon(
+                    game.paused
+                        ? Icons.play_arrow_rounded
+                        : Icons.pause_rounded,
+                    size: 24,
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    ),
+  );
+
   Widget boardChrome() {
     if (!tutorialActive && game.waitingForInput) {
       if (!playArmed) return const SizedBox();
@@ -1466,6 +1654,7 @@ class _GameScreenState extends State<GameScreen>
         ),
       );
     }
+    if (usesWideStage(MediaQuery.sizeOf(context))) return wideBoardChrome();
     return Align(
       alignment: Alignment.topCenter,
       child: Padding(
@@ -2840,10 +3029,11 @@ class _GameScreenState extends State<GameScreen>
                         ],
                       ),
                     ),
-                  if (!offeringRevive &&
-                          game.infinite &&
-                          !game.waitingForInput ||
-                      tutorialActive && tutorialStep.inInfinite)
+                  if (!usesWideStage(MediaQuery.sizeOf(context)) &&
+                      (!offeringRevive &&
+                              game.infinite &&
+                              !game.waitingForInput ||
+                          tutorialActive && tutorialStep.inInfinite))
                     Positioned(
                       top: MediaQuery.paddingOf(context).top + 70,
                       right: 24,

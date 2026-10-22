@@ -31,6 +31,7 @@ class MergeGate {
 
 /// Values descend from the head into a tapered, downward trailing snake.
 class MergeRun {
+  double arenaStretch = 1;
   MergeRun({int? seed}) : random = math.Random(seed) {
     assert(MergeDifficulty.startSpeed > 0);
     assert(MergeDifficulty.speedPerDoubling >= 0);
@@ -128,8 +129,8 @@ class MergeRun {
 
   // Only the head collects or collides. The decorative tail follows turns
   // through successive links and never restricts horizontal steering.
-  double get minHeadX => platformLeft + ballRadius;
-  double get maxHeadX => platformRight - ballRadius;
+  double get minHeadX => platformLeft + ballRadius / arenaStretch;
+  double get maxHeadX => platformRight - ballRadius / arenaStretch;
   double segmentX(double headX, int index) {
     var x = headX;
     for (var i = 1; i <= index; i++) {
@@ -253,8 +254,8 @@ class MergeRun {
     double travel,
     double radius,
   ) {
-    final ox = ax - x, oy = ay - y;
-    final dx = bx - ax, dy = by - ay - travel;
+    final ox = (ax - x) * arenaStretch, oy = ay - y;
+    final dx = (bx - ax) * arenaStretch, dy = by - ay - travel;
     final length = dx * dx + dy * dy;
     final c = ox * ox + oy * oy - radius * radius;
     if (c <= 0) return 0;

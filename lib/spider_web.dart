@@ -4,6 +4,7 @@ import 'infinite_progress.dart';
 /// World-space web shots move independently of the camera and platform.
 /// Aim is fixed at launch; neither the warning nor the shot tracks the player.
 class SpiderWebShot {
+  double arenaStretch = 1;
   SpiderWebShot({
     required this.x,
     required this.y,
@@ -49,6 +50,7 @@ class SpiderWebShot {
       0,
       0,
       7 + InfiniteTuning.webRadius,
+      xScale: arenaStretch,
     );
     return t == null ? null : _from + (_until - _from) * t;
   }

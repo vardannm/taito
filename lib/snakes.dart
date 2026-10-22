@@ -6,6 +6,7 @@ typedef SnakePoint = ({double x, double y});
 /// A travelling wave along a tapered body, moving diagonally in world space.
 /// The same body samples drive drawing and swept collision, including the tail.
 class BoardSnake {
+  double arenaStretch = 1;
   BoardSnake({
     required this.x,
     required this.y,
@@ -75,6 +76,7 @@ class BoardSnake {
         0,
         0,
         7 + radiusAt(i),
+        xScale: arenaStretch,
       );
       if (t != null && (first == null || t < first)) first = t;
     }

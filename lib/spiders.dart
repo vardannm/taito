@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 /// A fixed territory with slow patrol and a persistent chase once disturbed.
 class BoardSpider {
+  double arenaStretch = 1;
   BoardSpider(
     this.homeX,
     this.homeY,
@@ -37,15 +38,14 @@ class BoardSpider {
   ) {
     if (dt <= 0 || !dt.isFinite) return false;
     final oldX = x, oldY = y;
-    final dx = ballX - oldBallX, dy = ballY - oldBallY;
+    final dx = (ballX - oldBallX) * arenaStretch, dy = ballY - oldBallY;
     final length = dx * dx + dy * dy;
     final t = length == 0
         ? 0.0
-        : (((homeX - oldBallX) * dx + (homeY - oldBallY) * dy) / length).clamp(
-            0.0,
-            1.0,
-          );
-    if (math.pow(oldBallX + dx * t - homeX, 2) +
+        : (((homeX - oldBallX) * arenaStretch * dx + (homeY - oldBallY) * dy) /
+                  length)
+              .clamp(0.0, 1.0);
+    if (math.pow((oldBallX - homeX) * arenaStretch + dx * t, 2) +
             math.pow(oldBallY + dy * t - homeY, 2) <=
         math.pow(zoneRadius + 7, 2)) {
       chasing = true;
@@ -54,21 +54,21 @@ class BoardSpider {
     if (chasing) {
       final vx = ballX - x,
           vy = ballY - y,
-          distance = math.sqrt(vx * vx + vy * vy);
+          distance = math.sqrt(vx * vx * arenaStretch * arenaStretch + vy * vy);
       if (distance > 0) {
         final travel = math.min(distance, chaseSpeed * dt);
         x += vx / distance * travel;
         y += vy / distance * travel;
-        heading = math.atan2(vy, vx);
+        heading = math.atan2(vy, vx * arenaStretch);
       }
     } else {
       final angle = phase + time * .65;
-      x = homeX + math.cos(angle) * 12;
+      x = homeX + math.cos(angle) * 12 / arenaStretch;
       y = homeY + math.sin(angle) * 12;
       heading = angle + math.pi / 2;
     }
-    final rx = oldBallX - oldX, ry = oldBallY - oldY;
-    final vx = (ballX - x) - rx, vy = (ballY - y) - ry;
+    final rx = (oldBallX - oldX) * arenaStretch, ry = oldBallY - oldY;
+    final vx = (ballX - x) * arenaStretch - rx, vy = (ballY - y) - ry;
     final v2 = vx * vx + vy * vy;
     final hitTime = v2 == 0 ? 0.0 : (-(rx * vx + ry * vy) / v2).clamp(0.0, 1.0);
     return math.pow(rx + vx * hitTime, 2) + math.pow(ry + vy * hitTime, 2) <=

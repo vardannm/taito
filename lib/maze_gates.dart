@@ -3,6 +3,7 @@ import 'dart:math' as math;
 /// Laser walls that drift down the Infinite board during a maze section. Each
 /// one spans the playfield except for a single wide opening to steer through.
 class MazeGate {
+  double arenaStretch = 1;
   MazeGate({required this.y, required this.gapCenter, required this.gapWidth});
   static const beamHalf = 3.5, edge = 10.0, span = 340.0;
   double y;
@@ -49,8 +50,9 @@ class MazeGate {
     for (var i = 0; i <= 8; i++) {
       final t = lo + (hi - lo) * i / 8;
       final x = oldX + (newX - oldX) * t;
-      if (x - radius < gapLeft || x + radius > gapRight) {
-        if (x + radius >= edge && x - radius <= edge + span) return t;
+      final rx = radius / arenaStretch;
+      if (x - rx < gapLeft || x + rx > gapRight) {
+        if (x + rx >= edge && x - rx <= edge + span) return t;
       }
     }
     return null;

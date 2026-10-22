@@ -67,6 +67,9 @@ class BalanceGame {
   double get equipmentMultiplier =>
       1 + cosmetic.scoreBonus + platformStyle.scoreBonus;
   ControlMode controlMode = ControlMode.twoFinger;
+
+  /// Horizontal world metric chosen by the current viewport, never saved.
+  double arenaStretch = 1;
   ControlMode preferredControlMode = ControlMode.twoFinger;
   // A visual alternative to the original one-finger pad, with identical input.
   bool haloJoystick = false;
@@ -1067,7 +1070,8 @@ class BalanceGame {
       if (!paused) {
         if (started && phase == GamePhase.playing) {
           final distance = math.sqrt(
-            math.pow(ballX - oldX, 2) + math.pow(ballY - oldY, 2),
+            math.pow((ballX - oldX) * arenaStretch, 2) +
+                math.pow(ballY - oldY, 2),
           );
           // Visual decay spans the two physics ticks in a 60 Hz display frame.
           // It never feeds back into movement or the touch targets.
@@ -1090,8 +1094,40 @@ class BalanceGame {
     }
   }
 
+  void _syncArenaGeometry() {
+    for (final h in specialHazards) {
+      h.arenaStretch = arenaStretch;
+    }
+    for (final s in spiders) {
+      s.arenaStretch = arenaStretch;
+    }
+    for (final s in snakes) {
+      s.arenaStretch = arenaStretch;
+    }
+    for (final s in webShots) {
+      s.arenaStretch = arenaStretch;
+    }
+    for (final q in quills) {
+      q.arenaStretch = arenaStretch;
+    }
+    for (final g in mazeGates) {
+      g.arenaStretch = arenaStretch;
+    }
+    final visitor = lateEnemy;
+    if (visitor != null) {
+      visitor.arenaStretch = arenaStretch;
+      for (final shot in visitor.shots) {
+        shot.arenaStretch = arenaStretch;
+      }
+    }
+    for (final shot in boss?.shots ?? <LateEnemyShot>[]) {
+      shot.arenaStretch = arenaStretch;
+    }
+  }
+
   void _tick(double dt) {
     if (paused) return;
+    _syncArenaGeometry();
     clock += dt;
     if (!started || finished) return;
     if (mode == GameMode.classic) {
@@ -1221,14 +1257,17 @@ class BalanceGame {
       }
     }
     // A rolling sphere: 5/7 of gravity projected onto the bar, then onto x.
-    final slope = (right - left) / 320;
-    velocity += (6 / 7) * 1700 * slope / (1 + slope * slope) * dt;
+    final slope = (right - left) / (320 * arenaStretch);
+    velocity +=
+        (6 / 7) * 1700 * slope / (1 + slope * slope) * dt / arenaStretch;
     velocity *= math.exp(-.48 * dt);
-    velocity = velocity.clamp(-265.0, 265.0);
+    velocity = velocity.clamp(-265.0 / arenaStretch, 265.0 / arenaStretch);
     ballX += velocity * dt;
+    final laserContactX =
+        sideRailX + (sideLaserWidth / 2 + ballRadius) / arenaStretch;
     if (laserSideRails &&
-        (ballX <= sideLaserContactX || ballX >= width - sideLaserContactX)) {
-      ballX = ballX.clamp(sideLaserContactX, width - sideLaserContactX);
+        (ballX <= laserContactX || ballX >= width - laserContactX)) {
+      ballX = ballX.clamp(laserContactX, width - laserContactX);
       captureX = ballX;
       captureY = ballY;
       lives--;
@@ -1243,8 +1282,9 @@ class BalanceGame {
       clearInput();
       return;
     }
-    final minimumX = merging ? mergeRun.minHeadX : 28.0;
-    final maximumX = merging ? mergeRun.maxHeadX : 332.0;
+    if (merging) mergeRun.arenaStretch = arenaStretch;
+    final minimumX = merging ? mergeRun.minHeadX : 20 + 8 / arenaStretch;
+    final maximumX = merging ? mergeRun.maxHeadX : 340 - 8 / arenaStretch;
     if (ballX < minimumX) {
       ballX = minimumX;
       velocity = velocity.abs() * .22;
@@ -1256,7 +1296,8 @@ class BalanceGame {
     // Rolling relative to the bar, excluding its lift and the camera scroll.
     // Signed distance reverses the artwork when the ball rolls back.
     if (!merging) {
-      final rolled = (ballX - oldX) * math.sqrt(1 + slope * slope);
+      final rolled =
+          (ballX - oldX) * arenaStretch * math.sqrt(1 + slope * slope);
       ballRotation = (ballRotation + rolled / ballRadius) % (math.pi * 2);
     }
     if (infinite) {
@@ -1325,18 +1366,18 @@ class BalanceGame {
     var firstContact = double.infinity;
     for (final hole in board) {
       // Swept segment collision prevents fast balls skipping a hole between frames.
-      final dx = ballX - oldX, dy = ballY - oldY;
+      final dx = (ballX - oldX) * arenaStretch, dy = ballY - oldY;
       final length2 = dx * dx + dy * dy;
       final t = length2 == 0
           ? 0.0
-          : (((hole.x - oldX) * dx + (hole.y - oldY) * dy) / length2).clamp(
-              0.0,
-              1.0,
-            );
-      final hx = oldX + dx * t - hole.x, hy = oldY + dy * t - hole.y;
+          : (((hole.x - oldX) * arenaStretch * dx + (hole.y - oldY) * dy) /
+                    length2)
+                .clamp(0.0, 1.0);
+      final hx = (oldX - hole.x) * arenaStretch + dx * t,
+          hy = oldY + dy * t - hole.y;
       final radius = practice && hole.target == target ? 10.5 : 8.5;
       if (hx * hx + hy * hy <= radius * radius) {
-        final ox = oldX - hole.x, oy = oldY - hole.y;
+        final ox = (oldX - hole.x) * arenaStretch, oy = oldY - hole.y;
         final projection = ox * dx + oy * dy;
         final contact = length2 == 0
             ? 0.0
@@ -1378,15 +1419,15 @@ class BalanceGame {
   }
 
   void _collectCoins(double ax, double ay, double bx, double by) {
-    final dx = bx - ax, dy = by - ay, length = dx * dx + dy * dy;
+    final dx = (bx - ax) * arenaStretch,
+        dy = by - ay,
+        length = dx * dx + dy * dy;
     for (final coin in coins.where((c) => !c.collected)) {
       final t = length == 0
           ? 0.0
-          : (((coin.x - ax) * dx + (coin.y - ay) * dy) / length).clamp(
-              0.0,
-              1.0,
-            );
-      if (math.pow(ax + t * dx - coin.x, 2) +
+          : (((coin.x - ax) * arenaStretch * dx + (coin.y - ay) * dy) / length)
+                .clamp(0.0, 1.0);
+      if (math.pow((ax - coin.x) * arenaStretch + t * dx, 2) +
               math.pow(ay + t * dy - coin.y, 2) <=
           12 * 12) {
         _takeCoin(coin);
@@ -1409,11 +1450,15 @@ class BalanceGame {
   void _collectLevelStar(double ax, double ay, double bx, double by) {
     final star = levelStar;
     if (mode != GameMode.classic || star == null || star.collected) return;
-    final dx = bx - ax, dy = by - ay, length = dx * dx + dy * dy;
+    final dx = (bx - ax) * arenaStretch,
+        dy = by - ay,
+        length = dx * dx + dy * dy;
     final t = length == 0
         ? 0.0
-        : (((star.x - ax) * dx + (star.y - ay) * dy) / length).clamp(0.0, 1.0);
-    if (math.pow(ax + t * dx - star.x, 2) + math.pow(ay + t * dy - star.y, 2) >
+        : (((star.x - ax) * arenaStretch * dx + (star.y - ay) * dy) / length)
+              .clamp(0.0, 1.0);
+    if (math.pow((ax - star.x) * arenaStretch + t * dx, 2) +
+            math.pow(ay + t * dy - star.y, 2) >
         12 * 12)
       return;
     star.collected = true;

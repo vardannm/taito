@@ -2,9 +2,12 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'game.dart';
 import 'infinite_painter.dart';
+import 'arena_canvas.dart';
 
 void paintSnakes(Canvas canvas, BalanceGame game, bool reducedMotion) {
   if (!game.infinite) return;
+  final projection = canvas is ArenaCanvas ? canvas : null;
+  if (projection != null) canvas = projection.canvas;
   const palettes = [
     (Color(0xFF164D3B), Color(0xFF66B77A), Color(0xFFF0D38C)),
     (Color(0xFF285269), Color(0xFF68B9B7), Color(0xFFFFDEA0)),
@@ -17,7 +20,11 @@ void paintSnakes(Canvas canvas, BalanceGame game, bool reducedMotion) {
       continue;
     final (dark, scales, gold) = palettes[snake.variant % palettes.length];
     final points = snake.points
-        .map((p) => Offset(p.x, game.screenY(p.y)))
+        .map(
+          (p) =>
+              projection?.point(Offset(p.x, game.screenY(p.y))) ??
+              Offset(p.x, game.screenY(p.y)),
+        )
         .toList();
     final head = points.first;
     final contrast = infiniteBoardInk(game, head);
