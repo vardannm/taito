@@ -335,7 +335,7 @@ class FinaleBriefing extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'LEVEL ${game.level} · FINALE',
+                'FINALE',
                 style: const TextStyle(
                   color: brass,
                   fontSize: 11,
@@ -344,7 +344,7 @@ class FinaleBriefing extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                game.finaleTitle,
+                'Level ${game.level}',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: cream,

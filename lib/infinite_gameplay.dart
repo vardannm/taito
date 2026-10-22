@@ -94,7 +94,7 @@ extension InfiniteGameplay on BalanceGame {
     _bossWarningAt = null;
     boss = InfiniteBoss(
       top: visibleTop,
-      kind: BossKind.values[bossesEncountered],
+      kind: bossOrder[bossesEncountered],
       seed: bossScoreThresholds[bossesEncountered],
     );
     bossesEncountered++;

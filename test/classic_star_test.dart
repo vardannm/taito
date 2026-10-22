@@ -73,7 +73,7 @@ void main() {
   );
 
   test(
-    'a swept pickup saves immediately, survives failure, and cannot pay twice',
+    'a pickup requires a win, resets after failure, and cannot pay twice',
     () async {
       final profile = PlayerProfile()..wallet = 73;
       final game = BalanceGame()..start();
@@ -83,15 +83,16 @@ void main() {
       expect(game.score, 0);
       expect(game.coinsCollected, 0);
       expect(game.pivotTargets.every((p) => p != null), isTrue);
-      expect(profile.bankLevelStar(game), isTrue);
-      expect(profile.totalStars, 1);
+      expect(profile.bankLevelStar(game), isFalse);
+      expect(game.earnedStarMask, 0);
+      expect(profile.totalStars, 0);
       expect(profile.wallet, 73);
       expect(profile.levelRecord(1, game.controlMode).attempts, 0);
       expect(profile.bankLevelStar(game), isFalse);
       await Future<void>.delayed(Duration.zero);
       final immediatelyRestored = PlayerProfile();
       await immediatelyRestored.load();
-      expect(immediatelyRestored.totalStars, 1);
+      expect(immediatelyRestored.totalStars, 0);
       game.resetBall();
       expect(game.levelStarCollected, isTrue);
       game.phase = GamePhase.over;
@@ -100,25 +101,78 @@ void main() {
       await profile.save();
       final loaded = PlayerProfile();
       await loaded.load();
-      expect(loaded.totalStars, 1);
+      expect(game.earnedStarMask, 0);
+      expect(loaded.totalStars, 0);
       expect(loaded.wallet, 73);
-      expect(loaded.hasCollectedLevelStar(1), isTrue);
-      expect(loaded.levelRecord(1, ControlMode.oneFinger).starMask, 8);
+      expect(loaded.hasCollectedLevelStar(1), isFalse);
+      expect(loaded.levelRecord(1, game.controlMode).starMask, 0);
       final retry = BalanceGame()
         ..levelStarAlreadyOwned = loaded.hasCollectedLevelStar(1)
         ..setControlMode(ControlMode.oneFinger)
         ..start();
-      expect(retry.levelStar, isNull);
-      collectStar(
-        retry,
-      ); // Even an injected duplicate cannot grant another star.
+      expect(retry.levelStar, isNotNull);
+      expect(retry.levelStarCollected, isFalse);
+      collectStar(retry);
       expect(loaded.bankLevelStar(retry), isFalse);
       retry.phase = GamePhase.over;
       retry.won = true;
       loaded.recordResult(retry);
       expect(loaded.totalStars, 4);
+      expect(loaded.hasCollectedLevelStar(1), isTrue);
+      expect(loaded.bankLevelStar(retry), isFalse);
+      await loaded.save();
+      final wonProfile = PlayerProfile();
+      await wonProfile.load();
+      expect(wonProfile.totalStars, 4);
+      retry.levelStarAlreadyOwned = wonProfile.hasCollectedLevelStar(1);
+      retry.start();
+      expect(retry.levelStar, isNull);
     },
   );
+
+  test(
+    'abandoning a pickup cannot save progress or unlock the next level',
+    () async {
+      final profile = PlayerProfile();
+      final game = BalanceGame()..start();
+      collectStar(game);
+      profile.bankLevelStar(game);
+      profile.recordResult(game);
+      await profile.save();
+      final restored = PlayerProfile();
+      await restored.load();
+      expect(restored.totalStars, 0);
+      expect(restored.hasCollectedLevelStar(1), isFalse);
+      expect(restored.isClassicLevelUnlocked(2), isFalse);
+      game.start();
+      expect(game.levelStarCollected, isFalse);
+      expect(game.levelStar, isNotNull);
+    },
+  );
+
+  test('old pickup-only stars are cleared on load and backup import', () async {
+    final profile = PlayerProfile();
+    profile.levelRecords['oneFinger:1'] = const LevelRecord(
+      starMask: 8,
+      attempts: 2,
+    );
+    profile.levelRecords['oneFinger:2'] = const LevelRecord(starMask: 8);
+    profile.levelRecords['twoFinger:2'] = const LevelRecord(starMask: 1);
+    await profile.save();
+    final restored = PlayerProfile();
+    await restored.load();
+    final imported = ProgressBackup.decode(
+      ProgressBackup.encode(profile),
+      testEconomy: false,
+    );
+    for (final cleaned in [restored, imported]) {
+      expect(cleaned.hasCollectedLevelStar(1), isFalse);
+      expect(cleaned.levelRecord(1, ControlMode.oneFinger).starMask, 0);
+      expect(cleaned.levelRecord(1, ControlMode.oneFinger).attempts, 2);
+      expect(cleaned.hasCollectedLevelStar(2), isTrue);
+      expect(cleaned.totalStars, 2);
+    }
+  });
 
   test('a hole before the star stops collection on the same sweep', () {
     final game = BalanceGame()..start();
@@ -176,7 +230,7 @@ void main() {
   });
 
   testWidgets(
-    'Classic hides score, banks a star in live play, and hides it on replay',
+    'Classic pickup stays pending and a lost run restores the star on replay',
     (tester) async {
       tester.view.physicalSize = const Size(320, 568);
       tester.view.devicePixelRatio = 1;
@@ -194,18 +248,19 @@ void main() {
       game.score = 12345;
       collectStar(game);
       await tester.pump(const Duration(milliseconds: 20));
-      expect(profile.totalStars, 1);
+      expect(profile.totalStars, 0);
       expect(find.text('12345'), findsNothing);
-      expect(find.text('COLLECTED'), findsOneWidget);
+      expect(find.text('WIN TO KEEP'), findsOneWidget);
       game.phase = GamePhase.over;
       game.won = false;
       await tester.pump(const Duration(milliseconds: 20));
       expect(find.text('12345'), findsNothing);
-      expect(find.textContaining('Saved: 1/4 stars'), findsOneWidget);
+      expect(find.textContaining('Saved: 0/4 stars'), findsOneWidget);
       final dynamic state = tester.state(find.byType(GameScreen));
       state.start(GameMode.classic);
       await tester.pump();
-      expect(game.levelStar, isNull);
+      expect(game.levelStar, isNotNull);
+      expect(game.levelStarCollected, isFalse);
       expect(game.coins, isEmpty);
       state.showSettings();
       await tester.pump();

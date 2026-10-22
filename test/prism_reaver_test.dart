@@ -161,17 +161,18 @@ void main() {
   );
 
   test(
-    'fourth unlock preserves arena, pause, hearts, shields, and recovery',
+    'Reaver unlock preserves arena, pause, hearts, shields, and recovery',
     () {
-      final game = run()
-        ..bossesEncountered = 3
-        ..survival.points = 800000;
+      final game = run();
+      final slot = game.bossOrder.indexOf(BossKind.prismReaver);
+      game.bossesEncountered = slot;
+      game.survival.points = game.bossScoreThresholds[slot] - 1000.0;
       advance(game, .1);
       expect(game.bossPending, isFalse);
-      game.survival.points = game.bossScoreThresholds[3].toDouble();
+      game.survival.points = game.bossScoreThresholds[slot].toDouble();
       advance(game, 3.1);
       expect(game.boss!.kind, BossKind.prismReaver);
-      expect(game.bossesEncountered, 4);
+      expect(game.bossesEncountered, slot + 1);
       expect(game.board, isEmpty);
       final boss = game.boss!;
       game.setPaused(true);

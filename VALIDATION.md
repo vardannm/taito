@@ -831,3 +831,40 @@ Not verified here: native iOS compilation/signing, iPhone audio/haptic feel, sus
   tool/render_wide_panorama.dart; images are artifacts/panorama-*.png.
 - Refreshed the local web preview at http://127.0.0.1:7357. No native binary
   was rebuilt and no physical-device frame-rate result is claimed.
+
+## Connected wide arena and hazard readability — 2026-10-22
+
+- Replaced detached decorative rails with a connected arena spanning about
+  74% of wide windows. Positions spread horizontally while balls, targets,
+  sprites, platform thickness and text retain their proportions. Input,
+  swept contacts, laser clearances, spider territories and Merge contacts use
+  the same physical spacing. The viewport metric is transient and updates on
+  resize without restarting a run. Compact phone geometry is unchanged.
+- Darkened wide scenery, extended ambient ribbons across the whole window,
+  kept background particles round and reduced platform energy effects. Lives
+  and progress share a left HUD group; wallet, run earnings and pause share
+  the right group. The background retains two cached scenery blur passes.
+- Moving lasers display blinking chevrons during their warning period,
+  pointing along their initial travel direction. Fixed beams show no arrows;
+  countdown labels distinguish FIXED and MOVING. Reduced-motion mode keeps
+  arrows steady. Starting Steel-world spiders have light bodies and legs,
+  dark eyes and visible web boundaries; other worlds keep their palette.
+- All 70 final focused checks pass across geometry, wide layouts, phone safe
+  areas, five gameplay modes, contrast, hazard warnings and rendering budgets.
+  New tests exercise actual raster proportions, physical contact footprints,
+  arrow timing/directions (including turning points), reduced motion and
+  starting-world spider contrast. Log: artifacts/connected-arena-final-tests.log.
+- Static analysis of lib, test and the panorama renderer reports no issues;
+  whitespace checks pass. Analysis log: artifacts/connected-arena-final-analysis.log.
+- The full regression run completed with 721 passes and nine failures:
+  eight previously documented simulation failures (ascent, Classic placements,
+  Infinite contact order/generation, late enemies, porcupines, snakes and web
+  contact order), plus an old phone-pad test using a tablet-sized viewport.
+  Updated that test to use a phone viewport, consistent with the existing
+  adaptive control policy; it passes in the final focused run. Full-run log:
+  artifacts/connected-arena-regression.log. No clean full-suite claim is made.
+- Inspected 25 Flutter gameplay renders: all five modes at phone, Duo and
+  desktop sizes, all five Nebula samples, three maximum-combo scenes and two
+  fixed/moving-laser and spider warning scenes. Reproduce with
+  tool/render_wide_panorama.dart; images are artifacts/panorama-*.png.
+- No native binary or physical-device frame-rate/balance test was performed.

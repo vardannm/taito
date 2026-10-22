@@ -10,10 +10,14 @@ void main() {
     () {
       final a = BalanceGame(seed: 19), b = BalanceGame(seed: 19);
       final seen = <String>{};
+      final orders = <String>{};
       for (var i = 0; i < 20; i++) {
         a.start(gameMode: GameMode.infinite);
         b.start(gameMode: GameMode.infinite);
         expect(a.bossScoreThresholds, b.bossScoreThresholds);
+        expect(a.bossOrder, b.bossOrder);
+        expect(a.bossOrder.toSet(), BossKind.values.toSet());
+        orders.add(a.bossOrder.join(','));
         for (final kind in BossKind.values) {
           expect(
             a.bossScoreThresholds[kind.index],
@@ -23,15 +27,19 @@ void main() {
         seen.add(a.bossScoreThresholds.join(','));
       }
       expect(seen.length, greaterThan(1));
+      expect(orders.length, greaterThan(1));
       final thresholds = a.bossScoreThresholds;
+      final order = a.bossOrder;
       a.setPaused(true);
       advance(a, 10);
       a.setPaused(false);
       expect(a.bossScoreThresholds, same(thresholds));
+      expect(a.bossOrder, same(order));
       a.lives = 0;
       a.phase = GamePhase.over;
       expect(a.reviveInfinite(), isTrue);
       expect(a.bossScoreThresholds, same(thresholds));
+      expect(a.bossOrder, same(order));
     },
   );
 
@@ -39,7 +47,7 @@ void main() {
     final game = run()..survival.points = 120000;
     advance(game, .1);
     expect(game.bossWarningSeconds, 3);
-    expect(game.message, contains('SKY WARDEN IN 3'));
+    expect(game.message, contains('${game.bossOrder.first.name} IN 3'));
     advance(game, 1);
     expect(game.bossWarningSeconds, 2);
     game.setPaused(true);
@@ -63,7 +71,7 @@ void main() {
         ..lateEnemiesEnabled = false
         ..snakeEncountersEnabled = false;
       advance(game, 3.1);
-      expect(game.boss!.kind, BossKind.skyWarden);
+      expect(game.boss!.kind, game.bossOrder[0]);
       while (game.boss != null) advance(game, 1 / 120);
       final end = game.elapsed;
       advance(game, 59);
@@ -75,7 +83,7 @@ void main() {
       expect(game.bossPending, isTrue);
       expect(game.boss, isNull);
       advance(game, 3.1);
-      expect(game.boss!.kind, BossKind.stormColossus);
+      expect(game.boss!.kind, game.bossOrder[1]);
     },
   );
 

@@ -5,26 +5,29 @@ import 'package:balance_arcade/late_enemies.dart';
 import 'infinite_boss_test.dart' show run, advance;
 
 void main() {
-  test('a big score jump visits every boss in order with rest gaps', () {
-    final game = run()
-      ..survival.points = 2000000
-      ..survival.shield = 1000
-      ..lateEnemiesEnabled = false
-      ..snakeEncountersEnabled = false;
-    double? previousEnd;
-    for (final kind in BossKind.values) {
-      while (game.boss == null) advance(game, 1 / 120);
-      expect(game.boss!.kind, kind);
-      if (previousEnd != null)
-        expect(game.elapsed - previousEnd, greaterThanOrEqualTo(63));
-      while (game.boss != null) advance(game, 1 / 120);
-      previousEnd = game.elapsed;
-    }
-    expect(game.bossesEncountered, BossKind.values.length);
-    advance(game, 65);
-    expect(game.boss, isNull);
-    expect(game.bossPending, isFalse);
-  });
+  test(
+    'a big score jump visits every boss in shuffled order with rest gaps',
+    () {
+      final game = run()
+        ..survival.points = 2000000
+        ..survival.shield = 1000
+        ..lateEnemiesEnabled = false
+        ..snakeEncountersEnabled = false;
+      double? previousEnd;
+      for (final kind in game.bossOrder) {
+        while (game.boss == null) advance(game, 1 / 120);
+        expect(game.boss!.kind, kind);
+        if (previousEnd != null)
+          expect(game.elapsed - previousEnd, greaterThanOrEqualTo(63));
+        while (game.boss != null) advance(game, 1 / 120);
+        previousEnd = game.elapsed;
+      }
+      expect(game.bossesEncountered, BossKind.values.length);
+      advance(game, 65);
+      expect(game.boss, isNull);
+      expect(game.bossPending, isFalse);
+    },
+  );
   test(
     'Seraph has three distinct phases and finishes all attacks before exit',
     () {
@@ -119,7 +122,7 @@ void main() {
       expect(game.bossPending, isFalse);
       game.survival.points = game.bossScoreThresholds[2].toDouble();
       advance(game, 3.1);
-      expect(game.boss!.kind, BossKind.eclipseSeraph);
+      expect(game.boss!.kind, game.bossOrder[2]);
       expect(game.bossesEncountered, 3);
       while (game.boss != null) {
         expect(game.board, isEmpty);

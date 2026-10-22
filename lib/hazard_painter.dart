@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'game.dart';
 import 'hazards.dart';
 import 'infinite_painter.dart';
+import 'arena_canvas.dart';
 
 const _red = Color(0xFFE34336), _white = Color(0xFFFFF1D6);
 
@@ -84,10 +85,11 @@ void paintSpecialHazards(Canvas c, BalanceGame game, bool reducedMotion) {
         _caption(
           c,
           game,
-          '${h.countdown.toStringAsFixed(1)}s',
+          '${h.laserWarningDirection == null ? 'FIXED' : 'MOVING'} ${h.countdown.toStringAsFixed(1)}s',
           point(low + 29),
           _red,
         );
+        _paintLaserMotionCue(c, h, low, high, reducedMotion);
       } else if (h.active) {
         c.drawLine(
           point(low),
@@ -163,6 +165,52 @@ void paintSpecialHazards(Canvas c, BalanceGame game, bool reducedMotion) {
         c.drawLine(tip, tip + Offset(-d * 5, 5), warning);
       }
     }
+  }
+}
+
+void _paintLaserMotionCue(
+  Canvas c,
+  SpecialHazard hazard,
+  double low,
+  double high,
+  bool reducedMotion,
+) {
+  final direction = hazard.laserWarningDirection;
+  if (direction == null) return;
+  final stretch = c is ArenaCanvas ? c.stretch : 1.0;
+  final angle = math.atan2(direction.y, direction.x * stretch);
+  final alpha = reducedMotion || (hazard.age * 4).floor().isEven ? 255 : 70;
+  final arrow = Paint()
+    ..color = const Color(0xFFFFDA82).withAlpha(alpha)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2.2
+    ..strokeCap = StrokeCap.round
+    ..strokeJoin = StrokeJoin.round;
+  for (final fraction in [.25, .5, .75]) {
+    final along = low + (high - low) * fraction;
+    final anchor = hazard.orientation == LaserOrientation.horizontal
+        ? Offset(along, hazard.y - 23)
+        : Offset(hazard.x + 23 / stretch, along);
+    c.save();
+    c.translate(anchor.dx, anchor.dy);
+    c.rotate(angle);
+    c.drawRRect(
+      RRect.fromRectAndRadius(
+        const Rect.fromLTWH(-14, -10, 28, 20),
+        const Radius.circular(6),
+      ),
+      Paint()..color = const Color(0xFF10242B).withAlpha(215),
+    );
+    for (final x in [-5.0, 3.0]) {
+      c.drawPath(
+        Path()
+          ..moveTo(x - 3, -4)
+          ..lineTo(x + 1, 0)
+          ..lineTo(x - 3, 4),
+        arrow,
+      );
+    }
+    c.restore();
   }
 }
 

@@ -5,6 +5,8 @@ import 'package:balance_arcade/ball_cosmetics.dart';
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/profile.dart';
+import 'package:balance_arcade/hazards.dart';
+import 'package:balance_arcade/spiders.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -115,6 +117,23 @@ void main() {
           state.frame.value++;
           await tester.pump();
           await capture('$name-max-combo');
+        }
+        if (mode == GameMode.classic && (name == 'phone' || name == 'duo')) {
+          final dynamic state = tester.state(find.byType(GameScreen));
+          final game = tester.widget<PivotBoard>(find.byType(PivotBoard)).game;
+          game.spiders
+            ..clear()
+            ..add(BoardSpider(180, 300, 45));
+          game.specialHazards
+            ..clear()
+            ..add(SpecialHazard(HazardKind.laser, x: 105, y: 90))
+            ..add(
+              SpecialHazard(HazardKind.laser, x: 250, y: 90, sweeping: true),
+            );
+          state.hud.value = Object();
+          state.frame.value++;
+          await tester.pump();
+          await capture('$name-hazard-warning');
         }
         await tester.pumpWidget(const SizedBox());
       }

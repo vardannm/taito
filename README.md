@@ -29,7 +29,7 @@ Levels 31â€“50 form **The web**: one slow patrolling spider at first, two f
 
 ## Mastery, daily boards and cabinet styles
 
-Classic and Daily award three independent objective stars: finish, finish without a miss, and finish within the active-time target. Classic also has one collectible gold star per level, replacing its coins. Collecting it immediately adds one permanent progression star, even if the run is later lost or abandoned. It can only be earned once across all controls and disappears on replay after collection. Classic has four stars per level (320 total), target progress and time records, with no score or personal-best points display. Daily retains its score and three objective stars. Earned objectives merge across retries.
+Classic and Daily award three independent objective stars: finish, finish without a miss, and finish within the active-time target. Classic also has one collectible gold star per level, replacing its coins. Collecting it adds a permanent progression star only when that run is won; losing or abandoning the level leaves it available on retry. It can only be earned once across all controls and disappears on replay after a successful collection. Classic has four stars per level (320 total), target progress and time records, with no score or personal-best points display. Daily retains its score and three objective stars. Earned objectives merge across retries.
 
 Active time excludes pauses, capture animations, and the bar returning to launch. Initial time targets use board elevation, the control mode's lift speed, trap count and a finale/spider allowance. They are provisional until human playtesting; adjust the `targetTime` calculation in `BalanceGame.start` in `lib/game.dart`.
 
@@ -147,9 +147,11 @@ This is a playable, tested game build, not an App Store submission or a revenue 
 - `playtest/MASTERY.md`: a 5â€“10 player session plan for this update; no human results have been collected by the build process.
 
 
-Infinite hard encounters: from 2,400m, encounter sections increasingly alternate sideways sweeping lasers and top-entry zigzag holes. Both warn for two seconds; only one special hazard is present at a time. Lasers sweep 65 units either side of their origin for 3.5 seconds. Zigzag holes cross a 250-unit horizontal range and descend at 1.35 times board speed plus 35 units/second. Tune these in lib/hazards.dart and scheduling in lib/game.dart.
+Infinite hard encounters: from 2,400m, encounter sections increasingly alternate sideways sweeping lasers and top-entry zigzag holes. Both warn for two seconds; only one special hazard is present at a time. Lasers sweep 65 units either side of their origin for 3.5 seconds. Moving lasers display blinking direction chevrons before activation; fixed beams have no arrows, and countdown labels identify FIXED or MOVING. Reduced-motion mode keeps direction arrows steady. Spiders in the starting Steel world use a light body and legs against its dark scenery. Zigzag holes cross a 250-unit horizontal range and descend at 1.35 times board speed plus 35 units/second. Tune these in lib/hazards.dart and scheduling in lib/game.dart.
 
 ## Number Merge
+
+Each finished run reaching a 2,048 ball or higher banks 30 coins once, including runs that end in a loss. The prize appears on the results screen and can be earned again on another run.
 
 Choose **NUMBER MERGE** from the home screen. Steer the solid head ball into descending numbers. The largest value stays at the head of a translucent snake, with smaller values trailing downward. Values are sorted largest to smallest. Collecting another 2 with **32, 16, 8, 4, 2** combines all five matching powers into **64**.
 
@@ -347,8 +349,11 @@ The simulation is in `lib/late_enemies.dart` and vector art in
 `lib/late_enemy_painter.dart`. Render the warning/attack gallery with
 `scripts/flutter.ps1 test tool/render_late_enemies.dart`.
 
-Between 90,000 and 120,000 points, Infinite introduces the second enemy tier with the Sky
-Warden boss, once per run. It waits for committed attacks and laser mazes to
+Infinite shuffles all five second-tier bosses once per run, with no repeats.
+The five encounter score windows remain 90,000–120,000, 270,000–330,000,
+550,000–650,000, 850,000–950,000 and 1,200,000–1,350,000 points; any boss can
+occupy any slot. Pause and revive preserve the chosen order.
+Sky Warden waits for committed attacks and laser mazes to
 finish, then replaces the course with a clear arena: no holes, other enemies,
 ordinary lasers, or rising red floor. The boss stays above the player as the
 board climbs. Over 28 active seconds it fires five bullet fans, three warned
@@ -360,7 +365,7 @@ encounter; restarting resets its milestone. Tune and preview it in
 `lib/infinite_boss.dart`, `lib/infinite_boss_painter.dart`, and
 `scripts/flutter.ps1 test tool/render_infinite_boss.dart`.
 
-Between 270,000 and 330,000 points, Storm Colossus follows as the second boss, once per run.
+Storm Colossus appears once per run in its shuffled encounter slot.
 Its cyan and violet armored body has floating gauntlets instead of wings;
 its fired orbs and crescent blades use toxic dark violet with vivid pink cores
 or edges.
@@ -371,14 +376,14 @@ Mines mark their entire blast circle
 for 1.35 seconds before a 0.65-second damaging burst. The arena stays clear of
 ordinary holes, enemies, lasers and the rising red floor. All boss milestones
 survive a rewarded revive and reset on a new run; if a score jump crosses several,
-Sky Warden still appears first. Thresholds are sampled once per run using a
+the shuffled order is preserved. Thresholds are sampled once per run using a
 seeded random stream. At least 60 seconds of ordinary active gameplay separate
 encounters. Boss entry waits for committed attacks, mazes, recovery and five
 seconds after damage, then gives a three-second warning; pausing freezes the
 warning. Preview: `artifacts/infinite-colossus.png`.
 
-Eclipse Seraph is the third second-tier boss, appearing between 550,000 and
-650,000 points with the same pacing and clear-arena rules. Its six layered
+Eclipse Seraph appears in its shuffled slot with the same pacing and
+clear-arena rules. Its six layered
 gold-and-rose feathers unfold on arrival, a segmented halo rotates behind its
 crown, ribbons sway, and its crystal core pulses and charges with its attacks.
 The 28-second encounter sends 16 curving crystal petals, six warned laser
@@ -392,8 +397,7 @@ changing attack geometry. All three stay within 65 drawing calls per frame
 without blur or offscreen layers. Render animation frames with
 `scripts/flutter.ps1 test tool/render_boss_animation.dart`.
 
-Prism Reaver is the fourth second-tier boss, appearing once per run between
-850,000 and 950,000 points after Seraph and the usual rest interval. Its mint
+Prism Reaver appears once per run in its shuffled slot after the usual rest interval. Its mint
 and pink prism body keeps moving while firing: two single sweeping lasers,
 then two volleys of paired moving lasers, then twelve independently spinning
 rotors. Lasers charge harmlessly for 1.1 seconds and sweep for 1.65 seconds;
@@ -405,8 +409,7 @@ beam endpoints; pause, shields and recovery retain their existing behavior.
 All attacks end before departure, and the boss stays within the existing
 65-call drawing budget. Preview: `artifacts/infinite-reaver.png`.
 
-Venom Crown is the fifth second-tier boss, unlocking between 1,200,000 and
-1,350,000 points. Its attack forms a moving poison maze: 17 dense walls with
+Venom Crown appears once per run in its shuffled slot. Its attack forms a moving poison maze: 17 dense walls with
 24 toxic lime bullets each, acid-yellow cores and magenta rims. Five slalom
 walls lead into five walls that pulse their travel speed, then seven faster
 accelerating walls with a narrower opening. Each formation warns for 0.9s;

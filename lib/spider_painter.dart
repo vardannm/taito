@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'game.dart';
 import 'infinite_painter.dart';
 import 'arena_canvas.dart';
+import 'ball_cosmetics.dart';
 
 void paintSpiderBackdrop(Canvas c, BalanceGame game) {
   if (game.spiders.isEmpty) return;
@@ -55,7 +56,11 @@ void paintSpiderBackdrop(Canvas c, BalanceGame game) {
     if (center.dy + radius + 2 < game.visibleTop ||
         center.dy - radius - 2 > 560)
       continue;
-    final webInk = game.infinite ? infiniteBoardInk(game, center) : null;
+    final webInk = game.cosmetic == BallCosmetic.steel
+        ? const Color(0xFFCCE6E2)
+        : game.infinite
+        ? infiniteBoardInk(game, center)
+        : null;
     thread.color =
         webInk?.withAlpha(180) ?? const Color(0xFF193C38).withAlpha(32);
     final color = s.chasing
@@ -108,7 +113,9 @@ void paintSpiders(Canvas c, BalanceGame game, bool reducedMotion) {
     final webInk = game.infinite
         ? infiniteBoardInk(game, Offset(spider.x, game.screenY(spider.y)))
         : null;
-    final color = webInk == Colors.white
+    final lightSpider =
+        game.cosmetic == BallCosmetic.steel || webInk == Colors.white;
+    final color = lightSpider
         ? (spider.chasing ? const Color(0xFFFFB5A3) : const Color(0xFFF5EFDC))
         : spider.chasing
         ? const Color(0xFF80251F)
@@ -140,7 +147,7 @@ void paintSpiders(Canvas c, BalanceGame game, bool reducedMotion) {
         Offset(6, y),
         .85,
         Paint()
-          ..color = webInk == Colors.white
+          ..color = lightSpider
               ? const Color(0xFF253C34)
               : const Color(0xFFEAD8A6),
       );

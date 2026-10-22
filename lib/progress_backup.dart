@@ -188,6 +188,7 @@ class ProgressBackup {
         r'^(oneFinger|twoFinger|analog|tiltLift|boardTilt):\d{4}-\d{2}-\d{2}$',
       ),
     );
+    p.clearUnwonLevelStars();
     // Store purchases come back from the store, never from a pasted code, so
     // purchase-only gear in a backup is skipped rather than restored.
     void owned<T extends Enum>(

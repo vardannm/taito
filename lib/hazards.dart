@@ -48,6 +48,33 @@ class SpecialHazard {
   double get countdown => math.max(0, warningSeconds - age);
   double get gapLeft => x - 30;
   double get gapRight => x + 30;
+
+  /// Initial travel after charging; null distinguishes a fixed beam.
+  ({double x, double y})? get laserWarningDirection {
+    if (kind != HazardKind.laser) return null;
+    final direction = switch (motion) {
+      HazardMotion.legacy => (sweeping ? 65.0 : 0.0, 0.0),
+      HazardMotion.horizontal => (radiusX * math.cos(phase), 0.0),
+      HazardMotion.vertical => (0.0, radiusY * math.cos(phase)),
+      HazardMotion.circle => (
+        -radiusX * math.sin(phase),
+        radiusX * math.cos(phase),
+      ),
+      HazardMotion.oval => (
+        -radiusX * math.sin(phase),
+        radiusY * math.cos(phase),
+      ),
+      HazardMotion.stationary => (0.0, 0.0),
+    };
+    // At an oscillation's turning point, show the direction it will leave in.
+    var dx = direction.$1, dy = direction.$2;
+    if (dx.abs() + dy.abs() < .00001) {
+      if (motion == HazardMotion.horizontal) dx = -radiusX * math.sin(phase);
+      if (motion == HazardMotion.vertical) dy = -radiusY * math.sin(phase);
+    }
+    return dx.abs() + dy.abs() < .00001 ? null : (x: dx, y: dy);
+  }
+
   String get label => switch (kind) {
     HazardKind.formingHole => warning ? 'HOLE OPENING' : 'HOLE OPEN',
     HazardKind.movingHole =>

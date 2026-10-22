@@ -21,11 +21,11 @@ void main() {
       expect(game.boss, isNull);
       game.survival.points = 330000;
       advance(game, 3.1);
-      expect(game.boss!.kind, BossKind.stormColossus);
+      expect(game.boss!.kind, game.bossOrder[1]);
       expect(game.bossesEncountered, 2);
       final serial = game.runSerial;
       while (game.boss != null) {
-        expect(game.boss!.kind, BossKind.stormColossus);
+        expect(game.boss!.kind, game.bossOrder[1]);
         expect(game.board, isEmpty);
         expect(game.lateEnemy, isNull);
         expect(game.spiders, isEmpty);
@@ -51,10 +51,10 @@ void main() {
       game.start(gameMode: GameMode.infinite);
       game.survival.points = 330000;
       advance(game, 3.1);
-      expect(game.boss!.kind, BossKind.skyWarden);
+      expect(game.boss!.kind, game.bossOrder[0]);
       expect(game.bossesEncountered, 1);
       while (game.boss != null) {
-        expect(game.boss!.kind, BossKind.skyWarden);
+        expect(game.boss!.kind, game.bossOrder[0]);
         game.survival.shield = 100;
         game.survival.items.clear();
         game.step(1 / 120);
@@ -63,7 +63,7 @@ void main() {
       advance(game, 60);
       game.bossesEnabled = true;
       advance(game, 3.1);
-      expect(game.boss!.kind, BossKind.stormColossus);
+      expect(game.boss!.kind, game.bossOrder[1]);
       expect(game.bossesEncountered, 2);
     },
   );

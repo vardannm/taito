@@ -167,8 +167,10 @@ class MergeResult extends StatelessWidget {
     required this.newBest,
     required this.onRetry,
     required this.onHome,
+    this.coinsEarned = 0,
   });
   final MergeRun run;
+  final int coinsEarned;
   final bool newBest;
   final VoidCallback onRetry, onHome;
   @override
@@ -205,6 +207,18 @@ class MergeResult extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
+            if (coinsEarned > 0) ...[
+              const SizedBox(height: 12),
+              Text(
+                '+$coinsEarned coins · 2,048 reached',
+                key: const ValueKey('merge-coin-prize'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: menuGold,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,

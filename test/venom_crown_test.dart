@@ -181,14 +181,15 @@ void main() {
   );
 
   test(
-    'fifth threshold, pause, damage protection, and toxic palette are integrated',
+    'Crown threshold, pause, damage protection, and toxic palette are integrated',
     () {
-      final g = run()
-        ..bossesEncountered = 4
-        ..survival.points = 1100000;
+      final g = run();
+      final slot = g.bossOrder.indexOf(BossKind.venomCrown);
+      g.bossesEncountered = slot;
+      g.survival.points = g.bossScoreThresholds[slot] - 1000.0;
       advance(g, .1);
       expect(g.bossPending, isFalse);
-      g.survival.points = g.bossScoreThresholds[4].toDouble();
+      g.survival.points = g.bossScoreThresholds[slot].toDouble();
       advance(g, 3.1);
       expect(g.boss!.kind, BossKind.venomCrown);
       expect(g.board, isEmpty);

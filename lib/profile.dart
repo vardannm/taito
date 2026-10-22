@@ -425,9 +425,11 @@ class PlayerProfile {
     return hasCollectedLevelStar(level) ? record.withCollectedStar() : record;
   }
 
-  /// Persist the bonus immediately, independently of winning or losing the run.
+  /// A pickup becomes permanent only after winning the current run.
   bool bankLevelStar(BalanceGame game) {
     if (game.mode != GameMode.classic ||
+        !game.finished ||
+        !game.won ||
         !game.levelStarCollected ||
         hasCollectedLevelStar(game.level))
       return false;
@@ -436,6 +438,28 @@ class PlayerProfile {
         .withCollectedStar();
     unawaited(save());
     return true;
+  }
+
+  /// Remove pickups saved by the old rules on levels never completed.
+  void clearUnwonLevelStars() {
+    for (var level = 1; level <= ClassicLevels.count; level++) {
+      final completed = ControlMode.values.any(
+        (mode) =>
+            ((levelRecords[recordKey(level, mode)]?.starMask ?? 0) & 1) != 0,
+      );
+      if (completed) continue;
+      for (final mode in ControlMode.values) {
+        final key = recordKey(level, mode);
+        final record = levelRecords[key];
+        if (record == null || (record.starMask & 8) == 0) continue;
+        levelRecords[key] = LevelRecord(
+          starMask: record.starMask & 7,
+          bestScore: record.bestScore,
+          bestTime: record.bestTime,
+          attempts: record.attempts,
+        );
+      }
+    }
   }
 
   LevelRecord dailyRecord(String date, [ControlMode? control]) =>
@@ -529,7 +553,14 @@ class PlayerProfile {
       if (improved) mergeBest = game.score;
       if (game.mergeRun.highest > mergeHighest)
         mergeHighest = game.mergeRun.highest;
-      if (_recordedRuns[game] != game.runSerial) mergeRuns++;
+      if (_recordedRuns[game] != game.runSerial) {
+        mergeRuns++;
+        if (game.mergeRun.highest >= mergeCoinPrizeTarget) {
+          game.coinsCollected += mergeCoinPrize;
+          wallet += mergeCoinPrize;
+          unawaited(saveEconomy());
+        }
+      }
       _recordedRuns[game] = game.runSerial;
       return improved;
     }
@@ -538,6 +569,11 @@ class PlayerProfile {
         _recordedRuns[game] == game.runSerial)
       return false;
     _recordedRuns[game] = game.runSerial;
+    if (game.mode == GameMode.classic && game.won) {
+      game.coinsCollected += classicLevelCoinPrize;
+      wallet += classicLevelCoinPrize;
+      unawaited(saveEconomy());
+    }
     if (game.infinite) {
       _pendingRuns = 0;
       infiniteRuns++;
@@ -593,6 +629,7 @@ class PlayerProfile {
           }
         }
       }
+      clearUnwonLevelStars();
       final saved = CabinetStyle.values
           .where((c) => c.name == data['cabinet'])
           .firstOrNull;

@@ -140,7 +140,7 @@ void main() {
   testWidgets('board fills the screen while HUD and pad respect safe area', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     tester.view.padding = FakeViewPadding(
       top: 44,
@@ -166,11 +166,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
     final rect = tester.getRect(find.byType(PivotBoard));
     expect(rect.left, greaterThanOrEqualTo(12 - .001));
-    expect(rect.right, lessThanOrEqualTo(788 + .001));
-    expect(rect.bottom, closeTo(1200, .001));
+    expect(rect.right, lessThanOrEqualTo(378 + .001));
+    expect(rect.bottom, closeTo(844, .001));
     expect(
       tester.getRect(find.byType(OneFingerControls)).bottom,
-      closeTo(1166, .001),
+      closeTo(810, .001),
     );
     expect(rect.top, closeTo(0, .001));
     expect(
@@ -185,7 +185,7 @@ void main() {
       tester.getTopLeft(find.byKey(const ValueKey('board-hearts'))).dy,
       closeTo(66, .001),
     );
-    expect(rect.height, greaterThan(850));
+    expect(rect.height, greaterThan(700));
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

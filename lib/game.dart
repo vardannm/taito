@@ -170,7 +170,9 @@ class BalanceGame {
   final _spawnOverlappingHazards = <SpecialHazard>{};
   final _spawnOverlappingSpiders = <BoardSpider>{};
   int get earnedStarMask =>
-      (mode == GameMode.classic && levelStarCollected ? 8 : 0) |
+      (mode == GameMode.classic && finished && won && levelStarCollected
+          ? 8
+          : 0) |
       (!finished || !won || practice || infinite || merging
           ? 0
           : 1 | (misses == 0 ? 2 : 0) | (elapsed <= targetTime ? 4 : 0));
@@ -292,6 +294,8 @@ class BalanceGame {
   InfiniteBoss? boss;
   bool bossesEnabled = true;
   int bossesEncountered = 0;
+  List<BossKind> _bossOrder = List.unmodifiable(BossKind.values);
+  List<BossKind> get bossOrder => _bossOrder;
   List<int> _bossScoreThresholds = const [
     100000,
     300000,
@@ -643,7 +647,7 @@ class BalanceGame {
     if (boss != null) message = boss!.hint;
     if (bossWarningSeconds != null)
       message =
-          'BOSS · ${BossKind.values[bossesEncountered].name} IN $bossWarningSeconds';
+          'BOSS · ${bossOrder[bossesEncountered].name} IN $bossWarningSeconds';
   }
 
   void _loseClimb(String reason, {Hole? hole}) {
@@ -745,7 +749,11 @@ class BalanceGame {
     final encounterSeed = _random.nextInt(1 << 30);
     enemyDirector = EncounterDirector(encounterSeed);
     final bossRandom = math.Random(encounterSeed ^ 0xB055);
+    _bossOrder = List.unmodifiable(
+      BossKind.values.toList()..shuffle(bossRandom),
+    );
     _bossScoreThresholds = List.unmodifiable([
+      // Score windows belong to encounter slots, independently of boss order.
       for (final kind in BossKind.values)
         kind.minimumScore +
             bossRandom.nextInt(kind.maximumScore - kind.minimumScore + 1),

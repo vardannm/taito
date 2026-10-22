@@ -1495,9 +1495,10 @@ class _GameScreenState extends State<GameScreen>
                                     ),
                                     const SizedBox(width: 4),
                                     Text(
-                                      game.levelStarAlreadyOwned ||
-                                              game.levelStarCollected
+                                      game.levelStarAlreadyOwned
                                           ? 'COLLECTED'
+                                          : game.levelStarCollected
+                                          ? 'WIN TO KEEP'
                                           : 'BONUS STAR',
                                       style: detail,
                                     ),
@@ -1636,7 +1637,7 @@ class _GameScreenState extends State<GameScreen>
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        'Level ${game.level} · ${ClassicLevels.definition(game.level).name}',
+                        'Level ${game.level}',
                         key: const ValueKey('board-level-name'),
                         textAlign: TextAlign.center,
                         style: const TextStyle(
@@ -1784,9 +1785,10 @@ class _GameScreenState extends State<GameScreen>
                                     ),
                                     const SizedBox(width: 4),
                                     Text(
-                                      game.levelStarAlreadyOwned ||
-                                              game.levelStarCollected
+                                      game.levelStarAlreadyOwned
                                           ? 'COLLECTED'
+                                          : game.levelStarCollected
+                                          ? 'WIN TO KEEP'
                                           : 'BONUS STAR',
                                       style: detail.copyWith(fontSize: 10),
                                     ),
@@ -2595,9 +2597,7 @@ class _GameScreenState extends State<GameScreen>
                       Expanded(
                         child: Center(
                           child: Tooltip(
-                            message: ClassicLevels.definition(
-                              worldLevel(index),
-                            ).name,
+                            message: 'Level ${worldLevel(index)}',
                             child: SizedBox(
                               height: 40,
                               child: FilledButton.icon(
@@ -3311,6 +3311,7 @@ class _GameScreenState extends State<GameScreen>
       : game.merging && game.finished
       ? MergeResult(
           run: game.mergeRun,
+          coinsEarned: game.coinsCollected,
           newBest: newBest,
           onRetry: () => start(GameMode.merge2048),
           onHome: home,
@@ -3395,6 +3396,19 @@ class _GameScreenState extends State<GameScreen>
                             color: menuMuted,
                           ),
                         ),
+                        if (game.mode == GameMode.classic && game.won)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 16),
+                            child: Text(
+                              '+$classicLevelCoinPrize coins · Level complete',
+                              key: const ValueKey('level-coin-prize'),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: menuGold,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
                         if (offeringCoinDouble) coinDoubleOffer(),
                         if (game.infinite && profile.infiniteCoinsDoubled(game))
                           Padding(

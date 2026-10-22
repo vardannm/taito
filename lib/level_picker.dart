@@ -126,7 +126,7 @@ class _LevelPickerState extends State<LevelPicker> {
                             button: true,
                             enabled: open,
                             label:
-                                'Level $number: ${ClassicLevels.names[number - 1]}${number >= 31 ? ", spider territory" : ""}${open ? "" : ", locked, needs $required stars; you have $totalStars"}',
+                                'Level $number, $classicLevelCoinPrize coin completion prize${number >= 31 ? ", spider territory" : ""}${open ? "" : ", locked, needs $required stars; you have $totalStars"}',
                             child: Material(
                               key: number == 1 ? firstLevelKey : null,
                               color: Colors.transparent,
@@ -215,11 +215,7 @@ class _LevelPickerState extends State<LevelPicker> {
                                       const SizedBox(height: 7),
                                       Flexible(
                                         child: Text(
-                                          number % 10 == 0
-                                              ? ClassicLevels.finaleTitle(
-                                                  number,
-                                                )
-                                              : ClassicLevels.names[number - 1],
+                                          '+$classicLevelCoinPrize COINS',
                                           textAlign: TextAlign.center,
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
@@ -227,7 +223,7 @@ class _LevelPickerState extends State<LevelPicker> {
                                             backgroundColor: menuBackground,
                                             fontSize: 11,
                                             height: 1.2,
-                                            color: menuText,
+                                            color: menuGold,
                                             fontWeight: FontWeight.w600,
                                           ),
                                         ),
