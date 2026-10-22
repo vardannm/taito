@@ -131,7 +131,11 @@ void main() {
       final g = run();
       g.snakes.add(BoardSnake(x: 180, y: 350));
       g.survival.items.add(
-        InfiniteItem(InfiniteItemKind.shield, 180, shieldFirst ? 400 : 280),
+        InfiniteItem(
+          InfiniteItemKind.shield,
+          180,
+          shieldFirst ? 400 : g.minPivot,
+        ),
       );
       g.grabPivot(0);
       g.grabPivot(1);

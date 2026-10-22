@@ -18,7 +18,9 @@ void advanceWithoutTraps(BalanceGame game, double seconds) {
 
 void placeAtSafeHeight(BalanceGame game, double height) {
   final y = BalanceGame.infiniteStart - BalanceGame.ballRadius - height;
-  game.cameraOffset = math.max(0, 300 - y);
+  final topBallScreenY =
+      game.minPivot + game.cameraOffset - BalanceGame.ballRadius;
+  game.cameraOffset = math.max(0, topBallScreenY - y);
   game.ensureInfiniteBoard();
   final x = [180.0, 70.0, 290.0, 120.0, 240.0].firstWhere(
     (x) => game.board.every(
@@ -61,7 +63,10 @@ void main() {
       expect(game.metres, 500);
       expect(game.score, greaterThan(500));
       expect(game.cameraOffset, greaterThan(4500));
-      expect(game.screenY(game.ballY), closeTo(300, .01));
+      expect(
+        game.screenY(game.ballY),
+        closeTo(321 - BalanceGame.ballRadius, .01),
+      );
       expect(game.board.length, lessThan(40));
       expect(game.board.every((h) => h.target == 0), isTrue);
     },

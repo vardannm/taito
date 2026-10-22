@@ -1,5 +1,43 @@
 # Validation record
 
+## Google Play screenshots — 2026-10-23
+
+- Prepared six current Android-target Flutter UI renders for each of phone,
+  7-inch tablet and 10-inch tablet: 18 screenshots in total. Gameplay is
+  staged; these are not physical-device captures. Native-device comparison
+  remains part of release QA.
+- RGB PNGs passed dimension, aspect-ratio, transparency, chunk integrity,
+  decoded-pixel and source-identity checks. Contact sheets were reviewed.
+- Capture and overview render tests passed; static analysis of both render
+  tools reported no issues. Production gameplay code was unchanged.
+- Upload map, provenance, accessibility descriptions and checksums are in
+  `release/google-play/2026-10-23/`. No store upload was performed.
+
+## Release regression fixtures — 2026-10-23
+
+- Reproduced all nine failures from the launch audit before editing. Each
+  came from an outdated test setup or expectation; gameplay code did not need
+  to change.
+- Infinite's current manual-lift cap places the platform at screen y=321,
+  with the ball at y=314. Updated the camera-limit assertion and safe-height
+  helper to respect that cap. Shield-order tests now put the later shield on
+  the reachable sweep instead of beyond the lift limit; the exact heart-loss,
+  shield collection and projectile cleanup assertions remain in place.
+- Classic placement checks now distinguish timed hazards from moving holes
+  that persist from level start. They retain authored-position checks and
+  add coverage for the same moving-hole instances advancing across target
+  changes. The isolated test ball also stays clear of later side lasers.
+- Replaced the removed `First steps` level-name locator with `level-1`, so
+  the safe-area test reaches its layout assertions again.
+- Full suite: **743 passed, zero failures**. Static analysis of `lib` and
+  `test`: **no issues found**. Logs:
+  `artifacts/failing-checks-baseline-2026-10-23.log` and
+  `artifacts/regression-suite-2026-10-23.log`.
+- These are test/documentation changes. The signed Android bundle built
+  earlier on 23 October contains the same gameplay code; it was not rebuilt.
+  Ads/consent integration, store approvals and physical-device QA still need
+  their separate release sign-off.
+
 ## Enemy and weapon sound effects — 2026-10-09
 
 - Added 21 original synthesized mono 44.1 kHz / 16-bit PCM cues (872 KB):

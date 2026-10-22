@@ -161,7 +161,7 @@ void main() {
     await openClassicLevels(tester);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    await tester.tap(find.text('First steps'));
+    await tester.tap(find.byKey(const ValueKey('level-1')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
     final rect = tester.getRect(find.byType(PivotBoard));

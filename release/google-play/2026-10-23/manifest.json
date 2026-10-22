@@ -1,0 +1,200 @@
+[
+  {
+    "device": "phone",
+    "width": 1080,
+    "height": 1920,
+    "shot": "01-precision",
+    "title": "One ball. Total focus.",
+    "file": "screenshots/phone/01-precision.png",
+    "source": "source-ui/phone/01-precision.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "phone",
+    "width": 1080,
+    "height": 1920,
+    "shot": "02-infinite",
+    "title": "Find your flow.",
+    "file": "screenshots/phone/02-infinite.png",
+    "source": "source-ui/phone/02-infinite.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "phone",
+    "width": 1080,
+    "height": 1920,
+    "shot": "03-classic",
+    "title": "80 levels. One more try.",
+    "file": "screenshots/phone/03-classic.png",
+    "source": "source-ui/phone/03-classic.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "phone",
+    "width": 1080,
+    "height": 1920,
+    "shot": "04-boss",
+    "title": "Meet your next challenge.",
+    "file": "screenshots/phone/04-boss.png",
+    "source": "source-ui/phone/04-boss.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "phone",
+    "width": 1080,
+    "height": 1920,
+    "shot": "05-merge",
+    "title": "Match. Merge. Keep rolling.",
+    "file": "screenshots/phone/05-merge.png",
+    "source": "source-ui/phone/05-merge.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "phone",
+    "width": 1080,
+    "height": 1920,
+    "shot": "06-gear",
+    "title": "Play it your way.",
+    "file": "screenshots/phone/06-gear.png",
+    "source": "source-ui/phone/06-gear.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "tablet-7",
+    "width": 1440,
+    "height": 2560,
+    "shot": "01-precision",
+    "title": "One ball. Total focus.",
+    "file": "screenshots/tablet-7/01-precision.png",
+    "source": "source-ui/tablet-7/01-precision.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "tablet-7",
+    "width": 1440,
+    "height": 2560,
+    "shot": "02-infinite",
+    "title": "Find your flow.",
+    "file": "screenshots/tablet-7/02-infinite.png",
+    "source": "source-ui/tablet-7/02-infinite.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "tablet-7",
+    "width": 1440,
+    "height": 2560,
+    "shot": "03-classic",
+    "title": "80 levels. One more try.",
+    "file": "screenshots/tablet-7/03-classic.png",
+    "source": "source-ui/tablet-7/03-classic.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "tablet-7",
+    "width": 1440,
+    "height": 2560,
+    "shot": "04-boss",
+    "title": "Meet your next challenge.",
+    "file": "screenshots/tablet-7/04-boss.png",
+    "source": "source-ui/tablet-7/04-boss.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "tablet-7",
+    "width": 1440,
+    "height": 2560,
+    "shot": "05-merge",
+    "title": "Match. Merge. Keep rolling.",
+    "file": "screenshots/tablet-7/05-merge.png",
+    "source": "source-ui/tablet-7/05-merge.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "tablet-7",
+    "width": 1440,
+    "height": 2560,
+    "shot": "06-gear",
+    "title": "Play it your way.",
+    "file": "screenshots/tablet-7/06-gear.png",
+    "source": "source-ui/tablet-7/06-gear.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "tablet-10",
+    "width": 1800,
+    "height": 3200,
+    "shot": "01-precision",
+    "title": "One ball. Total focus.",
+    "file": "screenshots/tablet-10/01-precision.png",
+    "source": "source-ui/tablet-10/01-precision.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "tablet-10",
+    "width": 1800,
+    "height": 3200,
+    "shot": "02-infinite",
+    "title": "Find your flow.",
+    "file": "screenshots/tablet-10/02-infinite.png",
+    "source": "source-ui/tablet-10/02-infinite.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "tablet-10",
+    "width": 1800,
+    "height": 3200,
+    "shot": "03-classic",
+    "title": "80 levels. One more try.",
+    "file": "screenshots/tablet-10/03-classic.png",
+    "source": "source-ui/tablet-10/03-classic.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "tablet-10",
+    "width": 1800,
+    "height": 3200,
+    "shot": "04-boss",
+    "title": "Meet your next challenge.",
+    "file": "screenshots/tablet-10/04-boss.png",
+    "source": "source-ui/tablet-10/04-boss.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "tablet-10",
+    "width": 1800,
+    "height": 3200,
+    "shot": "05-merge",
+    "title": "Match. Merge. Keep rolling.",
+    "file": "screenshots/tablet-10/05-merge.png",
+    "source": "source-ui/tablet-10/05-merge.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "tablet-10",
+    "width": 1800,
+    "height": 3200,
+    "shot": "06-gear",
+    "title": "Play it your way.",
+    "file": "screenshots/tablet-10/06-gear.png",
+    "source": "source-ui/tablet-10/06-gear.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  }
+]

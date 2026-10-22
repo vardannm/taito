@@ -1,0 +1,142 @@
+{
+  "status": "passed",
+  "date": "2026-10-23",
+  "screenshotCount": 18,
+  "checks": [
+    "six screenshots per device",
+    "exact 9:16 dimensions",
+    "Google Play size bounds",
+    "24-bit RGB/no alpha",
+    "PNG chunk CRC and decoded pixels",
+    "unaltered Android UI captures",
+    "manifest provenance"
+  ],
+  "images": [
+    {
+      "file": "screenshots/phone/01-precision.png",
+      "width": 1080,
+      "height": 1920,
+      "bytes": 657526,
+      "sha256": "ace85bacb345fd0eb9d9f8da8f532c609527912ee934984ec87c15bac7ea5017"
+    },
+    {
+      "file": "screenshots/phone/02-infinite.png",
+      "width": 1080,
+      "height": 1920,
+      "bytes": 669643,
+      "sha256": "8568f6d421cf2a64ec50128b09fdb7957f093cb4d22ca29a0caa0d14cd4107ca"
+    },
+    {
+      "file": "screenshots/phone/03-classic.png",
+      "width": 1080,
+      "height": 1920,
+      "bytes": 818588,
+      "sha256": "4656d71fd33525d3c5e25fba1be8c9742fa40c478a9fb200be566dd20106d6a6"
+    },
+    {
+      "file": "screenshots/phone/04-boss.png",
+      "width": 1080,
+      "height": 1920,
+      "bytes": 581515,
+      "sha256": "a03fb3d0c22ff4851d8be365c5baf5003b92c68dccdd7a46d899afed6f7bab00"
+    },
+    {
+      "file": "screenshots/phone/05-merge.png",
+      "width": 1080,
+      "height": 1920,
+      "bytes": 530605,
+      "sha256": "d02190e865129787e1b965ee3c58700f50d4bc6c1227c2e0ed01326b884d6afd"
+    },
+    {
+      "file": "screenshots/phone/06-gear.png",
+      "width": 1080,
+      "height": 1920,
+      "bytes": 447123,
+      "sha256": "fc55b021e0051d29bf5c013862cead60d051343e86e06aeec17e877c74ea074f"
+    },
+    {
+      "file": "screenshots/tablet-7/01-precision.png",
+      "width": 1440,
+      "height": 2560,
+      "bytes": 864265,
+      "sha256": "7a6b2b399da665694aee6bace1401b191ea3407f5e58291ad5734562480bb844"
+    },
+    {
+      "file": "screenshots/tablet-7/02-infinite.png",
+      "width": 1440,
+      "height": 2560,
+      "bytes": 860046,
+      "sha256": "0064fa4cc44257075506ae7f73b6e22d71bbc0149eec55c3a682c367d764dc85"
+    },
+    {
+      "file": "screenshots/tablet-7/03-classic.png",
+      "width": 1440,
+      "height": 2560,
+      "bytes": 1064758,
+      "sha256": "5ace576482f8486444b6b41dca2f907a36e106271ab22434681aa4b7570c8810"
+    },
+    {
+      "file": "screenshots/tablet-7/04-boss.png",
+      "width": 1440,
+      "height": 2560,
+      "bytes": 604614,
+      "sha256": "2e15d293094f16a696ea949f06d4d21145d275f177dc51cfa352749adcb35911"
+    },
+    {
+      "file": "screenshots/tablet-7/05-merge.png",
+      "width": 1440,
+      "height": 2560,
+      "bytes": 699194,
+      "sha256": "4e3ee2d5ddefaf9700ec75454834ec419c36b60f06d3f11b353f68e3d5c7f956"
+    },
+    {
+      "file": "screenshots/tablet-7/06-gear.png",
+      "width": 1440,
+      "height": 2560,
+      "bytes": 826102,
+      "sha256": "c91a471bfb9896319d4b6841525cedee4f68a428eef32c5f3baa17b243203733"
+    },
+    {
+      "file": "screenshots/tablet-10/01-precision.png",
+      "width": 1800,
+      "height": 3200,
+      "bytes": 1136538,
+      "sha256": "04c88207eedd4ed4d40afb4fb11b2e96f71b22f17d2ec762104df0076d981e40"
+    },
+    {
+      "file": "screenshots/tablet-10/02-infinite.png",
+      "width": 1800,
+      "height": 3200,
+      "bytes": 1127674,
+      "sha256": "e3a140d1a51504c7b02478ee52ed85b2d16528e2a227c2fd8f31e377a8b503c1"
+    },
+    {
+      "file": "screenshots/tablet-10/03-classic.png",
+      "width": 1800,
+      "height": 3200,
+      "bytes": 1439523,
+      "sha256": "67aa380ba8213f121786850d98e4287ef77febaa71577525d1276aa948cc03aa"
+    },
+    {
+      "file": "screenshots/tablet-10/04-boss.png",
+      "width": 1800,
+      "height": 3200,
+      "bytes": 791298,
+      "sha256": "7d62eb2473a2484a2db7e92934362984796a620b80afef113b3031b8d4566840"
+    },
+    {
+      "file": "screenshots/tablet-10/05-merge.png",
+      "width": 1800,
+      "height": 3200,
+      "bytes": 968623,
+      "sha256": "f210932268e276e690aa5328bd12bfcc830dcdc2662b895d2e3f38b4dbfc5c2f"
+    },
+    {
+      "file": "screenshots/tablet-10/06-gear.png",
+      "width": 1800,
+      "height": 3200,
+      "bytes": 874300,
+      "sha256": "537f4daf2e853c9b185ee0c2305853b3d666225d752b198c8d7575f000c43892"
+    }
+  ]
+}

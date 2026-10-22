@@ -1,6 +1,7 @@
 // Actual Flutter UI captures plus deterministic App Store presentation cards.
 // Run: scripts/flutter.ps1 test --no-pub tool/render_app_store.dart
 // Optional: --dart-define=STORE_DEVICE=iphone-6-9
+// Google Play: --dart-define=STORE_PLATFORM=android (plain Android UI captures).
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -9,10 +10,8 @@ import 'dart:ui' as ui;
 
 import 'package:balance_arcade/ball_cosmetics.dart';
 import 'package:balance_arcade/game.dart';
-import 'package:balance_arcade/hazards.dart';
 import 'package:balance_arcade/infinite_boss.dart';
 import 'package:balance_arcade/infinite_progress.dart';
-import 'package:balance_arcade/levels.dart';
 import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/merge.dart';
 import 'package:balance_arcade/profile.dart';
@@ -26,9 +25,12 @@ import 'package:shared_preferences_platform_interface/in_memory_shared_preferenc
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import '../test/support/mode_navigation.dart' show startWorld;
 
+const playStore = String.fromEnvironment('STORE_PLATFORM') == 'android';
 const outputRoot = String.fromEnvironment(
   'STORE_OUTPUT',
-  defaultValue: 'release/app-store/2026-10-18',
+  defaultValue: playStore
+      ? 'release/google-play/2026-10-23'
+      : 'release/app-store/2026-10-18',
 );
 
 class StoreDevice {
@@ -47,7 +49,13 @@ class StoreDevice {
   bool get tablet => logical.width >= 600;
 }
 
-const devices = [
+const devices = playStore ? androidDevices : appleDevices;
+const androidDevices = [
+  StoreDevice('phone', 1080, 1920, 3, 24, 24),
+  StoreDevice('tablet-7', 1440, 2560, 2, 24, 24),
+  StoreDevice('tablet-10', 1800, 3200, 2, 24, 24),
+];
+const appleDevices = [
   StoreDevice('iphone-6-3', 1206, 2622, 3, 62, 34),
   StoreDevice('iphone-6-9', 1320, 2868, 3, 62, 34),
   StoreDevice('ipad-13', 2064, 2752, 2, 24, 20),
@@ -121,11 +129,11 @@ const shots = [
 ];
 
 void main() {
-  testWidgets('capture App Store sets from the actual app at Apple pixel sizes', (
-    tester,
-  ) async {
+  testWidgets('capture store sets from the current app UI', (tester) async {
     final previousPlatform = debugDefaultTargetPlatformOverride;
-    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    debugDefaultTargetPlatformOverride = playStore
+        ? TargetPlatform.android
+        : TargetPlatform.iOS;
     addTearDown(() => debugDefaultTargetPlatformOverride = previousPlatform);
     for (final family in [
       'sans-serif',
@@ -275,7 +283,9 @@ void main() {
         expect((raw.width, raw.height), (device.width, device.height));
         final rawPath = '$outputRoot/source-ui/${device.id}/${shot.id}.png';
         await tester.runAsync(() => saveRgb(raw, rawPath));
-        final composed = await presentation(raw, device, shot);
+        final composed = playStore
+            ? raw
+            : await presentation(raw, device, shot);
         final finalPath = '$outputRoot/screenshots/${device.id}/${shot.id}.png';
         await tester.runAsync(() => saveRgb(composed, finalPath));
         manifest.add({
@@ -286,11 +296,12 @@ void main() {
           'title': shot.title.replaceAll('\n', ' '),
           'file': 'screenshots/${device.id}/${shot.id}.png',
           'source': 'source-ui/${device.id}/${shot.id}.png',
-          'capture':
-              'Flutter app UI rendered with iOS target platform; not a native iOS device capture',
+          'capture': playStore
+              ? 'Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture'
+              : 'Flutter app UI rendered with iOS target platform; not a native iOS device capture',
           'pngColorType': 2,
         });
-        composed.dispose();
+        if (!identical(composed, raw)) composed.dispose();
         raw.dispose();
         print(
           'Captured ${device.id}/${shot.id} (${device.width}x${device.height}, RGB)',
@@ -349,25 +360,11 @@ void stageClassic(BalanceGame game, bool orbits) {
     }
   }
   if (orbits) {
-    final wave = ClassicLevels.definition(game.level).hazards.first;
-    final p = wave.positions.firstWhere((p) => p.target == game.target);
-    final hazard = SpecialHazard(
-      wave.kind,
-      x: p.x,
-      y: p.y,
-      motion: wave.motion,
-      orientation: wave.orientation,
-      radiusX: wave.radiusX,
-      radiusY: wave.radiusY,
-      period: wave.period,
-      phase: wave.phase,
-      warningSeconds: wave.warningSeconds,
-      liveSeconds: wave.liveSeconds,
-    );
-    hazard.step(1.1, 0);
-    game.specialHazards
-      ..clear()
-      ..add(hazard);
+    // Moving holes now persist from level start, rather than appearing as
+    // target-specific timed waves. Capture those real instances in motion.
+    for (final hazard in game.specialHazards) {
+      hazard.step(1.1, 0);
+    }
   }
 }
 
@@ -378,8 +375,8 @@ void stageInfinite(BalanceGame game, bool boss) {
   game.dangerY = 620 - camera;
   game.ballX = boss ? 240 : 178;
   // A valid raised-platform pose keeps the boss in view on shorter displays.
-  game.left = (boss ? 322 : 438) - camera;
-  game.right = (boss ? 308 : 414) - camera;
+  game.left = (boss ? 338 : 438) - camera;
+  game.right = (boss ? 324 : 414) - camera;
   game.velocity = 0;
   game.controlPosition = (game.right - game.left) / 140;
   game.score = boss ? 912840 : 18460;
@@ -465,7 +462,7 @@ void stageMerge(BalanceGame game) {
     ]);
   run.gates
     ..clear()
-    ..add(MergeGate(64, y: 74));
+    ..add(MergeGate(64, y: 180));
   run.notice = '';
   game.clock = 10.8;
 }

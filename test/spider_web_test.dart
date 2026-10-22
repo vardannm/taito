@@ -108,7 +108,11 @@ void main() {
         ),
       );
       g.survival.items.add(
-        InfiniteItem(InfiniteItemKind.shield, 180, shieldFirst ? 400 : 300),
+        InfiniteItem(
+          InfiniteItemKind.shield,
+          180,
+          shieldFirst ? 400 : g.minPivot,
+        ),
       );
       g.grabPivot(0);
       g.grabPivot(1);

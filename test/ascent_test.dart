@@ -17,8 +17,9 @@ void main() {
       final travel = game.ascentSpeed / 120;
       game.step(1 / 120);
       expect(game.cameraOffset - camera, closeTo(travel, 1e-8));
-      expect(game.screenY(game.left), closeTo(300, 1e-8));
-      expect(game.screenY(game.right), closeTo(300, 1e-8));
+      // The current lift range is 21.25% of the 560-unit board: 440 - 119.
+      expect(game.screenY(game.left), closeTo(321, 1e-8));
+      expect(game.screenY(game.right), closeTo(321, 1e-8));
       game.releasePivot(0);
       game.releasePivot(1);
     }
