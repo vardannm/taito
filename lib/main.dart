@@ -53,6 +53,9 @@ import 'responsive_layout.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  // Full screen: hides the status bar (time, battery) and Android's nav bar;
+  // a swipe from the edge shows them briefly. SafeAreas still avoid the notch.
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
