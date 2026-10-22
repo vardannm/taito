@@ -21,6 +21,7 @@ import 'cabinet.dart';
 import 'heart_loss_effect.dart';
 import 'pickup_painter.dart';
 import 'responsive_layout.dart';
+import 'wide_board_scenery.dart';
 
 const cream = Color(0xFFF2ECDD);
 const ink = Color(0xFF163D3B);
@@ -89,6 +90,13 @@ class BoardViewport {
                   0.0,
                 )),
     );
+    final edgeInset = math.min(24.0, full.width * .035);
+    railLeft = usesWideStage(full)
+        ? 20 + ((edgeInset - offset.dx) / scale - 20) * progress
+        : 20;
+    railRight = usesWideStage(full)
+        ? 340 + ((full.width - edgeInset - offset.dx) / scale - 340) * progress
+        : 340;
     // A two-finger board is drawn down through its handle strip, so the
     // screen stays full while the play area keeps one-finger's position.
     bottomExtension = bottomInset > 0
@@ -110,6 +118,9 @@ class BoardViewport {
     focusY: game.screenY((game.left + game.right) / 2),
   );
   late final double scale;
+
+  /// Decorative rails may move outward without relocating collision geometry.
+  late final double railLeft, railRight;
   late final double topExtension;
 
   /// World units painted below the board's bottom edge (y 560).
@@ -241,27 +252,15 @@ class BoardPainter extends CustomPainter {
       fillWidth: fillWidth,
       bottomInset: bottomInset,
     );
-    if (usesWideStage(size) && fillWidth > 0) {
-      // A calm surround makes the fitted stage feel part of the whole window.
-      // It follows the equipped world and Infinite's current combo palette.
-      final colors = boardFieldColors(game);
-      canvas.drawRect(
-        Offset.zero & size,
-        Paint()
-          ..shader = LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color.lerp(colors.first, Colors.black, .28)!,
-              Color.lerp(colors.last, Colors.black, .48)!,
-            ],
-          ).createShader(Offset.zero & size),
-      );
-      canvas.drawRect(
-        Rect.fromLTRB(viewport.rect.left, 0, viewport.rect.right, size.height),
-        Paint()
-          ..color = Colors.black.withAlpha(100)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18),
+    final panoramic = usesWideStage(size) && fillWidth > 0;
+    if (panoramic) {
+      paintWideBoardScenery(
+        canvas,
+        size,
+        game,
+        sharpArea: viewport.rect,
+        worldOffset: viewport.offset,
+        worldScale: viewport.scale,
       );
     }
     canvas.translate(viewport.offset.dx, viewport.offset.dy);
@@ -272,27 +271,30 @@ class BoardPainter extends CustomPainter {
       Rect.fromLTRB(0, top, 360, bottom),
       Radius.zero,
     );
-    canvas.drawRRect(
-      field,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: boardFieldColors(game),
-        ).createShader(field.outerRect),
-    );
+    if (!panoramic)
+      canvas.drawRRect(
+        field,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: boardFieldColors(game),
+          ).createShader(field.outerRect),
+      );
     canvas.save();
     canvas.clipRRect(field);
     paintInfiniteAtmosphere(canvas, game, reducedMotion);
-    paintBallWorld(
-      canvas,
-      field.outerRect,
-      game.cosmetic,
-      background: false,
-      time: game.clock,
-      reducedMotion: reducedMotion,
-      energy: game.infinite ? game.survival.visualCombo : 0,
-    );
+    if (!panoramic)
+      paintBallWorld(
+        canvas,
+        field.outerRect,
+        game.cosmetic,
+        background: false,
+        time: game.clock,
+        reducedMotion: reducedMotion,
+        energy: game.infinite ? game.survival.visualCombo : 0,
+      );
+    canvas.restore();
     final railTop = game.infinite ? game.screenY(game.minPivot) : top + 26;
     final fadeRails =
         game.oneFinger && !game.haloJoystick || game.bottomControls;
@@ -322,11 +324,17 @@ class BoardPainter extends CustomPainter {
     final railBody = railPaint(const Color(0xFF574A31), 5);
     final railHighlight = railPaint(const Color(0xFFEEE7CC), 1);
     final grain = railPaint(ink.withAlpha(75), .6);
-    for (final x in [
-      BalanceGame.sideRailX,
-      BalanceGame.width - BalanceGame.sideRailX,
+    for (final (x, laser) in [
+      if (panoramic) ...[
+        (viewport.railLeft, false),
+        (viewport.railRight, false),
+      ],
+      if (!panoramic || game.laserSideRails) ...[
+        (BalanceGame.sideRailX, game.laserSideRails),
+        (BalanceGame.width - BalanceGame.sideRailX, game.laserSideRails),
+      ],
     ]) {
-      if (game.laserSideRails) {
+      if (laser) {
         final start = Offset(x, railTop), end = Offset(x, railBottom);
         const laserRed = Color(0xFFE34336);
         canvas.drawLine(
@@ -371,8 +379,8 @@ class BoardPainter extends CustomPainter {
       );
       for (double y = railTop + 6; y < railBottom - 4; y += 10) {
         canvas.drawLine(
-          Offset(x == 20 ? 26 : 329, y),
-          Offset(x == 20 ? 30 : 333, y),
+          Offset(x + (x < 180 ? 6 : -11), y),
+          Offset(x + (x < 180 ? 10 : -7), y),
           grain,
         );
       }
@@ -399,6 +407,8 @@ class BoardPainter extends CustomPainter {
         }
       }
     }
+    canvas.save();
+    canvas.clipRRect(field);
     if (game.merging) {
       for (final orb in game.mergeRun.orbs) {
         paintNumberOrb(

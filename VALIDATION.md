@@ -806,3 +806,28 @@ Not verified here: native iOS compilation/signing, iPhone audio/haptic feel, sus
   updated menu in the browser. No native binary or physical Duo posture test
   was performed. The earlier unrelated movement/hazard suite failures remain
   documented above; this task does not claim a clean full project suite.
+
+## Full-width scenery and border rails — 2026-10-22
+
+- Wide gameplay now paints one continuous world background across the window,
+  replacing the distinct central backdrop and dark side margins. A smooth
+  gradient blends zero blur around the central playfield into full blur at
+  the edges. Two filtered passes reuse one cached scenery picture; actors,
+  HUD and rails paint afterward and remain sharp. The cache holds one scene
+  and refreshes when viewport, equipment or the combo palette changes.
+- Decorative rails move to 24 logical pixels from either window border.
+  Ball, targets, platform and input retain their fitted geometry. Late Classic
+  laser rails remain at the actual collision boundaries and are separate from
+  the decorative outer rails. Phone and carousel rail positions remain 20/340
+  world units with no panorama blur layers.
+- All 48 focused checks pass across all five modes, rail placement, laser
+  alignment, blur progression, unchanged simulation state, live resizing,
+  accessibility, phone controls and render culling. Static analysis reports no
+  issues; whitespace checks pass. Logs: artifacts/wide-panorama-tests.log and
+  artifacts/wide-panorama-analysis.log.
+- Inspected actual gameplay renders for Classic, Infinite, Number Merge,
+  Daily and Practice at 390×844, 1114×720 and 1920×1080, plus all five modes
+  with Nebula scenery at 1114×720. Reproduce with
+  tool/render_wide_panorama.dart; images are artifacts/panorama-*.png.
+- Refreshed the local web preview at http://127.0.0.1:7357. No native binary
+  was rebuilt and no physical-device frame-rate result is claimed.
