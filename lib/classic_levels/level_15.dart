@@ -28,11 +28,21 @@ const classicLevel15 = ClassicLevelDefinition(
     Hole(120, 214),
     Hole(240, 214),
     Hole(244, 54),
+    Hole(40, 400),
+    Hole(80, 410),
+    Hole(150, 420),
+    Hole(270, 360),
+    Hole(310, 360),
+    Hole(250, 140),
+    Hole(150, 90),
+    Hole(30, 180),
+    Hole(336, 280),
+    Hole(80, 200),
   ],
-  spiders: [],
+  spiders: [
+  ],
   finaleTitle: "Crosswind",
-  finaleRule:
-      "A marked lane warns before it fires. Cross while the light is dark.",
+  finaleRule: "A marked lane warns before it fires. Cross while the light is dark.",
   hazards: [
     ClassicHazardWave(
       kind: HazardKind.laser,
