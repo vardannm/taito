@@ -771,3 +771,38 @@ Not verified here: native iOS compilation/signing, iPhone audio/haptic feel, sus
   and 820×1180 (tablet). Reproduce with tool/render_adaptive_controls.dart;
   images are artifacts/controls-duo-closed.png, controls-duo-expanded.png and
   controls-tablet.png. No physical Duo posture test or native build was run.
+
+## Wide-screen board and menu proportions — 2026-10-22
+
+- Windows at least 600 logical pixels wide fit the full board vertically and
+  horizontally instead of zooming to fill their width. A separate 96-pixel
+  HUD area keeps top targets visible. Ball, holes, platform and effects retain
+  uniform scaling; platform movement does not pan the fitted viewport.
+  Infinite's simulation camera still follows actual climbing.
+- Two-Finger input extends across both window halves, including the themed
+  surround, so players can hold the device near its edges. Paint, input deltas,
+  grip markers and heart feedback still share one viewport transform. Resizing
+  a live run preserves its board, progress, lives and input ownership.
+- Wide main menus scale text and controls together by 1.15–1.5. Landscape
+  windows at least 1000 pixels wide place the world preview beside the actions.
+  Tablets retain stacked menus. Sheets have bounded reading widths and larger
+  type; pause/results use larger centered panels. Accessibility scaling is
+  retained without applying the wide multiplier twice. Compact phone menu
+  dimensions and full-width gameplay are unchanged, including rotated phones'
+  compact menu sizing.
+- The broad regression run passed all 92 checks across layouts, phone width,
+  controls, start flows, transitions and tutorials. After reserving the HUD
+  area, all 45 final layout/control/transition/render checks passed. These
+  include 1.8x accessibility text, live folding, edge input, circular geometry,
+  camera stability and all three world launches. Logs:
+  artifacts/wide-layout-tests.log and wide-layout-final-tests.log.
+- Static analysis reports no issues; diff whitespace checks pass. Analysis log:
+  artifacts/wide-layout-analysis.log. Inspected actual Flutter renders of menu,
+  Classic play, pause and Settings at 390×844, 540×720, 1114×720, 820×1180,
+  1440×900 and 1024×500. Additional geometry/UI checks cover 600×900 and
+  1920×1080. Reproduce with tool/render_wide_layout.dart; previews are
+  artifacts/wide-*.png.
+- Restarted the local web preview at http://127.0.0.1:7357 and verified the
+  updated menu in the browser. No native binary or physical Duo posture test
+  was performed. The earlier unrelated movement/hazard suite failures remain
+  documented above; this task does not claim a clean full project suite.

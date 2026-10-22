@@ -48,6 +48,7 @@ import 'control_hint.dart';
 import 'control_glass.dart';
 import 'one_finger_controls.dart';
 import 'boot_splash.dart';
+import 'responsive_layout.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -2339,13 +2340,15 @@ class _GameScreenState extends State<GameScreen>
     if (tutorialActive) return tutorialCarouselFooter(page);
     final index = page.round().clamp(0, arcadeModes.length - 1);
     final classic = index == 1;
+    final landscape = usesLandscapeMenu(MediaQuery.sizeOf(context));
     return Align(
-      alignment: Alignment.bottomCenter,
+      alignment: landscape ? Alignment.center : Alignment.bottomCenter,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 460),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
+            mainAxisSize: landscape ? MainAxisSize.min : MainAxisSize.max,
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               SizedBox(
@@ -2586,10 +2589,14 @@ class _GameScreenState extends State<GameScreen>
           )!;
           final ready =
               game.waitingForInput && !returning && entrance.isDismissed;
+          final menuScale = wideMenuScale(MediaQuery.sizeOf(context));
+          final landscapeMenu =
+              !tutorialActive && usesLandscapeMenu(MediaQuery.sizeOf(context));
+          final menuFooterWidth = 460.0 * menuScale;
           final menuHeaderHeight = !tutorialActive
               ? compactMenu
                     ? 64.0
-                    : 88.0
+                    : 88.0 * menuScale
               : MediaQuery.sizeOf(context).height < 650 &&
                     MediaQuery.textScalerOf(context).scale(10) <= 10
               ? 104.0
@@ -2599,7 +2606,7 @@ class _GameScreenState extends State<GameScreen>
               ? 84.0
               : compactMenu
               ? 284.0
-              : 310.0;
+              : 310.0 * menuScale;
           final menuGap = !tutorialActive && compactMenu ? 4.0 : 12.0;
           final controlHeight = bottomControlHeight(context);
           final stageBackground = Color.lerp(
@@ -2698,7 +2705,12 @@ class _GameScreenState extends State<GameScreen>
                                                       1.0,
                                                     )
                                                   : reveal,
-                                              child: selectionHeader(page),
+                                              child: ScaledMenuChrome(
+                                                scale: tutorialActive
+                                                    ? 1
+                                                    : menuScale,
+                                                child: selectionHeader(page),
+                                              ),
                                             ),
                                           ),
                                         ),
@@ -2708,36 +2720,70 @@ class _GameScreenState extends State<GameScreen>
                                 ),
                               ),
                             Expanded(
-                              child: Padding(
-                                padding: EdgeInsets.only(
-                                  top: menuGap * (1 - expansion),
-                                  bottom: menuGap * (1 - expansion),
-                                ),
-                                child: worlds,
-                              ),
-                            ),
-                            SizedBox(
-                              height: menuFooterHeight * (1 - expansion),
-                              child: OverflowBox(
-                                minHeight: menuFooterHeight,
-                                maxHeight: menuFooterHeight,
-                                alignment: Alignment.bottomCenter,
-                                child: IgnorePointer(
-                                  ignoring: !ready,
-                                  child: ExcludeSemantics(
-                                    excluding: !ready,
-                                    child: Opacity(
-                                      opacity: chromeOpacity,
-
-                                      child: MenuReveal(
-                                        animation: tutorialActive
-                                            ? const AlwaysStoppedAnimation(1.0)
-                                            : reveal,
-                                        child: carouselFooter(page),
+                              child: Flex(
+                                direction: landscapeMenu
+                                    ? Axis.horizontal
+                                    : Axis.vertical,
+                                children: [
+                                  Expanded(
+                                    child: Padding(
+                                      padding: EdgeInsets.only(
+                                        top: menuGap * (1 - expansion),
+                                        bottom: menuGap * (1 - expansion),
+                                      ),
+                                      child: worlds,
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: landscapeMenu
+                                        ? menuFooterWidth * (1 - expansion)
+                                        : null,
+                                    height: landscapeMenu
+                                        ? null
+                                        : menuFooterHeight * (1 - expansion),
+                                    child: ClipRect(
+                                      child: OverflowBox(
+                                        minWidth: landscapeMenu
+                                            ? menuFooterWidth
+                                            : null,
+                                        maxWidth: landscapeMenu
+                                            ? menuFooterWidth
+                                            : null,
+                                        minHeight: landscapeMenu
+                                            ? null
+                                            : menuFooterHeight,
+                                        maxHeight: landscapeMenu
+                                            ? null
+                                            : menuFooterHeight,
+                                        alignment: landscapeMenu
+                                            ? Alignment.centerRight
+                                            : Alignment.bottomCenter,
+                                        child: IgnorePointer(
+                                          ignoring: !ready,
+                                          child: ExcludeSemantics(
+                                            excluding: !ready,
+                                            child: Opacity(
+                                              opacity: chromeOpacity,
+                                              child: MenuReveal(
+                                                animation: tutorialActive
+                                                    ? const AlwaysStoppedAnimation(
+                                                        1.0,
+                                                      )
+                                                    : reveal,
+                                                child: ScaledMenuChrome(
+                                                  scale: tutorialActive
+                                                      ? 1
+                                                      : menuScale,
+                                                  child: carouselFooter(page),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
+                                ],
                               ),
                             ),
                           ],
@@ -2764,7 +2810,7 @@ class _GameScreenState extends State<GameScreen>
                       key: const ValueKey('run-overlay'),
                       child: Padding(
                         padding: const EdgeInsets.all(12),
-                        child: boardOverlay(),
+                        child: responsiveRunOverlay(context),
                       ),
                     ),
                   if (resumeSeconds > 0)
@@ -3057,6 +3103,18 @@ class _GameScreenState extends State<GameScreen>
       ),
     ),
   );
+
+  Widget responsiveRunOverlay(BuildContext context) {
+    final scale = wideMenuScale(MediaQuery.sizeOf(context));
+    final overlay = boardOverlay();
+    if (scale == 1) return overlay;
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: 520 * scale),
+        child: ScaledMenuChrome(scale: scale, child: overlay),
+      ),
+    );
+  }
 
   Widget boardOverlay() => offeringRevive
       ? reviveOffer()

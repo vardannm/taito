@@ -20,6 +20,7 @@ import 'infinite_boss_painter.dart';
 import 'cabinet.dart';
 import 'heart_loss_effect.dart';
 import 'pickup_painter.dart';
+import 'responsive_layout.dart';
 
 const cream = Color(0xFFF2ECDD);
 const ink = Color(0xFF163D3B);
@@ -52,17 +53,27 @@ class BoardViewport {
     double focusY = 440,
     double bottomInset = 0,
   }) {
-    final size = Size(full.width, math.max(1, full.height - bottomInset));
-    bounds = Offset.zero & size;
+    final progress = fillWidth.clamp(0.0, 1.0);
+    final topInset = usesWideStage(full) ? 96.0 * progress : 0.0;
+    final size = Size(
+      full.width,
+      math.max(1, full.height - bottomInset - topInset),
+    );
+    bounds = Rect.fromLTWH(0, topInset, size.width, size.height);
     // Without a strip, handles stay on the visible board as before.
     controlBottom = bottomInset > 0 ? full.height : 0;
     final fit = math.min(
       size.width / BalanceGame.width,
       size.height / BalanceGame.height,
     );
-    scale =
-        fit +
-        (size.width / BalanceGame.width - fit) * fillWidth.clamp(0.0, 1.0);
+    // A wide window must show the complete route. Filling its width would
+    // enlarge every object and turn ordinary platform movement into camera
+    // panning. Keep the same uniform transform for paint and pointer input.
+    scale = usesWideStage(full)
+        ? fit
+        : fit +
+              (size.width / BalanceGame.width - fit) *
+                  fillWidth.clamp(0.0, 1.0);
     final height = BalanceGame.height * scale;
     topExtension =
         math.max(0, size.height - height) / scale * fillWidth.clamp(0.0, 1.0);
@@ -70,12 +81,13 @@ class BoardViewport {
       (size.width - BalanceGame.width * scale) / 2,
       // Slack sits above the board during a run so it rests near the control
       // area instead of leaving a gap between the two.
-      height <= size.height
-          ? (size.height - height) * (.5 + .5 * fillWidth.clamp(0.0, 1.0))
-          : (size.height * .72 - focusY * scale).clamp(
-              size.height - height,
-              0.0,
-            ),
+      topInset +
+          (height <= size.height
+              ? (size.height - height) * (.5 + .5 * fillWidth.clamp(0.0, 1.0))
+              : (size.height * .72 - focusY * scale).clamp(
+                  size.height - height,
+                  0.0,
+                )),
     );
     // A two-finger board is drawn down through its handle strip, so the
     // screen stays full while the play area keeps one-finger's position.
@@ -127,6 +139,16 @@ class BoardViewport {
 
   /// The visible board plus the control strip below it.
   Rect get gripArea {
+    // Keep edge touches comfortable when the artwork fits the window height.
+    // Pointer motion still uses the exact painted scale.
+    if (usesWideStage(bounds.size)) {
+      return Rect.fromLTRB(
+        bounds.left,
+        bounds.top,
+        bounds.right,
+        math.max(bounds.bottom, controlBottom),
+      );
+    }
     final visible = rect.intersect(bounds);
     return Rect.fromLTRB(
       visible.left,
@@ -219,6 +241,29 @@ class BoardPainter extends CustomPainter {
       fillWidth: fillWidth,
       bottomInset: bottomInset,
     );
+    if (usesWideStage(size) && fillWidth > 0) {
+      // A calm surround makes the fitted stage feel part of the whole window.
+      // It follows the equipped world and Infinite's current combo palette.
+      final colors = boardFieldColors(game);
+      canvas.drawRect(
+        Offset.zero & size,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color.lerp(colors.first, Colors.black, .28)!,
+              Color.lerp(colors.last, Colors.black, .48)!,
+            ],
+          ).createShader(Offset.zero & size),
+      );
+      canvas.drawRect(
+        Rect.fromLTRB(viewport.rect.left, 0, viewport.rect.right, size.height),
+        Paint()
+          ..color = Colors.black.withAlpha(100)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18),
+      );
+    }
     canvas.translate(viewport.offset.dx, viewport.offset.dy);
     canvas.scale(viewport.scale);
     final top = -viewport.topExtension;

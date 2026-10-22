@@ -4,6 +4,7 @@ import 'control_hint.dart';
 import 'package:flutter/material.dart';
 import 'board_painter.dart';
 import 'game.dart';
+import 'responsive_layout.dart';
 
 /// Pointer ownership stays with the grabbed pivot through crossing and release.
 class PivotBoard extends StatefulWidget {
@@ -215,9 +216,11 @@ class _PivotBoardState extends State<PivotBoard> {
               ),
             if (widget.overlay != null)
               Positioned.fromRect(
-                rect: viewportNow().rect.intersect(
-                  Offset.zero & bounds.biggest,
-                ),
+                rect: usesWideStage(bounds.biggest)
+                    ? Offset.zero & bounds.biggest
+                    : viewportNow().rect.intersect(
+                        Offset.zero & bounds.biggest,
+                      ),
                 child: widget.overlay!,
               ),
           ],

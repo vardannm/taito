@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'responsive_layout.dart';
 
 const menuBackground = Color(0xFF0D171A);
 const menuPanel = Color(0xFF19282C);
@@ -148,22 +149,44 @@ class MenuSurface extends StatelessWidget {
   const MenuSurface({super.key, required this.child});
   final Widget child;
   @override
-  Widget build(BuildContext context) => Theme(
-    data: arcadeMenuTheme(),
-    child: DefaultTextStyle(
-      style: const TextStyle(
-        fontFamily: 'sans-serif',
-        color: menuText,
-        fontSize: 14,
-        height: 1.4,
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final factor = wideMenuScale(media.size);
+    final scaler = media.textScaler;
+    return MediaQuery(
+      data: media.copyWith(
+        textScaler: factor == 1 || scaler is WideMenuTextScaler
+            ? scaler
+            : WideMenuTextScaler(scaler, factor),
       ),
-      child: Material(
-        color: menuBackground,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        child: child,
+      child: Theme(
+        data: arcadeMenuTheme(),
+        child: DefaultTextStyle(
+          style: const TextStyle(
+            fontFamily: 'sans-serif',
+            color: menuText,
+            fontSize: 14,
+            height: 1.4,
+          ),
+          child: Material(
+            color: menuBackground,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            child: LayoutBuilder(
+              builder: (context, bounds) => Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: ((bounds.maxWidth - 960) / 2).clamp(
+                    0,
+                    double.infinity,
+                  ),
+                ),
+                child: child,
+              ),
+            ),
+          ),
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class MenuHeading extends StatelessWidget {
