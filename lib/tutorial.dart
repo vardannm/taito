@@ -107,11 +107,11 @@ class _FirstPlayTutorialState extends State<FirstPlayTutorial>
     0 =>
       game.oneFinger
           ? 'Drag up in the thumb area below the board, then let go. The platform holds its height.'
-          : 'Drag both end grips up, then let go. The platform holds its height.',
+          : 'Drag up on both halves of the board, then let go. The platform holds its height.',
     1 =>
       game.oneFinger
           ? 'Drag sideways in the thumb area below the board. Tilt until the ball rolls to either side.'
-          : 'Move one end grip up or down. Tilt until the ball rolls to either side.',
+          : 'Drag one half of the board up or down. Tilt until the ball rolls to either side.',
     _ =>
       'Lift toward the glowing hole. Use a little tilt to line up the ball. Take your time.',
   };

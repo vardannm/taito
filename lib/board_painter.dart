@@ -198,7 +198,6 @@ class BoardPainter extends CustomPainter {
     this.fillWidth = 0,
     this.bottomInset,
     this.showHud = true,
-    this.gripOffsets = const {},
     Listenable? repaint,
   }) : world = BallWorld.of(game.cosmetic),
        super(repaint: repaint);
@@ -208,7 +207,6 @@ class BoardPainter extends CustomPainter {
   final double fillWidth;
   final double? bottomInset;
   final bool showHud;
-  final Map<int, double> gripOffsets;
 
   void text(
     Canvas c,
@@ -877,69 +875,24 @@ class BoardPainter extends CustomPainter {
     );
     canvas.restore();
     paintGapWarning(canvas, game, reducedMotion);
-    // Only two-finger play grabs the ends, so only it wears grab handles. The
-    // other controls keep slim caps that never read as something to drag.
-    final grips =
-        game.started &&
-        !game.oneFinger &&
-        !game.bottomControls &&
-        !game.boardTilt;
-    // Two-finger handles may hang below the playfield into the control strip,
-    // so they are drawn after its clip ends; other controls' caps stay here.
+    // Every control shows slim caps at the ends. Two-finger play is driven by
+    // a touch anywhere on either half, so it needs no grab handles; its
+    // feedback (halves hint, finger rings, lit ends) is drawn by
+    // TwoFingerFeedbackPainter above the board.
     void paintEnds() {
       for (final p in [a, b]) {
-        final grip = grips
-            ? Offset(
-                p.dx,
-                (viewport.gripCenter(
-                              game,
-                              p == a ? 0 : 1,
-                              heldOffset: gripOffsets[p == a ? 0 : 1],
-                            ) -
-                            viewport.offset)
-                        .dy /
-                    viewport.scale,
-              )
-            : p;
-        if (grips) {
-          canvas.drawLine(
-            p,
-            grip,
-            Paint()
-              ..color = brass.withAlpha(180)
-              ..strokeWidth = 2 / viewport.scale,
-          );
-          canvas.drawCircle(p, 3, Paint()..color = ink);
-          canvas.drawCircle(p, 1.5, Paint()..color = brass);
-        }
         canvas.drawRRect(
           RRect.fromRectAndRadius(
-            Rect.fromCenter(
-              center: grip,
-              width: grips ? 27 / viewport.scale : 12,
-              height: grips ? 32 / viewport.scale : 19,
-            ),
+            Rect.fromCenter(center: p, width: 12, height: 19),
             const Radius.circular(3),
           ),
           Paint()..color = ink,
         );
-        canvas.drawCircle(grip, 2, Paint()..color = brass);
-        if (grips) {
-          for (final dy in [-7.0, 7.0]) {
-            final anchor = Offset(grip.dx * viewport.stretch, grip.dy);
-            plainCanvas.drawLine(
-              anchor + Offset(-6, dy) / viewport.scale,
-              anchor + Offset(6, dy) / viewport.scale,
-              Paint()
-                ..color = brass
-                ..strokeWidth = 1.5,
-            );
-          }
-        }
+        canvas.drawCircle(p, 2, Paint()..color = brass);
       }
     }
 
-    if (!grips) paintEnds();
+    paintEnds();
     if (game.merging) {
       final run = game.mergeRun;
       Offset segmentCenter(int i) {
@@ -1027,7 +980,6 @@ class BoardPainter extends CustomPainter {
         }
     }
     canvas.restore();
-    if (grips) paintEnds();
     plainCanvas.restore();
   }
 

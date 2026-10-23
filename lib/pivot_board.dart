@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'board_painter.dart';
 import 'game.dart';
 import 'responsive_layout.dart';
+import 'two_finger_feedback.dart';
 
 /// Pointer ownership stays with the grabbed pivot through crossing and release.
 class PivotBoard extends StatefulWidget {
@@ -38,13 +39,14 @@ class PivotBoard extends StatefulWidget {
 class _PivotBoardState extends State<PivotBoard> {
   double get bottomInset => widget.bottomInset ?? controlStrip(widget.game);
   final pointers = <int, int>{};
-  final gripOffsets = <int, double>{};
+  // Where each side's finger is, for the two-finger feedback overlay.
+  final fingers = <int, Offset>{};
   int epoch = -1;
 
   void synchronize() {
     if (epoch != widget.game.inputEpoch) {
       pointers.clear();
-      gripOffsets.clear();
+      fingers.clear();
       epoch = widget.game.inputEpoch;
     }
   }
@@ -107,11 +109,13 @@ class _PivotBoardState extends State<PivotBoard> {
     game.arenaStretch = viewportNow().stretch;
     game.visibleTop = -viewportNow().topExtension;
     game.visibleBottom = viewportNow().paintBottom;
+    final twoFinger =
+        !game.bottomControls && !game.oneFinger && !game.boardTilt;
     void release(PointerEvent event) {
       synchronize();
       final side = pointers.remove(event.pointer);
       if (side != null && side < 2) {
-        gripOffsets.remove(side);
+        fingers.remove(side);
         game.releasePivot(side);
       }
     }
@@ -131,13 +135,7 @@ class _PivotBoardState extends State<PivotBoard> {
             pointers.containsValue(side))
           return;
         pointers[event.pointer] = side;
-        final pivotY = viewport
-            .project(
-              Offset(0, game.screenY(side == 0 ? game.left : game.right)),
-            )
-            .dy;
-        // Keep the handle on the same side of the platform for this gesture.
-        gripOffsets[side] = viewport.gripCenter(game, side).dy - pivotY;
+        fingers[side] = event.localPosition;
         game.grabPivot(side);
       },
       onPointerMove: (event) {
@@ -145,6 +143,7 @@ class _PivotBoardState extends State<PivotBoard> {
         final side = pointers[event.pointer];
         if (side == null || !game.canControl || epoch != game.inputEpoch)
           return;
+        fingers[side] = event.localPosition;
         // Layout can expand under an already-held finger. Only physical pointer
         // motion is input; movement of the viewport itself must not move a pivot.
         final delta = event.localDelta.dy / viewportNow().scale;
@@ -179,11 +178,23 @@ class _PivotBoardState extends State<PivotBoard> {
                   fillWidth: widget.fillWidth,
                   bottomInset: bottomInset,
                   showHud: widget.overlay == null,
-                  gripOffsets: gripOffsets,
                 ),
                 child: const SizedBox.expand(),
               ),
             ),
+            if (twoFinger)
+              IgnorePointer(
+                child: CustomPaint(
+                  painter: TwoFingerFeedbackPainter(
+                    game,
+                    viewportNow,
+                    fingers,
+                    arrows: !widget.showHint,
+                    repaint: widget.frame,
+                  ),
+                  child: const SizedBox.expand(),
+                ),
+              ),
             if (widget.dimUntilInput)
               Positioned.fill(
                 bottom: game.oneFinger && !game.haloJoystick ? bottomInset : 0,
@@ -208,14 +219,11 @@ class _PivotBoardState extends State<PivotBoard> {
                 frame: widget.frame,
                 boardScale: viewportNow().scale,
               ),
-            if (widget.showHint &&
-                !game.bottomControls &&
-                !game.oneFinger &&
-                !game.boardTilt)
+            if (widget.showHint && twoFinger)
               ControlHint(
                 anchors: [
                   for (final side in [0, 1])
-                    viewportNow().gripCenter(game, side),
+                    TwoFingerFeedbackPainter.halfCenter(viewportNow(), game, side),
                 ],
               ),
             if (widget.overlay != null)
