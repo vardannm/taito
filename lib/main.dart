@@ -50,6 +50,7 @@ import 'control_glass.dart';
 import 'one_finger_controls.dart';
 import 'boot_splash.dart';
 import 'responsive_layout.dart';
+import 'infinite_coin_chip.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -413,6 +414,10 @@ class _GameScreenState extends State<GameScreen>
       game.survival.shield.ceil(),
       game.survival.recovery.ceil(),
       game.coinsCollected,
+      // Redraw the coin chip through its short pickup animation only.
+      game.lastCoinAge < InfiniteCoinChip.popSeconds
+          ? (game.lastCoinAge * 60).floor()
+          : -1,
       game.coins.length,
       game.levelStarCollected,
       game.merging ? game.mergeRun.highest : 0,
@@ -1526,26 +1531,10 @@ class _GameScreenState extends State<GameScreen>
                                     ),
                                   ],
                                 ),
-                              if (game.infinite && game.survival.noticeTime > 0)
-                                SizedBox(
-                                  width: 330,
-                                  child: Text(
-                                    game.survival.notice,
-                                    key: const ValueKey(
-                                      'infinite-pickup-notice',
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: detail,
-                                  ),
-                                ),
-                              if (game.infinite && game.survival.protected)
-                                Text(
-                                  game.survival.shield > 0
-                                      ? 'SHIELD ${game.survival.shield.ceil()}s'
-                                      : 'RECOVERY ${game.survival.recovery.ceil()}s',
-                                  key: const ValueKey('protection-status'),
-                                  style: detail,
+                              if (game.infinite && !offeringRevive)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 6),
+                                  child: coinChip(menuText),
                                 ),
                             ],
                           ),
@@ -1555,20 +1544,6 @@ class _GameScreenState extends State<GameScreen>
                   ),
                 ),
                 const SizedBox(width: 24),
-                if (game.infinite && !offeringRevive)
-                  IgnorePointer(
-                    key: tutorialCoinsKey,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 7, right: 14),
-                      child: RunCoinSummary(
-                        key: const ValueKey('run-coins'),
-                        wallet: profile.wallet,
-                        collected: game.coinsCollected,
-                        unlimited: profile.unlimitedCoins,
-                        compact: true,
-                      ),
-                    ),
-                  ),
                 IconButton.filledTonal(
                   key: const ValueKey('board-pause'),
                   tooltip: game.paused ? 'Resume' : 'Pause',
@@ -1589,6 +1564,20 @@ class _GameScreenState extends State<GameScreen>
           },
         ),
       ),
+    ),
+  );
+
+  /// Infinite's coin counter under the combo; [ink] is the HUD text color.
+  Widget coinChip(Color ink) => KeyedSubtree(
+    key: tutorialCoinsKey,
+    child: InfiniteCoinChip(
+      key: const ValueKey('run-coins'),
+      wallet: profile.wallet,
+      collected: game.coinsCollected,
+      unlimited: profile.unlimitedCoins,
+      ink: ink,
+      sinceCoin: game.lastCoinAge,
+      reducedMotion: MediaQuery.disableAnimationsOf(context),
     ),
   );
 
@@ -1817,23 +1806,13 @@ class _GameScreenState extends State<GameScreen>
                                   ],
                                 ),
                               ),
-                            if (game.infinite && game.survival.noticeTime > 0)
-                              Text(
-                                game.survival.notice,
-                                key: const ValueKey('infinite-pickup-notice'),
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: detail.copyWith(fontSize: 10),
-                              ),
-                            if (game.infinite && game.survival.protected)
-                              Text(
-                                game.survival.shield > 0
-                                    ? 'SHIELD ${game.survival.shield.ceil()}s'
-                                    : 'RECOVERY ${game.survival.recovery.ceil()}s',
-                                key: const ValueKey('protection-status'),
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: color, fontSize: 10),
+                            if (game.infinite && !offeringRevive)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: coinChip(color),
+                                ),
                               ),
                           ],
                         ),
@@ -3049,36 +3028,6 @@ class _GameScreenState extends State<GameScreen>
                             ),
                           ),
                         ],
-                      ),
-                    ),
-                  if (!usesWideStage(MediaQuery.sizeOf(context)) &&
-                      (!offeringRevive &&
-                              game.infinite &&
-                              !game.waitingForInput ||
-                          tutorialActive && tutorialStep.inInfinite))
-                    Positioned(
-                      top: MediaQuery.paddingOf(context).top + 70,
-                      right: 24,
-                      child: IgnorePointer(
-                        child: AnimatedBuilder(
-                          animation: hud,
-                          builder: (context, _) => ConstrainedBox(
-                            key: tutorialCoinsKey,
-                            constraints: BoxConstraints(
-                              maxWidth: MediaQuery.sizeOf(context).width - 48,
-                            ),
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: RunCoinSummary(
-                                key: const ValueKey('run-coins'),
-                                wallet: profile.wallet,
-                                collected: game.coinsCollected,
-                                unlimited: profile.unlimitedCoins,
-                                compact: true,
-                              ),
-                            ),
-                          ),
-                        ),
                       ),
                     ),
                   IgnorePointer(

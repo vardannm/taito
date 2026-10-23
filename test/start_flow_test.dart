@@ -160,7 +160,8 @@ void main() {
             game.survival.shield,
             greaterThan(InfiniteTuning.shieldSeconds - .1),
           );
-          expect(find.textContaining('SHIELD '), findsWidgets);
+          // The shield's time shows as the ring around the ball, not as HUD text.
+          expect(find.textContaining('SHIELD '), findsNothing);
         }
 
         await pickup();

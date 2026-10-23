@@ -75,7 +75,9 @@ void main() {
           }
           expect(tester.state(controller(mode)), same(state));
           expect(tester.getRect(controller(mode)), rect);
-          expect(find.textContaining('RECOVERY '), findsOneWidget);
+          // Recovery shows on the board itself (the blinking ball), not as HUD text.
+          expect(find.textContaining('RECOVERY '), findsNothing);
+          expect(find.byKey(const ValueKey('run-coins')), findsOneWidget);
 
           // No fresh touch: pending movement, expiry, and subsequent dragging all
           // belong to the original pointer(s).
