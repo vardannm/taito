@@ -1,12 +1,27 @@
 import Flutter
 import UIKit
 import XCTest
+@testable import Runner
 
 class RunnerTests: XCTestCase {
 
-  func testExample() {
-    // If you add code to the Runner application, consider adding tests here.
-    // See https://developer.apple.com/documentation/xctest for more information about using XCTest.
+  @MainActor
+  func testLaunchStoryboardUsesPortraitController() throws {
+    let bundle = Bundle(for: AppDelegate.self)
+    let storyboard = UIStoryboard(name: "Main", bundle: bundle)
+    let controller = try XCTUnwrap(
+      storyboard.instantiateInitialViewController() as? PortraitFlutterViewController
+    )
+    XCTAssertEqual(controller.supportedInterfaceOrientations, .portrait)
+    XCTAssertEqual(controller.preferredInterfaceOrientationForPresentation, .portrait)
+    XCTAssertEqual(
+      bundle.object(forInfoDictionaryKey: "UISupportedInterfaceOrientations") as? [String],
+      ["UIInterfaceOrientationPortrait"]
+    )
+    XCTAssertEqual(
+      bundle.object(forInfoDictionaryKey: "UISupportedInterfaceOrientations~ipad") as? [String],
+      ["UIInterfaceOrientationPortrait"]
+    )
   }
 
 }
