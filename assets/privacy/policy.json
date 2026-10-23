@@ -1,6 +1,6 @@
 {
   "title": "Rollrise Privacy Policy",
-  "updated": "2026-10-19",
+  "updated": "2026-10-23",
   "publisher": "Vardan Torosyan",
   "contactEmail": "vardan.torosyan40@gmail.com",
   "publicUrl": "https://gilt-ead46.web.app/privacy-policy.html",
@@ -15,11 +15,11 @@
     },
     {
       "title": "Optional rewarded ads",
-      "body": "On supported mobile devices, you can choose to request a rewarded ad to revive an Infinite run or double that run's collected coins after losing with more than 10 coins. Google Mobile Ads processes the request and may receive your IP address, approximate location inferred from it, device identifiers, ad views and interactions, and crash or performance information. Google uses this information for advertising, measurement, security, and service improvement. The current development build uses test ads; test ads should not be assumed to prevent SDK data processing. You can continue playing without requesting a rewarded ad."
+      "body": "On supported mobile devices, you can choose to request a rewarded ad to revive an Infinite run or double that run's collected coins after losing with more than 10 coins. Google Mobile Ads processes the request and may receive your IP address, approximate location inferred from it, device identifiers, ad views and interactions, and crash or performance information. Google uses this information for advertising, measurement, security, and service improvement. Release Android builds use the publisher’s rewarded ad unit; development builds use test ads. Test ads should not be assumed to prevent SDK data processing. Google’s consent platform checks your advertising choices before Rollrise requests ads. Where required, you can review or change those choices under Ad privacy choices in Options. You can continue playing without requesting a rewarded ad."
     },
     {
       "title": "Analytics",
-      "body": "On Android and iOS, Rollrise uses Google Analytics for Firebase to understand how the game is used and improve it. It sends mode selections, run starts and finishes, shop opens, control scheme, level, practice status, score, outcome, and run duration to Google. The SDK also collects standard app-usage events, app and device information, and installation or device identifiers. We do not attach your challenge name, email, or a custom user ID to gameplay events. Google processes and retains analytics data under its policies and the project's analytics settings. Advertising services may separately process measurement data when you request an ad."
+      "body": "Analytics collection is off by default. You can enable or disable Share gameplay analytics in Options. When enabled on Android and iOS, Rollrise uses Google Analytics for Firebase to understand how the game is used and improve it. When enabled, it sends mode selections, run starts and finishes, shop opens, control scheme, level, practice status, score, outcome, and run duration to Google. The SDK also collects standard app-usage events, app and device information, and installation or device identifiers. We do not attach your challenge name, email, or a custom user ID to gameplay events. Google processes and retains analytics data under its policies and the project's analytics settings. Advertising services may separately process measurement data when you request an ad."
     },
     {
       "title": "Permissions and access",

@@ -60,9 +60,11 @@ Future<void> main() async {
         saved) {
       throw StateError('Rejected save changed source');
     }
-    final count = Directory(
-      '${temp.path}/lib/classic_levels',
-    ).listSync().length;
+    final count = Directory('${temp.path}/lib/classic_levels')
+        .listSync()
+        .whereType<File>()
+        .where((f) => RegExp(r'level_\d+\.dart$').hasMatch(f.path))
+        .length;
     await builder.saveLevel(temp, jsonEncode({...draft, 'number': count + 1}));
     if (!File(
       '${temp.path}/lib/classic_levels.dart',
@@ -76,4 +78,3 @@ Future<void> main() async {
     temp.deleteSync(recursive: true);
   }
 }
-

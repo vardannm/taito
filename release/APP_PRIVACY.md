@@ -26,8 +26,8 @@ Apple's labels include third-party SDK practices. A local save file alone is not
 | Friend challenges | Name and result in a manually copied code; imports and friend list local | No automatic upload; reassess if online sharing/rankings are added |
 | Progress backups | Explicit clipboard copy and pasted import | No automatic upload; recipients and clipboard/device sync may retain exported copies |
 | Optional playtest recording | In memory, max 1,000 events, explicitly copied report | No automatic upload; if collected from testers by support, review the support data flow |
-| Google Mobile Ads | Initialized/requested for an optional rewarded revive or run-coin doubling; sample app/ad IDs currently | Include the SDK's collection even when no game account exists. Final configuration determines purposes, linkage and tracking |
-| Firebase Analytics | Configured for Android/iOS; initialization enables collection and logs gameplay events; live reporting not yet verified | Include SDK collection and gameplay usage in App Store privacy and Google Play Data Safety disclosures; verify final configuration, linkage, tracking, and consent |
+| Google Mobile Ads | UMP-gated optional rewarded revive or run-coin doubling; real Android IDs in release, sample units in QA | Include the SDK's collection even when no game account exists. Final configuration determines purposes, linkage and tracking |
+| Firebase Analytics | Off by default; explicit Options opt-in enables collection and gameplay events; live reporting not yet verified | Include SDK collection and gameplay usage in App Store privacy and Google Play Data Safety disclosures; verify final configuration, linkage, tracking, and consent |
 
 For an ads-enabled candidate, start with **Yes, data is collected from this app**, then review these categories against the exact native SDK's manifests and Xcode's aggregate Privacy Report:
 
@@ -41,7 +41,7 @@ For an ads-enabled candidate, start with **Yes, data is collected from this app*
 | Performance Data | Ad SDK performance measurements | App Functionality, Analytics, Third-Party Advertising where applicable |
 | Other Diagnostic Data | Include if identified in the final SDK report | Match its declared uses |
 
-These are candidate answers, not submitted or verified final labels. For **each** selected category, answer purposes, **linked to the user**, and **used for tracking** using the final SDK configuration/report. No login and no IDFA permission do not by themselves establish that data is unlinked or that tracking is absent. If identifiers/data are joined across companies for ads or measurement, apply Apple's tracking definition and ATT requirements. The current project has no ATT or UMP consent flow; those are separate ads-release work and are not implemented by this privacy screen.
+These are candidate answers, not submitted or verified final labels. For **each** selected category, answer purposes, **linked to the user**, and **used for tracking** using the final SDK configuration/report. No login and no IDFA permission do not by themselves establish that data is unlinked or that tracking is absent. If identifiers/data are joined across companies for ads or measurement, apply Apple's tracking definition and ATT requirements. UMP consent and required privacy options are integrated separately from the policy screen. Publishing AdMob messages and native-device verification remain pending. ATT is not implemented; iOS retains sample ads.
 
 Firebase Analytics is now configured. Review its automatically collected device/app data, identifiers, and logged gameplay events (`mode_selected`, `run_started`, `run_finished`, `shop_opened`, including mode/control/level/practice, score, outcome and duration). Evaluate Product Interaction and Gameplay Content, and the SDK's identifiers and other collection, against Google's guidance. Final labels and Google Play Data Safety answers must include this data flow.
 

@@ -6,7 +6,7 @@ const {spawnSync} = require('node:child_process');
 const M = require('./model.js');
 
 (async () => {
-  const levels = await (await fetch('http://127.0.0.1:8765/api/levels')).json();
+  const levels = await (await fetch(`${process.env.LEVEL_BUILDER_URL || 'http://127.0.0.1:8765'}/api/levels`)).json();
   assert.ok(levels.length >= 80);
   for (const d of levels) {
     assert.deepEqual(M.validate(d).errors, [], `Level ${d.number}`);

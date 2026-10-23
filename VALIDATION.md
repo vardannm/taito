@@ -1,5 +1,25 @@
 # Validation record
 
+## Android AdMob integration — 2026-10-23
+
+- Added launch-time UMP update/form handling, SDK-based eligibility checks
+  before loading/showing rewarded ads, and the required privacy-options entry.
+- Android release builds use the registered real IDs. Debug/profile and
+  explicit `AD_TEST_MODE=true` release QA builds retain sample rewarded units.
+- Analytics is now a separate persisted opt-in, off by default. Updated and
+  deployed the public/bundled privacy policy to describe both controls.
+- Focused consent, rewarded-ad and analytics tests: **22 passed**. Analysis of
+  `lib` and `test`: **no issues**. Full suite: **749 passed, 2 failed**, both in
+  current Classic-layout assumptions (`classic_progression_test.dart` and
+  `spiders_test.dart`); no Classic level source was edited for this integration.
+- Signed release AAB built and verified for ZIP integrity, real IDs, upload
+  signer and native ELF alignment. Physical Android device QA is pending.
+- European and US privacy messages are published. The signed QA APK was
+  verified to contain sample rewarded creatives only. A separate AdSense
+  payment-account verification alert remains in the console.
+- AdMob message/account status and test commands: `release/ADMOB_SETUP.md`.
+  Current bundle fingerprint: `release/ANDROID_SIGNING.md`.
+
 ## Google Play screenshots — 2026-10-23
 
 - Prepared six current Android-target Flutter UI renders for each of phone,

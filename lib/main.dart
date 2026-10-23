@@ -1,5 +1,6 @@
 import 'playtest_recorder.dart';
 import 'rewarded_revive_ads.dart';
+import 'ad_consent.dart';
 import 'app_analytics.dart';
 import 'privacy_policy.dart';
 import 'music_credits.dart';
@@ -67,11 +68,15 @@ Future<void> main() async {
   final profile = PlayerProfile();
   await profile.load();
   final analytics = await AppAnalytics.initialize();
+  final adConsent = AdConsent();
   runApp(
     ArcadeApp(
       profile: profile,
       analytics: analytics,
-      reviveAds: GoogleTestReviveAds(),
+      reviveAds: GoogleRewardedReviveAds(
+        canRequestAds: adConsent.canRequestAds,
+      ),
+      adConsent: adConsent,
       intro: true,
     ),
   );
@@ -83,11 +88,13 @@ class ArcadeApp extends StatelessWidget {
     required this.profile,
     this.analytics,
     this.reviveAds,
+    this.adConsent,
     this.intro = false,
   });
   final PlayerProfile profile;
   final AppAnalytics? analytics;
   final RewardedReviveAds? reviveAds;
+  final AdConsent? adConsent;
 
   /// The boot animation belongs to the real launch only; tests pump this app
   /// straight into the menu rather than waiting an intro out.
@@ -105,6 +112,7 @@ class ArcadeApp extends StatelessWidget {
       profile: profile,
       analytics: analytics,
       reviveAds: reviveAds,
+      adConsent: adConsent,
     ),
   );
 }
@@ -115,10 +123,12 @@ class GameScreen extends StatefulWidget {
     required this.profile,
     this.analytics,
     this.reviveAds,
+    this.adConsent,
   });
   final PlayerProfile profile;
   final AppAnalytics? analytics;
   final RewardedReviveAds? reviveAds;
+  final AdConsent? adConsent;
   @override
   State<GameScreen> createState() => _GameScreenState();
 }
@@ -238,6 +248,9 @@ class _GameScreenState extends State<GameScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(widget.adConsent?.initialize());
+    });
     entrance =
         AnimationController(
           vsync: this,
@@ -3762,6 +3775,54 @@ class _GameScreenState extends State<GameScreen>
                       builder: (_) => const PrivacyPolicyPage(),
                     ),
                   ),
+                ),
+                const SizedBox(height: 14),
+                if (widget.adConsent != null)
+                  ListenableBuilder(
+                    listenable: widget.adConsent!,
+                    builder: (context, _) =>
+                        widget.adConsent!.privacyOptionsRequired
+                        ? Padding(
+                            padding: const EdgeInsets.only(bottom: 14),
+                            child: MenuAction(
+                              key: const ValueKey('ad-privacy-options'),
+                              title: 'Ad privacy choices',
+                              subtitle:
+                                  'Review or change your advertising choices',
+                              icon: Icons.manage_accounts_outlined,
+                              onTap: () async {
+                                final error = await widget.adConsent!
+                                    .showPrivacyOptions();
+                                if (context.mounted && error != null) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text(error)),
+                                  );
+                                }
+                              },
+                            ),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                SwitchListTile.adaptive(
+                  key: const ValueKey('analytics-opt-in'),
+                  title: const Text('Share gameplay analytics'),
+                  subtitle: const Text(
+                    'Optional usage data to help improve Rollrise',
+                  ),
+                  value: analytics.collectionEnabled,
+                  onChanged: (enabled) async {
+                    final saved = await analytics.setCollectionEnabled(enabled);
+                    if (!context.mounted) return;
+                    update(() {});
+                    if (!saved)
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Could not update analytics. Please try again.',
+                          ),
+                        ),
+                      );
+                  },
                 ),
                 const SizedBox(height: 14),
                 const MenuSection('Choose your controls'),

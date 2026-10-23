@@ -1,5 +1,26 @@
 # Android upload signing and release bundle
 
+## Latest AdMob candidate — 23 October 2026
+
+The bundle at `build/app/outputs/bundle/release/app-release.aab` has now been
+rebuilt with the real Android app/rewarded IDs, UMP consent and optional
+analytics controls. Version remains `0.13.6+24`; no Play upload was made.
+
+- Size: 61,721,753 bytes.
+- SHA-256: `4b131206f38d6ff62e9644278d4622808affab992e671b2478581349b5ebb4ee`.
+- Upload signature verified and certificate fingerprint unchanged.
+- ZIP integrity, real manifest app ID, real compiled rewarded unit, and
+  16 KB ARM64/x86-64 ELF load alignment verified.
+- Evidence: `artifacts/admob-release-bundle-2026-10-23.log`,
+  `artifacts/admob-release-signature-2026-10-23.log` and
+  `artifacts/admob-release-bundle-validation-2026-10-23.json`.
+- Consent messages are published. Physical-device QA, account/app approvals and
+  the two separate Classic-layout test failures must be assessed before release.
+  See `release/ADMOB_SETUP.md` for the latest console status.
+
+The earlier signing-only bundle details below are historical and have been
+superseded by this build.
+
 Configured 23 October 2026 for `com.giltarcade.balance_arcade`.
 
 ## Signing files

@@ -8,7 +8,7 @@ import 'package:google_mobile_ads/src/ad_instance_manager.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  late GoogleTestReviveAds ads;
+  late GoogleRewardedReviveAds ads;
   final calls = <MethodCall>[];
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
@@ -32,7 +32,7 @@ void main() {
   setUp(() {
     instanceManager = AdInstanceManager('plugins.flutter.io/google_mobile_ads');
     calls.clear();
-    ads = GoogleTestReviveAds();
+    ads = GoogleRewardedReviveAds(canRequestAds: () async => true);
     messenger.setMockMethodCallHandler(instanceManager.channel, (call) async {
       calls.add(call);
       if (call.method == 'MobileAds#initialize') {
@@ -60,6 +60,49 @@ void main() {
     );
   }
 
+  test('release Android IDs and test overrides stay separate', () {
+    expect(
+      GoogleRewardedReviveAds.unitFor(
+        TargetPlatform.android,
+        release: true,
+        testAds: false,
+      ),
+      GoogleRewardedReviveAds.productionAndroidUnit,
+    );
+    expect(
+      GoogleRewardedReviveAds.unitFor(
+        TargetPlatform.android,
+        release: true,
+        testAds: true,
+      ),
+      GoogleRewardedReviveAds.androidUnit,
+    );
+    expect(
+      GoogleRewardedReviveAds.unitFor(
+        TargetPlatform.android,
+        release: false,
+        testAds: false,
+      ),
+      GoogleRewardedReviveAds.androidUnit,
+    );
+    expect(
+      GoogleRewardedReviveAds.unitFor(
+        TargetPlatform.iOS,
+        release: true,
+        testAds: false,
+      ),
+      GoogleRewardedReviveAds.iosUnit,
+    );
+  });
+
+  adTest('consent denial prevents SDK initialization and ad loading', (
+    tester,
+  ) async {
+    ads = GoogleRewardedReviveAds(canRequestAds: () async => false);
+    expect(await ads.show(), ReviveAdResult.unavailable);
+    expect(calls, isEmpty);
+  });
+
   for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
     adTest('$platform uses test ads and waits for both reward and dismissal', (
       tester,
@@ -71,8 +114,8 @@ void main() {
       expect(
         load.arguments['adUnitId'],
         platform == TargetPlatform.android
-            ? GoogleTestReviveAds.androidUnit
-            : GoogleTestReviveAds.iosUnit,
+            ? GoogleRewardedReviveAds.androidUnit
+            : GoogleRewardedReviveAds.iosUnit,
       );
       await event('onAdLoaded');
       await tester.pump();

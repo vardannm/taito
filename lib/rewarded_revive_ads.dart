@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'ad_consent.dart';
 
 enum ReviveAdResult { earned, dismissed, unavailable }
 
@@ -21,12 +22,22 @@ class UnavailableReviveAds implements RewardedReviveAds {
   void dispose() {}
 }
 
-/// Google sample units only. Replace both native app IDs and these units before
-/// monetizing. Shared by revive and coin-doubling offers; the caller grants
+/// Shared by revive and coin-doubling offers; the caller grants
 /// only the chosen reward. Loading is on demand while gameplay is stopped.
-class GoogleTestReviveAds implements RewardedReviveAds {
+class GoogleRewardedReviveAds implements RewardedReviveAds {
+  GoogleRewardedReviveAds({Future<bool> Function()? canRequestAds})
+    : _canRequestAds = canRequestAds ?? AdConsent().canRequestAds;
+  final Future<bool> Function() _canRequestAds;
   static const androidUnit = 'ca-app-pub-3940256099942544/5224354917';
   static const iosUnit = 'ca-app-pub-3940256099942544/1712485313';
+  static const productionAndroidUnit = 'ca-app-pub-8791729869708798/6338923389';
+  static String unitFor(
+    TargetPlatform platform, {
+    required bool release,
+    required bool testAds,
+  }) => platform == TargetPlatform.android
+      ? (release && !testAds ? productionAndroidUnit : androidUnit)
+      : iosUnit;
   bool _disposed = false, _busy = false;
   Future<void>? _initialization;
   Completer<ReviveAdResult>? _result;
@@ -44,14 +55,18 @@ class GoogleTestReviveAds implements RewardedReviveAds {
     RewardedAd? loaded;
     var acceptingLoad = true;
     try {
+      if (!await _canRequestAds() || _disposed)
+        return ReviveAdResult.unavailable;
       _initialization ??= MobileAds.instance.initialize().then((_) {});
       await _initialization!.timeout(const Duration(seconds: 15));
       if (_disposed) return ReviveAdResult.unavailable;
       final loading = Completer<RewardedAd?>();
       await RewardedAd.load(
-        adUnitId: defaultTargetPlatform == TargetPlatform.android
-            ? androidUnit
-            : iosUnit,
+        adUnitId: unitFor(
+          defaultTargetPlatform,
+          release: kReleaseMode,
+          testAds: const bool.fromEnvironment('AD_TEST_MODE'),
+        ),
         request: const AdRequest(),
         rewardedAdLoadCallback: RewardedAdLoadCallback(
           onAdLoaded: (ad) {
@@ -71,7 +86,7 @@ class GoogleTestReviveAds implements RewardedReviveAds {
         onTimeout: () => null,
       );
       acceptingLoad = false;
-      if (loaded == null || _disposed) {
+      if (loaded == null || _disposed || !await _canRequestAds()) {
         if (loaded != null) unawaited(loaded.dispose());
         return ReviveAdResult.unavailable;
       }

@@ -10,6 +10,28 @@ import 'package:shared_preferences_platform_interface/shared_preferences_async_p
 import 'support/mode_navigation.dart';
 
 void main() {
+  test(
+    'analytics opt-in is separate from ads and stops events on opt-out',
+    () async {
+      final events = <String>[];
+      final choices = <bool>[];
+      final analytics = AppAnalytics(
+        enabled: false,
+        send: (name, _) async => events.add(name),
+        changeCollection: (allow) async => choices.add(allow),
+      );
+      analytics.openShop(GameMode.infinite);
+      expect(events, isEmpty);
+      expect(analytics.collectionEnabled, false);
+      expect(await analytics.setCollectionEnabled(true), true);
+      analytics.openShop(GameMode.infinite);
+      expect(events, ['shop_opened']);
+      expect(await analytics.setCollectionEnabled(false), true);
+      analytics.openShop(GameMode.infinite);
+      expect(events, ['shop_opened']);
+      expect(choices, [true, false]);
+    },
+  );
   test('previews do not start runs; starts and finishes are deduplicated', () {
     final events = <(String, Map<String, Object>)>[];
     final analytics = AppAnalytics(
@@ -63,11 +85,14 @@ void main() {
     await Future<void>.delayed(Duration.zero);
   });
 
-  test('an unavailable Firebase implementation leaves analytics inactive', () async {
-    // Desktop tests have no configured native Firebase implementation.
-    final analytics = await AppAnalytics.initialize();
-    analytics.openShop(GameMode.infinite);
-  });
+  test(
+    'an unavailable Firebase implementation leaves analytics inactive',
+    () async {
+      // Desktop tests have no configured native Firebase implementation.
+      final analytics = await AppAnalytics.initialize();
+      analytics.openShop(GameMode.infinite);
+    },
+  );
 
   testWidgets(
     'screen reports selections, shop visits and actual run lifecycle',

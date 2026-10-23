@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'firebase_options.dart';
 import 'game.dart';
@@ -12,9 +13,35 @@ typedef AnalyticsSender =
 
 /// Optional reporting: analytics failures must never interrupt a game.
 class AppAnalytics {
-  AppAnalytics({AnalyticsSender? send}) : _send = send;
+  AppAnalytics({
+    AnalyticsSender? send,
+    bool enabled = true,
+    Future<void> Function(bool)? changeCollection,
+  }) : _send = send,
+       _enabled = enabled,
+       _changeCollection = changeCollection;
 
   final AnalyticsSender? _send;
+  final Future<void> Function(bool)? _changeCollection;
+  bool _enabled;
+  bool get collectionEnabled => _enabled && _send != null;
+  bool _changing = false;
+
+  Future<bool> setCollectionEnabled(bool enabled) async {
+    if (_changing || _changeCollection == null) return false;
+    _changing = true;
+    if (!enabled) _enabled = false;
+    try {
+      await _changeCollection(enabled);
+      _enabled = enabled;
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      _changing = false;
+    }
+  }
+
   int? _startedRun, _finishedRun;
   GameMode? _selectedMode;
 
@@ -24,8 +51,23 @@ class AppAnalytics {
         options: DefaultFirebaseOptions.currentPlatform,
       );
       final analytics = FirebaseAnalytics.instance;
-      await analytics.setAnalyticsCollectionEnabled(true);
+      final preferences = SharedPreferencesAsync();
+      final enabled = await preferences.getBool('analytics_opt_in') ?? false;
+      Future<void> applyConsent(bool allow) async {
+        await analytics.setConsent(
+          analyticsStorageConsentGranted: allow,
+          adStorageConsentGranted: false,
+          adUserDataConsentGranted: false,
+          adPersonalizationSignalsConsentGranted: false,
+        );
+        await analytics.setAnalyticsCollectionEnabled(allow);
+        await preferences.setBool('analytics_opt_in', allow);
+      }
+
+      await applyConsent(enabled);
       return AppAnalytics(
+        enabled: enabled,
+        changeCollection: applyConsent,
         send: (name, parameters) =>
             analytics.logEvent(name: name, parameters: parameters),
       );
@@ -76,6 +118,7 @@ class AppAnalytics {
   };
 
   void _record(String name, Map<String, Object> parameters) {
+    if (!_enabled) return;
     unawaited(_deliver(name, parameters));
   }
 
