@@ -30,6 +30,8 @@ const M = require('./model.js');
   next.holes[0].size = .6;
   const mover = next.holes.findIndex(h => h.x > 60 && h.x < 300 && Math.hypot(h.x - 180, h.y - 493) > 80);
   next.holes[mover].motion = {path: 'horizontal', radiusX: 10, radiusY: 25, period: 4, phase: 0};
+  const breather = next.holes.findIndex((h, i) => i > 0 && i !== mover && Math.hypot(h.x - 180, h.y - 493) > 80);
+  next.holes[breather].pulse = {minSize: .3, maxSize: 1, period: 2, phase: 0};
   assert.deepEqual(M.validate(next).errors, []);
   const oversized = M.clone(next); oversized.holes[0].size = 3;
   assert.throws(() => M.exportDart(oversized), /Hole size/);
@@ -59,6 +61,8 @@ void main() {
   game.step(.5);
   final moved = game.board[${mover}];
   if ((moved.x - moved.homeX).abs() < 1 || moved.y != moved.homeY) throw StateError('Moving hole did not move');
+  final breathing = game.board[${breather}];
+  if (holes[${breather}].pulse?.maxSize != 1 || breathing.size <= .3 || breathing.size >= 1) throw StateError('Breathing hole did not grow');
   for (var n = 1; n <= ${next.number}; n++) {
     final board = ClassicLevels.build(n);
     if (board.where((h) => h.target > 0).length != 10) throw StateError('Export lost targets');

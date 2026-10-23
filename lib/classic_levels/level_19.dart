@@ -30,6 +30,8 @@ const classicLevel19 = ClassicLevelDefinition(
     Hole(320, 110, target: 7),
     Hole(150, 170, target: 9),
     Hole(40, 240, target: 10),
+    Hole(110, 380, size: 1.15),
+    Hole(280, 380, pulse: HolePulse(minSize: 0.5, maxSize: 2.5, period: 2.5, phase: 0)),
   ],
   spiders: [
   ],

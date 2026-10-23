@@ -84,6 +84,39 @@ void main() {
     expect((game.board.first.x, game.board.first.y), before);
   });
 
+  test('a breathing hole grows and shrinks for the whole level', () {
+    const pulse = HolePulse(minSize: .4, maxSize: 2, period: 2);
+    final game = boardWith([const Hole(60, 100, target: 1, pulse: pulse)]);
+    final sizes = <double>[];
+    for (var i = 0; i < 300; i++) {
+      game.step(1 / 60);
+      sizes.add(game.board.first.size);
+    }
+    // Five seconds: two and a half full breaths between the two sizes.
+    expect(sizes.reduce(math.min), closeTo(.4, .01));
+    expect(sizes.reduce(math.max), closeTo(2, .01));
+    expect(game.board.first.x, 60, reason: 'breathing alone never moves it');
+    expect(game.board.first.reach, closeTo(Hole.rimRadius * 2, 1e-9));
+    expect(pulse.sizeAt(0), .4);
+    expect(pulse.sizeAt(1), closeTo(2, 1e-9));
+  });
+
+  test('a breathing hole catches the ball only while it is big', () {
+    // 15 units away: inside 8.5 × 2 but outside 8.5 × 0.5.
+    const pulse = HolePulse(minSize: .5, maxSize: 2, period: 2);
+    final game = boardWith([const Hole(180, 478, target: 1, pulse: pulse)]);
+    game.step(1 / 60);
+    expect(game.phase, GamePhase.playing);
+    var seconds = 1 / 60;
+    while (game.phase == GamePhase.playing && seconds < 2) {
+      game.step(1 / 60);
+      seconds += 1 / 60;
+    }
+    expect(game.phase, GamePhase.sinking);
+    expect(game.lastSuccess, isTrue);
+    expect(seconds, inInclusiveRange(.4, .9));
+  });
+
   test('stars and routes keep clear of a hole’s full reach', () {
     const moving = Hole(
       180,

@@ -7,6 +7,11 @@
   const holeSize = {min: .2, max: 2.5}, rimRadius = 12.8;
   const holePaths = ['horizontal', 'vertical', 'circle', 'oval'];
   const holeMotionDefaults = {path: 'horizontal', radiusX: 40, radiusY: 25, period: 4, phase: 0};
+  // A breathing hole grows and shrinks between two sizes for the whole level (HolePulse in lib/game.dart).
+  const holePulseDefaults = {minSize: .5, maxSize: 1.5, period: 3, phase: 0};
+  const holeSizeAt = (h, seconds) => !h.pulse ? h.size : h.pulse.minSize +
+    (h.pulse.maxSize - h.pulse.minSize) * (1 - Math.cos(h.pulse.phase + seconds * Math.PI * 2 / h.pulse.period)) / 2;
+  const largestSize = h => h.pulse ? Math.max(h.pulse.minSize, h.pulse.maxSize) : h.size;
   // Matches HoleMotion.extent / offset in lib/game.dart.
   const holeExtent = m => !m ? 0 : m.path === 'vertical' ? m.radiusY : m.path === 'oval' ? Math.max(m.radiusX, m.radiusY) : m.radiusX;
   function holeAt(h, seconds) {
@@ -31,9 +36,11 @@
     }
     const finite = (item, keys) => item && keys.every(k => typeof item[k] === 'number' && Number.isFinite(item[k]));
     d.hazards = d.hazards.map(w => ({...waveDefaults, ...w}));
-    d.holes = d.holes.map(h => ({...h, size: h.size ?? 1, motion: h.motion ? {...holeMotionDefaults, ...h.motion} : null}));
+    d.holes = d.holes.map(h => ({...h, size: h.size ?? 1, motion: h.motion ? {...holeMotionDefaults, ...h.motion} : null,
+      pulse: h.pulse ? {...holePulseDefaults, ...h.pulse} : null}));
     if (!d.holes.every(h => finite(h, ['x', 'y', 'target', 'size']) &&
-          (h.motion === null || (holePaths.includes(h.motion.path) && finite(h.motion, ['radiusX', 'radiusY', 'period', 'phase'])))) ||
+          (h.motion === null || (holePaths.includes(h.motion.path) && finite(h.motion, ['radiusX', 'radiusY', 'period', 'phase']))) &&
+          (h.pulse === null || finite(h.pulse, ['minSize', 'maxSize', 'period', 'phase']))) ||
         !d.spiders.every(s => finite(s, ['x', 'y', 'zoneRadius', 'phase', 'chaseSpeed', 'bodyRadius'])) ||
         !d.hazards.every(w => ['laser', 'movingHole'].includes(w.kind) &&
           finite(w, ['warningSeconds', 'liveSeconds', 'radiusX', 'radiusY', 'period', 'phase']) &&
@@ -59,6 +66,13 @@
       if (!Number.isInteger(h.target) || h.target < 0 || h.target > 10) errors.push('Hole targets must be 0 (trap) or 1–10.');
       if (h.x < 24 || h.x > 336 || h.y < 24 || h.y > 490) errors.push('Keep holes inside x 24–336 and y 24–490.');
       if (h.size < holeSize.min || h.size > holeSize.max) errors.push(`Hole size must be ${holeSize.min}–${holeSize.max} × a normal hole.`);
+      const p = h.pulse;
+      if (p) {
+        if ([p.minSize, p.maxSize].some(v => v < holeSize.min || v > holeSize.max))
+          errors.push(`Breathing sizes must be ${holeSize.min}–${holeSize.max} × a normal hole.`);
+        if (p.minSize >= p.maxSize) errors.push('A breathing hole needs a smallest size below its biggest size.');
+        if (p.period <= 0) errors.push('A breathing hole needs a positive number of seconds per breath.');
+      }
       const m = h.motion;
       if (m) {
         if (m.period <= 0 || m.radiusX < 0 || m.radiusY < 0 || m.radiusX > 150 || m.radiusY > 200)
@@ -68,16 +82,17 @@
           errors.push('A moving hole leaves the board. Move its center or reduce its radii.');
       }
       // The ball rests at the launch point before the first touch; never start inside a hole.
-      if (Math.hypot(h.x - launch.x, h.y - launch.y) < 8.5 * h.size + holeExtent(m) + 9)
-        (m ? warnings : errors).push(m ? 'A moving hole passes over the ball’s starting spot.' : 'A hole covers the ball’s starting spot.');
+      if (Math.hypot(h.x - launch.x, h.y - launch.y) < 8.5 * largestSize(h) + holeExtent(m) + 9)
+        (m || p ? warnings : errors).push(m || p ? 'A moving or breathing hole reaches the ball’s starting spot.' : 'A hole covers the ball’s starting spot.');
     }
     for (let i = 0; i < d.holes.length; i++) for (let j = i + 1; j < d.holes.length; j++) {
       const a = d.holes[i], b = d.holes[j], distance = Math.hypot(a.x - b.x, a.y - b.y);
       // 28 between two normal holes; sized holes scale their share of that clearance.
-      if (!a.motion && !b.motion && distance < 14 * (a.size + b.size))
+      const animated = a.motion || b.motion || a.pulse || b.pulse;
+      if (!animated && distance < 14 * (a.size + b.size))
         errors.push(`Holes ${i + 1} and ${j + 1} overlap or leave too little clearance.`);
-      else if ((a.motion || b.motion) && distance < rimRadius * (a.size + b.size) + holeExtent(a.motion) + holeExtent(b.motion))
-        warnings.push(`Moving hole ${a.motion ? i + 1 : j + 1} can pass over hole ${a.motion ? j + 1 : i + 1}.`);
+      else if (animated && distance < rimRadius * (largestSize(a) + largestSize(b)) + holeExtent(a.motion) + holeExtent(b.motion))
+        warnings.push(`Holes ${i + 1} and ${j + 1} can overlap while they move or grow.`);
     }
     for (const s of d.spiders) {
       if (s.x < 24 || s.x > 336 || s.y < 24 || s.y > 490 || s.zoneRadius < 10 ||
@@ -122,9 +137,11 @@
     for (const h of d.holes) {
       const named = [];
       if (h.target) named.push(`target: ${h.target}`);
-      if (h.size !== 1) named.push(`size: ${num(h.size)}`);
+      if (h.size !== 1 && !h.pulse) named.push(`size: ${num(h.size)}`);
       if (h.motion) named.push(`motion: HoleMotion(path: HazardMotion.${h.motion.path}, radiusX: ${num(h.motion.radiusX)}, ` +
         `radiusY: ${num(h.motion.radiusY)}, period: ${num(h.motion.period)}, phase: ${num(h.motion.phase)})`);
+      if (h.pulse) named.push(`pulse: HolePulse(minSize: ${num(h.pulse.minSize)}, maxSize: ${num(h.pulse.maxSize)}, ` +
+        `period: ${num(h.pulse.period)}, phase: ${num(h.pulse.phase)})`);
       lines.push(`    Hole(${[num(h.x), num(h.y), ...named].join(', ')}),`);
     }
     lines.push('  ],', '  spiders: [');
@@ -143,7 +160,7 @@
     lines.push('  ],', `  firstHazardAfter: ${num(d.firstHazardAfter)},`, `  hazardInterval: ${num(d.hazardInterval)},`, ');', '');
     return lines.join('\n');
   }
-  const api = {blank, clone, parseDraft, validate, exportDart, waveDefaults, holeSize, holePaths, holeMotionDefaults, holeAt, rimRadius};
+  const api = {blank, clone, parseDraft, validate, exportDart, waveDefaults, holeSize, holePaths, holeMotionDefaults, holeAt, rimRadius, holePulseDefaults, holeSizeAt, largestSize};
   if (typeof module !== 'undefined') module.exports = api;
   else root.LevelModel = api;
 })(globalThis);

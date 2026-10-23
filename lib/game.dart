@@ -17,9 +17,15 @@ import 'platforms.dart';
 part 'infinite_gameplay.dart';
 
 class Hole {
-  const Hole(this.x, this.y, {this.target = 0, this.size = 1, this.motion})
-    : homeX = x,
-      homeY = y;
+  const Hole(
+    this.x,
+    this.y, {
+    this.target = 0,
+    this.size = 1,
+    this.motion,
+    this.pulse,
+  }) : homeX = x,
+       homeY = y;
   const Hole._moved(
     this.x,
     this.y,
@@ -28,6 +34,7 @@ class Hole {
     this.target,
     this.size,
     this.motion,
+    this.pulse,
   );
 
   /// Current position; for a moving hole this changes every tick.
@@ -37,27 +44,58 @@ class Hole {
   final double homeX, homeY;
   final int target;
 
-  /// Diameter relative to a normal hole, from [minSize] to [maxSize].
+  /// Current diameter relative to a normal hole, from [minSize] to
+  /// [maxSize]. A breathing hole's [pulse] changes it every tick.
   final double size;
   final HoleMotion? motion;
+  final HolePulse? pulse;
   static const minSize = .2, maxSize = 2.5;
 
   /// Normal rim radius in board units; drawing and spacing scale from it.
   static const rimRadius = 12.8;
 
-  /// How far the rim can reach from [homeX], [homeY] over a whole path.
-  double get reach => rimRadius * size + (motion?.extent ?? 0);
+  bool get animated => motion != null || pulse != null;
+
+  /// How far the rim can reach from [homeX], [homeY] over a whole level.
+  double get reach =>
+      rimRadius * (pulse?.maxSize ?? size) + (motion?.extent ?? 0);
 
   /// Clearance to add beyond a normal stationary hole's; 0 for those.
   double get extraReach => reach - rimRadius;
 
-  /// This hole at [seconds] into the level. Stationary holes return themselves.
+  /// This hole at [seconds] into the level. Unanimated holes return themselves.
   Hole at(double seconds) {
-    final m = motion;
-    if (m == null) return this;
-    final (dx, dy) = m.offset(seconds);
-    return Hole._moved(homeX + dx, homeY + dy, homeX, homeY, target, size, m);
+    if (!animated) return this;
+    final (dx, dy) = motion?.offset(seconds) ?? (0.0, 0.0);
+    return Hole._moved(
+      homeX + dx,
+      homeY + dy,
+      homeX,
+      homeY,
+      target,
+      pulse?.sizeAt(seconds) ?? size,
+      motion,
+      pulse,
+    );
   }
+}
+
+/// A hole that grows and shrinks between two sizes for the whole level,
+/// starting at [minSize] when [phase] is 0.
+class HolePulse {
+  const HolePulse({
+    this.minSize = .5,
+    this.maxSize = 1.5,
+    this.period = 3,
+    this.phase = 0,
+  });
+  final double minSize, maxSize, period, phase;
+
+  double sizeAt(double seconds) =>
+      minSize +
+      (maxSize - minSize) *
+          (1 - math.cos(phase + seconds * math.pi * 2 / period)) /
+          2;
 }
 
 /// A repeating path around a hole's home position, with the same shapes and
@@ -261,15 +299,15 @@ class BalanceGame {
       ClassicLevels.definition(level).spiders.isNotEmpty;
   List<Hole> _classicBoard = [];
 
-  /// Seconds of Classic hole motion. Moving holes run while the level is
-  /// shown, before the first touch too, and stop only for pause.
+  /// Seconds of Classic hole animation. Moving and breathing holes run while
+  /// the level is shown, before the first touch too, and stop only for pause.
   double holeTime = 0;
   int? _sinkingHole;
   void _moveHoles(double dt) {
     holeTime += dt;
     final holes = _classicBoard;
     for (var i = 0; i < holes.length; i++) {
-      if (holes[i].motion != null) holes[i] = holes[i].at(holeTime);
+      if (holes[i].animated) holes[i] = holes[i].at(holeTime);
     }
     // A ball sinking into a moving hole travels with it.
     if (phase == GamePhase.playing) _sinkingHole = null;
@@ -1043,6 +1081,8 @@ class BalanceGame {
             level,
             dailySeed: daily ? DailyChallenge.seed(dailyDate!) : null,
           );
+    // Place animated holes at their first frame before anything is drawn.
+    _moveHoles(0);
     spiders.clear();
     webShots.clear();
     _nextWebTime = 0;

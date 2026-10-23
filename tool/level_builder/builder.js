@@ -23,7 +23,7 @@
   try { baseline = JSON.parse(localStorage.getItem(baselineKey)); } catch (_) {}
   if (draft.hazards.length) waveIndex = 0;
   // Key-sorted JSON with wave defaults filled, so the inspector's default-filling doesn't count as an edit.
-  const snapshot = d => JSON.stringify({...d, holes: d.holes.map(h => ({size: 1, motion: null, ...h})), hazards: d.hazards.map(w => ({...M.waveDefaults, ...w}))},
+  const snapshot = d => JSON.stringify({...d, holes: d.holes.map(h => ({size: 1, motion: null, pulse: null, ...h})), hazards: d.hazards.map(w => ({...M.waveDefaults, ...w}))},
     (_, v) => v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map(k => [k, v[k]])) : v);
   const working = () => viewing ? stash.draft : draft;
   function unsaved() {
@@ -96,7 +96,8 @@
   function labelFor(ref) {
     if (ref.type === 'hole') {
       const h = draft.holes[ref.index], size = h.size ?? 1;
-      return `${h.motion ? 'Moving ' : ''}${h.target ? `target ${h.target}` : 'trap hole'}${size !== 1 ? ` · ${size}×` : ''}`.replace(/^./, c => c.toUpperCase());
+      const sizeText = h.pulse ? ` · ${h.pulse.minSize}–${h.pulse.maxSize}×` : size !== 1 ? ` · ${size}×` : '';
+      return `${h.motion ? 'moving ' : ''}${h.pulse ? 'breathing ' : ''}${h.target ? `target ${h.target}` : 'trap hole'}${sizeText}`.replace(/^./, c => c.toUpperCase());
     }
     if (ref.type === 'spider') return `Spider ${ref.index + 1}`;
     const w = draft.hazards[ref.wave], p = w.positions[ref.index];
@@ -180,7 +181,19 @@
     if (viewing) for (const control of panel.querySelectorAll('input,select')) control.disabled = true;
   }
   function holeSettings(panel, hole) {
-    hole.size ??= 1; hole.motion ??= null;
+    hole.size ??= 1; hole.motion ??= null; hole.pulse ??= null;
+    const growLabel = document.createElement('label'); growLabel.textContent = 'Size over time';
+    const grow = document.createElement('select');
+    grow.add(new Option('Fixed size', 'fixed')); grow.add(new Option('Grow and shrink (whole level)', 'pulse'));
+    grow.value = hole.pulse ? 'pulse' : 'fixed';
+    grow.onchange = () => change(() => { hole.pulse = grow.value === 'pulse' ? {...M.holePulseDefaults} : null; });
+    growLabel.append(grow); panel.append(growLabel);
+    if (hole.pulse) {
+      field(panel, `Smallest size (${M.holeSize.min}–${M.holeSize.max} × normal)`, 'minSize', hole.pulse, {min: M.holeSize.min, max: M.holeSize.max, step: .05});
+      field(panel, `Biggest size (${M.holeSize.min}–${M.holeSize.max} × normal)`, 'maxSize', hole.pulse, {min: M.holeSize.min, max: M.holeSize.max, step: .05});
+      field(panel, 'Seconds per grow-and-shrink', 'period', hole.pulse, {min: .1});
+      field(panel, 'Starting angle (radians, 0 = smallest)', 'phase', hole.pulse);
+    }
     const sizeLabel = document.createElement('label'); sizeLabel.textContent = `Hole size (${M.holeSize.min}–${M.holeSize.max} × normal)`;
     const row = document.createElement('div'); row.className = 'size-row';
     const range = document.createElement('input'); range.type = 'range'; range.min = M.holeSize.min; range.max = M.holeSize.max; range.step = '0.05'; range.value = hole.size;
@@ -193,7 +206,7 @@
       if (!Number.isFinite(exact.valueAsNumber)) { exact.value = hole.size; return; }
       change(() => { hole.size = Math.round(Math.min(M.holeSize.max, Math.max(M.holeSize.min, exact.valueAsNumber)) * 100) / 100; });
     };
-    row.append(range, exact); sizeLabel.append(row); panel.append(sizeLabel);
+    row.append(range, exact); sizeLabel.append(row); if (!hole.pulse) growLabel.before(sizeLabel);
     const heading = document.createElement('div'); heading.className = 'section-title'; heading.textContent = 'MOVEMENT'; panel.append(heading);
     const label = document.createElement('label'); label.textContent = 'Movement path';
     const select = document.createElement('select');
@@ -302,7 +315,7 @@
     }
     const seconds=$('animate').checked?performance.now()/1000:0;
     for (const [index,h] of draft.holes.entries()) {
-      const s=h.size??1,m=h.motion,q=M.holeAt(h,seconds);
+      const s=M.holeSizeAt({size:1,pulse:null,...h},seconds),m=h.motion,q=M.holeAt(h,seconds);
       if(m){
         ctx.save();ctx.strokeStyle='#5d7f72';ctx.lineWidth=1;ctx.setLineDash([3,4]);ctx.beginPath();
         if(m.path==='horizontal'){ctx.moveTo(h.x-m.radiusX,h.y);ctx.lineTo(h.x+m.radiusX,h.y);}
@@ -310,10 +323,11 @@
         else ctx.ellipse(h.x,h.y,m.radiusX,m.path==='circle'?m.radiusX:m.radiusY,0,0,Math.PI*2);
         ctx.stroke();ctx.restore();circle(h.x,h.y,2,'#5d7f72');
       }
+      if(h.pulse){ctx.save();ctx.setLineDash([2,3]);circle(q.x,q.y,(h.target?12:10)*M.largestSize(h),null,'#7d8f6c',1);circle(q.x,q.y,(h.target?12:10)*Math.min(h.pulse.minSize,h.pulse.maxSize),null,'#7d8f6c',1);ctx.restore();}
       circle(q.x,q.y,(h.target?12:10)*s,h.target?'#ead28b':'#384c40',h.target?'#a68b43':'#7a8469',1.5);
       circle(q.x,q.y,(h.target?8.5:6.5)*s,h.target?'#31574a':'#1c352e');
       if(h.target){ctx.fillStyle='#fff6ce';ctx.font=`bold ${Math.round(10*Math.min(2.5,Math.max(.75,s)))}px Segoe UI`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(String(h.target),q.x,q.y+.2);}
-      if(same(selection,{type:'hole',index})) circle(h.x,h.y,Math.max(16,13*s+4),null,'#2f7a68',2);
+      if(same(selection,{type:'hole',index})) circle(h.x,h.y,Math.max(16,13*M.largestSize({size:1,pulse:null,...h})+4),null,'#2f7a68',2);
     }
     ctx.fillStyle='#6c7960';ctx.fillRect(32,527,296,3);circle(180,519,7,'#e6e4d6','#a3a993');
     ctx.font='9px Segoe UI';ctx.fillStyle='#7a8167';ctx.textAlign='center';ctx.fillText('START',180,547);
@@ -324,7 +338,7 @@
     return {x:Math.max(24,Math.min(336,Math.round(x*10)/10)),y:Math.max(24,Math.min(490,Math.round(y*10)/10))};
   }
   function hit(p) {
-    return objects().reverse().find(ref => (!filter || ref.type!=='hazard' || ref.o.target===filter) && Math.hypot(ref.o.x-p.x,ref.o.y-p.y)<(ref.type==='hole'?Math.max(16,M.rimRadius*(ref.o.size??1)+3):16));
+    return objects().reverse().find(ref => (!filter || ref.type!=='hazard' || ref.o.target===filter) && Math.hypot(ref.o.x-p.x,ref.o.y-p.y)<(ref.type==='hole'?Math.max(16,M.rimRadius*M.largestSize({size:1,pulse:null,...ref.o})+3):16));
   }
   function add(p) {
     if(tool==='target' && draft.holes.filter(h=>h.target>0).length>=10){toast('All 10 targets are placed. Select one to move it.');return;}

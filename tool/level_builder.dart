@@ -154,6 +154,15 @@ Map<String, Object> _json(int number, ClassicLevelDefinition level) => {
             'phase': m.phase,
           },
         },
+        'pulse': switch (h.pulse) {
+          null => null,
+          final p => {
+            'minSize': p.minSize,
+            'maxSize': p.maxSize,
+            'period': p.period,
+            'phase': p.phase,
+          },
+        },
       },
   ],
   'spiders': [
