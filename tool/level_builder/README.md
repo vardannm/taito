@@ -32,6 +32,8 @@ tool is not compiled into the player app. No Firebase account is used here.
   (x 24–336). Enable **Preview hazard movement** to see the paths animate.
   Original sway preserves older levels. Spider coordinates are patrol centers.
 - Add briefing text and timing under **Briefing & timing**.
+- Click any **Level check** message to select what it is about (it flashes on
+  the board). Click it again to step to the next object it mentions.
 - The browser autosaves one current draft. **Save draft** downloads a JSON file
   for durable storage; **Import draft** restores it. Save drafts before replacing them.
 - Resolve blocking level checks, review warnings, then **Save to game**. This writes

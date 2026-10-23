@@ -7,6 +7,8 @@
   // viewing: number of a level shown read-only; stash keeps the real draft meanwhile.
   // baseline: {source, snapshot} of the draft as last opened or saved, for unsaved-change checks.
   let viewing = null, stash = null, baseline = null;
+  // The level-check message last clicked, which of its objects is shown, and a brief board highlight.
+  let activeIssue = null, highlight = null;
   const storageKey = 'gilt-developer-level-builder-v1', baselineKey = `${storageKey}-baseline`;
   const icons = {
     eye: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
@@ -228,12 +230,59 @@
       const card = document.createElement('div'); card.className = `status ${kind}`;
       const title = document.createElement('strong'); title.textContent = `${items.length} ${kind === 'error' ? 'to fix' : 'to review'}`;
       const list = document.createElement('ul');
-      for (const item of items) { const li = document.createElement('li'); li.textContent = item; list.append(li); }
+      for (const issue of result.issues.filter(i => i.level === kind)) {
+        const li = document.createElement('li'); li.textContent = issue.text;
+        if (issue.refs.length) {
+          li.className = 'issue'; li.tabIndex = 0; li.setAttribute('role', 'button');
+          li.title = issue.refs.length > 1 ? 'Click to show it on the board. Click again for the next one.' : 'Click to show it on the board.';
+          li.classList.toggle('active', activeIssue?.text === issue.text);
+          li.onclick = () => focusIssue(issue, li);
+          li.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); focusIssue(issue, li); } };
+        }
+        list.append(li);
+      }
       card.append(title, list); box.append(card);
     }
     if (!result.errors.length) { const card = document.createElement('div'); card.className = 'status'; card.textContent = '✓ Ready to export'; box.prepend(card); }
     if (!viewing && presets.some(p => p.number === draft.number)) {
       const warning = document.createElement('p'); warning.className = 'hint'; warning.textContent = `Level ${draft.number} already exists. Use ${nextNumber()} to add a new level.`; box.append(warning);
+    }
+  }
+  function refPoints(ref) {
+    if (ref.type === 'hole') { const h = draft.holes[ref.index]; return h ? [{x: h.x, y: h.y, r: Math.max(18, M.rimRadius * M.largestSize({size: 1, pulse: null, ...h}) + 6)}] : []; }
+    if (ref.type === 'spider') { const s = draft.spiders[ref.index]; return s ? [{x: s.x, y: s.y, r: s.zoneRadius + 6}] : []; }
+    if (ref.type === 'hazard') { const p = draft.hazards[ref.wave]?.positions[ref.index]; return p ? [{x: p.x, y: p.y, r: 14}] : []; }
+    if (ref.type === 'wave') return (draft.hazards[ref.wave]?.positions ?? []).map(p => ({x: p.x, y: p.y, r: 14}));
+    return [];
+  }
+  // Selects what a level-check message is about; repeated clicks step through its objects.
+  function focusIssue(issue, item) {
+    // The inspector above changes height as the selection changes; keep the clicked message under the pointer.
+    const top = item.getBoundingClientRect().top;
+    const keepInPlace = () => {
+      const again = document.querySelector('#validation li.issue.active');
+      if (again) window.scrollBy(0, again.getBoundingClientRect().top - top);
+      again?.focus({preventScroll: true});
+    };
+    const step = activeIssue?.text === issue.text ? (activeIssue.step + 1) % issue.refs.length : 0;
+    activeIssue = {text: issue.text, step};
+    const ref = issue.refs[step];
+    highlight = {points: issue.refs.flatMap(refPoints), until: performance.now() + 1600};
+    if (ref.type === 'hole' || ref.type === 'spider' || ref.type === 'hazard') {
+      selection = {...ref}; tool = 'select';
+      if (ref.type === 'hazard') {
+        waveIndex = ref.wave;
+        const target = draft.hazards[ref.wave]?.positions[ref.index]?.target;
+        if (filter && filter !== target) { filter = 0; $('filter').value = '0'; }
+      }
+      render(); keepInPlace();
+    } else if (ref.type === 'wave') {
+      waveIndex = ref.wave; selection = null; render(); keepInPlace();
+    } else if (ref.type === 'field') {
+      render(); const input = $(ref.id); input.closest('details')?.setAttribute('open', '');
+      input.scrollIntoView({behavior: 'smooth', block: 'center'}); input.focus();
+    } else if (ref.type === 'tool') {
+      tool = ref.tool; selection = null; render(); keepInPlace(); toast('Click the board to place it.');
     }
   }
   function render() {
@@ -331,6 +380,11 @@
     }
     ctx.fillStyle='#6c7960';ctx.fillRect(32,527,296,3);circle(180,519,7,'#e6e4d6','#a3a993');
     ctx.font='9px Segoe UI';ctx.fillStyle='#7a8167';ctx.textAlign='center';ctx.fillText('START',180,547);
+    if(highlight){
+      const left=highlight.until-performance.now();
+      if(left<=0)highlight=null;
+      else for(const p of highlight.points){ctx.save();ctx.globalAlpha=Math.min(1,left/400);circle(p.x,p.y,p.r+3*Math.sin(performance.now()/90),null,'#d9822b',2.5);ctx.restore();}
+    }
   }
   function point(event, snap = false) {
     const rect=canvas.getBoundingClientRect(); let x=(event.clientX-rect.left)*360/rect.width,y=(event.clientY-rect.top)*560/rect.height;
@@ -424,5 +478,5 @@
     else if(e.key==='Escape'){selection=null;tool='select';render();}
   });
   render();
-  function animate(){if($("animate").checked)draw();requestAnimationFrame(animate);} requestAnimationFrame(animate);
+  function animate(){if($("animate").checked||highlight)draw();requestAnimationFrame(animate);} requestAnimationFrame(animate);
 })();

@@ -53,76 +53,91 @@
     }
     return clone(d);
   }
+  // Each issue lists the objects it is about, so the builder can select them:
+  // {type: 'hole'|'spider', index}, {type: 'hazard', wave, index}, {type: 'wave', wave},
+  // {type: 'field', id} for a level setting, or {type: 'tool', tool} for something to place.
   function validate(d) {
-    const errors = [], warnings = [];
-    try { d = parseDraft(JSON.stringify(d)); } catch (e) { return {errors: [e.message], warnings}; }
-    if (!d.name.trim()) errors.push('Give this level a name.');
+    const issues = new Map();
+    const note = (level, text, refs) => {
+      if (!issues.has(text)) issues.set(text, {level, text, refs: []});
+      issues.get(text).refs.push(...refs);
+    };
+    const err = (text, ...refs) => note('error', text, refs), warn = (text, ...refs) => note('warn', text, refs);
+    const hole = index => ({type: 'hole', index});
+    try { d = parseDraft(JSON.stringify(d)); } catch (e) { return {errors: [e.message], warnings: [], issues: [{level: 'error', text: e.message, refs: []}]}; }
+    if (!d.name.trim()) err('Give this level a name.', {type: 'field', id: 'name'});
     const targets = d.holes.filter(h => h.target > 0);
     for (let n = 1; n <= 10; n++) {
-      const count = targets.filter(h => h.target === n).length;
-      if (count !== 1) errors.push(count ? `Target ${n} appears more than once.` : `Place target ${n}.`);
+      const matches = [...d.holes.entries()].filter(([, h]) => h.target === n).map(([i]) => hole(i));
+      if (matches.length > 1) err(`Target ${n} appears more than once.`, ...matches);
+      else if (!matches.length) err(`Place target ${n}.`, {type: 'tool', tool: 'target'});
     }
-    for (const h of d.holes) {
-      if (!Number.isInteger(h.target) || h.target < 0 || h.target > 10) errors.push('Hole targets must be 0 (trap) or 1–10.');
-      if (h.x < 24 || h.x > 336 || h.y < 24 || h.y > 490) errors.push('Keep holes inside x 24–336 and y 24–490.');
-      if (h.size < holeSize.min || h.size > holeSize.max) errors.push(`Hole size must be ${holeSize.min}–${holeSize.max} × a normal hole.`);
+    for (const [i, h] of d.holes.entries()) {
+      if (!Number.isInteger(h.target) || h.target < 0 || h.target > 10) err('Hole targets must be 0 (trap) or 1–10.', hole(i));
+      if (h.x < 24 || h.x > 336 || h.y < 24 || h.y > 490) err('Keep holes inside x 24–336 and y 24–490.', hole(i));
+      if (h.size < holeSize.min || h.size > holeSize.max) err(`Hole size must be ${holeSize.min}–${holeSize.max} × a normal hole.`, hole(i));
       const p = h.pulse;
       if (p) {
         if ([p.minSize, p.maxSize].some(v => v < holeSize.min || v > holeSize.max))
-          errors.push(`Breathing sizes must be ${holeSize.min}–${holeSize.max} × a normal hole.`);
-        if (p.minSize >= p.maxSize) errors.push('A breathing hole needs a smallest size below its biggest size.');
-        if (p.period <= 0) errors.push('A breathing hole needs a positive number of seconds per breath.');
+          err(`Breathing sizes must be ${holeSize.min}–${holeSize.max} × a normal hole.`, hole(i));
+        if (p.minSize >= p.maxSize) err('A breathing hole needs a smallest size below its biggest size.', hole(i));
+        if (p.period <= 0) err('A breathing hole needs a positive number of seconds per breath.', hole(i));
       }
       const m = h.motion;
       if (m) {
         if (m.period <= 0 || m.radiusX < 0 || m.radiusY < 0 || m.radiusX > 150 || m.radiusY > 200)
-          errors.push('Moving holes need a positive period and radii up to 150 (horizontal) and 200 (vertical).');
+          err('Moving holes need a positive period and radii up to 150 (horizontal) and 200 (vertical).', hole(i));
         const rx = m.path === 'vertical' ? 0 : m.radiusX, ry = m.path === 'horizontal' ? 0 : m.path === 'circle' ? m.radiusX : m.radiusY;
         if (h.x - rx < 24 || h.x + rx > 336 || h.y - ry < 24 || h.y + ry > 490)
-          errors.push('A moving hole leaves the board. Move its center or reduce its radii.');
+          err('A moving hole leaves the board. Move its center or reduce its radii.', hole(i));
       }
       // The ball rests at the launch point before the first touch; never start inside a hole.
       if (Math.hypot(h.x - launch.x, h.y - launch.y) < 8.5 * largestSize(h) + holeExtent(m) + 9)
-        (m || p ? warnings : errors).push(m || p ? 'A moving or breathing hole reaches the ball’s starting spot.' : 'A hole covers the ball’s starting spot.');
+        (m || p ? warn : err)(m || p ? 'A moving or breathing hole reaches the ball’s starting spot.' : 'A hole covers the ball’s starting spot.', hole(i));
     }
     for (let i = 0; i < d.holes.length; i++) for (let j = i + 1; j < d.holes.length; j++) {
       const a = d.holes[i], b = d.holes[j], distance = Math.hypot(a.x - b.x, a.y - b.y);
       // 28 between two normal holes; sized holes scale their share of that clearance.
       const animated = a.motion || b.motion || a.pulse || b.pulse;
       if (!animated && distance < 14 * (a.size + b.size))
-        errors.push(`Holes ${i + 1} and ${j + 1} overlap or leave too little clearance.`);
+        err(`Holes ${i + 1} and ${j + 1} overlap or leave too little clearance.`, hole(i), hole(j));
       else if (animated && distance < rimRadius * (largestSize(a) + largestSize(b)) + holeExtent(a.motion) + holeExtent(b.motion))
-        warnings.push(`Holes ${i + 1} and ${j + 1} can overlap while they move or grow.`);
+        warn(`Holes ${i + 1} and ${j + 1} can overlap while they move or grow.`, hole(i), hole(j));
     }
-    for (const s of d.spiders) {
+    for (const [i, s] of d.spiders.entries()) {
+      const spider = {type: 'spider', index: i};
       if (s.x < 24 || s.x > 336 || s.y < 24 || s.y > 490 || s.zoneRadius < 10 ||
           s.zoneRadius > 150 || s.chaseSpeed <= 0 || s.bodyRadius < 1 || s.bodyRadius > 30)
-        errors.push('Check spider bounds, radius and speed.');
-      if (targets.some(h => Math.hypot(h.x - s.x, h.y - s.y) < s.zoneRadius + 24))
-        warnings.push('A spider territory is close to a numbered target.');
+        err('Check spider bounds, radius and speed.', spider);
+      const near = [...d.holes.entries()].filter(([, h]) => h.target > 0 && Math.hypot(h.x - s.x, h.y - s.y) < s.zoneRadius + 24);
+      if (near.length) warn('A spider territory is close to a numbered target.', spider, ...near.map(([j]) => hole(j)));
     }
     for (const [i, w] of d.hazards.entries()) {
+      const wave = {type: 'wave', wave: i};
       if (w.period <= 0 || w.radiusX < 0 || w.radiusY < 0 || w.radiusX > 150 || w.radiusY > 200)
-        errors.push(`Wave ${i + 1} needs a positive period and valid movement radii.`);
-      if (w.warningSeconds <= 0 || w.liveSeconds <= 0) errors.push(`Wave ${i + 1} needs positive warning and active times.`);
-      if (!w.positions.length) errors.push(`Wave ${i + 1} has no positions. Add one or delete the wave.`);
-      for (const p of w.positions) {
+        err(`Wave ${i + 1} needs a positive period and valid movement radii.`, wave);
+      if (w.warningSeconds <= 0 || w.liveSeconds <= 0) err(`Wave ${i + 1} needs positive warning and active times.`, wave);
+      if (!w.positions.length) err(`Wave ${i + 1} has no positions. Add one or delete the wave.`, wave);
+      for (const [j, p] of w.positions.entries()) {
+        const position = {type: 'hazard', wave: i, index: j};
         if (!Number.isInteger(p.target) || p.target < 1 || p.target > 10 ||
-            p.x < 24 || p.x > 336 || p.y < 24 || p.y > 490) errors.push(`Check wave ${i + 1} target numbers and coordinates.`);
-        const h = targets.find(h => h.target === p.target);
+            p.x < 24 || p.x > 336 || p.y < 24 || p.y > 490) err(`Check wave ${i + 1} target numbers and coordinates.`, position);
+        const target = d.holes.findIndex(h => h.target > 0 && h.target === p.target), h = d.holes[target];
         const rx = ['horizontal', 'circle', 'oval'].includes(w.motion) ? w.radiusX : 0;
         const ry = w.motion === 'circle' ? w.radiusX : ['vertical', 'oval'].includes(w.motion) ? w.radiusY : 0;
         if (w.motion !== 'legacy' && (p.x-rx<24 || p.x+rx>336 || p.y-ry<24 || p.y+ry>490))
-          errors.push(`Wave ${i + 1} movement leaves the board. Move its center or reduce its radii.`);
+          err(`Wave ${i + 1} movement leaves the board. Move its center or reduce its radii.`, position);
         if (h && (w.kind === 'laser' ?
           (w.orientation === 'horizontal' ? Math.abs(h.y-p.y)<=32+ry : Math.abs(h.x-p.x)<=32+rx) :
           Math.hypot(Math.max(0,Math.abs(h.x-p.x)-rx), Math.max(0,Math.abs(h.y-p.y)-ry))<=32))
-          warnings.push(`Wave ${i + 1} is close to target ${p.target}.`);
+          warn(`Wave ${i + 1} is close to target ${p.target}.`, position, hole(target));
       }
     }
-    if (d.firstHazardAfter < 0 || d.hazardInterval <= 0) errors.push('First hazard delay must be nonnegative; repeat interval must be positive.');
-    if (d.hazards.length && !d.finaleTitle.trim()) warnings.push('Add a briefing title and rule to introduce the hazards.');
-    return {errors: [...new Set(errors)], warnings: [...new Set(warnings)]};
+    if (d.firstHazardAfter < 0 || d.hazardInterval <= 0)
+      err('First hazard delay must be nonnegative; repeat interval must be positive.', {type: 'field', id: d.firstHazardAfter < 0 ? 'firstHazardAfter' : 'hazardInterval'});
+    if (d.hazards.length && !d.finaleTitle.trim()) warn('Add a briefing title and rule to introduce the hazards.', {type: 'field', id: 'finaleTitle'});
+    const list = [...issues.values()];
+    return {errors: list.filter(i => i.level === 'error').map(i => i.text), warnings: list.filter(i => i.level === 'warn').map(i => i.text), issues: list};
   }
   const num = value => Number.isInteger(value) ? String(value) : String(value);
   // JSON quoting plus Dart interpolation escaping; never insert raw draft text as code.
