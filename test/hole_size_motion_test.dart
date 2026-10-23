@@ -17,13 +17,11 @@ BalanceGame boardWith(List<Hole> holes) {
 }
 
 void main() {
-  test('existing levels keep normal, stationary holes', () {
+  test('holes without movement or breathing never change over time', () {
     for (final level in classicLevelDefinitions) {
-      for (final hole in level.holes) {
-        expect(hole.size, 1);
-        expect(hole.motion, isNull);
+      for (final hole in level.holes.where((h) => !h.animated)) {
         expect(identical(hole.at(12.5), hole), isTrue);
-        expect(hole.extraReach, 0);
+        if (hole.size == 1) expect(hole.extraReach, 0);
       }
     }
   });
@@ -96,7 +94,7 @@ void main() {
     expect(sizes.reduce(math.min), closeTo(.4, .01));
     expect(sizes.reduce(math.max), closeTo(2, .01));
     expect(game.board.first.x, 60, reason: 'breathing alone never moves it');
-    expect(game.board.first.reach, closeTo(Hole.rimRadius * 2, 1e-9));
+    expect(game.board.first.reach, closeTo(Hole.openingRadius * 2 + Hole.rimWidth, 1e-9));
     expect(pulse.sizeAt(0), .4);
     expect(pulse.sizeAt(1), closeTo(2, 1e-9));
   });
@@ -125,7 +123,7 @@ void main() {
       size: 2,
       motion: HoleMotion(path: HazardMotion.circle, radiusX: 40),
     );
-    expect(moving.reach, closeTo(Hole.rimRadius * 2 + 40, 1e-9));
+    expect(moving.reach, closeTo(Hole.openingRadius * 2 + Hole.rimWidth + 40, 1e-9));
     final targets = [
       for (var i = 0; i < 10; i++) Hole(50.0 + i * 26, 60.0 + i * 38, target: i + 1),
     ];

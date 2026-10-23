@@ -41,6 +41,50 @@ class LevelPicker extends StatefulWidget {
 
 class _LevelPickerState extends State<LevelPicker> {
   final firstLevelKey = GlobalKey();
+  final _firstRowKey = GlobalKey(), _scrollKey = GlobalKey();
+  final _scroll = ScrollController();
+  bool _placedAtProgress = false;
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  /// Highest level completed with any control, or 0 before the first win.
+  int get lastWon {
+    bool won(int number) => [
+      records[number],
+      if (widget.recordForControl != null)
+        for (final mode in selectableControlModes)
+          widget.recordForControl!(number, mode),
+    ].any((record) => record != null && record.starMask & 1 != 0);
+    for (var number = visibleCount; number > 0; number--) {
+      if (won(number)) return number;
+    }
+    return 0;
+  }
+
+  /// Opens the road at the player's progress instead of level 1: the last
+  /// won level sits just above the middle with the next one just below it.
+  void _showProgress(double rowHeight) {
+    final last = lastWon;
+    final row = _firstRowKey.currentContext?.findRenderObject() as RenderBox?;
+    final viewport = _scrollKey.currentContext?.findRenderObject() as RenderBox?;
+    if (last <= 1 || row == null || viewport == null || !_scroll.hasClients) {
+      return;
+    }
+    final firstTop =
+        row.localToGlobal(Offset.zero, ancestor: viewport).dy + _scroll.offset;
+    final next = last < visibleCount && unlocked(last + 1);
+    final focus = firstTop + (last - 1) * rowHeight + rowHeight * (next ? 1 : .5);
+    _scroll.jumpTo(
+      (focus - viewport.size.height / 2).clamp(
+        0.0,
+        _scroll.position.maxScrollExtent,
+      ),
+    );
+  }
   bool skipped = false;
   late ControlMode? _preferredControl = widget.controlMode;
   late bool _haloJoystick = widget.haloJoystick;
@@ -75,6 +119,13 @@ class _LevelPickerState extends State<LevelPicker> {
         LayoutBuilder(
           builder: (context, bounds) {
             final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+            final rowHeight = 166 + 65 * (textScale - 1).clamp(0.0, 2.0);
+            if (!_placedAtProgress && !(widget.tutorial && !skipped)) {
+              _placedAtProgress = true;
+              WidgetsBinding.instance.addPostFrameCallback(
+                (_) => _showProgress(rowHeight),
+              );
+            }
             Widget heading(String title, String subtitle) => SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
@@ -101,7 +152,8 @@ class _LevelPickerState extends State<LevelPicker> {
             );
             Widget road(int first, int count) => SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-              sliver: SliverList(
+              sliver: SliverFixedExtentList(
+                itemExtent: rowHeight,
                 delegate: SliverChildBuilderDelegate((context, index) {
                   final number = first + index;
                   final open = unlocked(number);
@@ -112,7 +164,8 @@ class _LevelPickerState extends State<LevelPicker> {
                       ? widget.recordForControl!(number, control!)
                       : records[number] ?? const LevelRecord();
                   return SizedBox(
-                    height: 166 + 65 * (textScale - 1).clamp(0, 2),
+                    key: number == 1 ? _firstRowKey : null,
+                    height: rowHeight,
                     child: CustomPaint(
                       painter: LevelRoadPainter(number, open: open),
                       child: Align(
@@ -282,6 +335,8 @@ class _LevelPickerState extends State<LevelPicker> {
               ),
             );
             return CustomScrollView(
+              key: _scrollKey,
+              controller: _scroll,
               slivers: [
                 heading(
                   'Choose your challenge.',

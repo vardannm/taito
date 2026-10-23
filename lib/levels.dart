@@ -115,7 +115,9 @@ class ClassicLevels {
           (h) =>
               math.pow(h.homeX - x, 2) + math.pow(h.homeY - y, 2) <
               math.pow(
-                (pickup ? (h.target > 0 ? 34 : 25) : 16) + h.extraReach,
+                pickup
+                    ? (h.target > 0 ? 34 : 25) + h.extraReach
+                    : 16 + h.passReach,
                 2,
               ),
         ) &&
@@ -193,7 +195,7 @@ class ClassicLevels {
         if (board.any(
               (h) =>
                   math.pow(h.homeX - x, 2) + math.pow(h.homeY - y, 2) <
-                  math.pow(14 + h.extraReach, 2),
+                  math.pow(14 + h.passReach, 2),
             ) ||
             spiders.any(
               (s) =>
@@ -212,7 +214,7 @@ class ClassicLevels {
             (cell) =>
                 math.pow(30 + (cell % columns) * 6 - h.homeX, 2) +
                     math.pow(36 + (cell ~/ columns) * 6 - h.homeY, 2) <
-                math.pow(22 + h.extraReach, 2),
+                math.pow(22 + math.max(0, h.passReach), 2),
           ),
         );
   }

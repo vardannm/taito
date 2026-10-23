@@ -1,6 +1,7 @@
 import 'package:balance_arcade/level_picker.dart';
 import 'package:balance_arcade/levels.dart';
 import 'package:balance_arcade/premium_menu.dart';
+import 'package:balance_arcade/rewards.dart';
 import 'package:balance_arcade/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -35,7 +36,9 @@ void main() {
             ),
           ),
         );
-        final road = tester.widget<SliverList>(find.byType(SliverList));
+        final road = tester.widget<SliverFixedExtentList>(
+          find.byType(SliverFixedExtentList),
+        );
         expect(road.delegate.estimatedChildCount, last);
         expect(find.byKey(const ValueKey('level-1')), findsOneWidget);
         final scrollable = find.descendant(
@@ -64,6 +67,37 @@ void main() {
       },
     );
   }
+
+  testWidgets('road opens at the last won level, not at level 1', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: LevelPicker(
+            selected: 21,
+            totalStars: 40,
+            records: {
+              for (var n = 1; n <= 20; n++)
+                n: const LevelRecord(starMask: 1),
+            },
+            onSelected: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    final won = tester.getCenter(find.byKey(const ValueKey('level-20')));
+    final next = tester.getCenter(find.byKey(const ValueKey('level-21')));
+    expect(won.dy, inInclusiveRange(200, 422));
+    expect(next.dy, inInclusiveRange(422, 700));
+    expect(find.byKey(const ValueKey('level-1')), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
 
   testWidgets('road winds between stops and reaches the final level', (
     tester,

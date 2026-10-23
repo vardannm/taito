@@ -5,6 +5,8 @@
   const waveDefaults = {motion: 'legacy', orientation: 'vertical', radiusX: 40, radiusY: 25, period: 4, phase: 0};
   // Hole size is a diameter multiple of a normal hole; motion is null or a path around its home.
   const holeSize = {min: .2, max: 2.5}, rimRadius = 12.8;
+  // Size scales only the opening (10.4 at 1×); the 2.4-unit brass rim stays the same (Hole.reach in lib/game.dart).
+  const holeRim = size => 10.4 * size + 2.4;
   const holePaths = ['horizontal', 'vertical', 'circle', 'oval'];
   const holeMotionDefaults = {path: 'horizontal', radiusX: 40, radiusY: 25, period: 4, phase: 0};
   // A breathing hole grows and shrinks between two sizes for the whole level (HolePulse in lib/game.dart).
@@ -101,7 +103,7 @@
       const animated = a.motion || b.motion || a.pulse || b.pulse;
       if (!animated && distance < 14 * (a.size + b.size))
         err(`Holes ${i + 1} and ${j + 1} overlap or leave too little clearance.`, hole(i), hole(j));
-      else if (animated && distance < rimRadius * (largestSize(a) + largestSize(b)) + holeExtent(a.motion) + holeExtent(b.motion))
+      else if (animated && distance < holeRim(largestSize(a)) + holeRim(largestSize(b)) + holeExtent(a.motion) + holeExtent(b.motion))
         warn(`Holes ${i + 1} and ${j + 1} can overlap while they move or grow.`, hole(i), hole(j));
     }
     for (const [i, s] of d.spiders.entries()) {
@@ -175,7 +177,7 @@
     lines.push('  ],', `  firstHazardAfter: ${num(d.firstHazardAfter)},`, `  hazardInterval: ${num(d.hazardInterval)},`, ');', '');
     return lines.join('\n');
   }
-  const api = {blank, clone, parseDraft, validate, exportDart, waveDefaults, holeSize, holePaths, holeMotionDefaults, holeAt, rimRadius, holePulseDefaults, holeSizeAt, largestSize};
+  const api = {blank, clone, parseDraft, validate, exportDart, waveDefaults, holeSize, holePaths, holeMotionDefaults, holeAt, rimRadius, holeRim, holePulseDefaults, holeSizeAt, largestSize};
   if (typeof module !== 'undefined') module.exports = api;
   else root.LevelModel = api;
 })(globalThis);

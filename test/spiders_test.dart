@@ -160,7 +160,7 @@ void main() {
             ),
           ),
         );
-        expect(find.byType(SliverList), findsOneWidget);
+        expect(find.byType(SliverFixedExtentList), findsOneWidget);
         await tester.scrollUntilVisible(
           find.byKey(const ValueKey('level-50')),
           300,

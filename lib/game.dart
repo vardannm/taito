@@ -51,17 +51,26 @@ class Hole {
   final HolePulse? pulse;
   static const minSize = .2, maxSize = 2.5;
 
-  /// Normal rim radius in board units; drawing and spacing scale from it.
-  static const rimRadius = 12.8;
+  /// Normal rim radius in board units. Size scales only the opening; the
+  /// brass rim around it keeps [rimWidth].
+  static const rimRadius = 12.8, openingRadius = 10.4, rimWidth = 2.4;
 
   bool get animated => motion != null || pulse != null;
 
   /// How far the rim can reach from [homeX], [homeY] over a whole level.
   double get reach =>
-      rimRadius * (pulse?.maxSize ?? size) + (motion?.extent ?? 0);
+      openingRadius * (pulse?.maxSize ?? size) +
+      rimWidth +
+      (motion?.extent ?? 0);
 
   /// Clearance to add beyond a normal stationary hole's; 0 for those.
   double get extraReach => reach - rimRadius;
+
+  /// Clearance beyond a normal hole's at the hole's most passable moment:
+  /// smallest size, at its home. A player can wait for a moving or breathing
+  /// hole, so routes stay open where [extraReach] would wall them off.
+  double get passReach =>
+      openingRadius * (pulse?.minSize ?? size) + rimWidth - rimRadius;
 
   /// This hole at [seconds] into the level. Unanimated holes return themselves.
   Hole at(double seconds) {

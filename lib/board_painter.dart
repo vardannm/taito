@@ -479,20 +479,23 @@ class BoardPainter extends CustomPainter {
       }
       final active = !game.infinite && hole.target == game.target.clamp(1, 10);
       final done = hole.target > 0 && hole.target < game.target;
-      // Sized holes scale their rim; glow and number stay readable when tiny.
+      // A sized hole scales its opening only. The brass rim, outlines and
+      // glow keep their normal thickness around it, so a growing hole never
+      // grows a heavy border; the number stays readable when tiny.
       final s = hole.size, d = s.clamp(.75, 2.5);
+      final opening = Hole.openingRadius * s, rim = opening + Hole.rimWidth;
       if (active) {
         final pulse = reducedMotion ? .5 : (math.sin(game.clock * 3.5) + 1) / 2;
         canvas.drawCircle(
           p,
-          (23 + pulse * 3) * d,
+          rim + 10.2 + pulse * 3,
           Paint()
             ..color = const Color(0xFFEAFFF3).withAlpha(90)
             ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 9),
         );
         canvas.drawCircle(
           p,
-          (18 + pulse * 2) * d,
+          rim + 5.2 + pulse * 2,
           Paint()
             ..color = ink.withAlpha(120)
             ..style = PaintingStyle.stroke
@@ -500,9 +503,10 @@ class BoardPainter extends CustomPainter {
         );
         for (int i = 0; i < 4; i++) {
           final angle = i * math.pi / 2;
+          final direction = Offset(math.cos(angle), math.sin(angle));
           canvas.drawLine(
-            p + Offset(math.cos(angle) * 22 * d, math.sin(angle) * 22 * d),
-            p + Offset(math.cos(angle) * 25 * d, math.sin(angle) * 25 * d),
+            p + direction * (rim + 9.2),
+            p + direction * (rim + 12.2),
             Paint()
               ..color = ink
               ..strokeWidth = 1.5,
@@ -510,21 +514,21 @@ class BoardPainter extends CustomPainter {
         }
       }
       canvas.drawCircle(
-        p + Offset(0, 1.5 * s),
-        13.5 * s,
+        p + const Offset(0, 1.5),
+        rim + .7,
         Paint()..color = const Color(0xFFFFE9B7),
       );
       canvas.drawCircle(
         p,
-        Hole.rimRadius * s,
+        rim,
         Paint()
           ..shader = const LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [Color(0xFF77542F), Color(0xFFC29251)],
-          ).createShader(Rect.fromCircle(center: p, radius: 13 * s)),
+          ).createShader(Rect.fromCircle(center: p, radius: rim + .2)),
       );
-      canvas.drawCircle(p, 10.4 * s, Paint()..color = const Color(0xFF192F2D));
+      canvas.drawCircle(p, opening, Paint()..color = const Color(0xFF192F2D));
       canvas.drawCircle(
         p - Offset(0, 2 * s),
         8 * s,
@@ -533,11 +537,11 @@ class BoardPainter extends CustomPainter {
       if (active || done)
         canvas.drawCircle(
           p,
-          12.3 * s,
+          opening + 1.9,
           Paint()
             ..color = active ? const Color(0xFFDCFAD9) : ink.withAlpha(150)
             ..style = PaintingStyle.stroke
-            ..strokeWidth = (active ? 2.5 : 1.5) * d,
+            ..strokeWidth = active ? 2.5 : 1.5,
         );
       if (hole.target > 0)
         text(

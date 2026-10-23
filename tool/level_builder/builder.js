@@ -249,7 +249,7 @@
     }
   }
   function refPoints(ref) {
-    if (ref.type === 'hole') { const h = draft.holes[ref.index]; return h ? [{x: h.x, y: h.y, r: Math.max(18, M.rimRadius * M.largestSize({size: 1, pulse: null, ...h}) + 6)}] : []; }
+    if (ref.type === 'hole') { const h = draft.holes[ref.index]; return h ? [{x: h.x, y: h.y, r: Math.max(18, M.holeRim(M.largestSize({size: 1, pulse: null, ...h})) + 6)}] : []; }
     if (ref.type === 'spider') { const s = draft.spiders[ref.index]; return s ? [{x: s.x, y: s.y, r: s.zoneRadius + 6}] : []; }
     if (ref.type === 'hazard') { const p = draft.hazards[ref.wave]?.positions[ref.index]; return p ? [{x: p.x, y: p.y, r: 14}] : []; }
     if (ref.type === 'wave') return (draft.hazards[ref.wave]?.positions ?? []).map(p => ({x: p.x, y: p.y, r: 14}));
@@ -372,11 +372,13 @@
         else ctx.ellipse(h.x,h.y,m.radiusX,m.path==='circle'?m.radiusX:m.radiusY,0,0,Math.PI*2);
         ctx.stroke();ctx.restore();circle(h.x,h.y,2,'#5d7f72');
       }
-      if(h.pulse){ctx.save();ctx.setLineDash([2,3]);circle(q.x,q.y,(h.target?12:10)*M.largestSize(h),null,'#7d8f6c',1);circle(q.x,q.y,(h.target?12:10)*Math.min(h.pulse.minSize,h.pulse.maxSize),null,'#7d8f6c',1);ctx.restore();}
-      circle(q.x,q.y,(h.target?12:10)*s,h.target?'#ead28b':'#384c40',h.target?'#a68b43':'#7a8469',1.5);
-      circle(q.x,q.y,(h.target?8.5:6.5)*s,h.target?'#31574a':'#1c352e');
+      // Size scales only the opening; the rim around it keeps its width, like the game.
+      const opening=h.target?8.5:6.5,rimAt=size=>opening*size+3.5;
+      if(h.pulse){ctx.save();ctx.setLineDash([2,3]);circle(q.x,q.y,rimAt(M.largestSize(h)),null,'#7d8f6c',1);circle(q.x,q.y,rimAt(Math.min(h.pulse.minSize,h.pulse.maxSize)),null,'#7d8f6c',1);ctx.restore();}
+      circle(q.x,q.y,rimAt(s),h.target?'#ead28b':'#384c40',h.target?'#a68b43':'#7a8469',1.5);
+      circle(q.x,q.y,opening*s,h.target?'#31574a':'#1c352e');
       if(h.target){ctx.fillStyle='#fff6ce';ctx.font=`bold ${Math.round(10*Math.min(2.5,Math.max(.75,s)))}px Segoe UI`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(String(h.target),q.x,q.y+.2);}
-      if(same(selection,{type:'hole',index})) circle(h.x,h.y,Math.max(16,13*M.largestSize({size:1,pulse:null,...h})+4),null,'#2f7a68',2);
+      if(same(selection,{type:'hole',index})) circle(h.x,h.y,Math.max(16,M.holeRim(M.largestSize({size:1,pulse:null,...h}))+4),null,'#2f7a68',2);
     }
     ctx.fillStyle='#6c7960';ctx.fillRect(32,527,296,3);circle(180,519,7,'#e6e4d6','#a3a993');
     ctx.font='9px Segoe UI';ctx.fillStyle='#7a8167';ctx.textAlign='center';ctx.fillText('START',180,547);
@@ -392,7 +394,7 @@
     return {x:Math.max(24,Math.min(336,Math.round(x*10)/10)),y:Math.max(24,Math.min(490,Math.round(y*10)/10))};
   }
   function hit(p) {
-    return objects().reverse().find(ref => (!filter || ref.type!=='hazard' || ref.o.target===filter) && Math.hypot(ref.o.x-p.x,ref.o.y-p.y)<(ref.type==='hole'?Math.max(16,M.rimRadius*M.largestSize({size:1,pulse:null,...ref.o})+3):16));
+    return objects().reverse().find(ref => (!filter || ref.type!=='hazard' || ref.o.target===filter) && Math.hypot(ref.o.x-p.x,ref.o.y-p.y)<(ref.type==='hole'?Math.max(16,M.holeRim(M.largestSize({size:1,pulse:null,...ref.o}))+3):16));
   }
   function add(p) {
     if(tool==='target' && draft.holes.filter(h=>h.target>0).length>=10){toast('All 10 targets are placed. Select one to move it.');return;}
