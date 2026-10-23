@@ -17,6 +17,10 @@ tool is not compiled into the player app. No Firebase account is used here.
   confirm when your current draft has unsaved changes.
 - Place **Target** holes 1–10, **Trap holes**, **Spiders**, **Lasers**, or **Moving holes**.
 - Drag objects, or select them and type exact properties in the inspector.
+- Select any hole to set its **Hole size** (0.2–2.5 × a normal hole) and its
+  **Movement path** (side to side, up and down, circle or oval) to make a
+  moving target or trap. X/Y become the path's center; the dashed line shows
+  the route. Normal stationary holes export exactly as before.
 - Use **Erase**, Delete, **Undo**, and **Redo**. Snap can be switched off.
 - For hazards, choose the active wave and target. Waves repeat in their listed order.
   Add/reorder waves to alternate lasers and moving holes; set warning/active times.

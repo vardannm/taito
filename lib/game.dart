@@ -17,9 +17,85 @@ import 'platforms.dart';
 part 'infinite_gameplay.dart';
 
 class Hole {
-  const Hole(this.x, this.y, {this.target = 0});
+  const Hole(this.x, this.y, {this.target = 0, this.size = 1, this.motion})
+    : homeX = x,
+      homeY = y;
+  const Hole._moved(
+    this.x,
+    this.y,
+    this.homeX,
+    this.homeY,
+    this.target,
+    this.size,
+    this.motion,
+  );
+
+  /// Current position; for a moving hole this changes every tick.
   final double x, y;
+
+  /// Where the level places the hole: a moving hole's path center.
+  final double homeX, homeY;
   final int target;
+
+  /// Diameter relative to a normal hole, from [minSize] to [maxSize].
+  final double size;
+  final HoleMotion? motion;
+  static const minSize = .2, maxSize = 2.5;
+
+  /// Normal rim radius in board units; drawing and spacing scale from it.
+  static const rimRadius = 12.8;
+
+  /// How far the rim can reach from [homeX], [homeY] over a whole path.
+  double get reach => rimRadius * size + (motion?.extent ?? 0);
+
+  /// Clearance to add beyond a normal stationary hole's; 0 for those.
+  double get extraReach => reach - rimRadius;
+
+  /// This hole at [seconds] into the level. Stationary holes return themselves.
+  Hole at(double seconds) {
+    final m = motion;
+    if (m == null) return this;
+    final (dx, dy) = m.offset(seconds);
+    return Hole._moved(homeX + dx, homeY + dy, homeX, homeY, target, size, m);
+  }
+}
+
+/// A repeating path around a hole's home position, with the same shapes and
+/// formulas as moving hazards so the level builder preview matches play.
+class HoleMotion {
+  const HoleMotion({
+    this.path = HazardMotion.horizontal,
+    this.radiusX = 40,
+    this.radiusY = 25,
+    this.period = 4,
+    this.phase = 0,
+  });
+  final HazardMotion path;
+  final double radiusX, radiusY, period, phase;
+
+  double get extent => switch (path) {
+    HazardMotion.horizontal || HazardMotion.circle => radiusX,
+    HazardMotion.vertical => radiusY,
+    HazardMotion.oval => math.max(radiusX, radiusY),
+    _ => 0,
+  };
+
+  (double, double) offset(double seconds) {
+    final angle = phase + seconds * math.pi * 2 / period;
+    return switch (path) {
+      HazardMotion.horizontal => (radiusX * math.sin(angle), 0.0),
+      HazardMotion.vertical => (0.0, radiusY * math.sin(angle)),
+      HazardMotion.circle => (
+        radiusX * math.cos(angle),
+        radiusX * math.sin(angle),
+      ),
+      HazardMotion.oval => (
+        radiusX * math.cos(angle),
+        radiusY * math.sin(angle),
+      ),
+      _ => (0.0, 0.0),
+    };
+  }
 }
 
 enum GamePhase { playing, sinking, returning, over }
@@ -184,6 +260,26 @@ class BalanceGame {
       mode == GameMode.classic &&
       ClassicLevels.definition(level).spiders.isNotEmpty;
   List<Hole> _classicBoard = [];
+
+  /// Seconds of Classic hole motion. Moving holes run while the level is
+  /// shown, before the first touch too, and stop only for pause.
+  double holeTime = 0;
+  int? _sinkingHole;
+  void _moveHoles(double dt) {
+    holeTime += dt;
+    final holes = _classicBoard;
+    for (var i = 0; i < holes.length; i++) {
+      if (holes[i].motion != null) holes[i] = holes[i].at(holeTime);
+    }
+    // A ball sinking into a moving hole travels with it.
+    if (phase == GamePhase.playing) _sinkingHole = null;
+    final sinking = _sinkingHole;
+    if (phase == GamePhase.sinking && sinking != null && sinking < holes.length) {
+      captureX = holes[sinking].x;
+      captureY = holes[sinking].y;
+    }
+  }
+
   double controlPosition = 0;
   bool controlHeld = false;
   double _controlLift = 0;
@@ -937,6 +1033,8 @@ class BalanceGame {
         ? ClassicLevels.definition(level).firstHazardAfter
         : 3;
     _finaleSequence = 0;
+    holeTime = 0;
+    _sinkingHole = null;
     _classicBoard = infinite || merging
         ? []
         : practice
@@ -1061,6 +1159,7 @@ class BalanceGame {
     if (!dt.isFinite || dt <= 0) return;
     if (waitingForInput) {
       if (!paused && started && mode == GameMode.classic) {
+        _moveHoles(math.min(dt, .1));
         for (final hazard in specialHazards) {
           if (hazard.kind == HazardKind.movingHole) {
             hazard.step(math.min(dt, .1), 0);
@@ -1140,6 +1239,7 @@ class BalanceGame {
     if (!started || finished) return;
     if (mode == GameMode.classic) {
       _classicSceneTime += dt;
+      _moveHoles(dt);
       if (phase == GamePhase.sinking || phase == GamePhase.returning) {
         // The ball is hidden, but the level's patrols, chases and hazard cycle
         // keep advancing. Pause still freezes everything at the top of _tick.
@@ -1383,7 +1483,8 @@ class BalanceGame {
                 .clamp(0.0, 1.0);
       final hx = (oldX - hole.x) * arenaStretch + dx * t,
           hy = oldY + dy * t - hole.y;
-      final radius = practice && hole.target == target ? 10.5 : 8.5;
+      final radius =
+          (practice && hole.target == target ? 10.5 : 8.5) * hole.size;
       if (hx * hx + hy * hy <= radius * radius) {
         final ox = (oldX - hole.x) * arenaStretch, oy = oldY - hole.y;
         final projection = ox * dx + oy * dy;
@@ -1574,6 +1675,7 @@ class BalanceGame {
     }
     captureX = hole.x;
     captureY = hole.y;
+    _sinkingHole = hole.motion == null ? null : board.indexOf(hole);
     lastSuccess = hole.target == target;
     if (lastSuccess) {
       streak++;

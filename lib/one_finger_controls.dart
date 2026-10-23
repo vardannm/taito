@@ -15,6 +15,17 @@ class OneFingerControls extends StatefulWidget {
   });
   static const height = controlStripHeight;
   static double heightFor(BalanceGame game) => game.haloJoystick ? 0 : height;
+
+  /// Gap kept between the pad's strip and the screen edge. The pad grows down
+  /// into the rest of the device's bottom inset, which is otherwise empty.
+  static double bottomMargin(double bottomPadding) =>
+      math.min(bottomPadding, 8.0);
+
+  /// Pad strip height including the part of [bottomPadding] it extends into.
+  static double extendedHeightFor(BalanceGame game, double bottomPadding) =>
+      game.haloJoystick
+      ? 0
+      : height + bottomPadding - bottomMargin(bottomPadding);
   final BalanceGame game;
   final Listenable frame;
   final double boardScale;

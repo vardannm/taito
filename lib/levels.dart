@@ -70,8 +70,8 @@ class ClassicLevels {
         if (x < 44 || x > 316 || y < 55 || y > 470) continue;
         if (board.any(
           (h) =>
-              math.pow(h.x - x, 2) + math.pow(h.y - y, 2) <
-              math.pow(h.target > 0 ? 34 : 25, 2),
+              math.pow(h.homeX - x, 2) + math.pow(h.homeY - y, 2) <
+              math.pow((h.target > 0 ? 34 : 25) + h.extraReach, 2),
         ))
           continue;
         if (spiders.any(
@@ -113,8 +113,11 @@ class ClassicLevels {
     bool clear(double x, double y, {bool pickup = false}) =>
         !board.any(
           (h) =>
-              math.pow(h.x - x, 2) + math.pow(h.y - y, 2) <
-              math.pow(pickup ? (h.target > 0 ? 34 : 25) : 16, 2),
+              math.pow(h.homeX - x, 2) + math.pow(h.homeY - y, 2) <
+              math.pow(
+                (pickup ? (h.target > 0 ? 34 : 25) : 16) + h.extraReach,
+                2,
+              ),
         ) &&
         !spiders.any(
           (s) =>
@@ -188,7 +191,9 @@ class ClassicLevels {
         if (visited[next]) continue;
         final x = 30 + nx * 6.0, y = 36 + ny * 6.0;
         if (board.any(
-              (h) => math.pow(h.x - x, 2) + math.pow(h.y - y, 2) < 14 * 14,
+              (h) =>
+                  math.pow(h.homeX - x, 2) + math.pow(h.homeY - y, 2) <
+                  math.pow(14 + h.extraReach, 2),
             ) ||
             spiders.any(
               (s) =>
@@ -205,9 +210,9 @@ class ClassicLevels {
         .every(
           (h) => queue.any(
             (cell) =>
-                math.pow(30 + (cell % columns) * 6 - h.x, 2) +
-                    math.pow(36 + (cell ~/ columns) * 6 - h.y, 2) <
-                22 * 22,
+                math.pow(30 + (cell % columns) * 6 - h.homeX, 2) +
+                    math.pow(36 + (cell ~/ columns) * 6 - h.homeY, 2) <
+                math.pow(22 + h.extraReach, 2),
           ),
         );
   }

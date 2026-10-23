@@ -1250,7 +1250,13 @@ class _GameScreenState extends State<GameScreen>
               top &
                   Size(
                     board.size.width - 24,
-                    OneFingerControls.heightFor(game) - 20,
+                    OneFingerControls.extendedHeightFor(
+                          game,
+                          (boardKey.currentWidget as PivotBoard?)
+                                  ?.bottomPadding ??
+                              0,
+                        ) -
+                        20,
                   ),
             );
           } else {

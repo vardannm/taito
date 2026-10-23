@@ -68,8 +68,11 @@ class _PivotBoardState extends State<PivotBoard> {
           Positioned(
             left: 0,
             right: 0,
-            bottom: widget.bottomPadding,
-            height: OneFingerControls.heightFor(widget.game),
+            bottom: OneFingerControls.bottomMargin(widget.bottomPadding),
+            height: OneFingerControls.extendedHeightFor(
+              widget.game,
+              widget.bottomPadding,
+            ),
             child: Stack(
               fit: StackFit.expand,
               children: [

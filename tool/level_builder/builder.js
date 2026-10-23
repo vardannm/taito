@@ -23,7 +23,7 @@
   try { baseline = JSON.parse(localStorage.getItem(baselineKey)); } catch (_) {}
   if (draft.hazards.length) waveIndex = 0;
   // Key-sorted JSON with wave defaults filled, so the inspector's default-filling doesn't count as an edit.
-  const snapshot = d => JSON.stringify({...d, hazards: d.hazards.map(w => ({...M.waveDefaults, ...w}))},
+  const snapshot = d => JSON.stringify({...d, holes: d.holes.map(h => ({size: 1, motion: null, ...h})), hazards: d.hazards.map(w => ({...M.waveDefaults, ...w}))},
     (_, v) => v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map(k => [k, v[k]])) : v);
   const working = () => viewing ? stash.draft : draft;
   function unsaved() {
@@ -94,7 +94,10 @@
     return draft.hazards[selection.wave]?.positions[selection.index];
   }
   function labelFor(ref) {
-    if (ref.type === 'hole') { const h = draft.holes[ref.index]; return h.target ? `Target ${h.target}` : 'Trap hole'; }
+    if (ref.type === 'hole') {
+      const h = draft.holes[ref.index], size = h.size ?? 1;
+      return `${h.motion ? 'Moving ' : ''}${h.target ? `target ${h.target}` : 'trap hole'}${size !== 1 ? ` · ${size}×` : ''}`.replace(/^./, c => c.toUpperCase());
+    }
     if (ref.type === 'spider') return `Spider ${ref.index + 1}`;
     const w = draft.hazards[ref.wave], p = w.positions[ref.index];
     return `${w.kind === 'laser' ? 'Laser' : 'Moving hole'} · target ${p.target}`;
@@ -139,7 +142,10 @@
     if (object) {
       field(panel, selection.type === 'spider' ? 'Patrol center X' : 'X position', 'x', object, {min: 24, max: 336});
       field(panel, selection.type === 'spider' ? 'Patrol center Y' : 'Y position', 'y', object, {min: 24, max: 490});
-      if (selection.type === 'hole') field(panel, 'Target number (0 = trap)', 'target', object, {min: 0, max: 10, step: 1});
+      if (selection.type === 'hole') {
+        field(panel, 'Target number (0 = trap)', 'target', object, {min: 0, max: 10, step: 1});
+        holeSettings(panel, object);
+      }
       if (selection.type === 'spider') {
         field(panel, 'Territory radius', 'zoneRadius', object, {min: 10, max: 150});
         field(panel, 'Chase speed', 'chaseSpeed', object, {min: 1});
@@ -172,6 +178,35 @@
       field(panel, 'Active time (seconds)', 'liveSeconds', wave, {min: .1});
     }
     if (viewing) for (const control of panel.querySelectorAll('input,select')) control.disabled = true;
+  }
+  function holeSettings(panel, hole) {
+    hole.size ??= 1; hole.motion ??= null;
+    const sizeLabel = document.createElement('label'); sizeLabel.textContent = `Hole size (${M.holeSize.min}–${M.holeSize.max} × normal)`;
+    const row = document.createElement('div'); row.className = 'size-row';
+    const range = document.createElement('input'); range.type = 'range'; range.min = M.holeSize.min; range.max = M.holeSize.max; range.step = '0.05'; range.value = hole.size;
+    const exact = document.createElement('input'); exact.type = 'number'; exact.min = M.holeSize.min; exact.max = M.holeSize.max; exact.step = '0.05'; exact.value = hole.size;
+    // Dragging previews live; one undo step is recorded when the drag ends.
+    let before = null;
+    range.oninput = () => { before ??= M.clone(draft); hole.size = range.valueAsNumber; exact.value = hole.size; draw(); };
+    range.onchange = () => { if (before) { undo.push(before); redo = []; before = null; } render(); };
+    exact.onchange = () => {
+      if (!Number.isFinite(exact.valueAsNumber)) { exact.value = hole.size; return; }
+      change(() => { hole.size = Math.round(Math.min(M.holeSize.max, Math.max(M.holeSize.min, exact.valueAsNumber)) * 100) / 100; });
+    };
+    row.append(range, exact); sizeLabel.append(row); panel.append(sizeLabel);
+    const heading = document.createElement('div'); heading.className = 'section-title'; heading.textContent = 'MOVEMENT'; panel.append(heading);
+    const label = document.createElement('label'); label.textContent = 'Movement path';
+    const select = document.createElement('select');
+    for (const [value, text] of [['none', 'Stationary'], ['horizontal', 'Side to side'], ['vertical', 'Up and down'], ['circle', 'Circle'], ['oval', 'Oval']]) select.add(new Option(text, value));
+    select.value = hole.motion?.path ?? 'none';
+    select.onchange = () => change(() => { hole.motion = select.value === 'none' ? null : {...M.holeMotionDefaults, ...hole.motion, path: select.value}; });
+    label.append(select); panel.append(label);
+    if (!hole.motion) return;
+    if (hole.motion.path !== 'vertical') field(panel, 'Horizontal radius', 'radiusX', hole.motion, {min: 0, max: 150});
+    if (['vertical', 'oval'].includes(hole.motion.path)) field(panel, 'Vertical radius', 'radiusY', hole.motion, {min: 0, max: 200});
+    field(panel, 'Seconds per cycle', 'period', hole.motion, {min: .1});
+    field(panel, 'Starting angle (radians)', 'phase', hole.motion);
+    const hint = document.createElement('p'); hint.className = 'hint'; hint.textContent = 'X / Y above are the center of the path. Turn on Preview movement to watch it.'; panel.append(hint);
   }
   function validation() {
     const result = M.validate(draft); const box = $('validation'); box.replaceChildren();
@@ -265,11 +300,20 @@
       circle(x,y,s.bodyRadius,'#705435');circle(s.x,s.y,2,'#9a8042');
       if(same(selection,{type:'spider',index})) circle(s.x,s.y,s.zoneRadius+3,null,'#2f7a68',2);
     }
+    const seconds=$('animate').checked?performance.now()/1000:0;
     for (const [index,h] of draft.holes.entries()) {
-      circle(h.x,h.y,h.target?12:10,h.target?'#ead28b':'#384c40',h.target?'#a68b43':'#7a8469',1.5);
-      circle(h.x,h.y,h.target?8.5:6.5,h.target?'#31574a':'#1c352e');
-      if(h.target){ctx.fillStyle='#fff6ce';ctx.font='bold 10px Segoe UI';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(String(h.target),h.x,h.y+.2);}
-      if(same(selection,{type:'hole',index})) circle(h.x,h.y,16,null,'#2f7a68',2);
+      const s=h.size??1,m=h.motion,q=M.holeAt(h,seconds);
+      if(m){
+        ctx.save();ctx.strokeStyle='#5d7f72';ctx.lineWidth=1;ctx.setLineDash([3,4]);ctx.beginPath();
+        if(m.path==='horizontal'){ctx.moveTo(h.x-m.radiusX,h.y);ctx.lineTo(h.x+m.radiusX,h.y);}
+        else if(m.path==='vertical'){ctx.moveTo(h.x,h.y-m.radiusY);ctx.lineTo(h.x,h.y+m.radiusY);}
+        else ctx.ellipse(h.x,h.y,m.radiusX,m.path==='circle'?m.radiusX:m.radiusY,0,0,Math.PI*2);
+        ctx.stroke();ctx.restore();circle(h.x,h.y,2,'#5d7f72');
+      }
+      circle(q.x,q.y,(h.target?12:10)*s,h.target?'#ead28b':'#384c40',h.target?'#a68b43':'#7a8469',1.5);
+      circle(q.x,q.y,(h.target?8.5:6.5)*s,h.target?'#31574a':'#1c352e');
+      if(h.target){ctx.fillStyle='#fff6ce';ctx.font=`bold ${Math.round(10*Math.min(2.5,Math.max(.75,s)))}px Segoe UI`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(String(h.target),q.x,q.y+.2);}
+      if(same(selection,{type:'hole',index})) circle(h.x,h.y,Math.max(16,13*s+4),null,'#2f7a68',2);
     }
     ctx.fillStyle='#6c7960';ctx.fillRect(32,527,296,3);circle(180,519,7,'#e6e4d6','#a3a993');
     ctx.font='9px Segoe UI';ctx.fillStyle='#7a8167';ctx.textAlign='center';ctx.fillText('START',180,547);
@@ -280,14 +324,14 @@
     return {x:Math.max(24,Math.min(336,Math.round(x*10)/10)),y:Math.max(24,Math.min(490,Math.round(y*10)/10))};
   }
   function hit(p) {
-    return objects().reverse().find(ref => (!filter || ref.type!=='hazard' || ref.o.target===filter) && Math.hypot(ref.o.x-p.x,ref.o.y-p.y)<16);
+    return objects().reverse().find(ref => (!filter || ref.type!=='hazard' || ref.o.target===filter) && Math.hypot(ref.o.x-p.x,ref.o.y-p.y)<(ref.type==='hole'?Math.max(16,M.rimRadius*(ref.o.size??1)+3):16));
   }
   function add(p) {
     if(tool==='target' && draft.holes.filter(h=>h.target>0).length>=10){toast('All 10 targets are placed. Select one to move it.');return;}
     change(()=>{
       if(tool==='target'||tool==='trap'){
         let target=0;if(tool==='target'){target=1;while(draft.holes.some(h=>h.target===target))target++;}
-        draft.holes.push({...p,target});selection={type:'hole',index:draft.holes.length-1};
+        draft.holes.push({...p,target,size:1,motion:null});selection={type:'hole',index:draft.holes.length-1};
       }else if(tool==='spider'){
         draft.spiders.push({...p,zoneRadius:40,phase:0,chaseSpeed:72,bodyRadius:6});selection={type:'spider',index:draft.spiders.length-1};
       }else{

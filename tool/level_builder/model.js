@@ -3,6 +3,21 @@
   'use strict';
   const clone = value => JSON.parse(JSON.stringify(value));
   const waveDefaults = {motion: 'legacy', orientation: 'vertical', radiusX: 40, radiusY: 25, period: 4, phase: 0};
+  // Hole size is a diameter multiple of a normal hole; motion is null or a path around its home.
+  const holeSize = {min: .2, max: 2.5}, rimRadius = 12.8;
+  const holePaths = ['horizontal', 'vertical', 'circle', 'oval'];
+  const holeMotionDefaults = {path: 'horizontal', radiusX: 40, radiusY: 25, period: 4, phase: 0};
+  // Matches HoleMotion.extent / offset in lib/game.dart.
+  const holeExtent = m => !m ? 0 : m.path === 'vertical' ? m.radiusY : m.path === 'oval' ? Math.max(m.radiusX, m.radiusY) : m.radiusX;
+  function holeAt(h, seconds) {
+    const m = h.motion; if (!m) return {x: h.x, y: h.y};
+    const a = m.phase + seconds * Math.PI * 2 / m.period;
+    if (m.path === 'horizontal') return {x: h.x + m.radiusX * Math.sin(a), y: h.y};
+    if (m.path === 'vertical') return {x: h.x, y: h.y + m.radiusY * Math.sin(a)};
+    return {x: h.x + m.radiusX * Math.cos(a), y: h.y + (m.path === 'circle' ? m.radiusX : m.radiusY) * Math.sin(a)};
+  }
+  // Ball resting at the launch point, matching BalanceGame.launchHeight - ballRadius.
+  const launch = {x: 180, y: 493};
   function blank(number = 51) {
     return {version: 1, number, name: 'Untitled level', holes: [], spiders: [], hazards: [],
       finaleTitle: '', finaleRule: '', firstHazardAfter: 3, hazardInterval: 9};
@@ -16,7 +31,9 @@
     }
     const finite = (item, keys) => item && keys.every(k => typeof item[k] === 'number' && Number.isFinite(item[k]));
     d.hazards = d.hazards.map(w => ({...waveDefaults, ...w}));
-    if (!d.holes.every(h => finite(h, ['x', 'y', 'target'])) ||
+    d.holes = d.holes.map(h => ({...h, size: h.size ?? 1, motion: h.motion ? {...holeMotionDefaults, ...h.motion} : null}));
+    if (!d.holes.every(h => finite(h, ['x', 'y', 'target', 'size']) &&
+          (h.motion === null || (holePaths.includes(h.motion.path) && finite(h.motion, ['radiusX', 'radiusY', 'period', 'phase'])))) ||
         !d.spiders.every(s => finite(s, ['x', 'y', 'zoneRadius', 'phase', 'chaseSpeed', 'bodyRadius'])) ||
         !d.hazards.every(w => ['laser', 'movingHole'].includes(w.kind) &&
           finite(w, ['warningSeconds', 'liveSeconds', 'radiusX', 'radiusY', 'period', 'phase']) &&
@@ -41,10 +58,26 @@
     for (const h of d.holes) {
       if (!Number.isInteger(h.target) || h.target < 0 || h.target > 10) errors.push('Hole targets must be 0 (trap) or 1–10.');
       if (h.x < 24 || h.x > 336 || h.y < 24 || h.y > 490) errors.push('Keep holes inside x 24–336 and y 24–490.');
+      if (h.size < holeSize.min || h.size > holeSize.max) errors.push(`Hole size must be ${holeSize.min}–${holeSize.max} × a normal hole.`);
+      const m = h.motion;
+      if (m) {
+        if (m.period <= 0 || m.radiusX < 0 || m.radiusY < 0 || m.radiusX > 150 || m.radiusY > 200)
+          errors.push('Moving holes need a positive period and radii up to 150 (horizontal) and 200 (vertical).');
+        const rx = m.path === 'vertical' ? 0 : m.radiusX, ry = m.path === 'horizontal' ? 0 : m.path === 'circle' ? m.radiusX : m.radiusY;
+        if (h.x - rx < 24 || h.x + rx > 336 || h.y - ry < 24 || h.y + ry > 490)
+          errors.push('A moving hole leaves the board. Move its center or reduce its radii.');
+      }
+      // The ball rests at the launch point before the first touch; never start inside a hole.
+      if (Math.hypot(h.x - launch.x, h.y - launch.y) < 8.5 * h.size + holeExtent(m) + 9)
+        (m ? warnings : errors).push(m ? 'A moving hole passes over the ball’s starting spot.' : 'A hole covers the ball’s starting spot.');
     }
     for (let i = 0; i < d.holes.length; i++) for (let j = i + 1; j < d.holes.length; j++) {
-      if (Math.hypot(d.holes[i].x - d.holes[j].x, d.holes[i].y - d.holes[j].y) < 28)
+      const a = d.holes[i], b = d.holes[j], distance = Math.hypot(a.x - b.x, a.y - b.y);
+      // 28 between two normal holes; sized holes scale their share of that clearance.
+      if (!a.motion && !b.motion && distance < 14 * (a.size + b.size))
         errors.push(`Holes ${i + 1} and ${j + 1} overlap or leave too little clearance.`);
+      else if ((a.motion || b.motion) && distance < rimRadius * (a.size + b.size) + holeExtent(a.motion) + holeExtent(b.motion))
+        warnings.push(`Moving hole ${a.motion ? i + 1 : j + 1} can pass over hole ${a.motion ? j + 1 : i + 1}.`);
     }
     for (const s of d.spiders) {
       if (s.x < 24 || s.x > 336 || s.y < 24 || s.y > 490 || s.zoneRadius < 10 ||
@@ -86,7 +119,14 @@
     const id = String(d.number).padStart(2, '0');
     const lines = ["part of '../classic_levels.dart';", '', `// Classic level ${d.number}. Coordinates use the 360 x 560 board.`,
       `const classicLevel${id} = ClassicLevelDefinition(`, `  name: ${str(d.name)},`, '  holes: ['];
-    for (const h of d.holes) lines.push(`    Hole(${num(h.x)}, ${num(h.y)}${h.target ? `, target: ${h.target}` : ''}),`);
+    for (const h of d.holes) {
+      const named = [];
+      if (h.target) named.push(`target: ${h.target}`);
+      if (h.size !== 1) named.push(`size: ${num(h.size)}`);
+      if (h.motion) named.push(`motion: HoleMotion(path: HazardMotion.${h.motion.path}, radiusX: ${num(h.motion.radiusX)}, ` +
+        `radiusY: ${num(h.motion.radiusY)}, period: ${num(h.motion.period)}, phase: ${num(h.motion.phase)})`);
+      lines.push(`    Hole(${[num(h.x), num(h.y), ...named].join(', ')}),`);
+    }
     lines.push('  ],', '  spiders: [');
     for (const s of d.spiders) lines.push('    ClassicSpiderPlacement(',
       ...['x', 'y', 'zoneRadius', 'phase', 'chaseSpeed', 'bodyRadius'].map(k => `      ${k}: ${num(s[k])},`), '    ),');
@@ -103,7 +143,7 @@
     lines.push('  ],', `  firstHazardAfter: ${num(d.firstHazardAfter)},`, `  hazardInterval: ${num(d.hazardInterval)},`, ');', '');
     return lines.join('\n');
   }
-  const api = {blank, clone, parseDraft, validate, exportDart, waveDefaults};
+  const api = {blank, clone, parseDraft, validate, exportDart, waveDefaults, holeSize, holePaths, holeMotionDefaults, holeAt, rimRadius};
   if (typeof module !== 'undefined') module.exports = api;
   else root.LevelModel = api;
 })(globalThis);

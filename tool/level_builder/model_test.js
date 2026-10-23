@@ -26,6 +26,13 @@ const M = require('./model.js');
   const next = M.clone(levels[49]); next.number = levels.length + 1;
   next.name = 'A "quoted" $level \\ path\nSecond line — café';
   next.finaleRule = 'Literal ${notDartCode} and apostrophe\'s';
+  // A shrunken hole and a moving one must survive export and play.
+  next.holes[0].size = .6;
+  const mover = next.holes.findIndex(h => h.x > 60 && h.x < 300 && Math.hypot(h.x - 180, h.y - 493) > 80);
+  next.holes[mover].motion = {path: 'horizontal', radiusX: 10, radiusY: 25, period: 4, phase: 0};
+  assert.deepEqual(M.validate(next).errors, []);
+  const oversized = M.clone(next); oversized.holes[0].size = 3;
+  assert.throws(() => M.exportDart(oversized), /Hole size/);
   fs.writeFileSync(path.join(fixture, `lib/classic_levels/level_${next.number}.dart`), M.exportDart(next));
   fs.writeFileSync(path.join(fixture, 'expected.json'), JSON.stringify(next));
   const dart = path.join(root, '.tools/flutter/bin/cache/dart-sdk/bin/dart.exe');
@@ -39,6 +46,7 @@ const M = require('./model.js');
 import 'dart:io';
 import 'dart:convert';
 import 'lib/game.dart';
+import 'lib/hazards.dart';
 import 'lib/levels.dart';
 void main() {
   final expected = jsonDecode(File.fromUri(Platform.script.resolve('expected.json')).readAsStringSync());
@@ -46,6 +54,11 @@ void main() {
   final game = BalanceGame()..start(levelNumber: ${next.number});
   if (game.level != ${next.number} || game.spiders.length != 3 || !game.finale) throw StateError('New level is not playable');
   if (ClassicLevels.definition(${next.number}).finaleRule != expected['finaleRule']) throw StateError('String escaping failed');
+  final holes = ClassicLevels.definition(${next.number}).holes;
+  if (holes[0].size != .6 || holes[${mover}].motion?.path != HazardMotion.horizontal) throw StateError('Hole size or motion was lost');
+  game.step(.5);
+  final moved = game.board[${mover}];
+  if ((moved.x - moved.homeX).abs() < 1 || moved.y != moved.homeY) throw StateError('Moving hole did not move');
   for (var n = 1; n <= ${next.number}; n++) {
     final board = ClassicLevels.build(n);
     if (board.where((h) => h.target > 0).length != 10) throw StateError('Export lost targets');

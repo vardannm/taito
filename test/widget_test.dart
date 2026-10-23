@@ -168,9 +168,10 @@ void main() {
     expect(rect.left, greaterThanOrEqualTo(12 - .001));
     expect(rect.right, lessThanOrEqualTo(378 + .001));
     expect(rect.bottom, closeTo(844, .001));
+    // The pad grows down into the 34-point inset, 8 points above the edge.
     expect(
       tester.getRect(find.byType(OneFingerControls)).bottom,
-      closeTo(810, .001),
+      closeTo(844 - OneFingerControls.bottomMargin(34), .001),
     );
     expect(rect.top, closeTo(0, .001));
     expect(

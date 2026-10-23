@@ -138,7 +138,23 @@ Map<String, Object> _json(int number, ClassicLevelDefinition level) => {
   'number': number,
   'name': level.name,
   'holes': [
-    for (final h in level.holes) {'x': h.x, 'y': h.y, 'target': h.target},
+    for (final h in level.holes)
+      {
+        'x': h.homeX,
+        'y': h.homeY,
+        'target': h.target,
+        'size': h.size,
+        'motion': switch (h.motion) {
+          null => null,
+          final m => {
+            'path': m.path.name,
+            'radiusX': m.radiusX,
+            'radiusY': m.radiusY,
+            'period': m.period,
+            'phase': m.phase,
+          },
+        },
+      },
   ],
   'spiders': [
     for (final s in level.spiders)
