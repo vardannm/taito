@@ -28,6 +28,7 @@ class SpecialHazard {
     this.dashLength = 0,
     this.dashGap = 30,
     this.dashSpeed = 0,
+    this.laserBottom = 537,
     double? cameraOffset,
   }) : assert(period > 0),
        originX = x,
@@ -47,6 +48,11 @@ class SpecialHazard {
   /// (negative: up or left). A [dashLength] of 0 is the classic solid beam.
   final double dashLength, dashGap, dashSpeed;
   bool get dashed => kind == HazardKind.laser && dashLength > 0;
+
+  /// Where a vertical beam ends. 537 reaches the bottom of the board;
+  /// [startClearBottom] keeps the ball's launch spot out of the beam.
+  final double laserBottom;
+  static const startClearBottom = 470.0;
   double x, y, age = 0;
   double? _worldY, _lastCameraOffset;
   double? get worldY => _worldY;
@@ -206,7 +212,7 @@ class SpecialHazard {
       double? first;
       for (final (low, high) in laserSegments(
         horizontal ? 24 : laserTop(boardTop),
-        horizontal ? 336 : 537,
+        horizontal ? 336 : laserBottom,
       )) {
         final hit = horizontal
             ? _rectContact(ax, ay - _oldY, bx, by - y, low - pad, high + pad, -10, 10)

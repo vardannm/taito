@@ -191,6 +191,7 @@ Map<String, Object> _json(int number, ClassicLevelDefinition level) => {
         'dashLength': h.dashLength,
         'dashGap': h.dashGap,
         'dashSpeed': h.dashSpeed,
+        'stopAboveStart': h.stopAboveStart,
         'positions': [
           for (final p in h.positions) {'target': p.target, 'x': p.x, 'y': p.y},
         ],

@@ -38,7 +38,7 @@
   }
 
   const tools = [['select', '↖', 'Select'], ['target', '①', 'Target'], ['trap', '●', 'Trap hole'],
-    ['spider', '✳', 'Spider'], ['laser', '↕', 'Laser'], ['movingHole', '↔', 'Moving hole'], ['erase', '×', 'Erase']];
+    ['spider', '✳', 'Spider'], ['laser', '↕', 'Laser'], ['movingHole', '↔', 'Moving hole'], ['duplicate', '⧉', 'Duplicate'], ['erase', '×', 'Erase']];
   for (const [id, icon, label] of tools) {
     const button = document.createElement('button'); button.className = 'tool'; button.dataset.tool = id;
     const symbol = document.createElement('span'); symbol.textContent = icon;
@@ -113,6 +113,24 @@
     ];
   }
   const same = (a, b) => a && b && a.type === b.type && a.index === b.index && a.wave === b.wave;
+  // Copies an object with all its settings into the same list; a copied
+  // target takes the next free number, or becomes a trap when all ten exist.
+  function duplicateRef(ref, offset = 0) {
+    const nudge = o => ({...M.clone(o), x: Math.max(24, Math.min(336, o.x + offset)), y: Math.max(24, Math.min(490, o.y + offset))});
+    if (ref.type === 'hole') {
+      const copy = nudge(draft.holes[ref.index]);
+      if (copy.target) { let next = 1; while (next <= 10 && draft.holes.some(h => h.target === next)) next++; copy.target = next <= 10 ? next : 0; }
+      draft.holes.push(copy); return {type: 'hole', index: draft.holes.length - 1};
+    }
+    if (ref.type === 'spider') { draft.spiders.push(nudge(draft.spiders[ref.index])); return {type: 'spider', index: draft.spiders.length - 1}; }
+    const positions = draft.hazards[ref.wave].positions;
+    positions.push(nudge(positions[ref.index])); return {type: 'hazard', wave: ref.wave, index: positions.length - 1};
+  }
+  function duplicateSelection() {
+    if (!selectedObject() || viewing) return;
+    change(() => { selection = duplicateRef(selection, 20); });
+    toast('Duplicated. Drag the copy where you want it.');
+  }
   function deleteSelection() {
     if (!selectedObject()) return;
     change(() => {
@@ -124,7 +142,7 @@
   }
   function refreshTools() {
     for (const button of $('tools').children) { button.classList.toggle('active', !viewing && button.dataset.tool === tool); button.disabled = !!viewing; }
-    canvas.style.cursor = viewing || tool === 'select' ? 'default' : 'crosshair';
+    canvas.style.cursor = viewing || tool === 'select' ? 'default' : tool === 'duplicate' ? 'copy' : 'crosshair';
   }
   function field(container, label, key, object, options = {}) {
     const wrap = document.createElement('label'); wrap.textContent = label;
@@ -141,7 +159,7 @@
     const panel = $('inspector'); panel.replaceChildren();
     const object = selectedObject();
     $('selection-title').textContent = object ? labelFor(selection) : 'Nothing selected';
-    $('selection-hint').hidden = !!object; $('delete').hidden = !object;
+    $('selection-hint').hidden = !!object; $('delete').hidden = !object; $('duplicate').hidden = !object;
     if (object) {
       field(panel, selection.type === 'spider' ? 'Patrol center X' : 'X position', 'x', object, {min: 24, max: 336});
       field(panel, selection.type === 'spider' ? 'Patrol center Y' : 'Y position', 'y', object, {min: 24, max: 490});
@@ -179,6 +197,12 @@
         beam.value=wave.dashLength>0?'dashed':'solid';
         beam.onchange=()=>change(()=>{Object.assign(wave,beam.value==='dashed'?M.dashDefaults:{dashLength:0});});
         beamLabel.append(beam);panel.append(beamLabel);
+        if(wave.orientation!=='horizontal'){
+          const clear=document.createElement('label');clear.className='check';
+          const box=document.createElement('input');box.type='checkbox';box.checked=!!wave.stopAboveStart;
+          box.onchange=()=>change(()=>{wave.stopAboveStart=box.checked;});
+          clear.append(box,document.createTextNode(' Stop above the start (keeps the launch spot safe)'));panel.append(clear);
+        }
         if(wave.dashLength>0){
           field(panel,'Dash length','dashLength',wave,{min:1,max:500});
           field(panel,'Gap length (over 14 lets the ball through)','dashGap',wave,{min:0,max:500});
@@ -301,7 +325,7 @@
     for (const key of ['number', 'name', 'finaleTitle', 'finaleRule', 'firstHazardAfter', 'hazardInterval']) $(key).value = draft[key];
     $('file-name').textContent = `level_${String(draft.number).padStart(2, '0')}.dart`;
     $('undo').disabled = viewing || !undo.length; $('redo').disabled = viewing || !redo.length;
-    for (const id of ['number', 'name', 'finaleTitle', 'finaleRule', 'firstHazardAfter', 'hazardInterval', 'snap', 'add-wave', 'delete', 'new', 'import', 'save', 'save-game']) $(id).disabled = !!viewing;
+    for (const id of ['number', 'name', 'finaleTitle', 'finaleRule', 'firstHazardAfter', 'hazardInterval', 'snap', 'add-wave', 'delete', 'duplicate', 'new', 'import', 'save', 'save-game']) $(id).disabled = !!viewing;
     document.body.classList.toggle('viewing', !!viewing); $('view-banner').hidden = !viewing;
     if (viewing) $('view-title').textContent = `Level ${viewing} · ${draft.name}`;
     $('wave').replaceChildren();
@@ -356,7 +380,7 @@
       if (w.kind === 'laser') {
         const horizontal=w.orientation==='horizontal';
         ctx.fillStyle='#e37965';ctx.strokeStyle='#b74335';
-        for(const [a,b] of M.laserSegments(w,horizontal?24:33,horizontal?336:537,$('animate').checked?performance.now()/1000:0)){
+        for(const [a,b] of M.laserSegments(w,horizontal?24:33,horizontal?336:M.laserBottom(w),$('animate').checked?performance.now()/1000:0)){
           if(horizontal)ctx.fillRect(a,q.y-3,b-a,6);else ctx.fillRect(q.x-3,a,6,b-a);
           ctx.beginPath();if(horizontal){ctx.moveTo(a,q.y);ctx.lineTo(b,q.y);}else{ctx.moveTo(q.x,a);ctx.lineTo(q.x,b);}ctx.stroke();
         }
@@ -419,7 +443,7 @@
         draft.spiders.push({...p,zoneRadius:40,phase:0,chaseSpeed:72,bodyRadius:6});selection={type:'spider',index:draft.spiders.length-1};
       }else{
         if(!draft.hazards[waveIndex]||draft.hazards[waveIndex].kind!==tool){
-          draft.hazards.push({...M.waveDefaults,kind:tool,warningSeconds:2.4,liveSeconds:tool==='laser'?1.2:3,positions:[]});waveIndex=draft.hazards.length-1;
+          draft.hazards.push({...M.waveDefaults,kind:tool,warningSeconds:2.4,liveSeconds:tool==='laser'?1.2:3,stopAboveStart:tool==='laser',positions:[]});waveIndex=draft.hazards.length-1;
         }
         const positions=draft.hazards[waveIndex].positions;positions.push({...p,target:filter||1});selection={type:'hazard',wave:waveIndex,index:positions.length-1};
       }
@@ -429,6 +453,12 @@
     if(e.button!==0||viewing)return;
     const p=point(e),found=hit(p);
     if(tool==='erase'){selection=found||null;deleteSelection();return;}
+    // Duplicate tool: press an object and drag out its copy.
+    if(tool==='duplicate'){
+      if(!found)return;
+      remember();selection=duplicateRef(found);if(found.type==='hazard')waveIndex=found.wave;
+      drag={id:e.pointerId,start:p,x:found.o.x,y:found.o.y,copy:true};canvas.setPointerCapture(e.pointerId);render();return;
+    }
     if(found){selection=found;if(found.type==='hazard')waveIndex=found.wave;remember();drag={id:e.pointerId,start:point(e),x:found.o.x,y:found.o.y};canvas.setPointerCapture(e.pointerId);render();}
     else if(tool==='select'){selection=null;render();}
     else add(point(e,true));
@@ -440,11 +470,17 @@
     if($('snap').checked){x=Math.round(x/10)*10;y=Math.round(y/10)*10;}
     obj.x=Math.max(24,Math.min(336,Math.round(x*10)/10));obj.y=Math.max(24,Math.min(490,Math.round(y*10)/10));draw();
   };
-  canvas.onpointerup=canvas.onpointercancel=()=>{if(drag){drag=null;render();}};
-  $('undo').onclick=()=>restore(undo,redo);$('redo').onclick=()=>restore(redo,undo);$('delete').onclick=deleteSelection;
+  canvas.onpointerup=canvas.onpointercancel=()=>{
+    if(!drag)return;
+    // A click without dragging would hide the copy under the original; offset it.
+    const obj=selectedObject();
+    if(drag.copy&&obj&&obj.x===drag.x&&obj.y===drag.y){obj.x=Math.min(336,obj.x+20);obj.y=Math.min(490,obj.y+20);}
+    drag=null;render();
+  };
+  $('undo').onclick=()=>restore(undo,redo);$('redo').onclick=()=>restore(redo,undo);$('delete').onclick=deleteSelection;$('duplicate').onclick=duplicateSelection;
   $('filter').onchange=()=>{filter=Number($('filter').value);draw();};
   $('wave').onchange=()=>{waveIndex=Number($('wave').value);selection=null;render();};
-  $('add-wave').onclick=()=>change(()=>{draft.hazards.push({...M.waveDefaults,kind:'laser',warningSeconds:2.4,liveSeconds:1.2,positions:[]});waveIndex=draft.hazards.length-1;selection=null;tool='laser';});
+  $('add-wave').onclick=()=>change(()=>{draft.hazards.push({...M.waveDefaults,kind:'laser',warningSeconds:2.4,liveSeconds:1.2,stopAboveStart:true,positions:[]});waveIndex=draft.hazards.length-1;selection=null;tool='laser';});
   $('wave-up').onclick=()=>{if(waveIndex>0)change(()=>{[draft.hazards[waveIndex-1],draft.hazards[waveIndex]]=[draft.hazards[waveIndex],draft.hazards[waveIndex-1]];waveIndex--;selection=null;});};
   $('delete-wave').onclick=()=>{if(waveIndex>=0 && confirm('Delete this wave and all its positions?'))change(()=>{draft.hazards.splice(waveIndex,1);waveIndex=Math.min(waveIndex,draft.hazards.length-1);selection=null;});};
   for(const key of ['number','name','finaleTitle','finaleRule','firstHazardAfter','hazardInterval'])$(key).onchange=()=>{
@@ -489,6 +525,7 @@
     if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)||document.querySelector('dialog[open]'))return;
     if(viewing){if(e.key==='Escape')leaveView();return;}
     if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?restore(redo,undo):restore(undo,redo);}
+    else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='d'){e.preventDefault();duplicateSelection();}
     else if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSelection();}
     else if(e.key==='Escape'){selection=null;tool='select';render();}
   });

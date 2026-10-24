@@ -57,4 +57,23 @@ void main() {
     expect(first.$2, closeTo(108, .01));
     expect(crossing(moving, 102), isTrue, reason: 'a dash moved into it');
   });
+
+  test('a beam stopped above the start never reaches the waiting ball', () {
+    SpecialHazard vertical(double bottom) => SpecialHazard(
+      HazardKind.laser,
+      x: 180,
+      y: 300,
+      warningSeconds: 0,
+      liveSeconds: 10,
+      motion: HazardMotion.stationary,
+      laserBottom: bottom,
+    )..step(1 / 120, 0);
+    // The ball rests at (180, 493) on the launch platform.
+    bool restingHit(SpecialHazard h) => [
+      for (var i = 0; i < 240; i++) (h..step(1 / 120, 0)).hits(180, 493, 180, 493),
+    ].any((hit) => hit);
+    expect(restingHit(vertical(537)), isTrue);
+    expect(restingHit(vertical(SpecialHazard.startClearBottom)), isFalse);
+    expect(vertical(SpecialHazard.startClearBottom).hits(180, 440, 180, 460), isTrue);
+  });
 }

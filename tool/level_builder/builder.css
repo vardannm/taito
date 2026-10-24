@@ -4,3 +4,4 @@ input:disabled,select:disabled,textarea:disabled{opacity:.55;cursor:default}
 .size-row{display:flex;align-items:center;gap:8px}.size-row input[type=range]{flex:1;padding:0;accent-color:#2f6052}.size-row input[type=number]{width:72px;flex:none}
 .status li.issue{cursor:pointer;border-radius:4px;padding:1px 4px;margin-left:-4px}.status li.issue:hover,.status li.issue:focus-visible{background:#ffffff80;text-decoration:underline}.status li.issue.active{background:#fffaf0;box-shadow:inset 3px 0 0 currentColor}
 @media(min-width:801px){.stage{position:sticky;top:0;align-self:start;max-height:100vh}}
+.duplicate{width:100%;margin-top:12px}.duplicate+.danger{margin-top:6px}

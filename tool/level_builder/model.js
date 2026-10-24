@@ -4,7 +4,9 @@
   const clone = value => JSON.parse(JSON.stringify(value));
   // dashLength 0 is a solid laser; otherwise lit dashes with gaps slide dashSpeed units/s along the beam.
   const waveDefaults = {motion: 'legacy', orientation: 'vertical', radiusX: 40, radiusY: 25, period: 4, phase: 0,
-    dashLength: 0, dashGap: 30, dashSpeed: 0};
+    dashLength: 0, dashGap: 30, dashSpeed: 0, stopAboveStart: false};
+  // A vertical beam ends at 537, or above the ball's launch spot (SpecialHazard.startClearBottom).
+  const laserBottom = w => w.stopAboveStart ? 470 : 537;
   const dashDefaults = {dashLength: 60, dashGap: 36, dashSpeed: 40};
   // Matches SpecialHazard.laserSegments in lib/hazards.dart.
   function laserSegments(w, low, high, seconds) {
@@ -58,7 +60,7 @@
           (h.pulse === null || finite(h.pulse, ['minSize', 'maxSize', 'period', 'phase']))) ||
         !d.spiders.every(s => finite(s, ['x', 'y', 'zoneRadius', 'phase', 'chaseSpeed', 'bodyRadius'])) ||
         !d.hazards.every(w => ['laser', 'movingHole'].includes(w.kind) &&
-          finite(w, ['warningSeconds', 'liveSeconds', 'radiusX', 'radiusY', 'period', 'phase', 'dashLength', 'dashGap', 'dashSpeed']) &&
+          finite(w, ['warningSeconds', 'liveSeconds', 'radiusX', 'radiusY', 'period', 'phase', 'dashLength', 'dashGap', 'dashSpeed']) && typeof w.stopAboveStart === 'boolean' &&
           ['legacy', 'stationary', 'horizontal', 'vertical', 'circle', 'oval'].includes(w.motion) &&
           ['vertical', 'horizontal'].includes(w.orientation) && Array.isArray(w.positions) &&
           w.positions.length <= 500 && w.positions.every(p => finite(p, ['x', 'y', 'target']))) ||
@@ -191,6 +193,7 @@
         `      period: ${num(w.period)},`, `      phase: ${num(w.phase)},`,
         ...(w.kind === 'laser' && w.dashLength > 0 ? [`      dashLength: ${num(w.dashLength)},`, `      dashGap: ${num(w.dashGap)},`,
           `      dashSpeed: ${num(w.dashSpeed)},`] : []),
+        ...(w.kind === 'laser' && w.stopAboveStart ? ['      stopAboveStart: true,'] : []),
         `      warningSeconds: ${num(w.warningSeconds)},`, `      liveSeconds: ${num(w.liveSeconds)},`, '      positions: [');
       for (const p of w.positions) lines.push(`        ClassicHazardPosition(target: ${p.target}, x: ${num(p.x)}, y: ${num(p.y)}),`);
       lines.push('      ],', '    ),');
@@ -198,7 +201,7 @@
     lines.push('  ],', `  firstHazardAfter: ${num(d.firstHazardAfter)},`, `  hazardInterval: ${num(d.hazardInterval)},`, ');', '');
     return lines.join('\n');
   }
-  const api = {blank, clone, parseDraft, validate, exportDart, waveDefaults, dashDefaults, laserSegments, holeSize, holePaths, holeMotionDefaults, holeAt, rimRadius, holeRim, holePulseDefaults, holeSizeAt, largestSize};
+  const api = {blank, clone, parseDraft, validate, exportDart, waveDefaults, dashDefaults, laserSegments, laserBottom, holeSize, holePaths, holeMotionDefaults, holeAt, rimRadius, holeRim, holePulseDefaults, holeSizeAt, largestSize};
   if (typeof module !== 'undefined') module.exports = api;
   else root.LevelModel = api;
 })(globalThis);

@@ -22,7 +22,7 @@
 <div class="canvas-wrap"><canvas id="board" width="720" height="1120" aria-label="Level layout. Click to place an object and drag selected objects to move them."></canvas></div>
 <div class="stage-footer"><span id="cursor">360 × 560 board</span><span id="counts"></span></div>
 </section>
-<aside class="right"><div class="eyebrow">OBJECT INSPECTOR</div><h2 id="selection-title">Nothing selected</h2><p id="selection-hint" class="muted">Choose a tool and click the board, or select an existing object.</p><div id="inspector"></div><button id="delete" class="danger" hidden>Delete selected object</button>
+<aside class="right"><div class="eyebrow">OBJECT INSPECTOR</div><h2 id="selection-title">Nothing selected</h2><p id="selection-hint" class="muted">Choose a tool and click the board, or select an existing object.</p><div id="inspector"></div><button id="duplicate" class="duplicate" hidden title="Ctrl+D">⧉ Duplicate selected object</button><button id="delete" class="danger" hidden>Delete selected object</button>
 <div class="section-title">LEVEL CHECK</div><div id="validation"></div><p class="hint">Checks cover targets, bounds and spacing. Playtest the exported level to judge difficulty.</p>
 <details><summary>Objects <span id="object-count"></span></summary><div id="objects"></div></details>
 <div class="help-card"><strong>Only for you.</strong><p>This builder runs separately from the game. Save to game writes the numbered level file and updates the registry. Existing files are backed up locally. Rebuild to play your changes.</p></div>

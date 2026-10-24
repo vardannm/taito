@@ -64,7 +64,7 @@ void paintSpecialHazards(Canvas c, BalanceGame game, bool reducedMotion) {
       Offset point(double along) =>
           horizontal ? Offset(along, h.y) : Offset(h.x, along);
       final low = horizontal ? 24.0 : SpecialHazard.laserTop(game.visibleTop),
-          high = horizontal ? 336.0 : 537.0;
+          high = horizontal ? 336.0 : h.laserBottom;
       if (h.sweeping && h.warning) {
         c.drawLine(
           Offset(h.originX - 65, low + 15),

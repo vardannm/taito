@@ -24,6 +24,9 @@ tool is not compiled into the player app. No Firebase account is used here.
   between a smallest and biggest size for the whole level (dashed rings show
   both sizes). Normal stationary holes export exactly as before.
 - Use **Erase**, Delete, **Undo**, and **Redo**. Snap can be switched off.
+- **Duplicate**: with the Duplicate tool, press an object and drag out a copy;
+  or select one and press **Ctrl+D** / *Duplicate selected object*. Copies keep
+  every setting; a copied target takes the next free number (or becomes a trap).
 - For hazards, choose the active wave and target. Waves repeat in their listed order.
   Add/reorder waves to alternate lasers and moving holes; set warning/active times.
   Select circular, oval, horizontal or vertical movement and set its radii,

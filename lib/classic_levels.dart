@@ -141,6 +141,7 @@ class ClassicHazardWave {
     this.dashLength = 0,
     this.dashGap = 30,
     this.dashSpeed = 0,
+    this.stopAboveStart = false,
   });
   final HazardKind kind;
   final double warningSeconds, liveSeconds;
@@ -151,6 +152,10 @@ class ClassicHazardWave {
 
   /// Laser only: see [SpecialHazard.dashLength]; 0 keeps a solid beam.
   final double dashLength, dashGap, dashSpeed;
+
+  /// Vertical laser only: end the beam above the ball's launch spot, so a
+  /// sweeping beam never hits a ball waiting to start.
+  final bool stopAboveStart;
 }
 
 class ClassicHazardPosition {

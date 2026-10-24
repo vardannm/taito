@@ -1714,6 +1714,9 @@ class BalanceGame {
         dashLength: wave.dashLength,
         dashGap: wave.dashGap,
         dashSpeed: wave.dashSpeed,
+        laserBottom: wave.stopAboveStart
+            ? SpecialHazard.startClearBottom
+            : 537,
       ),
     );
     _finaleSequence++;

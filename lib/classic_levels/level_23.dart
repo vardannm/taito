@@ -14,9 +14,6 @@ const classicLevel23 = ClassicLevelDefinition(
     Hole(100, 160, target: 8, motion: HoleMotion(path: HazardMotion.horizontal, radiusX: 40, radiusY: 25, period: 4, phase: 0)),
     Hole(120, 70, target: 9),
     Hole(200, 70, target: 10),
-    Hole(100, 300),
-    Hole(40, 280),
-    Hole(50, 360),
   ],
   spiders: [
   ],
@@ -33,11 +30,11 @@ const classicLevel23 = ClassicLevelDefinition(
       phase: 0,
       dashLength: 60,
       dashGap: 39.8,
-      dashSpeed: 40,
+      dashSpeed: 5,
       warningSeconds: 2.4,
       liveSeconds: 999,
       positions: [
-        ClassicHazardPosition(target: 1, x: 180, y: 240),
+        ClassicHazardPosition(target: 1, x: 180, y: 250),
       ],
     ),
   ],
