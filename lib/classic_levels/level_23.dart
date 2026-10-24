@@ -31,6 +31,7 @@ const classicLevel23 = ClassicLevelDefinition(
       dashLength: 60,
       dashGap: 39.8,
       dashSpeed: 5,
+      stopAboveStart: true,
       warningSeconds: 2.4,
       liveSeconds: 999,
       positions: [
