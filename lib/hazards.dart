@@ -25,6 +25,9 @@ class SpecialHazard {
     this.radiusY = 25,
     this.period = 4,
     this.phase = 0,
+    this.dashLength = 0,
+    this.dashGap = 30,
+    this.dashSpeed = 0,
     double? cameraOffset,
   }) : assert(period > 0),
        originX = x,
@@ -38,6 +41,12 @@ class SpecialHazard {
   final HazardMotion motion;
   final LaserOrientation orientation;
   final double radiusX, radiusY, period, phase;
+
+  /// A dashed laser lights only [dashLength]-long stretches with [dashGap]
+  /// openings between them, sliding [dashSpeed] units a second along the beam
+  /// (negative: up or left). A [dashLength] of 0 is the classic solid beam.
+  final double dashLength, dashGap, dashSpeed;
+  bool get dashed => kind == HazardKind.laser && dashLength > 0;
   double x, y, age = 0;
   double? _worldY, _lastCameraOffset;
   double? get worldY => _worldY;
@@ -163,6 +172,19 @@ class SpecialHazard {
 
   static double laserTop(double boardTop) => boardTop + 33;
 
+  /// Lit stretches of the beam between [low] and [high] along its axis; a
+  /// solid beam is a single stretch. Shared by collision and drawing.
+  List<(double, double)> laserSegments(double low, double high) {
+    if (!dashed) return [(low, high)];
+    final cycle = dashLength + math.max(0.0, dashGap);
+    final shift = (dashSpeed * age) % cycle;
+    return [
+      for (var start = low + shift - cycle; start < high; start += cycle)
+        if (math.min(high, start + dashLength) > math.max(low, start))
+          (math.max(low, start), math.min(high, start + dashLength)),
+    ];
+  }
+
   double? contact(
     double oldX,
     double oldY,
@@ -177,18 +199,30 @@ class SpecialHazard {
     final by = oldY + (newY - oldY) * _until;
     final double? t;
     if (kind == HazardKind.laser) {
-      t = orientation == LaserOrientation.horizontal
-          ? _rectContact(ax, ay - _oldY, bx, by - y, 24, 336, -10, 10)
-          : _rectContact(
-              ax - _oldX,
-              ay,
-              bx - x,
-              by,
-              -10 / arenaStretch,
-              10 / arenaStretch,
-              laserTop(boardTop),
-              537,
-            );
+      final horizontal = orientation == LaserOrientation.horizontal;
+      // Dashes reach out by the ball's radius (7) along the beam, so a gap
+      // lets the ball through only where it truly clears both lit ends.
+      final pad = dashed ? 7 / (horizontal ? arenaStretch : 1) : 0;
+      double? first;
+      for (final (low, high) in laserSegments(
+        horizontal ? 24 : laserTop(boardTop),
+        horizontal ? 336 : 537,
+      )) {
+        final hit = horizontal
+            ? _rectContact(ax, ay - _oldY, bx, by - y, low - pad, high + pad, -10, 10)
+            : _rectContact(
+                ax - _oldX,
+                ay,
+                bx - x,
+                by,
+                -10 / arenaStretch,
+                10 / arenaStretch,
+                low - pad,
+                high + pad,
+              );
+        if (hit != null && (first == null || hit < first)) first = hit;
+      }
+      t = first;
     } else if (kind == HazardKind.platformGap) {
       t = _rectContact(
         ax,

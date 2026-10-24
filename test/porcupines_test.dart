@@ -82,14 +82,33 @@ void main() {
     expect(g.quills, isNotEmpty);
   });
 
-  test('bursts do not overlap web shots or special hazards', () {
+  test('a first burst never waits for a busy board', () {
+    // Before this, a porcupine crossing the screen during any hazard or web
+    // shot could scroll away without ever firing.
     final g = run();
     final p = BoardPorcupine(85, 260);
+    g.porcupines.add(p);
+    g.specialHazards
+      ..add(SpecialHazard(HazardKind.laser, x: 280, y: 200))
+      ..add(SpecialHazard(HazardKind.formingHole, x: 200, y: 150));
+    advance(g, .2);
+    expect(p.charge, isNotNull);
+    advance(g, 1.2);
+    expect(p.bursts, 1);
+    expect(g.quills, isNotEmpty);
+  });
+
+  test('repeat bursts do not overlap web shots or timed hazards', () {
+    final g = run();
+    final p = BoardPorcupine(85, 260)..bursts = 1;
     g.porcupines.add(p);
     g.specialHazards.add(SpecialHazard(HazardKind.laser, x: 280, y: 200));
     advance(g, .2);
     expect(p.charge, isNull);
-    g.specialHazards.clear();
+    // Holes that form or wander are obstacles, not timed attacks.
+    g.specialHazards
+      ..clear()
+      ..add(SpecialHazard(HazardKind.formingHole, x: 200, y: 150));
     g.spiders.add(BoardSpider(290, 280, 38));
     advance(g, .2);
     expect(p.charge, isNotNull);

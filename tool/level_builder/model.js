@@ -2,7 +2,20 @@
 (function (root) {
   'use strict';
   const clone = value => JSON.parse(JSON.stringify(value));
-  const waveDefaults = {motion: 'legacy', orientation: 'vertical', radiusX: 40, radiusY: 25, period: 4, phase: 0};
+  // dashLength 0 is a solid laser; otherwise lit dashes with gaps slide dashSpeed units/s along the beam.
+  const waveDefaults = {motion: 'legacy', orientation: 'vertical', radiusX: 40, radiusY: 25, period: 4, phase: 0,
+    dashLength: 0, dashGap: 30, dashSpeed: 0};
+  const dashDefaults = {dashLength: 60, dashGap: 36, dashSpeed: 40};
+  // Matches SpecialHazard.laserSegments in lib/hazards.dart.
+  function laserSegments(w, low, high, seconds) {
+    if (w.kind !== 'laser' || !(w.dashLength > 0)) return [[low, high]];
+    const cycle = w.dashLength + Math.max(0, w.dashGap), shift = (((w.dashSpeed * seconds) % cycle) + cycle) % cycle, out = [];
+    for (let start = low + shift - cycle; start < high; start += cycle) {
+      const a = Math.max(low, start), b = Math.min(high, start + w.dashLength);
+      if (b > a) out.push([a, b]);
+    }
+    return out;
+  }
   // Hole size is a diameter multiple of a normal hole; motion is null or a path around its home.
   const holeSize = {min: .2, max: 2.5}, rimRadius = 12.8;
   // Size scales only the opening (10.4 at 1×); the 2.4-unit brass rim stays the same (Hole.reach in lib/game.dart).
@@ -45,7 +58,7 @@
           (h.pulse === null || finite(h.pulse, ['minSize', 'maxSize', 'period', 'phase']))) ||
         !d.spiders.every(s => finite(s, ['x', 'y', 'zoneRadius', 'phase', 'chaseSpeed', 'bodyRadius'])) ||
         !d.hazards.every(w => ['laser', 'movingHole'].includes(w.kind) &&
-          finite(w, ['warningSeconds', 'liveSeconds', 'radiusX', 'radiusY', 'period', 'phase']) &&
+          finite(w, ['warningSeconds', 'liveSeconds', 'radiusX', 'radiusY', 'period', 'phase', 'dashLength', 'dashGap', 'dashSpeed']) &&
           ['legacy', 'stationary', 'horizontal', 'vertical', 'circle', 'oval'].includes(w.motion) &&
           ['vertical', 'horizontal'].includes(w.orientation) && Array.isArray(w.positions) &&
           w.positions.length <= 500 && w.positions.every(p => finite(p, ['x', 'y', 'target']))) ||
@@ -119,6 +132,12 @@
       if (w.period <= 0 || w.radiusX < 0 || w.radiusY < 0 || w.radiusX > 150 || w.radiusY > 200)
         err(`Wave ${i + 1} needs a positive period and valid movement radii.`, wave);
       if (w.warningSeconds <= 0 || w.liveSeconds <= 0) err(`Wave ${i + 1} needs positive warning and active times.`, wave);
+      if (w.kind === 'laser' && w.dashLength > 0) {
+        if (w.dashLength > 500 || w.dashGap < 0 || w.dashGap > 500 || Math.abs(w.dashSpeed) > 400)
+          err(`Wave ${i + 1} dashes need a length and gap up to 500 and a speed up to 400.`, wave);
+        // The ball (radius 7) fits through a gap only when it is wider than 14.
+        else if (w.dashGap <= 14) warn(`Wave ${i + 1} dash gaps are too narrow for the ball to pass.`, wave);
+      }
       if (!w.positions.length) err(`Wave ${i + 1} has no positions. Add one or delete the wave.`, wave);
       for (const [j, p] of w.positions.entries()) {
         const position = {type: 'hazard', wave: i, index: j};
@@ -170,6 +189,8 @@
         `      motion: HazardMotion.${w.motion},`, `      orientation: LaserOrientation.${w.orientation},`,
         `      radiusX: ${num(w.radiusX)},`, `      radiusY: ${num(w.radiusY)},`,
         `      period: ${num(w.period)},`, `      phase: ${num(w.phase)},`,
+        ...(w.kind === 'laser' && w.dashLength > 0 ? [`      dashLength: ${num(w.dashLength)},`, `      dashGap: ${num(w.dashGap)},`,
+          `      dashSpeed: ${num(w.dashSpeed)},`] : []),
         `      warningSeconds: ${num(w.warningSeconds)},`, `      liveSeconds: ${num(w.liveSeconds)},`, '      positions: [');
       for (const p of w.positions) lines.push(`        ClassicHazardPosition(target: ${p.target}, x: ${num(p.x)}, y: ${num(p.y)}),`);
       lines.push('      ],', '    ),');
@@ -177,7 +198,7 @@
     lines.push('  ],', `  firstHazardAfter: ${num(d.firstHazardAfter)},`, `  hazardInterval: ${num(d.hazardInterval)},`, ');', '');
     return lines.join('\n');
   }
-  const api = {blank, clone, parseDraft, validate, exportDart, waveDefaults, holeSize, holePaths, holeMotionDefaults, holeAt, rimRadius, holeRim, holePulseDefaults, holeSizeAt, largestSize};
+  const api = {blank, clone, parseDraft, validate, exportDart, waveDefaults, dashDefaults, laserSegments, holeSize, holePaths, holeMotionDefaults, holeAt, rimRadius, holeRim, holePulseDefaults, holeSizeAt, largestSize};
   if (typeof module !== 'undefined') module.exports = api;
   else root.LevelModel = api;
 })(globalThis);

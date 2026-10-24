@@ -28,6 +28,10 @@ const classicLevel20 = ClassicLevelDefinition(
     Hole(60, 140),
     Hole(336, 110),
     Hole(336, 180),
+    Hole(30, 200),
+    Hole(60, 80),
+    Hole(130, 70),
+    Hole(210, 70),
   ],
   spiders: [
     ClassicSpiderPlacement(

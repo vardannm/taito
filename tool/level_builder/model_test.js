@@ -33,6 +33,8 @@ const M = require('./model.js');
   const breather = next.holes.findIndex((h, i) => i > 0 && i !== mover && Math.hypot(h.x - 180, h.y - 493) > 80);
   next.holes[breather].pulse = {minSize: .3, maxSize: 1, period: 2, phase: 0};
   assert.deepEqual(M.validate(next).errors, []);
+  next.hazards.push({...M.waveDefaults, kind: 'laser', motion: 'horizontal', warningSeconds: 2.4, liveSeconds: 1.2,
+    dashLength: 60, dashGap: 36, dashSpeed: 40, positions: [{target: 1, x: 180, y: 200}]});
   const oversized = M.clone(next); oversized.holes[0].size = 3;
   assert.throws(() => M.exportDart(oversized), /Hole size/);
   fs.writeFileSync(path.join(fixture, `lib/classic_levels/level_${next.number}.dart`), M.exportDart(next));
@@ -61,6 +63,8 @@ void main() {
   game.step(.5);
   final moved = game.board[${mover}];
   if ((moved.x - moved.homeX).abs() < 1 || moved.y != moved.homeY) throw StateError('Moving hole did not move');
+  final dashed = ClassicLevels.definition(${next.number}).hazards.last;
+  if (dashed.dashLength != 60 || dashed.dashGap != 36 || dashed.dashSpeed != 40) throw StateError('Dashed laser was lost');
   final breathing = game.board[${breather}];
   if (holes[${breather}].pulse?.maxSize != 1 || breathing.size <= .3 || breathing.size >= 1) throw StateError('Breathing hole did not grow');
   for (var n = 1; n <= ${next.number}; n++) {

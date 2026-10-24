@@ -188,6 +188,9 @@ Map<String, Object> _json(int number, ClassicLevelDefinition level) => {
         'radiusY': h.radiusY,
         'period': h.period,
         'phase': h.phase,
+        'dashLength': h.dashLength,
+        'dashGap': h.dashGap,
+        'dashSpeed': h.dashSpeed,
         'positions': [
           for (final p in h.positions) {'target': p.target, 'x': p.x, 'y': p.y},
         ],

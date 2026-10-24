@@ -173,6 +173,18 @@
         const input=document.createElement('select');for(const [value,text] of choices)input.add(new Option(text,value));input.value=wave[key];
         input.onchange=()=>change(()=>{wave[key]=input.value;});label.append(input);panel.append(label);
       }
+      if(wave.kind==='laser'){
+        const beamLabel=document.createElement('label');beamLabel.textContent='Beam';
+        const beam=document.createElement('select');beam.add(new Option('Solid','solid'));beam.add(new Option('Dashed (gaps to slip through)','dashed'));
+        beam.value=wave.dashLength>0?'dashed':'solid';
+        beam.onchange=()=>change(()=>{Object.assign(wave,beam.value==='dashed'?M.dashDefaults:{dashLength:0});});
+        beamLabel.append(beam);panel.append(beamLabel);
+        if(wave.dashLength>0){
+          field(panel,'Dash length','dashLength',wave,{min:1,max:500});
+          field(panel,'Gap length (over 14 lets the ball through)','dashGap',wave,{min:0,max:500});
+          field(panel,'Dash speed along the beam (− = up/left)','dashSpeed',wave,{min:-400,max:400});
+        }
+      }
       field(panel,'Horizontal radius','radiusX',wave,{min:0,max:150});
       field(panel,'Vertical radius (oval / vertical)','radiusY',wave,{min:0,max:200});
       field(panel,'Movement period (seconds)','period',wave,{min:.1});
@@ -343,10 +355,11 @@
       ctx.setLineDash([]);
       if (w.kind === 'laser') {
         const horizontal=w.orientation==='horizontal';
-        ctx.fillStyle='#e37965';
-        if(horizontal)ctx.fillRect(24,q.y-3,312,6);else ctx.fillRect(q.x-3,33,6,504);
-        ctx.strokeStyle='#b74335';ctx.beginPath();
-        if(horizontal){ctx.moveTo(24,q.y);ctx.lineTo(336,q.y);}else{ctx.moveTo(q.x,33);ctx.lineTo(q.x,537);}ctx.stroke();
+        ctx.fillStyle='#e37965';ctx.strokeStyle='#b74335';
+        for(const [a,b] of M.laserSegments(w,horizontal?24:33,horizontal?336:537,$('animate').checked?performance.now()/1000:0)){
+          if(horizontal)ctx.fillRect(a,q.y-3,b-a,6);else ctx.fillRect(q.x-3,a,6,b-a);
+          ctx.beginPath();if(horizontal){ctx.moveTo(a,q.y);ctx.lineTo(b,q.y);}else{ctx.moveTo(q.x,a);ctx.lineTo(q.x,b);}ctx.stroke();
+        }
       } else {circle(q.x,q.y,9,'#c27a4c','#8b4b26');}
       ctx.restore();ctx.save();ctx.globalAlpha=filter && filter!==p.target ? .1 : 1;
       circle(p.x,p.y,6,w.kind==='laser'?'#ba4c3c':'#b07435','#fff8e6');

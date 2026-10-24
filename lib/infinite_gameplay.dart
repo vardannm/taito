@@ -365,15 +365,22 @@ extension InfiniteGameplay on BalanceGame {
         return;
       }
     }
-    if (elapsed < _nextQuillTime ||
-        bossPending ||
-        lateEnemy != null ||
-        snakes.isNotEmpty ||
-        quills.isNotEmpty ||
-        webShots.isNotEmpty ||
-        specialHazards.isNotEmpty)
-      return;
+    // Big encounters own the screen; no porcupine starts a burst during them.
+    if (bossPending || lateEnemy != null || snakes.isNotEmpty) return;
+    // Repeat bursts wait for a calm moment. Holes that form or wander are
+    // board obstacles, not timed attacks, so they never hold one back.
+    final calm =
+        elapsed >= _nextQuillTime &&
+        quills.isEmpty &&
+        webShots.isEmpty &&
+        !specialHazards.any(
+          (h) =>
+              h.kind == HazardKind.laser || h.kind == HazardKind.platformGap,
+        );
     for (final p in porcupines) {
+      // A porcupine's first burst does not wait for calm: otherwise a busy
+      // stretch lets it scroll past without ever firing.
+      if (p.bursts > 0 && !calm) continue;
       final sy = screenY(p.y);
       final distance = math.sqrt(
         math.pow(p.x - ballX, 2) + math.pow(p.y - ballY, 2),

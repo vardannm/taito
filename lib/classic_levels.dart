@@ -138,6 +138,9 @@ class ClassicHazardWave {
     this.radiusY = 25,
     this.period = 4,
     this.phase = 0,
+    this.dashLength = 0,
+    this.dashGap = 30,
+    this.dashSpeed = 0,
   });
   final HazardKind kind;
   final double warningSeconds, liveSeconds;
@@ -145,6 +148,9 @@ class ClassicHazardWave {
   final HazardMotion motion;
   final LaserOrientation orientation;
   final double radiusX, radiusY, period, phase;
+
+  /// Laser only: see [SpecialHazard.dashLength]; 0 keeps a solid beam.
+  final double dashLength, dashGap, dashSpeed;
 }
 
 class ClassicHazardPosition {

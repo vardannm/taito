@@ -4,17 +4,19 @@ import 'game.dart';
 import 'infinite_painter.dart';
 import 'late_enemies.dart';
 
+// Visitors wear warning colors, like poisonous animals: dark bodies with
+// acid, venom and neon accents, so none of them reads as a friendly pickup.
 Color _enemyAccent(LateEnemyKind kind, bool light) => switch (kind) {
   LateEnemyKind.beetle =>
-    light ? const Color(0xFFBDFA6A) : const Color(0xFF436F08),
+    light ? const Color(0xFFC6FF2E) : const Color(0xFF4E8A00),
   LateEnemyKind.cricket =>
-    light ? const Color(0xFFFFD080) : const Color(0xFF97520C),
+    light ? const Color(0xFFF4FF3A) : const Color(0xFF8C8200),
   LateEnemyKind.moth =>
-    light ? const Color(0xFFE7BBFF) : const Color(0xFF7931A3),
+    light ? const Color(0xFFFF4FE0) : const Color(0xFFB0008F),
   LateEnemyKind.scorpion =>
-    light ? const Color(0xFFFFAD8B) : const Color(0xFFA53417),
+    light ? const Color(0xFFFF3B4A) : const Color(0xFFC4001A),
   LateEnemyKind.seedSpitter =>
-    light ? const Color(0xFF79E8CB) : const Color(0xFF076D58),
+    light ? const Color(0xFFD4FF5A) : const Color(0xFF2E6B00),
 };
 
 Paint _stroke(Color color, double width) => Paint()
@@ -228,11 +230,11 @@ void paintLateEnemy(Canvas canvas, BalanceGame game, bool reducedMotion) {
   canvas.scale(.7 + .3 * enemy.presence);
   const dark = Color(0xFF20282A);
   final shell = switch (enemy.kind) {
-    LateEnemyKind.beetle => const Color(0xFF688B24),
-    LateEnemyKind.cricket => const Color(0xFFC08A3B),
-    LateEnemyKind.moth => const Color(0xFFAB79CA),
-    LateEnemyKind.scorpion => const Color(0xFFAD5638),
-    LateEnemyKind.seedSpitter => const Color(0xFF439777),
+    LateEnemyKind.beetle => const Color(0xFF1C2A0A),
+    LateEnemyKind.cricket => const Color(0xFFD9D21C),
+    LateEnemyKind.moth => const Color(0xFF2E0D40),
+    LateEnemyKind.scorpion => const Color(0xFF2B100C),
+    LateEnemyKind.seedSpitter => const Color(0xFF4FCB16),
   };
   final contrast = ink == Colors.white ? Colors.black : Colors.white;
   canvas.drawCircle(Offset.zero, 23, Paint()..color = contrast.withAlpha(135));
@@ -332,7 +334,7 @@ void paintLateEnemy(Canvas canvas, BalanceGame game, bool reducedMotion) {
         canvas.rotate(side * (.04 * breathe + .06 * charge));
         oval(
           Rect.fromCenter(center: Offset(side * 6, -2), width: 9, height: 23),
-          enemy.warning ? accent : const Color(0xFF9DC445),
+          enemy.warning ? accent : const Color(0xFFA6F01E),
         );
         canvas.drawArc(
           Rect.fromLTWH(side * 6 - 3, -10, 6, 14),
@@ -384,9 +386,9 @@ void paintLateEnemy(Canvas canvas, BalanceGame game, bool reducedMotion) {
         -2.4,
         1.7,
         false,
-        _stroke(const Color(0xFFF2DCA3), 1.5),
+        _stroke(const Color(0xFFFFF86A), 1.5),
       );
-      oval(const Rect.fromLTWH(-8, 5, 16, 12), const Color(0xFFDEBA72));
+      oval(const Rect.fromLTWH(-8, 5, 16, 12), dark);
     case LateEnemyKind.moth:
       final flutter = reducedMotion ? 1.0 : .72 + .28 * math.cos(time * 14);
       canvas.translate(0, math.sin(time * 4.2) * 2.5 * motion);
@@ -405,13 +407,13 @@ void paintLateEnemy(Canvas canvas, BalanceGame game, bool reducedMotion) {
           ..quadraticBezierTo(side * 12, -18, side * 25, -16)
           ..moveTo(side * 3, 7)
           ..quadraticBezierTo(side * 12, 12, side * 17, 17);
-        canvas.drawPath(veins, _stroke(const Color(0xFFDEC3EB), 1.3));
+        canvas.drawPath(veins, _stroke(const Color(0xFFFF3FD8), 1.3));
         oval(Rect.fromCircle(center: Offset(side * 16, -3), radius: 5), dark);
         canvas.drawCircle(Offset(side * 16, -3), 2.3, Paint()..color = accent);
         canvas.restore();
         limb([Offset(side * 2, -10), Offset(side * (8 + sway), -21)], 1, shell);
       }
-      oval(const Rect.fromLTWH(-4, -13, 8, 32), const Color(0xFFE8CEEF));
+      oval(const Rect.fromLTWH(-4, -13, 8, 32), const Color(0xFF9DFF2E));
     case LateEnemyKind.scorpion:
       final feet = Path();
       for (final side in [-1.0, 1.0]) {
@@ -454,7 +456,7 @@ void paintLateEnemy(Canvas canvas, BalanceGame game, bool reducedMotion) {
           ..lineTo(20, -15)
           ..lineTo(10, -12)
           ..close(),
-        enemy.warning ? accent : shell,
+        accent,
       );
       canvas.restore();
       oval(const Rect.fromLTWH(-8, -10, 16, 28), shell);
@@ -496,7 +498,7 @@ void paintLateEnemy(Canvas canvas, BalanceGame game, bool reducedMotion) {
           _stroke(accent.withAlpha(170), 1),
         );
       }
-      oval(const Rect.fromLTWH(-8, 0, 16, 18), const Color(0xFF82C398));
+      oval(const Rect.fromLTWH(-8, 0, 16, 18), const Color(0xFF7A1E8C));
       oval(
         Rect.fromLTWH(-5 - charge, 7, 10 + charge * 2, 8 + charge * 2),
         dark,

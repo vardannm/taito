@@ -72,15 +72,28 @@ void paintSpecialHazards(Canvas c, BalanceGame game, bool reducedMotion) {
           warning,
         );
       }
+      // A dashed beam's warning already shows where its dashes and gaps are.
+      final segments = h.laserSegments(low, high);
       if (h.warning) {
-        c.drawRect(
-          horizontal
-              ? Rect.fromLTRB(24, h.y - 10, 336, h.y + 10)
-              : Rect.fromLTRB(h.x - 10, low, h.x + 10, high),
-          Paint()..color = _red.withAlpha(30),
-        );
-        for (var along = low + 6; along < high - 8; along += 16) {
-          c.drawLine(point(along), point(along + 8), warning);
+        for (final (a, b) in segments) {
+          final rect = horizontal
+              ? Rect.fromLTRB(a, h.y - 10, b, h.y + 10)
+              : Rect.fromLTRB(h.x - 10, a, h.x + 10, b);
+          c.drawRect(rect, Paint()..color = _red.withAlpha(30));
+          if (h.dashed) {
+            c.drawRRect(
+              RRect.fromRectAndRadius(rect.deflate(6), const Radius.circular(4)),
+              Paint()
+                ..color = _red.withAlpha(alpha)
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = 1.5,
+            );
+          }
+        }
+        if (!h.dashed) {
+          for (var along = low + 6; along < high - 8; along += 16) {
+            c.drawLine(point(along), point(along + 8), warning);
+          }
         }
         _caption(
           c,
@@ -91,28 +104,34 @@ void paintSpecialHazards(Canvas c, BalanceGame game, bool reducedMotion) {
         );
         _paintLaserMotionCue(c, h, low, high, reducedMotion);
       } else if (h.active) {
-        c.drawLine(
-          point(low),
-          point(high),
-          Paint()
-            ..color = _red.withAlpha(160)
-            ..strokeWidth = 14
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
-        );
-        c.drawLine(
-          point(low),
-          point(high),
-          Paint()
-            ..color = _red
-            ..strokeWidth = 6,
-        );
-        c.drawLine(
-          point(low),
-          point(high),
-          Paint()
-            ..color = _white
-            ..strokeWidth = 2,
-        );
+        final cap = h.dashed ? StrokeCap.round : StrokeCap.butt;
+        for (final (a, b) in segments) {
+          c.drawLine(
+            point(a),
+            point(b),
+            Paint()
+              ..color = _red.withAlpha(160)
+              ..strokeWidth = 14
+              ..strokeCap = cap
+              ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+          );
+          c.drawLine(
+            point(a),
+            point(b),
+            Paint()
+              ..color = _red
+              ..strokeWidth = 6
+              ..strokeCap = cap,
+          );
+          c.drawLine(
+            point(a),
+            point(b),
+            Paint()
+              ..color = _white
+              ..strokeWidth = 2
+              ..strokeCap = cap,
+          );
+        }
       }
       for (final end in [low, high]) {
         c.drawRRect(

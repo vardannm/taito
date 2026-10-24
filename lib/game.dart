@@ -1711,6 +1711,9 @@ class BalanceGame {
         radiusY: wave.radiusY,
         period: wave.period,
         phase: wave.phase,
+        dashLength: wave.dashLength,
+        dashGap: wave.dashGap,
+        dashSpeed: wave.dashSpeed,
       ),
     );
     _finaleSequence++;
