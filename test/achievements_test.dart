@@ -4,6 +4,7 @@ import 'package:balance_arcade/achievements.dart';
 import 'package:balance_arcade/achievement_sheet.dart';
 import 'package:balance_arcade/ball_cosmetics.dart';
 import 'package:balance_arcade/game.dart';
+import 'package:balance_arcade/infinite_boss.dart';
 import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/profile.dart';
 import 'package:balance_arcade/rewards.dart';
@@ -76,16 +77,17 @@ void main() {
   });
 
   test('additional milestones use existing saved records', () async {
-    expect(Achievement.values.length, 26);
+    expect(Achievement.values.length, 33);
     final p = PlayerProfile()
       ..infiniteBest = 5000
-      ..infiniteBestScore = 25000
+      ..infiniteBestScore = 1000000
+      ..infiniteBestBosses = 6
       ..infiniteRuns = 100
       ..mergeHighest = 4096
       ..mergeRuns = 100;
-    for (var level = 1; level <= 40; level++) {
+    for (var level = 1; level <= 50; level++) {
       p.levelRecords[p.recordKey(level, ControlMode.oneFinger)] =
-          const LevelRecord(starMask: 7);
+          const LevelRecord(starMask: 15);
     }
     p.dailyPrizes.claimed = 60;
     p.dailyPrizes.lastClaim = DateTime.utc(2026, 9, 30);
@@ -207,8 +209,44 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.byType(AchievementSheet), findsOneWidget);
-    expect(find.text('0 of 26 earned'), findsOneWidget);
+    expect(find.text('0 of 33 earned'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('the big menu button opens achievements; Modes is in the corner', (
+    tester,
+  ) async {
+    final p = PlayerProfile()..tutorialSeen = true;
+    await tester.pumpWidget(ArcadeApp(profile: p));
+    await tester.pump();
+    expect(find.byTooltip('Modes'), findsOneWidget);
+    expect(find.text('Arcade'), findsNothing);
+    await tester.tap(find.text('Achievements'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(AchievementSheet), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  test('outlasting bosses counts toward the boss achievements', () {
+    final game = BalanceGame(seed: 5)..start(gameMode: GameMode.infinite);
+    game.boss = InfiniteBoss(kind: BossKind.novaPulsar);
+    for (var i = 0; i < 29 * 120 && game.boss != null; i++) {
+      game.survival.shield = 99;
+      game.lives = 3;
+      game.step(1 / 120);
+    }
+    expect(game.boss, isNull);
+    expect(game.bossesCleared, 1);
+    final p = PlayerProfile();
+    game
+      ..phase = GamePhase.over
+      ..lives = 0;
+    p.recordResult(game);
+    expect(p.infiniteBestBosses, 1);
+    expect(p.achievementEarned(Achievement.boss1), isTrue);
+    expect(p.achievementProgress(Achievement.boss3), 1);
   });
 }

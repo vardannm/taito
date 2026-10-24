@@ -43,6 +43,7 @@ class ProgressBackup {
     'music': p.music,
     'haptics': p.haptics,
     'fastStart': p.infiniteFastStart,
+    'bestBosses': p.infiniteBestBosses,
     'achievements': p.claimedAchievements.map((a) => a.name).toList(),
     'tutorial': p.tutorialSeen,
     'onboarding':
@@ -122,6 +123,8 @@ class ProgressBackup {
     p.music = d['music'] != null ? flag('music') : p.sound;
     p.haloJoystick = d['haloJoystick'] != null ? flag('haloJoystick') : false;
     if (d['fastStart'] != null) p.infiniteFastStart = flag('fastStart');
+    // Older backups predate boss records; they restore as none outlasted.
+    if (d['bestBosses'] != null) p.infiniteBestBosses = integer(d['bestBosses'], 99);
     final upgrades = d['survivalUpgrades'];
     if (upgrades != null) {
       if (upgrades is! Map) invalid();
@@ -248,6 +251,7 @@ class ProgressBackup {
       ..infiniteBest = source.infiniteBest
       ..infiniteRuns = source.infiniteRuns
       ..infiniteBestScore = source.infiniteBestScore
+      ..infiniteBestBosses = source.infiniteBestBosses
       ..mergeBest = source.mergeBest
       ..mergeHighest = source.mergeHighest
       ..mergeRuns = source.mergeRuns

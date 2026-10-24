@@ -4,6 +4,7 @@ import 'game.dart';
 import 'infinite_painter.dart';
 import 'arena_canvas.dart';
 import 'ball_cosmetics.dart';
+import 'ball_world.dart';
 
 void paintSpiderBackdrop(Canvas c, BalanceGame game) {
   if (game.spiders.isEmpty) return;
@@ -56,7 +57,10 @@ void paintSpiderBackdrop(Canvas c, BalanceGame game) {
     if (center.dy + radius + 2 < game.visibleTop ||
         center.dy - radius - 2 > 560)
       continue;
-    final webInk = game.cosmetic == BallCosmetic.steel
+    // Dark Classic worlds get light webs, like the steel world always did.
+    final webInk =
+        game.cosmetic == BallCosmetic.steel ||
+            (!game.infinite && BallWorld.of(game.cosmetic).dark)
         ? const Color(0xFFCCE6E2)
         : game.infinite
         ? infiniteBoardInk(game, center)
@@ -113,8 +117,12 @@ void paintSpiders(Canvas c, BalanceGame game, bool reducedMotion) {
     final webInk = game.infinite
         ? infiniteBoardInk(game, Offset(spider.x, game.screenY(spider.y)))
         : null;
+    // A light spider on dark boards (Infinite's dark sections and dark
+    // Classic worlds), a dark one on light boards; never dark on dark.
     final lightSpider =
-        game.cosmetic == BallCosmetic.steel || webInk == Colors.white;
+        game.cosmetic == BallCosmetic.steel ||
+        webInk == Colors.white ||
+        (!game.infinite && BallWorld.of(game.cosmetic).dark);
     final color = lightSpider
         ? (spider.chasing ? const Color(0xFFFFB5A3) : const Color(0xFFF5EFDC))
         : spider.chasing
@@ -140,6 +148,14 @@ void paintSpiders(Canvas c, BalanceGame game, bool reducedMotion) {
         );
       }
     }
+    // A thin contrasting rim keeps the body readable over any scenery.
+    final rim = Paint()
+      ..color = (lightSpider ? const Color(0xFF10201C) : Colors.white)
+          .withAlpha(150)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+    c.drawOval(const Rect.fromLTWH(-9, -5, 12, 10), rim);
+    c.drawCircle(const Offset(4, 0), 4, rim);
     c.drawOval(const Rect.fromLTWH(-9, -5, 12, 10), Paint()..color = color);
     c.drawCircle(const Offset(4, 0), 4, Paint()..color = color);
     for (final y in [-1.5, 1.5]) {

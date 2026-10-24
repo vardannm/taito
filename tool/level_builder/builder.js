@@ -365,6 +365,16 @@
     for (let x = 10; x < 360; x += 10) {ctx.beginPath();ctx.moveTo(x, 20);ctx.lineTo(x, 540);ctx.stroke();}
     for (let y = 20; y < 550; y += 10) {ctx.beginPath();ctx.moveTo(10, y);ctx.lineTo(350, y);ctx.stroke();}
     ctx.strokeStyle = '#b7b291';ctx.lineWidth = 1;ctx.strokeRect(16, 16, 328, 528);
+    // Classic levels after 30 have deadly lasers along both side rails (BalanceGame.laserSideRails).
+    if (M.sideLasers(draft)) {
+      for (const x of [M.sideLaser.x, 360 - M.sideLaser.x]) {
+        ctx.fillStyle = 'rgba(227,67,54,.18)'; ctx.fillRect(x - 6, 20, 12, 520);
+        ctx.fillStyle = '#e34336'; ctx.fillRect(x - M.sideLaser.width / 2, 20, M.sideLaser.width, 520);
+        ctx.fillStyle = '#fff1d6'; ctx.fillRect(x - .5, 20, 1, 520);
+      }
+      ctx.save(); ctx.fillStyle = '#b74335'; ctx.font = 'bold 7px Segoe UI'; ctx.textAlign = 'left';
+      ctx.fillText('SIDE LASERS · 31+', 22, 12); ctx.restore();
+    }
     ctx.font = 'bold 8px Segoe UI';ctx.textAlign = 'center';ctx.fillStyle = '#7e866b';ctx.fillText('GILT  /  CLASSIC', 180, 12);
     for (const [wave, w] of draft.hazards.entries()) for (const [index, p] of w.positions.entries()) {
       const q = movingPoint(w,p,$('animate').checked ? performance.now()/1000 : 0);

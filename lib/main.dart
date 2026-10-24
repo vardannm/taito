@@ -2447,11 +2447,12 @@ class _GameScreenState extends State<GameScreen>
     if (tutorialActive) return tutorialSelectionHeader(page);
     return Row(
       children: [
+        // Modes are also one swipe away in the carousel, so the full mode
+        // list sits in the quiet corner and Achievements gets the big button.
         MenuQuietButton(
-          icon: Icons.emoji_events_outlined,
-          tooltip: 'Achievements',
-          badge: profile.achievementsReady > 0,
-          onPressed: carouselMoving ? null : showAchievements,
+          icon: Icons.grid_view_rounded,
+          tooltip: 'Modes',
+          onPressed: carouselMoving ? null : showModes,
         ),
         MenuQuietButton(
           icon: Icons.redeem_outlined,
@@ -2654,10 +2655,13 @@ class _GameScreenState extends State<GameScreen>
                   const SizedBox(width: 12),
                   Expanded(
                     child: MenuActionButton(
-                      label: 'Arcade',
-                      icon: Icons.grid_view_rounded,
-                      tooltip: 'Modes',
-                      onPressed: carouselMoving ? null : showModes,
+                      label: 'Achievements',
+                      icon: Icons.emoji_events_outlined,
+                      tooltip: 'Achievements',
+                      upgradeAvailable: profile.achievementsReady > 0,
+                      hintLabel: 'Achievement rewards ready',
+                      hintKey: 'achievement-ready-hint',
+                      onPressed: carouselMoving ? null : showAchievements,
                     ),
                   ),
                 ],

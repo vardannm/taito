@@ -28,6 +28,7 @@ void main() {
         BossKind.eclipseSeraph => [4.5, 10.8, 11.7, 18.5, 20.4],
         BossKind.prismReaver => [3.2, 4.5, 12.0, 18.5, 20.4],
         BossKind.venomCrown => [3.0, 5.8, 13.4, 19.0, 23.8],
+        BossKind.novaPulsar => [3.2, 5.6, 12.6, 16.4, 21.5],
       };
       final labels = switch (kind) {
         BossKind.skyWarden => [
@@ -65,6 +66,13 @@ void main() {
           'GAUNTLET WARNING',
           'TOXIC GAUNTLET',
         ],
+        BossKind.novaPulsar => [
+          'RING WARNING',
+          'NOVA RINGS',
+          'DASHED RAILS',
+          'RAIL CORRIDOR',
+          'NOVA LANCE',
+        ],
       };
       final recorder = ui.PictureRecorder();
       final canvas = Canvas(recorder);
@@ -75,7 +83,7 @@ void main() {
           game.board.clear();
           game.coins.clear();
           game.survival.items.clear();
-          game.score = kind.minimumScore;
+          game.score = bossScoreWindows.first.$1;
           if (row == 1) {
             game.survival.combo = 10;
             game.survival.visualCombo = 1;
@@ -124,6 +132,7 @@ void main() {
           BossKind.eclipseSeraph => 'artifacts/infinite-seraph.png',
           BossKind.prismReaver => 'artifacts/infinite-reaver.png',
           BossKind.venomCrown => 'artifacts/infinite-venom-crown.png',
+          BossKind.novaPulsar => 'artifacts/infinite-nova-pulsar.png',
         }).writeAsBytes(bytes!.buffer.asUint8List());
       });
       image.dispose();

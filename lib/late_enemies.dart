@@ -230,6 +230,56 @@ class LateEnemyEncounter {
 /// An analytic path with timed activation. Collision splits a rebound at its
 /// exact wall time and samples curves at <= 1/120s, sweeping each segment.
 /// Pending and expired fractions never damage the ball, even on a long frame.
+/// Lit stretches along a laser beam: [length]-long dashes with [gap]
+/// openings, sliding [speed] units a second from the beam's start toward its
+/// end (negative: back toward the start). Only lit dashes hurt.
+class LaserDashes {
+  const LaserDashes({required this.length, required this.gap, this.speed = 0});
+  final double length, gap, speed;
+
+  /// Lit stretches, as distances from the beam start, clipped to the beam.
+  List<(double, double)> segments(double beamLength, double time) {
+    final cycle = length + math.max(0.0, gap);
+    final shift = (speed * time) % cycle;
+    return [
+      for (var a = shift - cycle; a < beamLength; a += cycle)
+        if (math.min(beamLength, a + length) > math.max(0.0, a))
+          (math.max(0.0, a), math.min(beamLength, a + length)),
+    ];
+  }
+
+  /// Whether a point [along] the beam touches a dash, with [reach] of slack.
+  bool covers(double along, double beamLength, double time, double reach) =>
+      segments(beamLength, time).any(
+        (s) => along >= s.$1 - reach && along <= s.$2 + reach,
+      );
+}
+
+/// A laser ring that grows from a fixed center at [speed] units a second,
+/// open where its [gaps] are: (start angle, width) in radians, measured
+/// clockwise from the right on screen, turning [spin] radians a second.
+class LaserRing {
+  const LaserRing({
+    required this.startRadius,
+    required this.speed,
+    required this.gaps,
+    this.spin = 0,
+  });
+  final double startRadius, speed, spin;
+  final List<(double, double)> gaps;
+  double radiusAt(double time) => startRadius + speed * math.max(0.0, time);
+
+  /// Whether [angle] on the ring is open, keeping [reach] radians of slack
+  /// at each edge so the ball's whole body fits through.
+  bool open(double angle, double time, double reach) {
+    for (final (start, width) in gaps) {
+      final a = (angle - start - spin * time) % (math.pi * 2);
+      if (a >= reach && a <= width - reach) return true;
+    }
+    return false;
+  }
+}
+
 class LateEnemyShot {
   double arenaStretch = 1;
   LateEnemyShot({
@@ -250,6 +300,8 @@ class LateEnemyShot {
     this.pathPhase = 0,
     this.pathMix = 0,
     this.spin = 0,
+    this.dashes,
+    this.ring,
   }) : age = -delay,
        _previousAge = -delay;
 
@@ -263,6 +315,12 @@ class LateEnemyShot {
   final EnemyBeam Function(double time)? beamPath;
   final EnemyPoint Function(double time)? positionPath;
   final double pathFrequency, pathPhase, pathMix, spin;
+
+  /// Laser only: lit dashes along the beam instead of a solid line.
+  final LaserDashes? dashes;
+
+  /// Laser only: a growing ring around [origin] instead of a straight beam.
+  final LaserRing? ring;
   EnemyBeam beamAt(double time) =>
       beamPath?.call(time) ?? (start: origin, end: beamEnd ?? origin);
   EnemyBeam get beam => beamAt(age.clamp(-delay, life));
@@ -347,7 +405,8 @@ class LateEnemyShot {
     final start = math.max(0.0, _previousAge), end = math.min(life, age);
     if (end <= start) return null;
     if (kind == LateShotKind.laser) {
-      if (beamPath != null)
+      if (ring != null) return _ringContact(ax, ay, bx, by, start, end);
+      if (beamPath != null || dashes != null)
         return _movingBeamContact(ax, ay, bx, by, start, end);
       final from = (start - _previousAge) / _dt;
       final until = (end - _previousAge) / _dt;
@@ -436,7 +495,59 @@ class LateEnemyShot {
         segment: middle,
         padding: padding,
       );
-      if (t != null) return from + t * (until - from);
+      if (t == null) continue;
+      final hit = from + t * (until - from);
+      final pattern = dashes;
+      if (pattern != null) {
+        // A dashed beam only hurts where a dash is lit at that moment.
+        final x = ax + (bx - ax) * hit, y = ay + (by - ay) * hit;
+        final dx = (middle.end.x - middle.start.x) * arenaStretch;
+        final dy = middle.end.y - middle.start.y;
+        final length = math.sqrt(dx * dx + dy * dy);
+        final along = length < 1e-9
+            ? 0.0
+            : ((x - middle.start.x) * arenaStretch * dx +
+                      (y - middle.start.y) * dy) /
+                  length;
+        if (!pattern.covers(along, length, (a + b) / 2, 7 + radius + padding)) {
+          continue;
+        }
+      }
+      return hit;
+    }
+    return null;
+  }
+
+  /// Sweeps the ball against the growing ring in short slices: a hit is the
+  /// ball's body meeting or crossing the lit band outside the open gaps.
+  double? _ringContact(
+    double ax,
+    double ay,
+    double bx,
+    double by,
+    double start,
+    double end,
+  ) {
+    final shape = ring!;
+    final band = 7 + radius;
+    double offset(double x, double y, double time) =>
+        math.sqrt(
+          math.pow((x - origin.x) * arenaStretch, 2) + math.pow(y - origin.y, 2),
+        ) -
+        shape.radiusAt(time);
+    final count = math.max(1, ((end - start) * 240).ceil());
+    for (var i = 0; i < count; i++) {
+      final a = start + (end - start) * i / count;
+      final b = start + (end - start) * (i + 1) / count;
+      final from = (a - _previousAge) / _dt, until = (b - _previousAge) / _dt;
+      final x0 = ax + (bx - ax) * from, y0 = ay + (by - ay) * from;
+      final x1 = ax + (bx - ax) * until, y1 = ay + (by - ay) * until;
+      final before = offset(x0, y0, a), after = offset(x1, y1, b);
+      if (after.abs() > band && before.sign == after.sign) continue;
+      final angle = math.atan2(y1 - origin.y, (x1 - origin.x) * arenaStretch);
+      final r = math.max(1.0, shape.radiusAt(b));
+      if (shape.open(angle, b, band / r)) continue;
+      return until;
     }
     return null;
   }

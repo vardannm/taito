@@ -16,6 +16,24 @@ Offset _point(EnemyPoint point) => Offset(point.x, point.y);
 const toxicLime = Color(0xFFB6FF19), toxicYellow = Color(0xFFEFFF35);
 const toxicMagenta = Color(0xFFFF3ABF);
 const colossusShotViolet = Color(0xFF6418A6), colossusShotPink = Color(0xFFFF3ABF);
+const novaCyan = Color(0xFF6FF2FF), novaViolet = Color(0xFF9B5CFF);
+
+/// Lit arcs of a [LaserRing] at [time], as (start angle, sweep) pairs.
+List<(double, double)> _ringArcs(LaserRing ring, double time) {
+  final gaps = [
+    for (final (start, width) in ring.gaps)
+      ((start + ring.spin * time) % (math.pi * 2), width),
+  ]..sort((a, b) => a.$1.compareTo(b.$1));
+  return [
+    for (var i = 0; i < gaps.length; i++)
+      (
+        gaps[i].$1 + gaps[i].$2,
+        (i + 1 < gaps.length ? gaps[i + 1].$1 : gaps.first.$1 + math.pi * 2) -
+            gaps[i].$1 -
+            gaps[i].$2,
+      ),
+  ];
+}
 
 /// Shared shot geometry keeps the aim warnings, pools and laser hitboxes in
 /// agreement. Bullets are batched; the encounter uses no blur or saveLayer.
@@ -26,14 +44,19 @@ void paintInfiniteBoss(Canvas canvas, BalanceGame game, bool reducedMotion) {
   final seraph = boss.kind == BossKind.eclipseSeraph;
   final prism = boss.kind == BossKind.prismReaver;
   final venom = boss.kind == BossKind.venomCrown;
-  final amber = venom
+  final nova = boss.kind == BossKind.novaPulsar;
+  final amber = nova
+      ? novaCyan
+      : venom
       ? toxicLime
       : prism
       ? const Color(0xFF70F3D4)
       : storm
       ? const Color(0xFF51D6E7)
       : const Color(0xFFFFB543);
-  final hot = venom
+  final hot = nova
+      ? novaViolet
+      : venom
       ? toxicMagenta
       : prism
       ? const Color(0xFFF884D4)
@@ -217,6 +240,66 @@ void paintInfiniteBoss(Canvas canvas, BalanceGame game, bool reducedMotion) {
       canvas.drawPath(blade, _outline(ink, 4));
       canvas.drawPath(blade, Paint()..color = colossusShotViolet);
       canvas.drawPath(blade, _outline(colossusShotPink, 1.5));
+    } else if (shot.kind == LateShotKind.laser && shot.ring != null) {
+      final ring = shot.ring!;
+      final center = _point(shot.origin);
+      if (shot.age < 0) {
+        // Charging: a tight pulsing ring at the core, and a dashed ray along
+        // every opening so the player can move into line before it grows.
+        final progress = (1 + shot.age / InfiniteBoss.laserWarning).clamp(
+          0.0,
+          1.0,
+        );
+        canvas.drawCircle(
+          center,
+          ring.startRadius + 4 * progress,
+          _outline(hot.withAlpha((90 + 120 * progress).round()), 2),
+        );
+        final rays = Path();
+        for (final (start, width) in ring.gaps) {
+          final mid = start + width / 2;
+          final direction = Offset(math.cos(mid), math.sin(mid));
+          for (var d = ring.startRadius + 8; d < 520; d += 16) {
+            final a = center + direction * d, b = center + direction * (d + 7);
+            rays.moveTo(a.dx, a.dy);
+            rays.lineTo(b.dx, b.dy);
+          }
+        }
+        canvas.drawPath(rays, _outline(amber.withAlpha(170), 1.5));
+      } else if (shot.visible) {
+        final radius = ring.radiusAt(shot.age);
+        final rect = Rect.fromCircle(center: center, radius: radius);
+        for (final (start, sweep) in _ringArcs(ring, shot.age)) {
+          canvas.drawArc(rect, start, sweep, false, _outline(ink, 12));
+          canvas.drawArc(rect, start, sweep, false, _outline(hot, 8));
+          canvas.drawArc(rect, start, sweep, false, _outline(pale, 2.5));
+        }
+      }
+    } else if (shot.kind == LateShotKind.laser && shot.dashes != null) {
+      final pattern = shot.dashes!;
+      final beam = shot.beam;
+      final start = _point(beam.start), end = _point(beam.end);
+      final delta = end - start;
+      final length = delta.distance;
+      Offset along(double d) =>
+          length < 1e-9 ? start : start + delta * (d / length);
+      final segments = pattern.segments(length, math.max(0, shot.age));
+      if (shot.age < 0) {
+        // Outlined capsules show exactly where the dashes and gaps will be.
+        for (final (a, b) in segments) {
+          canvas.drawLine(along(a), along(b), _outline(hot.withAlpha(150), 7));
+          canvas.drawLine(along(a), along(b), _outline(shell, 4));
+        }
+        final destination = _point(shot.beamAt(shot.life).start);
+        canvas.drawLine(start, destination, _outline(amber.withAlpha(150), 1.5));
+        canvas.drawCircle(destination, 4, _outline(amber, 1.5));
+      } else if (shot.visible) {
+        for (final (a, b) in segments) {
+          canvas.drawLine(along(a), along(b), _outline(ink, 12));
+          canvas.drawLine(along(a), along(b), _outline(hot, shot.radius * 2));
+          canvas.drawLine(along(a), along(b), _outline(pale, 2.5));
+        }
+      }
     } else if (shot.kind == LateShotKind.laser) {
       final beam = shot.beam;
       final start = _point(beam.start), end = _point(beam.end);
@@ -343,6 +426,12 @@ void paintInfiniteBoss(Canvas canvas, BalanceGame game, bool reducedMotion) {
 
   canvas.save();
   canvas.translate(position.dx, position.dy);
+  if (nova) {
+    _paintNova(canvas, boss, reducedMotion, ink);
+    canvas.restore();
+    canvas.restore();
+    return;
+  }
   if (venom) {
     _paintVenom(canvas, boss, reducedMotion, ink);
     canvas.restore();
@@ -644,6 +733,68 @@ void _paintVenom(
     const Offset(-9, 31),
     const Offset(9, 31),
     _outline(toxicLime, 2),
+  );
+}
+
+/// A pulsar: a white-hot core inside two tilted orbit rings that spin
+/// opposite ways, with emitter nodes that flare while an attack charges.
+void _paintNova(Canvas canvas, InfiniteBoss boss, bool reducedMotion, Color ink) {
+  const shell = Color(0xFF151A3A), pale = Color(0xFFF4FBFF);
+  final time = reducedMotion ? 0.0 : boss.age;
+  final charge = boss.charge, recoil = reducedMotion ? 0.0 : boss.recoil;
+  canvas.drawCircle(
+    const Offset(0, InfiniteBoss.novaCoreOffset),
+    44 + recoil * 6,
+    Paint()..color = novaViolet.withAlpha((30 + 50 * charge).round()),
+  );
+  for (final (tilt, speed) in [(.55, 1.0), (-.55, -1.3)]) {
+    canvas.save();
+    canvas.translate(0, InfiniteBoss.novaCoreOffset);
+    canvas.rotate(tilt + time * .25 * speed);
+    final orbit = Rect.fromCenter(center: Offset.zero, width: 92, height: 34);
+    canvas.drawOval(orbit, _outline(ink, 6));
+    canvas.drawOval(orbit, _outline(speed > 0 ? novaCyan : novaViolet, 2.5));
+    final node = Offset(
+      math.cos(time * 2.2 * speed) * 46,
+      math.sin(time * 2.2 * speed) * 17,
+    );
+    canvas.drawCircle(node, 5.5, Paint()..color = shell);
+    canvas.drawCircle(node, 3 + charge * 2, Paint()..color = novaCyan);
+    canvas.restore();
+  }
+  final body = Path();
+  for (var i = 0; i < 8; i++) {
+    final a = i * math.pi / 4 + math.pi / 8;
+    final r = i.isEven ? 30.0 : 24.0;
+    final p = Offset(math.cos(a) * r, math.sin(a) * r + InfiniteBoss.novaCoreOffset);
+    if (i == 0) {
+      body.moveTo(p.dx, p.dy);
+    } else {
+      body.lineTo(p.dx, p.dy);
+    }
+  }
+  body.close();
+  canvas.drawPath(body, _outline(ink, 5));
+  canvas.drawPath(body, Paint()..color = shell);
+  canvas.drawPath(body, _outline(novaViolet, 2));
+  canvas.drawCircle(
+    const Offset(0, InfiniteBoss.novaCoreOffset),
+    15 + charge * 4,
+    Paint()
+      ..shader = const RadialGradient(
+        colors: [pale, novaCyan, novaViolet],
+        stops: [0, .45, 1],
+      ).createShader(
+        Rect.fromCircle(
+          center: const Offset(0, InfiniteBoss.novaCoreOffset),
+          radius: 19,
+        ),
+      ),
+  );
+  canvas.drawCircle(
+    const Offset(0, InfiniteBoss.novaCoreOffset),
+    5,
+    Paint()..color = pale,
   );
 }
 

@@ -139,6 +139,12 @@ void main() {
           EnemyCue.ricochet: 3,
         },
         BossKind.venomCrown => {EnemyCue.seraphArrival: 1, EnemyCue.bullet: 17},
+        // Six rings, two pairs of rails (one cue per pair) and one lance.
+        BossKind.novaPulsar => {
+          EnemyCue.wardenArrival: 1,
+          EnemyCue.laserCharge: 9,
+          EnemyCue.laserFire: 9,
+        },
       });
     });
   }

@@ -65,6 +65,9 @@ class PlayerProfile {
   late final SharedPreferencesAsync storage = SharedPreferencesAsync();
   int best = 0, runs = 0;
   int infiniteBest = 0, infiniteRuns = 0, infiniteBestScore = 0;
+
+  /// Most bosses outlasted in one Infinite run.
+  int infiniteBestBosses = 0;
   bool infiniteFastStart = true;
 
   void applyInfiniteStart(BalanceGame game, {bool tutorial = false}) {
@@ -127,11 +130,19 @@ class PlayerProfile {
       Achievement.distance1000 ||
       Achievement.distance2500 ||
       Achievement.distance5000 => infiniteBest,
-      Achievement.score10000 || Achievement.score25000 => infiniteBestScore,
+      Achievement.score10000 ||
+      Achievement.score25000 ||
+      Achievement.score100000 ||
+      Achievement.score500000 ||
+      Achievement.score1000000 => infiniteBestScore,
+      Achievement.boss1 ||
+      Achievement.boss3 ||
+      Achievement.boss6 => infiniteBestBosses,
       Achievement.stars12 ||
       Achievement.stars30 ||
       Achievement.stars60 ||
-      Achievement.stars120 => totalStars,
+      Achievement.stars120 ||
+      Achievement.stars200 => totalStars,
       Achievement.merge128 ||
       Achievement.merge256 ||
       Achievement.merge512 ||
@@ -303,6 +314,7 @@ class PlayerProfile {
       'bestScore': infiniteBestScore > _pendingBestScore
           ? infiniteBestScore
           : _pendingBestScore,
+      'bestBosses': infiniteBestBosses,
       'platforms': ownedPlatforms.map((p) => p.name).toList(),
       'platform': selectedPlatform.name,
     });
@@ -340,6 +352,8 @@ class PlayerProfile {
         wallet = (data['wallet'] as int).clamp(0, 1 << 30);
       if (data['bestScore'] is int)
         infiniteBestScore = (data['bestScore'] as int).clamp(0, 1 << 30);
+      if (data['bestBosses'] is int)
+        infiniteBestBosses = (data['bestBosses'] as int).clamp(0, 99);
       final platforms = data['platforms'];
       if (platforms is List)
         ownedPlatforms.addAll(
@@ -580,6 +594,10 @@ class PlayerProfile {
       final improved = game.score > infiniteBestScore;
       if (improved) infiniteBestScore = game.score;
       if (game.metres > infiniteBest) infiniteBest = game.metres;
+      if (game.bossesCleared > infiniteBestBosses) {
+        infiniteBestBosses = game.bossesCleared;
+        unawaited(saveEconomy());
+      }
       return improved;
     }
     final records = game.daily ? dailyRecords : levelRecords;

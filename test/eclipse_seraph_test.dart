@@ -183,7 +183,7 @@ void main() {
     for (final kind in BossKind.values) {
       final boss = InfiniteBoss(kind: kind);
       boss.step(
-        kind == BossKind.prismReaver
+        kind == BossKind.prismReaver || kind == BossKind.novaPulsar
             ? 3.7
             : kind == BossKind.venomCrown
             ? 3.5

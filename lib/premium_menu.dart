@@ -862,11 +862,16 @@ class MenuActionButton extends StatelessWidget {
     required this.tooltip,
     required this.onPressed,
     this.upgradeAvailable = false,
+    this.hintLabel = 'Upgrade available in Shop',
+    this.hintKey = 'shop-upgrade-hint',
   });
   final String label, tooltip;
   final IconData icon;
   final VoidCallback? onPressed;
   final bool upgradeAvailable;
+
+  /// What the gold dot announces to screen readers, and its test key.
+  final String hintLabel, hintKey;
   @override
   Widget build(BuildContext context) => Tooltip(
     message: tooltip,
@@ -887,7 +892,13 @@ class MenuActionButton extends StatelessWidget {
           ),
         ),
         onPressed: onPressed,
-        icon: ShopHintIcon(icon, size: 26, available: upgradeAvailable),
+        icon: ShopHintIcon(
+          icon,
+          size: 26,
+          available: upgradeAvailable,
+          hintLabel: hintLabel,
+          hintKey: hintKey,
+        ),
         label: FittedBox(fit: BoxFit.scaleDown, child: Text(label)),
       ),
     ),
@@ -902,17 +913,20 @@ class ShopHintIcon extends StatelessWidget {
     required this.size,
     this.available = false,
     this.color,
+    this.hintLabel = 'Upgrade available in Shop',
+    this.hintKey = 'shop-upgrade-hint',
   });
   final IconData icon;
   final double size;
   final bool available;
   final Color? color;
+  final String hintLabel, hintKey;
 
   @override
   Widget build(BuildContext context) => Semantics(
-    label: available ? 'Upgrade available in Shop' : null,
+    label: available ? hintLabel : null,
     child: Badge(
-      key: available ? const ValueKey('shop-upgrade-hint') : null,
+      key: available ? ValueKey(hintKey) : null,
       isLabelVisible: available,
       backgroundColor: menuGold,
       smallSize: 8,

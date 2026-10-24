@@ -36,6 +36,9 @@ tool is not compiled into the player app. No Firebase account is used here.
   Set a laser wave's **Beam** to *Dashed* for lit dashes with gaps the ball
   can slip through (gaps over 14); **Dash speed** slides them along the beam.
   Original sway preserves older levels. Spider coordinates are patrol centers.
+- Levels 31 and up have deadly lasers on both side rails in the game; the
+  board draws them in red, and Level check warns about a target that can only
+  be reached by brushing a side laser.
 - Add briefing text and timing under **Briefing & timing**.
 - Click any **Level check** message to select what it is about (it flashes on
   the board). Click it again to step to the next object it mentions.

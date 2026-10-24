@@ -5,6 +5,29 @@ import 'package:balance_arcade/late_enemies.dart';
 import 'infinite_boss_test.dart' show advance, run;
 
 void main() {
+  test('the six slots use the set windows and any boss can fill any slot', () {
+    expect(bossScoreWindows, [
+      (70000, 110000),
+      (220000, 250000),
+      (450000, 520000),
+      (700000, 780000),
+      (1000000, 1100000),
+      (1300000, 1400000),
+    ]);
+    final bySlot = List.generate(6, (_) => <BossKind>{});
+    for (var seed = 0; seed < 300; seed++) {
+      final game = BalanceGame(seed: seed)..start(gameMode: GameMode.infinite);
+      expect(game.bossOrder.toSet(), BossKind.values.toSet());
+      for (final (slot, kind) in game.bossOrder.indexed) {
+        bySlot[slot].add(kind);
+      }
+    }
+    // Venom Crown can open a run, Sky Warden can close it, and so on.
+    for (final kinds in bySlot) {
+      expect(kinds, BossKind.values.toSet());
+    }
+  });
+
   test(
     'seeded windows vary between runs and stay fixed on pause and revive',
     () {
@@ -18,11 +41,8 @@ void main() {
         expect(a.bossOrder, b.bossOrder);
         expect(a.bossOrder.toSet(), BossKind.values.toSet());
         orders.add(a.bossOrder.join(','));
-        for (final kind in BossKind.values) {
-          expect(
-            a.bossScoreThresholds[kind.index],
-            inInclusiveRange(kind.minimumScore, kind.maximumScore),
-          );
+        for (final (slot, (low, high)) in bossScoreWindows.indexed) {
+          expect(a.bossScoreThresholds[slot], inInclusiveRange(low, high));
         }
         seen.add(a.bossScoreThresholds.join(','));
       }

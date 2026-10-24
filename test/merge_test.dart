@@ -554,7 +554,7 @@ void main() {
     run.step(.01, 180, 500, 180, 500);
     expect(run.gates.single.requiredValue, 16384);
   });
-  test('fresh score cannot bypass the three-second gate cooldown', () {
+  test('fresh score cannot bypass the gate cooldown', () {
     final run = emptyRun()..score = MergeRun.gateInterval;
     run.segments[0] = 8192;
     run.step(.01, 180, 500, 180, 500);
@@ -562,7 +562,8 @@ void main() {
     run.gates.single.y = 500;
     run.step(.01, 180, 500, 180, 500);
     run.score = run.nextGateScore;
-    for (var i = 0; i < 28; i++) {
+    final cooldownSteps = (MergeDifficulty.gateCooldownSeconds * 10).round();
+    for (var i = 0; i < cooldownSteps - 2; i++) {
       run.orbs.clear();
       run.step(.1, 180, 500, 180, 500);
     }
@@ -580,7 +581,7 @@ void main() {
     expect(MergeRun.gateValueForHead(65536, previous: 512), 65536);
     expect(MergeRun.gateValueForHead(2), 2);
     final fresh = emptyRun();
-    expect(fresh.nextGateScore, 900);
+    expect(fresh.nextGateScore, MergeRun.gateInterval);
     expect(fresh.lastGateValue, 0);
     expect(fresh.gateCooldown, 0);
   });

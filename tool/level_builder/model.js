@@ -38,6 +38,10 @@
     if (m.path === 'vertical') return {x: h.x, y: h.y + m.radiusY * Math.sin(a)};
     return {x: h.x + m.radiusX * Math.cos(a), y: h.y + (m.path === 'circle' ? m.radiusX : m.radiusY) * Math.sin(a)};
   }
+  // Classic levels after 30 have lasers on both side rails; the ball (radius 7)
+  // touches one once its center is within 30 of either edge (BalanceGame.sideLaserContactX).
+  const sideLaser = {x: 20, width: 6, contact: 30};
+  const sideLasers = d => d.number > 30;
   // Ball resting at the launch point, matching BalanceGame.launchHeight - ballRadius.
   const launch = {x: 180, y: 493};
   function blank(number = 51) {
@@ -158,6 +162,15 @@
     }
     if (d.firstHazardAfter < 0 || d.hazardInterval <= 0)
       err('First hazard delay must be nonnegative; repeat interval must be positive.', {type: 'field', id: d.firstHazardAfter < 0 ? 'firstHazardAfter' : 'hazardInterval'});
+    if (sideLasers(d)) {
+      for (const [i, h] of d.holes.entries()) {
+        if (!h.target) continue;
+        // Warn when the ball can only drop in by brushing within 3 units of the laser.
+        const reach = 8.5 * Math.min(h.size, h.pulse ? Math.min(h.pulse.minSize, h.pulse.maxSize) : h.size) + holeExtent(h.motion);
+        if (h.x - reach < sideLaser.contact + 3 || h.x + reach > 360 - sideLaser.contact - 3)
+          warn(`Target ${h.target} is very close to a side laser (level 31+).`, hole(i));
+      }
+    }
     if (d.hazards.length && !d.finaleTitle.trim()) warn('Add a briefing title and rule to introduce the hazards.', {type: 'field', id: 'finaleTitle'});
     const list = [...issues.values()];
     return {errors: list.filter(i => i.level === 'error').map(i => i.text), warnings: list.filter(i => i.level === 'warn').map(i => i.text), issues: list};
@@ -201,7 +214,7 @@
     lines.push('  ],', `  firstHazardAfter: ${num(d.firstHazardAfter)},`, `  hazardInterval: ${num(d.hazardInterval)},`, ');', '');
     return lines.join('\n');
   }
-  const api = {blank, clone, parseDraft, validate, exportDart, waveDefaults, dashDefaults, laserSegments, laserBottom, holeSize, holePaths, holeMotionDefaults, holeAt, rimRadius, holeRim, holePulseDefaults, holeSizeAt, largestSize};
+  const api = {sideLaser, sideLasers, blank, clone, parseDraft, validate, exportDart, waveDefaults, dashDefaults, laserSegments, laserBottom, holeSize, holePaths, holeMotionDefaults, holeAt, rimRadius, holeRim, holePulseDefaults, holeSizeAt, largestSize};
   if (typeof module !== 'undefined') module.exports = api;
   else root.LevelModel = api;
 })(globalThis);

@@ -120,6 +120,7 @@ extension InfiniteGameplay on BalanceGame {
       );
       message = active.hint;
       if (!active.expired) return;
+      bossesCleared++;
     }
     boss = null;
     _nextBossAt = elapsed + 60;

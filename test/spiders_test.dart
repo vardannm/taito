@@ -96,7 +96,7 @@ void main() {
     },
   );
   test(
-    'spider contact ends run once; capture preserves pursuit and replay resets it',
+    'spider contact costs one heart; capture preserves pursuit and replay resets it',
     () {
       final g = BalanceGame()..start(levelNumber: 31);
       final s = g.spiders.first;
@@ -110,18 +110,37 @@ void main() {
       expect(s.chasing, isTrue);
       expect(s.time, greaterThan(1.5));
       final score = g.score;
+      final hearts = g.lives;
+      final hunter = BoardSpider(g.ballX, g.ballY, 40);
       g.spiders
         ..clear()
-        ..add(BoardSpider(g.ballX, g.ballY, 40));
+        ..add(hunter);
       g.step(1 / 120);
-      expect(g.finished, isTrue);
-      expect(g.lives, 0);
+      // A catch costs one heart, like any other hazard, not the whole run.
+      expect(g.finished, isFalse);
+      expect(g.lives, hearts - 1);
+      expect(g.phase, GamePhase.sinking);
       expect(g.ballScale, 0);
       expect(g.score, score);
       expect(g.caughtBySpider, isTrue);
       final misses = g.misses;
-      advance(g, 2);
+      advance(g, .3);
+      expect(hunter.chasing, isFalse, reason: 'the catch calls off the chase');
+      advance(g, 1.7);
+      // The ball is back at the launch point.
       expect(g.misses, misses);
+      expect(g.phase, GamePhase.playing);
+      expect(g.caughtBySpider, isFalse);
+      expect(g.ballScale, 1);
+      // With one heart left, a catch ends the run.
+      g.lives = 1;
+      g.spiders
+        ..clear()
+        ..add(BoardSpider(g.ballX, g.ballY, 40));
+      g.step(1 / 120);
+      advance(g, 1);
+      expect(g.finished, isTrue);
+      expect(g.lives, 0);
       g.start(levelNumber: 31);
       expect(g.caughtBySpider, isFalse);
       expect(g.spiders.length, 1);
@@ -131,6 +150,31 @@ void main() {
       expect(g.spiders, isEmpty);
     },
   );
+  test('a lost heart calls off the chase and the spider walks home', () {
+    final g = BalanceGame()..start(levelNumber: 31);
+    final s = g.spiders.first;
+    // The spider is chasing when the ball falls into a hole somewhere else.
+    s.chasing = true;
+    s.x += 60;
+    g.board
+      ..clear()
+      ..add(Hole(g.ballX, g.ballY - 4));
+    g.step(1 / 120);
+    expect(g.phase, GamePhase.sinking);
+    g.board.clear();
+    advance(g, .3);
+    expect(s.chasing, isFalse);
+    expect(s.returning, isTrue);
+    // It walks back instead of jumping, then resumes its patrol ring.
+    advance(g, 3);
+    expect(s.returning, isFalse);
+    final ring = math.sqrt(
+      math.pow(s.x - s.homeX, 2) + math.pow(s.y - s.homeY, 2),
+    );
+    expect(ring, closeTo(12, .5));
+    expect(g.phase, GamePhase.playing);
+  });
+
   test('fast crossing cannot skip the spider body', () {
     final s = BoardSpider(180, 250, 40);
     expect(s.step(1 / 120, 100, 250, 260, 250), isTrue);

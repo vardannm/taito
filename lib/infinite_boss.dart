@@ -7,29 +7,29 @@ enum BossKind {
   eclipseSeraph,
   prismReaver,
   venomCrown,
+  novaPulsar,
 }
 
+/// Score windows for the 1st to 6th boss of a run. Each run picks one score
+/// inside every window; the bosses themselves are shuffled, so any of the
+/// six can fill any slot.
+const bossScoreWindows = [
+  (70000, 110000),
+  (220000, 250000),
+  (450000, 520000),
+  (700000, 780000),
+  (1000000, 1100000),
+  (1300000, 1400000),
+];
+
 extension BossKindDetails on BossKind {
-  int get minimumScore => switch (this) {
-    BossKind.skyWarden => 90000,
-    BossKind.stormColossus => 270000,
-    BossKind.eclipseSeraph => 550000,
-    BossKind.prismReaver => 850000,
-    BossKind.venomCrown => 1200000,
-  };
-  int get maximumScore => switch (this) {
-    BossKind.skyWarden => 120000,
-    BossKind.stormColossus => 330000,
-    BossKind.eclipseSeraph => 650000,
-    BossKind.prismReaver => 950000,
-    BossKind.venomCrown => 1350000,
-  };
   String get name => switch (this) {
     BossKind.skyWarden => 'SKY WARDEN',
     BossKind.stormColossus => 'STORM COLOSSUS',
     BossKind.eclipseSeraph => 'ECLIPSE SERAPH',
     BossKind.prismReaver => 'PRISM REAVER',
     BossKind.venomCrown => 'VENOM CROWN',
+    BossKind.novaPulsar => 'NOVA PULSAR',
   };
 }
 
@@ -50,6 +50,9 @@ enum BossPhase {
   toxicSlalom,
   toxicPulse,
   toxicGauntlet,
+  novaRings,
+  dashedRails,
+  novaLance,
   leaving,
 }
 
@@ -129,6 +132,7 @@ class InfiniteBoss {
           BossKind.eclipseSeraph => BossPhase.petals,
           BossKind.prismReaver => BossPhase.sweepingLaser,
           BossKind.venomCrown => BossPhase.toxicSlalom,
+          BossKind.novaPulsar => BossPhase.novaRings,
         }
       : age < 18
       ? switch (kind) {
@@ -137,6 +141,7 @@ class InfiniteBoss {
           BossKind.eclipseSeraph => BossPhase.curtains,
           BossKind.prismReaver => BossPhase.twinLasers,
           BossKind.venomCrown => BossPhase.toxicPulse,
+          BossKind.novaPulsar => BossPhase.dashedRails,
         }
       : age < 26
       ? switch (kind) {
@@ -145,6 +150,7 @@ class InfiniteBoss {
           BossKind.eclipseSeraph => BossPhase.comets,
           BossKind.prismReaver => BossPhase.rotors,
           BossKind.venomCrown => BossPhase.toxicGauntlet,
+          BossKind.novaPulsar => BossPhase.novaLance,
         }
       : BossPhase.leaving;
   bool get expired => age >= duration;
@@ -167,12 +173,18 @@ class InfiniteBoss {
     BossPhase.toxicPulse => 'BOSS · Watch the poison walls change speed',
     BossPhase.toxicGauntlet =>
       'BOSS · Stay inside the narrowing toxic corridor',
+    BossPhase.novaRings => 'BOSS · Meet each growing ring at an opening',
+    BossPhase.dashedRails =>
+      'BOSS · Slip through the gaps as the side lasers pass',
+    BossPhase.novaLance => 'BOSS · Cross the sweeping laser through its gaps',
     BossPhase.leaving => 'BOSS · Clear! Keep climbing',
   };
 
   EnemyPoint positionAt(double time) {
     final x = kind == BossKind.venomCrown
         ? 180 + math.sin(time * .65) * 35
+        : kind == BossKind.novaPulsar
+        ? 180 + math.sin(time * .55) * 28
         : kind == BossKind.prismReaver
         ? 180 + math.sin(time * 1.05) * 52 + math.sin(time * 1.83) * 16
         : time < 10
@@ -214,6 +226,8 @@ class InfiniteBoss {
         _seraphWeapons(before, target);
       } else if (kind == BossKind.prismReaver) {
         _prismWeapons(before, target);
+      } else if (kind == BossKind.novaPulsar) {
+        _novaWeapons(before, target);
       } else {
         _toxicWeapons(before, target);
       }
@@ -315,6 +329,127 @@ class InfiniteBoss {
       shot.step(dt, scrollDistance: scrollDistance);
     }
   }
+
+  /// Nova Pulsar: growing rings with turning openings, then dashed side
+  /// lasers that cross the board, then one sweeping dashed lance. Every gap
+  /// is wider than the ball plus the beam, and every attack is marked first.
+  void _novaWeapons(double before, EnemyPoint target) {
+    void ring(double at, int gaps, double width, double speed, double spin) {
+      _lastVolleyAt = at + laserWarning;
+      final body = positionAt(at);
+      // The first opening always faces down toward the player's side of the
+      // board; the others are spread evenly around the ring.
+      final first = math.pi * (.35 + _random.nextDouble() * .3);
+      shots.add(
+        LateEnemyShot(
+          kind: LateShotKind.laser,
+          origin: (x: body.x, y: body.y + novaCoreOffset),
+          velocity: (x: 0, y: 0),
+          delay: at - before + laserWarning,
+          life: novaRingLife,
+          radiusOverride: 4,
+          ring: LaserRing(
+            startRadius: novaRingStart,
+            speed: speed,
+            spin: spin,
+            gaps: [
+              for (var i = 0; i < gaps; i++)
+                (first + i * math.pi * 2 / gaps - width / 2, width),
+            ],
+          ),
+          reasonOverride: 'Nova ring. Meet it at one of its openings.',
+        ),
+      );
+    }
+
+    void lance(
+      double at,
+      double life,
+      EnemyPoint Function(double time) at0,
+      LaserDashes dashes,
+      String reason,
+    ) {
+      _lastVolleyAt = at + laserWarning;
+      EnemyBeam path(double time) {
+        final p = at0(time);
+        return (start: p, end: (x: p.x, y: 537.0));
+      }
+
+      final first = path(0);
+      shots.add(
+        LateEnemyShot(
+          kind: LateShotKind.laser,
+          origin: first.start,
+          velocity: (x: 0, y: 0),
+          delay: at - before + laserWarning,
+          life: life,
+          beamEnd: first.end,
+          beamPath: path,
+          radiusOverride: 4,
+          dashes: dashes,
+          reasonOverride: reason,
+        ),
+      );
+    }
+
+    final beamTop = top + 150;
+    // Phase 1: four rings, 1.5 seconds (about 160 units) apart.
+    while (_bulletWave < 4 && age >= 2.6 + _bulletWave * 1.5) {
+      final wave = _bulletWave++;
+      ring(
+        2.6 + wave * 1.5,
+        wave < 2 ? 3 : 2,
+        .36,
+        105,
+        wave.isEven ? .22 : -.22,
+      );
+    }
+    // Phase 2: two dashed side lasers. First they cross the whole board in
+    // opposite directions, then they slide together as a moving corridor.
+    while (_laserWave < 2 && age >= 10 + _laserWave * 4.2) {
+      final wave = _laserWave++;
+      final at = 10 + wave * 4.2;
+      for (final side in [-1.0, 1.0]) {
+        lance(
+          at,
+          wave == 0 ? 3.0 : 2.6,
+          wave == 0
+              ? (t) => (
+                  x: 180 + side * 136 * math.cos(math.pi * t / 3),
+                  y: beamTop,
+                )
+              : (t) => (
+                  x: 180 + side * 60 + 70 * math.sin(math.pi * 2 * t / 2.6),
+                  y: beamTop,
+                ),
+          LaserDashes(length: 62, gap: 54, speed: side * -45),
+          'Nova rail. Slip through a gap as it passes.',
+        );
+      }
+    }
+    // Phase 3: one dashed lance sweeps the full width, starting on the side
+    // away from the player, while two more rings pulse through it.
+    if (_poolWave == 0 && age >= 18) {
+      _poolWave++;
+      final phase = target.x < 180 ? math.pi / 2 : -math.pi / 2;
+      lance(
+        18,
+        6.5,
+        (t) => (
+          x: 180 + 138 * math.sin(math.pi * 2 * t / 3.4 + phase),
+          y: beamTop,
+        ),
+        const LaserDashes(length: 70, gap: 52, speed: 90),
+        'Nova lance. Cross it through a gap.',
+      );
+    }
+    while (_poolWave >= 1 && _poolWave < 3 && age >= 19.6 + (_poolWave - 1) * 3) {
+      final wave = _poolWave++;
+      ring(19.6 + (wave - 1) * 3, 3, .38, 85, wave.isEven ? .18 : -.18);
+    }
+  }
+
+  static const novaCoreOffset = 6.0, novaRingStart = 30.0, novaRingLife = 5.0;
 
   void _toxicWeapons(double before, EnemyPoint target) {
     if (_toxicAnchor == null && age >= 2.6) {

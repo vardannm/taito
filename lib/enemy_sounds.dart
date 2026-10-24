@@ -139,6 +139,7 @@ class EnemySoundDirector {
         BossKind.eclipseSeraph => EnemyCue.seraphArrival,
         BossKind.prismReaver => EnemyCue.colossusArrival,
         BossKind.venomCrown => EnemyCue.seraphArrival,
+        BossKind.novaPulsar => EnemyCue.wardenArrival,
       });
       shots(boss.shots, boss.kind);
     }

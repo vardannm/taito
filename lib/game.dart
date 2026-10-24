@@ -437,14 +437,13 @@ class BalanceGame {
   InfiniteBoss? boss;
   bool bossesEnabled = true;
   int bossesEncountered = 0;
+
+  /// Bosses outlasted in this run (a fight that ends without losing the run).
+  int bossesCleared = 0;
   List<BossKind> _bossOrder = List.unmodifiable(BossKind.values);
   List<BossKind> get bossOrder => _bossOrder;
-  List<int> _bossScoreThresholds = const [
-    100000,
-    300000,
-    600000,
-    900000,
-    1275000,
+  List<int> _bossScoreThresholds = [
+    for (final (low, high) in bossScoreWindows) (low + high) ~/ 2,
   ];
   List<int> get bossScoreThresholds => _bossScoreThresholds;
   double _nextBossAt = 0;
@@ -897,9 +896,8 @@ class BalanceGame {
     );
     _bossScoreThresholds = List.unmodifiable([
       // Score windows belong to encounter slots, independently of boss order.
-      for (final kind in BossKind.values)
-        kind.minimumScore +
-            bossRandom.nextInt(kind.maximumScore - kind.minimumScore + 1),
+      for (final (low, high) in bossScoreWindows)
+        low + bossRandom.nextInt(high - low + 1),
     ]);
   }
 
@@ -1010,6 +1008,8 @@ class BalanceGame {
   }
 
   void resetBall() {
+    // A ball the spider caught reappears at the launch point.
+    caughtBySpider = false;
     ballTrail.clear();
     motionSpeed = 0;
     left = right = infinite ? infiniteStart : launchHeight;
@@ -1100,7 +1100,7 @@ class BalanceGame {
     snakes.clear();
     lateEnemy = null;
     boss = null;
-    bossesEncountered = 0;
+    bossesEncountered = bossesCleared = 0;
     _nextBossAt = 0;
     _lastDamageAt = double.negativeInfinity;
     _bossWarningAt = null;
@@ -1290,10 +1290,20 @@ class BalanceGame {
       _classicSceneTime += dt;
       _moveHoles(dt);
       if (phase == GamePhase.sinking || phase == GamePhase.returning) {
-        // The ball is hidden, but the level's patrols, chases and hazard cycle
-        // keep advancing. Pause still freezes everything at the top of _tick.
+        // The ball is hidden, but the level's patrols and hazard cycle keep
+        // advancing. Pause still freezes everything at the top of _tick. A
+        // lost heart calls off every chase: spiders walk back to patrol and
+        // cannot notice the hidden ball until it is back in play.
         for (final spider in spiders) {
-          spider.step(dt, captureX, captureY, captureX, captureY);
+          if (!lastSuccess) spider.calm();
+          spider.step(
+            dt,
+            captureX,
+            captureY,
+            captureX,
+            captureY,
+            noticing: false,
+          );
         }
         if (finale) _updateFinale(dt, captureX, captureY, canDamage: false);
       }
@@ -1632,15 +1642,22 @@ class BalanceGame {
         continue;
       }
       if (!hit) continue;
-      lives = 0;
+      // Like any other hazard, a catch costs one heart; the ball vanishes
+      // into the spider, then returns to the launch point if hearts remain.
+      if (!practice) lives--;
       misses++;
       streak = 0;
       lastSuccess = false;
       caughtBySpider = true;
-      message = 'Caught by a spider. Stay outside its territory.';
+      captureX = ballX;
+      captureY = ballY;
+      message = lives > 0
+          ? 'Caught by a spider. Stay outside its territory.'
+          : 'Caught by a spider. One more run?';
       event = GameEvent.miss;
-      phase = GamePhase.over;
-      velocity = 0;
+      phase = GamePhase.sinking;
+      phaseTime = 0;
+      velocity = leftSpeed = rightSpeed = 0;
       clearInput();
       return true;
     }

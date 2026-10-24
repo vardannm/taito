@@ -349,10 +349,19 @@ The simulation is in `lib/late_enemies.dart` and vector art in
 `lib/late_enemy_painter.dart`. Render the warning/attack gallery with
 `scripts/flutter.ps1 test tool/render_late_enemies.dart`.
 
-Infinite shuffles all five second-tier bosses once per run, with no repeats.
-The five encounter score windows remain 90,000–120,000, 270,000–330,000,
-550,000–650,000, 850,000–950,000 and 1,200,000–1,350,000 points; any boss can
-occupy any slot. Pause and revive preserve the chosen order.
+Infinite shuffles all six second-tier bosses once per run, with no repeats.
+The six encounter score windows are 70,000–110,000, 220,000–250,000,
+450,000–520,000, 700,000–780,000, 1,000,000–1,100,000 and
+1,300,000–1,400,000 points (`bossScoreWindows` in `lib/infinite_boss.dart`);
+any boss can occupy any slot.
+
+Nova Pulsar is the laser boss. Nova rings grow from its core with two or three
+turning openings (the first always faces down; dashed rays mark every opening
+while it charges). Dashed rails then cross the whole board in opposite
+directions and slide as a moving pair, and the finale is one dashed lance
+sweeping the full width (starting away from the player) with two more rings.
+Only lit dashes and lit ring arcs hurt; every opening is wider than the ball
+and beam. Render it with `scripts/flutter.ps1 test tool/render_infinite_boss.dart`. Pause and revive preserve the chosen order.
 Sky Warden waits for committed attacks and laser mazes to
 finish, then replaces the course with a clear arena: no holes, other enemies,
 ordinary lasers, or rising red floor. The boss stays above the player as the

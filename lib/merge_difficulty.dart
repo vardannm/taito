@@ -5,9 +5,10 @@ abstract final class MergeDifficulty {
   // Falling balls: speed = startSpeed + speedPerDoubling for every doubling
   // of the highest ball above 2, capped at maxSpeed.
   // startSpeed > 0; speedPerDoubling >= 0; maxSpeed >= startSpeed.
-  static const startSpeed = 42.0;
-  static const speedPerDoubling = 8.0;
-  static const maxSpeed = 112.0;
+  // Lowered 15% (from 42, 8 and 112) to make Merge a little gentler.
+  static const startSpeed = 35.7;
+  static const speedPerDoubling = 6.8;
+  static const maxSpeed = 95.2;
 
   // Distance between new waves (> 0). Larger means more breathing room.
   // Time between waves is waveSpacing / current falling speed.
@@ -37,11 +38,12 @@ abstract final class MergeDifficulty {
   static const matchingChance = .4;
 
   // Minimum fresh score between gates. Later gaps grow to the head value.
-  static const gateInterval = 900;
-  // Gate speed is falling speed + this nonnegative bonus.
-  static const gateSpeedBonus = 22.0;
+  // Raised from 900 so the first gate and later ones arrive less often.
+  static const gateInterval = 1400;
+  // Gate speed is falling speed + this nonnegative bonus (15% lower than 22).
+  static const gateSpeedBonus = 18.7;
   // Minimum seconds after clearing a gate before another can spawn (>= 0).
-  static const gateCooldownSeconds = 3.0;
+  static const gateCooldownSeconds = 5.0;
 
   // Integer power-of-two adjustment to gate requirements (-8..8).
   // 0 = half the head value, -1 = quarter, +1 = equal to the head.
