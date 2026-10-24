@@ -47,6 +47,8 @@ const classicLevel21 = ClassicLevelDefinition(
     Hole(240, 50, motion: HoleMotion(path: HazardMotion.vertical, radiusX: 40, radiusY: 25, period: 4, phase: 0)),
     Hole(290, 100, motion: HoleMotion(path: HazardMotion.horizontal, radiusX: 40, radiusY: 25, period: 4, phase: 0)),
     Hole(336, 130),
+    Hole(140, 130),
+    Hole(190, 60),
   ],
   spiders: [
     ClassicSpiderPlacement(
