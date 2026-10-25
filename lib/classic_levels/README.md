@@ -51,7 +51,9 @@ maintain safe clearance. `finaleTitle` and `finaleRule` set the optional briefin
 The October 2026 progression pass keeps level IDs and names stable, reauthors
 levels 2–9, and replaces density-only trap growth with slaloms, offset gates,
 paired bays and broken central routes. Known hazards return between milestone
-introductions and combine again in the final chapters. See
+introductions and combine again in the final chapters. A later pass rebuilt
+levels 26–80 around the moving, breathing and sized holes, moving targets and
+dashed beams introduced in 19–25, with one set piece per board. See
 `../../CLASSIC_PROGRESSION.md` for the full level-by-level review.
 
 Run the campaign audit with the project-local Dart SDK:
