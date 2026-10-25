@@ -1488,8 +1488,10 @@ class BalanceGame {
       return;
     }
     if (infinite) {
+      // The guided course generates nothing itself; only its practice boss
+      // can be present, so the boss updates in either case.
+      _updateInfiniteBoss(dt, cameraOffset - (oldScreenY - oldY));
       if (!tutorialCourse) {
-        _updateInfiniteBoss(dt, cameraOffset - (oldScreenY - oldY));
         _updateLateEnemies(dt, cameraOffset - (oldScreenY - oldY));
         _updateSnakes(dt);
         _updateSpecialHazards(dt);

@@ -426,6 +426,8 @@ void paintInfiniteBoss(Canvas canvas, BalanceGame game, bool reducedMotion) {
 
   canvas.save();
   canvas.translate(position.dx, position.dy);
+  // The practice boss reads as a smaller, lesser version of the real one.
+  if (boss.training) canvas.scale(.75);
   if (nova) {
     _paintNova(canvas, boss, reducedMotion, ink);
     canvas.restore();

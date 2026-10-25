@@ -60,9 +60,18 @@ enum BossPhase {
 /// climbs; thrown pools attach to the scrolling floor only after landing.
 class InfiniteBoss {
   InfiniteBoss({this.top = 0, this.kind = BossKind.skyWarden, int seed = 0})
-    : _random = math.Random(seed);
+    : training = false,
+      _random = math.Random(seed);
+
+  /// The tutorial's practice boss: a smaller Sky Warden with one short round
+  /// each of slow three-shot volleys and single lasers, and no pools.
+  InfiniteBoss.training({this.top = 0})
+    : kind = BossKind.skyWarden,
+      training = true,
+      _random = math.Random(0);
 
   static const duration = 28.0;
+  static const trainingDuration = 16.0;
   static const laserWarning = 1.1;
   static const laserLife = 1.3;
   static const throwFlight = .9;
@@ -73,8 +82,10 @@ class InfiniteBoss {
   static const toxicWarning = .9, toxicLife = 2.5;
 
   final BossKind kind;
+  final bool training;
   final math.Random _random;
-  String get displayName => kind.name;
+  String get displayName => training ? 'PRACTICE WARDEN' : kind.name;
+  double get lifetime => training ? trainingDuration : duration;
   double age = 0, top;
   final shots = <LateEnemyShot>[];
   final toxicWalls = <ToxicWall>[];
@@ -125,6 +136,12 @@ class InfiniteBoss {
 
   BossPhase get phase => age < 2
       ? BossPhase.arriving
+      : training
+      ? age < 8
+            ? BossPhase.bullets
+            : age < 13.5
+            ? BossPhase.lasers
+            : BossPhase.leaving
       : age < 10
       ? switch (kind) {
           BossKind.skyWarden => BossPhase.bullets,
@@ -153,7 +170,7 @@ class InfiniteBoss {
           BossKind.novaPulsar => BossPhase.novaLance,
         }
       : BossPhase.leaving;
-  bool get expired => age >= duration;
+  bool get expired => age >= lifetime;
   String get hint => switch (phase) {
     BossPhase.arriving => 'BOSS · $displayName',
     BossPhase.bullets => 'BOSS · Slip between the bullet volleys',
@@ -181,6 +198,12 @@ class InfiniteBoss {
   };
 
   EnemyPoint positionAt(double time) {
+    if (training) {
+      final x = time < 8 ? 180 + math.sin(time * math.pi / 5) * 40 : 180.0;
+      final entrance = time < 2 ? -150 * math.pow(1 - time / 2, 2) : 0.0;
+      final exit = time > 13.5 ? -170 * math.pow((time - 13.5) / 2.5, 2) : 0.0;
+      return (x: x, y: top + 105 + entrance + exit);
+    }
     final x = kind == BossKind.venomCrown
         ? 180 + math.sin(time * .65) * 35
         : kind == BossKind.novaPulsar
@@ -219,6 +242,13 @@ class InfiniteBoss {
       (wall) => before >= wall.at + toxicWarning + toxicLife,
     );
 
+    if (training) {
+      _trainingWeapons(before, target);
+      for (final shot in shots) {
+        shot.step(dt, scrollDistance: scrollDistance);
+      }
+      return;
+    }
     if (kind != BossKind.skyWarden) {
       if (kind == BossKind.stormColossus) {
         _stormWeapons(before, target);
@@ -327,6 +357,60 @@ class InfiniteBoss {
     }
     for (final shot in shots) {
       shot.step(dt, scrollDistance: scrollDistance);
+    }
+  }
+
+  /// Three slow, three-shot volleys with wide gaps, then two single lasers.
+  /// The same marked warnings as the real Sky Warden, at a gentler pace.
+  void _trainingWeapons(double before, EnemyPoint target) {
+    while (_bulletWave < 3 && age >= 2.8 + _bulletWave * 1.8) {
+      final at = 2.8 + _bulletWave++ * 1.8;
+      _lastVolleyAt = at;
+      final origin = positionAt(at);
+      final angle = math.atan2(target.y - origin.y, target.x - origin.x);
+      final dx = target.x - origin.x, dy = target.y - origin.y;
+      final speed = math.max(115.0, math.sqrt(dx * dx + dy * dy) / 3.2);
+      for (final spread in [-.42, 0.0, .42]) {
+        shots.add(
+          LateEnemyShot(
+            kind: LateShotKind.shard,
+            origin: origin,
+            velocity: (
+              x: math.cos(angle + spread) * speed,
+              y: math.sin(angle + spread) * speed,
+            ),
+            delay: at - before,
+            life: 4.2,
+            radiusOverride: 4,
+            reasonOverride: 'Boss bullet. Slip between the volleys.',
+          ),
+        );
+      }
+    }
+    while (_laserWave < 2 && age >= 8.2 + _laserWave * 2.4) {
+      final at = 8.2 + _laserWave++ * 2.4;
+      _lastVolleyAt = at + laserWarning;
+      final origin = positionAt(at);
+      final dx = target.x - origin.x;
+      final dy = math.max(60.0, target.y - origin.y);
+      final scale = math.min(
+        (537 - origin.y) / dy,
+        dx.abs() < 1e-9
+            ? double.infinity
+            : ((dx > 0 ? 336 : 24) - origin.x) / dx,
+      );
+      shots.add(
+        LateEnemyShot(
+          kind: LateShotKind.laser,
+          origin: origin,
+          velocity: (x: 0, y: 0),
+          delay: at - before + laserWarning,
+          life: laserLife,
+          beamEnd: (x: origin.x + dx * scale, y: origin.y + dy * scale),
+          radiusOverride: 5,
+          reasonOverride: 'Boss laser. Leave the marked aim line.',
+        ),
+      );
     }
   }
 

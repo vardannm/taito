@@ -27,33 +27,35 @@ enum PlatformStyle {
   aether(
     'Aether bridge',
     'Platinum filigree and rose-gold starlight',
-    0,
+    6000,
     0xFFCFEAFF,
     3.5,
   ),
   phoenix(
     'Phoenix forge',
     'Ruby enamel with flowing golden feathers',
-    0,
+    9500,
     0xFFFFAB65,
     4,
   ),
   chrono(
     'Chrono relay',
     'Teal sapphire, precision gears and gold seams',
-    0,
+    14000,
     0xFF83F1E0,
     4.5,
   ),
   genesis(
     'Genesis arc',
     'Iridescent crystal petals and luminous pearl',
-    0,
+    20000,
     0xFFF4B6F0,
     5,
   );
 
   bool get energized => index >= aurora.index;
+
+  /// Premium tier: the most expensive coin rails, never given as a prize.
   bool get purchaseOnly => index >= aether.index;
 
   const PlatformStyle(
@@ -68,14 +70,8 @@ enum PlatformStyle {
   final double scoreBonus;
 }
 
-/// Shop order, weakest first: coin rails by price, then store-only rails by
-/// boost. Also ranks strength, so the shop never suggests a weaker rail.
+/// Shop order, weakest first, by price. Also ranks strength, so the shop
+/// never suggests a weaker rail.
 final List<PlatformStyle> platformShopOrder = List.unmodifiable(
-  [...PlatformStyle.values]..sort(
-    (a, b) => a.purchaseOnly != b.purchaseOnly
-        ? (a.purchaseOnly ? 1 : -1)
-        : a.purchaseOnly
-        ? a.scoreBonus.compareTo(b.scoreBonus)
-        : a.cost.compareTo(b.cost),
-  ),
+  [...PlatformStyle.values]..sort((a, b) => a.cost.compareTo(b.cost)),
 );

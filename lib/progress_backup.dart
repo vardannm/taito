@@ -124,7 +124,8 @@ class ProgressBackup {
     p.haloJoystick = d['haloJoystick'] != null ? flag('haloJoystick') : false;
     if (d['fastStart'] != null) p.infiniteFastStart = flag('fastStart');
     // Older backups predate boss records; they restore as none outlasted.
-    if (d['bestBosses'] != null) p.infiniteBestBosses = integer(d['bestBosses'], 99);
+    if (d['bestBosses'] != null)
+      p.infiniteBestBosses = integer(d['bestBosses'], 99);
     final upgrades = d['survivalUpgrades'];
     if (upgrades != null) {
       if (upgrades is! Map) invalid();
@@ -192,31 +193,18 @@ class ProgressBackup {
       ),
     );
     p.clearUnwonLevelStars();
-    // Store purchases come back from the store, never from a pasted code, so
-    // purchase-only gear in a backup is skipped rather than restored.
-    void owned<T extends Enum>(
-      String key,
-      Set<T> target,
-      List<T> values,
-      bool Function(T) purchaseOnly,
-    ) {
+    void owned<T extends Enum>(String key, Set<T> target, List<T> values) {
       final source = d[key];
       if (source is! List || source.isEmpty || source.length > values.length)
         invalid();
       target.clear();
       for (final v in source) {
-        final item = choice(v, values);
-        if (!purchaseOnly(item)) target.add(item);
+        target.add(choice(v, values));
       }
     }
 
-    owned('balls', p.ownedBalls, BallCosmetic.values, (b) => b.purchaseOnly);
-    owned(
-      'platforms',
-      p.ownedPlatforms,
-      PlatformStyle.values,
-      (s) => s.purchaseOnly,
-    );
+    owned('balls', p.ownedBalls, BallCosmetic.values);
+    owned('platforms', p.ownedPlatforms, PlatformStyle.values);
     final ball = choice(d['ball'], BallCosmetic.values);
     p.selectedBall = p.ownedBalls.contains(ball) ? ball : BallCosmetic.steel;
     final platform = choice(d['platform'], PlatformStyle.values);

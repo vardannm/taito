@@ -10,6 +10,8 @@ import 'package:balance_arcade/levels.dart';
 import 'package:balance_arcade/progress_backup.dart';
 import 'package:balance_arcade/tutorial_spotlight.dart';
 import 'package:balance_arcade/game.dart';
+import 'package:balance_arcade/infinite_boss.dart';
+import 'package:balance_arcade/late_enemies.dart';
 import 'package:balance_arcade/one_finger_controls.dart';
 
 Future<void> frames(WidgetTester tester, [int count = 25]) async {
@@ -193,6 +195,16 @@ void main() {
       expect(g.survival.combo, 2);
       expect(progress.step, TutorialStep.comboFeedback);
       simulate(g, lesson, 2.6);
+      expect(progress.step, TutorialStep.boss);
+      expect(g.boss?.training, isTrue);
+      expect(g.lives, g.heartCapacity);
+      // This walk-through checks the lesson order, not dodging.
+      g.survival.shield = 30;
+      simulate(g, lesson, InfiniteBoss.trainingDuration + .1);
+      expect(g.boss, isNull);
+      expect(g.bossesCleared, 0);
+      expect(progress.step, TutorialStep.bossFeedback);
+      simulate(g, lesson, 3.1);
       expect(progress.step, TutorialStep.freePlay);
       expect(g.tutorialCourse, isFalse);
       final seconds = progress.freePlaySeconds;
@@ -205,6 +217,48 @@ void main() {
       expect(progress.step, TutorialStep.shop);
     },
   );
+  test('the practice boss is shorter and fires far less than a real one', () {
+    int fired(InfiniteBoss boss) {
+      final seen = <LateEnemyShot>{};
+      for (var i = 0; i < 60 * 40 && !boss.expired; i++) {
+        boss.step(1 / 60, target: (x: 180, y: 470));
+        seen.addAll(boss.shots);
+      }
+      return seen.length;
+    }
+
+    final practice = InfiniteBoss.training();
+    final real = InfiniteBoss();
+    final practiceShots = fired(practice);
+    expect(practice.expired, isTrue);
+    expect(practice.age, closeTo(InfiniteBoss.trainingDuration, .02));
+    expect(practice.lifetime, lessThan(real.lifetime));
+    // Three three-bullet volleys and two lasers.
+    expect(practiceShots, 11);
+    expect(fired(real), greaterThan(practiceShots * 2));
+    expect(practice.displayName, 'PRACTICE WARDEN');
+  });
+  test('practice-boss hits cost hearts but never end the lesson run', () {
+    final g = BalanceGame(seed: 3)
+      ..setControlMode(ControlMode.oneFinger)
+      ..start(gameMode: GameMode.infinite);
+    g.lives = 1;
+    final progress = TutorialProgress(step: TutorialStep.boss);
+    final lesson = TutorialRun(g, progress, () {})..configure();
+    expect(g.tutorialCourse, isTrue);
+    expect(g.lives, g.heartCapacity);
+    // Standing still under the first, slow aimed volley.
+    simulate(g, lesson, 6.5);
+    expect(g.lives, lessThan(g.heartCapacity));
+    expect(g.finished, isFalse);
+    expect(progress.step, TutorialStep.boss);
+    expect(g.boss, isNotNull);
+    // Never moving through the whole fight still leaves the last heart.
+    simulate(g, lesson, InfiniteBoss.trainingDuration - 6.5 + .2);
+    expect(g.lives, 1);
+    expect(g.finished, isFalse);
+    expect(progress.step, TutorialStep.bossFeedback);
+  });
   test(
     'an accidental tutorial hit costs one heart and continues without resetting input',
     () {
@@ -309,7 +363,8 @@ void main() {
       await tester.tap(find.byTooltip('Done shopping'));
       await frames(tester);
       expect(p.tutorial.step, TutorialStep.levels);
-      await tester.tap(find.byTooltip('Classic levels'));
+      expect(find.text('Handmade levels'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('choose-level')));
       await frames(tester);
       expect(p.tutorial.step, TutorialStep.level1);
       await tester.tap(find.byKey(const ValueKey('level-1')));
@@ -332,8 +387,10 @@ void main() {
       await tester.ensureVisible(find.text('BACK TO MENU'));
       await tester.tap(find.text('BACK TO MENU'));
       await frames(tester, 35);
+      // The win moved Classic on, without tapping Next Level.
+      expect(p.classicLevel, 2);
       expect(find.textContaining('Daily Challenge:'), findsOneWidget);
-      await tester.tap(find.byTooltip('Daily Challenge'));
+      await tester.tap(find.byTooltip('Modes'));
       await frames(tester);
       expect(p.tutorial.step, TutorialStep.completed);
       expect(tester.takeException(), isNull);
@@ -371,7 +428,7 @@ void main() {
       expect(p.tutorial.step, TutorialStep.shopBrowse);
       await tester.tap(find.byTooltip('Done shopping'));
       await frames(tester);
-      await tester.tap(find.byTooltip('Classic levels'));
+      await tester.tap(find.byKey(const ValueKey('choose-level')));
       await frames(tester);
       expect(p.tutorial.step, TutorialStep.level1);
       expect(find.text('Choose your challenge.'), findsOneWidget);

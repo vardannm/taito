@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/ball_cosmetics.dart';
@@ -40,28 +41,45 @@ void main() {
     },
   );
 
-  test(
-    'coin balances and unlimited-coin mode cannot unlock reserved premium gear',
-    () async {
-      for (final unlimited in [false, true]) {
-        final profile = PlayerProfile(unlimitedCoins: unlimited)
-          ..wallet = 100000;
-        for (final ball in BallCosmetic.values.where((b) => b.purchaseOnly)) {
-          expect(profile.selectBall(ball), isFalse);
-          expect(profile.ownedBalls.contains(ball), isFalse);
-        }
-        for (final platform in PlatformStyle.values.where(
-          (p) => p.purchaseOnly,
-        )) {
-          expect(profile.selectPlatform(platform), isFalse);
-          expect(profile.ownedPlatforms.contains(platform), isFalse);
-        }
-        expect(profile.wallet, 100000);
-        expect(profile.selectedBall, BallCosmetic.steel);
-        expect(profile.selectedPlatform, PlatformStyle.classic);
-      }
-    },
-  );
+  test('premium gear outprices all coin gear and is bought with coins', () {
+    final balls = BallCosmetic.values.where((b) => b.purchaseOnly).toList();
+    final platforms = PlatformStyle.values
+        .where((p) => p.purchaseOnly)
+        .toList();
+    final topBall = BallCosmetic.values
+        .where((b) => !b.purchaseOnly)
+        .map((b) => b.cost)
+        .reduce(math.max);
+    final topPlatform = PlatformStyle.values
+        .where((p) => !p.purchaseOnly)
+        .map((p) => p.cost)
+        .reduce(math.max);
+    expect(balls.first.cost, greaterThan(topBall * 1.5));
+    expect(platforms.first.cost, greaterThan(topPlatform * 2));
+    for (var i = 1; i < balls.length; i++) {
+      expect(balls[i].cost, greaterThan(balls[i - 1].cost));
+      expect(platforms[i].cost, greaterThan(platforms[i - 1].cost));
+    }
+    final short = PlayerProfile()..wallet = BallCosmetic.aether.cost - 1;
+    expect(short.selectBall(BallCosmetic.aether), isFalse);
+    expect(short.ownedBalls.contains(BallCosmetic.aether), isFalse);
+    final total = [
+      ...balls.map((b) => b.cost),
+      ...platforms.map((p) => p.cost),
+    ].reduce((a, b) => a + b);
+    final rich = PlayerProfile()..wallet = total;
+    for (final ball in balls) {
+      expect(rich.selectBall(ball), isTrue);
+    }
+    for (final platform in platforms) {
+      expect(rich.selectPlatform(platform), isTrue);
+    }
+    expect(rich.wallet, 0);
+    expect(rich.ownedBalls, containsAll(balls));
+    expect(rich.ownedPlatforms, containsAll(platforms));
+    expect(rich.selectedBall, BallCosmetic.genesis);
+    expect(rich.selectedPlatform, PlatformStyle.genesis);
+  });
 
   test(
     'daily gifts skip premium gear even when every coin item is owned',
@@ -83,7 +101,6 @@ void main() {
 
   test('an owned premium entitlement equips and survives reload', () async {
     final p = PlayerProfile()..wallet = 50;
-    // Represents a future verified purchase; the coin-buy path cannot grant it.
     p.ownedBalls.add(BallCosmetic.genesis);
     p.ownedPlatforms.add(PlatformStyle.genesis);
     expect(p.selectBall(BallCosmetic.genesis), isTrue);
@@ -98,7 +115,7 @@ void main() {
   });
 
   testWidgets(
-    'premium cards show disabled Coming soon actions on a small phone',
+    'premium cards show coin prices and buy when affordable on a small phone',
     (tester) async {
       tester.view.physicalSize = const Size(320, 568);
       tester.view.devicePixelRatio = 1;
@@ -126,14 +143,15 @@ void main() {
         maxScrolls: 100,
       );
       await tester.pump();
-      expect(find.text('Coming soon'), findsWidgets);
-      expect(
-        tester
-            .widget<FilledButton>(find.byKey(const ValueKey('buy-aether')))
-            .onPressed,
-        isNull,
-      );
-      expect(p.ownedBalls.contains(BallCosmetic.aether), isFalse);
+      expect(find.text('Coming soon'), findsNothing);
+      expect(find.text('25,000'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('buy-aether')));
+      await tester.pump();
+      expect(p.ownedBalls.contains(BallCosmetic.aether), isTrue);
+      expect(p.selectedBall, BallCosmetic.aether);
+      expect(p.wallet, 100000 - BallCosmetic.aether.cost);
+      // Out of reach now: the price stays and the button waits.
+      p.wallet = PlatformStyle.aether.cost - 1;
       await tester.tap(find.text('Platforms'));
       await tester.pump();
       await tester.scrollUntilVisible(

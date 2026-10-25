@@ -322,9 +322,18 @@ class MenuIconButton extends StatelessWidget {
 }
 
 class MenuPill extends StatelessWidget {
-  const MenuPill(this.text, {super.key, this.icon, this.accent = menuGold});
+  const MenuPill(
+    this.text, {
+    super.key,
+    this.icon,
+    this.leading,
+    this.accent = menuGold,
+  });
   final String text;
   final IconData? icon;
+
+  /// Replaces [icon] with a custom mark, such as the painted coin.
+  final Widget? leading;
   final Color accent;
   @override
   Widget build(BuildContext context) => Container(
@@ -337,8 +346,8 @@ class MenuPill extends StatelessWidget {
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (icon != null) ...[
-          Icon(icon, size: 16, color: accent),
+        if (leading != null || icon != null) ...[
+          leading ?? Icon(icon, size: 16, color: accent),
           const SizedBox(width: 6),
         ],
         Flexible(

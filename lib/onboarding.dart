@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'game.dart';
+import 'infinite_boss.dart';
 import 'infinite_progress.dart';
 import 'rewards.dart';
 
@@ -18,6 +19,8 @@ enum TutorialStep {
   metrics,
   combo,
   comboFeedback,
+  boss,
+  bossFeedback,
   freePlay,
   shop,
   shopBall,
@@ -36,6 +39,23 @@ enum TutorialStep {
   bool get inInfinite => index <= freePlay.index;
   bool get scripted => index < freePlay.index;
   bool get inShop => index >= shop.index && index <= shopBrowse.index;
+
+  /// The lesson this checkpoint belongs to, from 1 to [lessons]. Feedback
+  /// checkpoints share their lesson's place on the progress bar.
+  int get lesson => switch (this) {
+    controls => 1,
+    heartsHoles || heartsFeedback => 2,
+    coins || coinsFeedback => 3,
+    shield || shieldFeedback => 4,
+    magnet || magnetFeedback => 5,
+    metrics => 6,
+    combo || comboFeedback => 7,
+    boss || bossFeedback || freePlay => 8,
+    shop || shopBall || shopPlatform || shopBrowse => 9,
+    levels || level1 || classicPlay => 10,
+    dailyChallenge || completed => 11,
+  };
+  static const lessons = 11;
 }
 
 class TutorialProgress {
@@ -79,6 +99,7 @@ class TutorialRun {
   Hole? hole;
   BrassCoin? coin;
   InfiniteItem? pickup;
+  InfiniteBoss? boss;
 
   void advance(TutorialStep step) {
     progress.step = step;
@@ -91,6 +112,7 @@ class TutorialRun {
     hole = null;
     coin = null;
     pickup = null;
+    boss = null;
     initialHeight = game.screenY((game.left + game.right) / 2);
     initialCoins = game.coinsCollected;
     initialLives = game.lives;
@@ -132,6 +154,15 @@ class TutorialRun {
     }
     if (step == TutorialStep.comboFeedback) {
       game.survival.combo = math.max(2, game.survival.combo);
+    }
+    if (step == TutorialStep.boss) {
+      // A rehearsal, not a run-ender: full hearts and a shortened, slower
+      // practice boss. Its shots cost hearts, down to a shielded last one.
+      game.lives = game.heartCapacity;
+      initialLives = game.lives;
+      boss = game.boss = InfiniteBoss.training(top: game.visibleTop);
+    } else {
+      game.boss = null;
     }
   }
 
@@ -220,7 +251,15 @@ class TutorialRun {
           spawnPickup();
         }
       case TutorialStep.comboFeedback:
-        if (age >= 2.5) advance(TutorialStep.freePlay);
+        if (age >= 2.5) advance(TutorialStep.boss);
+      case TutorialStep.boss:
+        // Hits still cost hearts, but the practice boss never takes the last.
+        if (game.lives == 1) {
+          game.survival.shield = math.max(game.survival.shield, .5);
+        }
+        if (game.boss == null) advance(TutorialStep.bossFeedback);
+      case TutorialStep.bossFeedback:
+        if (age >= 3) advance(TutorialStep.freePlay);
       case TutorialStep.freePlay:
         final before = progress.freePlaySeconds ~/ 5;
         progress.freePlaySeconds = math.min(45, progress.freePlaySeconds + dt);

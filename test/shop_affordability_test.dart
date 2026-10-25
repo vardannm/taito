@@ -43,8 +43,10 @@ void main() {
     for (final upgrade in SurvivalUpgrade.values) {
       p.survivalUpgrades[upgrade] = upgrade.maxLevel;
     }
-    p.wallet = 100000;
-    expect(p.shopUpgradeAvailable, isFalse); // No coin-purchasable improvement.
+    p.wallet = PlatformStyle.aether.cost - 1;
+    expect(p.shopUpgradeAvailable, isFalse); // Premium gear is out of reach.
+    p.wallet = PlatformStyle.aether.cost;
+    expect(p.shopUpgradeAvailable, isTrue); // Premium gear sells for coins.
     p.ownedBalls.remove(BallCosmetic.singularity);
     p.ownedBalls.add(BallCosmetic.nova);
     p.wallet = BallCosmetic.titanium.cost;
@@ -73,12 +75,16 @@ void main() {
     expect(p.shopUpgradeAvailable, isTrue);
   });
 
-  test('shop lists coin gear by price, store-only gear last', () {
-    void check<T>(List<T> order, int Function(T) cost, bool Function(T) store) {
-      final coin = order.where((e) => !store(e)).toList();
-      expect(order.take(coin.length), coin);
-      for (var i = 1; i < coin.length; i++) {
-        expect(cost(coin[i]), greaterThanOrEqualTo(cost(coin[i - 1])));
+  test('shop lists gear by price, premium gear last', () {
+    void check<T>(
+      List<T> order,
+      int Function(T) cost,
+      bool Function(T) premium,
+    ) {
+      final standard = order.where((e) => !premium(e)).toList();
+      expect(order.take(standard.length), standard);
+      for (var i = 1; i < order.length; i++) {
+        expect(cost(order[i]), greaterThanOrEqualTo(cost(order[i - 1])));
       }
     }
 

@@ -11,6 +11,7 @@ import 'menu_design.dart';
 import 'survival_upgrades.dart';
 import 'shop_design.dart';
 import 'premium_menu.dart';
+import 'infinite_coin_chip.dart';
 
 class BallShop extends StatefulWidget {
   const BallShop({
@@ -56,6 +57,21 @@ class _BallShopState extends State<BallShop>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     if (widget.profile.tutorial.step == TutorialStep.shopPlatform) category = 1;
+    revealExample();
+  }
+
+  /// Scrolls the starter card's button into view under the spotlight.
+  void revealExample() {
+    if (!guiding) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final target = exampleKey.currentContext;
+      if (!mounted || target == null) return;
+      // Rebuild once it lands, so the spotlight measures the moved button
+      // even when reduced motion has stopped its pulse.
+      Scrollable.ensureVisible(target, alignment: .8).then((_) {
+        if (mounted) setState(() {});
+      });
+    });
   }
 
   void equippedExample() {
@@ -69,6 +85,7 @@ class _BallShopState extends State<BallShop>
       }
     });
     widget.onTutorialChanged?.call();
+    revealExample();
   }
 
   late final AnimationController preview = AnimationController(
@@ -104,166 +121,6 @@ class _BallShopState extends State<BallShop>
     super.dispose();
   }
 
-  Widget item({
-    required String id,
-    required String name,
-    required String description,
-    required int cost,
-    required double bonus,
-    required bool owned,
-    required bool selected,
-    required CustomPainter painter,
-    required VoidCallback buy,
-    bool example = false,
-    BallCosmetic? worldBall,
-  }) => Padding(
-    padding: const EdgeInsets.only(bottom: 16),
-    child: MenuPanel(
-      key: example ? exampleKey : null,
-      selected: selected,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: Container(
-                  color: const Color(0xFFEAE6D9),
-                  width: example
-                      ? 76
-                      : worldBall == null
-                      ? 94
-                      : 100,
-                  height: example
-                      ? 100
-                      : worldBall == null
-                      ? 92
-                      : 144,
-                  child: RepaintBoundary(
-                    child: CustomPaint(
-                      key: worldBall == null
-                          ? null
-                          : ValueKey('world-preview-${worldBall.name}'),
-                      painter: worldBall == null
-                          ? painter
-                          : BallWorldPreview(worldBall, animation: preview),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (!example)
-                      Text(
-                        selected
-                            ? 'YOUR EQUIPMENT'
-                            : owned
-                            ? 'IN YOUR COLLECTION'
-                            : 'DISCOVER',
-                        style: TextStyle(
-                          color: selected ? menuMint : menuMuted,
-                          fontSize: 8,
-                          letterSpacing: 1.1,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    if (!example) const SizedBox(height: 8),
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        color: menuText,
-                        fontSize: 18,
-                        height: 1.1,
-                        letterSpacing: -.5,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      description,
-                      maxLines: example ? 2 : 4,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: menuMuted,
-                        fontSize: 11,
-                        height: 1.4,
-                      ),
-                    ),
-                    if (worldBall != null && !example) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        BallWorld.of(worldBall).name,
-                        style: const TextStyle(
-                          color: menuGold,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      const Text(
-                        'WORLD INCLUDED · ALL MODES',
-                        style: TextStyle(
-                          color: menuMuted,
-                          fontSize: 7,
-                          letterSpacing: .6,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          const Divider(height: 1),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  example
-                      ? 'Free'
-                      : bonus == 0
-                      ? 'Base equipment'
-                      : '+${formatBoost(bonus)}x Infinite points',
-                  style: const TextStyle(
-                    color: menuMint,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              FilledButton(
-                key: ValueKey(id),
-                onPressed:
-                    (selected && !example) ||
-                        (!owned && !widget.profile.canAfford(cost))
-                    ? null
-                    : () {
-                        buy();
-                        if (example) equippedExample();
-                      },
-                child: Text(
-                  selected && !example
-                      ? 'Equipped'
-                      : owned
-                      ? 'Equip'
-                      : '$cost coins',
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    ),
-  );
   Widget galleryItem({
     required String id,
     required String name,
@@ -275,6 +132,7 @@ class _BallShopState extends State<BallShop>
     required CustomPainter painter,
     required VoidCallback buy,
     bool purchaseOnly = false,
+    bool example = false,
     BallCosmetic? worldBall,
   }) => ShopGalleryCard(
     name: name,
@@ -285,7 +143,7 @@ class _BallShopState extends State<BallShop>
         : owned
         ? 'IN YOUR COLLECTION'
         : purchaseOnly
-        ? 'PREMIUM · COMING SOON'
+        ? 'PREMIUM'
         : 'DISCOVER',
     worldName: worldBall == null ? null : BallWorld.of(worldBall).name,
     artHeight: worldBall == null ? 136 : 188,
@@ -307,22 +165,32 @@ class _BallShopState extends State<BallShop>
         : bonus == 0
         ? 'Base equipment'
         : '+${formatBoost(bonus)}× Infinite points',
-    action: ShopPurchaseButton(
-      buttonKey: ValueKey(id),
-      equipped: selected,
-      label: selected
-          ? 'Equipped'
-          : owned
-          ? 'Equip'
-          : purchaseOnly
-          ? 'Coming soon'
-          : '$cost coins',
-      onPressed:
-          selected ||
-              (!owned && (purchaseOnly || !widget.profile.canAfford(cost)))
-          ? null
-          : buy,
-    ),
+    action: example && guiding
+        // The lesson's one live button: equipping the starter moves it on.
+        ? KeyedSubtree(
+            key: exampleKey,
+            child: ShopPurchaseButton(
+              buttonKey: ValueKey(id),
+              label: 'Equip',
+              onPressed: () {
+                buy();
+                equippedExample();
+              },
+            ),
+          )
+        : ShopPurchaseButton(
+            buttonKey: ValueKey(id),
+            equipped: selected,
+            price: selected || owned ? null : cost,
+            label: selected
+                ? 'Equipped'
+                : owned
+                ? 'Equip'
+                : formatMenuScore(cost),
+            onPressed: selected || (!owned && !widget.profile.canAfford(cost))
+                ? null
+                : buy,
+          ),
   );
 
   Widget collection() {
@@ -390,7 +258,7 @@ class _BallShopState extends State<BallShop>
                         child: MenuPill(
                           p.unlimitedCoins ? '∞' : formatMenuScore(p.wallet),
                           key: const ValueKey('wallet'),
-                          icon: Icons.toll_rounded,
+                          leading: const CoinIcon(size: 18),
                         ),
                       ),
                     ),
@@ -485,6 +353,7 @@ class _BallShopState extends State<BallShop>
                               cost: b.cost,
                               bonus: b.scoreBonus,
                               purchaseOnly: b.purchaseOnly,
+                              example: b == BallCosmetic.steel,
                               owned: p.ownedBalls.contains(b),
                               selected: p.selectedBall == b,
                               painter: CosmeticPreview(b, animation: preview),
@@ -499,6 +368,7 @@ class _BallShopState extends State<BallShop>
                               cost: rail.cost,
                               bonus: rail.scoreBonus,
                               purchaseOnly: rail.purchaseOnly,
+                              example: rail == PlatformStyle.classic,
                               owned: p.ownedPlatforms.contains(rail),
                               selected: p.selectedPlatform == rail,
                               painter: PlatformPreview(
@@ -626,98 +496,39 @@ class _BallShopState extends State<BallShop>
 
   @override
   Widget build(BuildContext context) {
-    if (!guiding) {
-      return GestureDetector(
-        key: const ValueKey('shop-swipe-area'),
-        behavior: HitTestBehavior.translucent,
-        onHorizontalDragStart: (_) => swipeDistance = 0,
-        onHorizontalDragUpdate: (details) => swipeDistance += details.delta.dx,
-        onHorizontalDragEnd: finishSwipe,
-        child: collection(),
-      );
-    }
     final p = widget.profile;
-    return MenuSurface(
+    return GestureDetector(
+      key: const ValueKey('shop-swipe-area'),
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragStart: (_) => swipeDistance = 0,
+      onHorizontalDragUpdate: (details) => swipeDistance += details.delta.dx,
+      onHorizontalDragEnd: finishSwipe,
       child: Stack(
         children: [
-          SafeArea(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
-              children: [
-                Row(
-                  children: [
-                    const Expanded(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Gear Shop',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                    MenuIconButton(
-                      icon: Icons.close_rounded,
-                      tooltip: 'Done shopping',
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                if (category == 0)
-                  item(
-                    id: 'buy-steel',
-                    worldBall: BallCosmetic.steel,
-                    name: BallCosmetic.steel.label,
-                    description: 'Free starter ball',
-                    cost: 0,
-                    bonus: 0,
-                    owned: true,
-                    selected: p.selectedBall == BallCosmetic.steel,
-                    painter: CosmeticPreview(
-                      BallCosmetic.steel,
-                      animation: preview,
-                    ),
-                    buy: () => setState(() => p.selectBall(BallCosmetic.steel)),
-                    example: true,
-                  ),
-                if (category == 1)
-                  item(
-                    id: 'buy-platform-classic',
-                    name: PlatformStyle.classic.label,
-                    description: 'Free starter platform',
-                    cost: 0,
-                    bonus: 0,
-                    owned: true,
-                    selected: p.selectedPlatform == PlatformStyle.classic,
-                    painter: PlatformPreview(
-                      PlatformStyle.classic,
-                      animation: preview,
-                    ),
-                    buy: () =>
-                        setState(() => p.selectPlatform(PlatformStyle.classic)),
-                    example: true,
-                  ),
-              ],
+          collection(),
+          if (guiding)
+            TutorialSpotlight(
+              title: p.tutorial.step == TutorialStep.shopBall
+                  ? 'Balls bring their world'
+                  : 'Platforms add points',
+              icon: p.tutorial.step == TutorialStep.shopBall
+                  ? Icons.sports_baseball_rounded
+                  : Icons.horizontal_rule_rounded,
+              lesson: p.tutorial.step.lesson,
+              lessons: TutorialStep.lessons,
+              message: p.tutorial.step == TutorialStep.shopBall
+                  ? 'Each ball comes with its own background, and stronger balls boost Infinite points. Tap Equip on your Steel starter.'
+                  : 'Platforms boost Infinite points too. Equip your starter rail, then browse the gear and upgrades.',
+              blockOutside: true,
+              onSkip: () {
+                widget.onSkipTutorial?.call();
+                setState(() {});
+              },
+              targets: (layer) {
+                final rect = tutorialTarget(exampleKey, layer);
+                return [if (rect != null) rect];
+              },
             ),
-          ),
-          TutorialSpotlight(
-            message: p.tutorial.step == TutorialStep.shopBall
-                ? 'Each ball includes a background. Stronger balls boost Infinite points. Tap Equip on your starter ball.'
-                : 'Platforms add an Infinite point boost. Tap Equip on your starter platform, then browse gear and upgrades.',
-            blockOutside: true,
-            onSkip: () {
-              widget.onSkipTutorial?.call();
-              setState(() {});
-            },
-            targets: (layer) {
-              final rect = tutorialTarget(exampleKey, layer);
-              return [if (rect != null) rect];
-            },
-          ),
         ],
       ),
     );

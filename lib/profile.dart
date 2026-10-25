@@ -48,11 +48,11 @@ class PlayerProfile {
     final ballRank = strongest(ballShopOrder, ownedBalls);
     final strongerBall = ballShopOrder
         .skip(ballRank + 1)
-        .any((ball) => !ball.purchaseOnly && canAfford(ball.cost));
+        .any((ball) => canAfford(ball.cost));
     final platformRank = strongest(platformShopOrder, ownedPlatforms);
     final strongerPlatform = platformShopOrder
         .skip(platformRank + 1)
-        .any((platform) => !platform.purchaseOnly && canAfford(platform.cost));
+        .any((platform) => canAfford(platform.cost));
     return strongerBall ||
         strongerPlatform ||
         SurvivalUpgrade.values.any(
@@ -279,7 +279,7 @@ class PlayerProfile {
 
   bool selectBall(BallCosmetic ball) {
     if (!ownedBalls.contains(ball)) {
-      if (ball.purchaseOnly || !canAfford(ball.cost)) return false;
+      if (!canAfford(ball.cost)) return false;
       if (!unlimitedCoins) wallet -= ball.cost;
       ownedBalls.add(ball);
     }
@@ -290,7 +290,7 @@ class PlayerProfile {
 
   bool selectPlatform(PlatformStyle platform) {
     if (!ownedPlatforms.contains(platform)) {
-      if (platform.purchaseOnly || !canAfford(platform.cost)) return false;
+      if (!canAfford(platform.cost)) return false;
       if (!unlimitedCoins) wallet -= platform.cost;
       ownedPlatforms.add(platform);
     }
@@ -622,6 +622,13 @@ class PlayerProfile {
     } else {
       runs++;
       if (game.mode != GameMode.classic && game.score > best) best = game.score;
+    }
+    // A win moves the menu on to the next level, whichever button leaves the
+    // result screen. Replaying an older level does not pull progress back.
+    if (game.mode == GameMode.classic &&
+        game.won &&
+        classicLevel == game.level) {
+      selectClassicLevel(game.level + 1);
     }
     return game.mode != GameMode.classic && game.score > previous.bestScore;
   }

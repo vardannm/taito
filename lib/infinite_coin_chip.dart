@@ -117,6 +117,20 @@ class InfiniteCoinChip extends StatelessWidget {
   }
 }
 
+/// Infinite's painted coin as an inline icon, so menus and price tags show
+/// the same coin the player collects on the board.
+class CoinIcon extends StatelessWidget {
+  const CoinIcon({super.key, this.size = 16});
+  final double size;
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+    child: SizedBox.square(
+      dimension: size,
+      child: const CustomPaint(painter: CoinPainter()),
+    ),
+  );
+}
+
 /// A minted gold coin with a rim, an inner ring and a shine. [spin] from 1
 /// to 0 turns it once around its vertical axis.
 class CoinPainter extends CustomPainter {

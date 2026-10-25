@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'menu_design.dart';
+import 'onboarding.dart';
 import 'tutorial_spotlight.dart';
 import 'package:flutter/material.dart';
 import 'levels.dart';
@@ -70,14 +71,16 @@ class _LevelPickerState extends State<LevelPicker> {
   void _showProgress(double rowHeight) {
     final last = lastWon;
     final row = _firstRowKey.currentContext?.findRenderObject() as RenderBox?;
-    final viewport = _scrollKey.currentContext?.findRenderObject() as RenderBox?;
+    final viewport =
+        _scrollKey.currentContext?.findRenderObject() as RenderBox?;
     if (last <= 1 || row == null || viewport == null || !_scroll.hasClients) {
       return;
     }
     final firstTop =
         row.localToGlobal(Offset.zero, ancestor: viewport).dy + _scroll.offset;
     final next = last < visibleCount && unlocked(last + 1);
-    final focus = firstTop + (last - 1) * rowHeight + rowHeight * (next ? 1 : .5);
+    final focus =
+        firstTop + (last - 1) * rowHeight + rowHeight * (next ? 1 : .5);
     _scroll.jumpTo(
       (focus - viewport.size.height / 2).clamp(
         0.0,
@@ -85,6 +88,7 @@ class _LevelPickerState extends State<LevelPicker> {
       ),
     );
   }
+
   bool skipped = false;
   late ControlMode? _preferredControl = widget.controlMode;
   late bool _haloJoystick = widget.haloJoystick;
@@ -392,8 +396,12 @@ class _LevelPickerState extends State<LevelPicker> {
         ),
         if (widget.tutorial && !skipped)
           TutorialSpotlight(
+            title: 'Start Level 1',
+            icon: Icons.flag_rounded,
+            lesson: TutorialStep.level1.lesson,
+            lessons: TutorialStep.lessons,
             message:
-                'Level 1: reach glowing holes in order, 1–10. Avoid dark holes.',
+                'Levels are handmade boards. Reach the glowing holes in order, 1 to 10, and avoid the dark ones. Tap Level 1.',
             blockOutside: true,
             onSkip: () {
               widget.onSkipTutorial?.call();

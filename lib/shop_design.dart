@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'infinite_coin_chip.dart';
 import 'menu_design.dart';
 
 /// A full-screen destination whose opening rectangle comes from the real
@@ -101,11 +102,15 @@ class ShopPurchaseButton extends StatelessWidget {
     required this.label,
     required this.onPressed,
     this.equipped = false,
+    this.price,
   });
   final Key? buttonKey;
   final String label;
   final VoidCallback? onPressed;
   final bool equipped;
+
+  /// A coin price leads the label with the painted coin.
+  final int? price;
   @override
   Widget build(BuildContext context) => FilledButton(
     key: buttonKey,
@@ -121,13 +126,23 @@ class ShopPurchaseButton extends StatelessWidget {
     ),
     child: FittedBox(
       fit: BoxFit.scaleDown,
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontFamily: 'sans-serif',
-          fontWeight: FontWeight.w700,
-          fontSize: 13,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (price != null) ...[
+            const CoinIcon(size: 18),
+            const SizedBox(width: 7),
+          ],
+          Text(
+            label,
+            semanticsLabel: price == null ? null : '$label coins',
+            style: const TextStyle(
+              fontFamily: 'sans-serif',
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
+          ),
+        ],
       ),
     ),
   );

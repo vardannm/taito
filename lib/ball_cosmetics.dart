@@ -29,7 +29,7 @@ enum BallCosmetic {
   aether(
     'Aether',
     'Platinum glass with rose-gold celestial rings',
-    0,
+    25000,
     0xFFCCE8FF,
     0,
     4,
@@ -37,7 +37,7 @@ enum BallCosmetic {
   phoenix(
     'Phoenix',
     'Ruby fire with a gold feather corona',
-    0,
+    40000,
     0xFFFFAD70,
     0,
     4.75,
@@ -45,7 +45,7 @@ enum BallCosmetic {
   chronosphere(
     'Chronosphere',
     'A sapphire timepiece in gilded crystal',
-    0,
+    60000,
     0xFF71F0E5,
     0,
     5.5,
@@ -53,7 +53,7 @@ enum BallCosmetic {
   genesis(
     'Genesis',
     'An iridescent universe blooming around a white core',
-    0,
+    90000,
     0xFFF6B6F5,
     0,
     6.5,
@@ -71,7 +71,7 @@ enum BallCosmetic {
   final int cost, color, sides;
   final double scoreBonus;
 
-  /// Reserved for verified store purchases once billing is connected.
+  /// Premium tier: the most expensive coin gear, never given as a prize.
   bool get purchaseOnly => index >= aether.index;
 
   /// Permanent Infinite collection radius. Zero means contact collection only.
@@ -119,16 +119,10 @@ enum BallCosmetic {
   bool get premium => index >= plasma.index;
 }
 
-/// Shop order, weakest first: coin gear by price, then store-only gear by
-/// boost. Also ranks strength, so the shop never suggests a weaker ball.
+/// Shop order, weakest first, by price. Also ranks strength, so the shop
+/// never suggests a weaker ball.
 final List<BallCosmetic> ballShopOrder = List.unmodifiable(
-  [...BallCosmetic.values]..sort(
-    (a, b) => a.purchaseOnly != b.purchaseOnly
-        ? (a.purchaseOnly ? 1 : -1)
-        : a.purchaseOnly
-        ? a.scoreBonus.compareTo(b.scoreBonus)
-        : a.cost.compareTo(b.cost),
-  ),
+  [...BallCosmetic.values]..sort((a, b) => a.cost.compareTo(b.cost)),
 );
 
 String formatBoost(double value) =>

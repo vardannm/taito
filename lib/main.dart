@@ -51,6 +51,7 @@ import 'one_finger_controls.dart';
 import 'boot_splash.dart';
 import 'responsive_layout.dart';
 import 'infinite_coin_chip.dart';
+import 'infinite_boss.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -162,15 +163,28 @@ class _GameScreenState extends State<GameScreen>
   bool recorded = false, newBest = false, briefing = false;
   TutorialRun? tutorialRun;
   bool tutorialSheetOpen = false;
-  final tutorialShopKey = GlobalKey();
   final shopOriginKey = GlobalKey();
   final tutorialLevelsKey = GlobalKey();
   final tutorialDailyKey = GlobalKey();
+  final tutorialPlayKey = GlobalKey();
   final tutorialHeartsKey = GlobalKey();
   final tutorialScoreKey = GlobalKey();
   final tutorialCoinsKey = GlobalKey();
   bool get tutorialActive => !profile.tutorialSeen && profile.tutorial.active;
   TutorialStep get tutorialStep => profile.tutorial.step;
+
+  /// Lessons play on the opened board. Between them the tutorial guides the
+  /// ordinary menu, where only Play opens the board.
+  bool get tutorialBoard => tutorialActive && !entrance.isDismissed;
+
+  /// The Levels lessons point at Choose Level, which only Classic shows.
+  bool get tutorialOnLevels =>
+      tutorialActive &&
+      const [
+        TutorialStep.levels,
+        TutorialStep.level1,
+        TutorialStep.classicPlay,
+      ].contains(tutorialStep);
 
   void tutorialChanged() {
     unawaited(profile.saveTutorial());
@@ -213,8 +227,9 @@ class _GameScreenState extends State<GameScreen>
     profile.controlMode = ControlMode.oneFinger;
     unawaited(profile.save());
     setState(() {
-      prepareInfinite();
+      // Open the board first, so the lesson board accepts the first touch.
       entrance.value = 1;
+      prepareInfinite();
     });
   }
 
@@ -265,14 +280,14 @@ class _GameScreenState extends State<GameScreen>
       profile.tutorial.step = TutorialStep.levels;
       unawaited(profile.saveTutorial());
     }
-    if (tutorialActive && tutorialStep == TutorialStep.classicPlay) {
+    if (tutorialActive &&
+        (tutorialStep.inInfinite || tutorialStep == TutorialStep.classicPlay))
+      entrance.value = 1;
+    if (tutorialOnLevels) {
       prepareWorld(1);
     } else {
       prepareInfinite();
     }
-    if (tutorialActive &&
-        (tutorialStep.inInfinite || tutorialStep == TutorialStep.classicPlay))
-      entrance.value = 1;
     game.onInputStarted = () {
       tutorialRun?.configure();
       analytics.startRun(game);
@@ -365,7 +380,7 @@ class _GameScreenState extends State<GameScreen>
     accumulator += math.min(delta, .05);
     final inputEpoch = game.inputEpoch;
     final before =
-        '${game.phase}/${game.target}/${game.lives}/${game.inputEpoch}/$recorded';
+        '${game.phase}/${game.target}/${game.lives}/${game.inputEpoch}/$recorded/${game.boss?.phase}';
     final enemyCues = <EnemyCue>{};
     while (accumulator >= 1 / 120) {
       game.step(1 / 120);
@@ -426,7 +441,7 @@ class _GameScreenState extends State<GameScreen>
     frame.value++;
     if (game.finished && heartEffects.isEmpty) ticker.stop();
     if (before !=
-        '${game.phase}/${game.target}/${game.lives}/${game.inputEpoch}/$recorded')
+        '${game.phase}/${game.target}/${game.lives}/${game.inputEpoch}/$recorded/${game.boss?.phase}')
       setState(() {});
   }
 
@@ -562,11 +577,7 @@ class _GameScreenState extends State<GameScreen>
   }
 
   bool onKey(KeyEvent event) {
-    if ((!tutorialActive && !playArmed && game.waitingForInput) ||
-        (tutorialActive &&
-            game.waitingForInput &&
-            !tutorialStep.inInfinite &&
-            tutorialStep != TutorialStep.classicPlay) ||
+    if ((!tutorialBoard && !playArmed && game.waitingForInput) ||
         returning ||
         carouselMoving ||
         ModalRoute.of(context)?.isCurrent != true)
@@ -847,9 +858,7 @@ class _GameScreenState extends State<GameScreen>
       advanceTutorial(TutorialStep.shopBall);
     analytics.openShop(game.mode);
     final originBox =
-        (shopOriginKey.currentContext ?? tutorialShopKey.currentContext)
-                ?.findRenderObject()
-            as RenderBox?;
+        shopOriginKey.currentContext?.findRenderObject() as RenderBox?;
     final viewport = MediaQuery.sizeOf(context);
     final origin = originBox != null && originBox.hasSize
         ? originBox.localToGlobal(Offset.zero) & originBox.size
@@ -878,7 +887,9 @@ class _GameScreenState extends State<GameScreen>
         game.cosmetic = profile.selectedBall;
         game.platformStyle = profile.selectedPlatform;
         game.cabinet = profile.cabinet;
-        if (game.waitingForInput) prepareWorld(selectedMode);
+        if (game.waitingForInput) {
+          prepareWorld(tutorialOnLevels ? 1 : selectedMode);
+        }
       });
   }
 
@@ -1004,7 +1015,7 @@ class _GameScreenState extends State<GameScreen>
       levelNumber: worldLevel(index),
       waitForInput: true,
     );
-    game.inputLocked = !tutorialActive;
+    game.inputLocked = !tutorialBoard;
     tutorialRun = tutorialActive && tutorialStep.inInfinite && game.infinite
         ? TutorialRun(game, profile.tutorial, tutorialChanged)
         : null;
@@ -1040,7 +1051,13 @@ class _GameScreenState extends State<GameScreen>
     }
     if (!mounted) return;
     setState(() {
-      prepareWorld(index < 0 ? 0 : index);
+      prepareWorld(
+        tutorialOnLevels
+            ? 1
+            : index < 0
+            ? 0
+            : index,
+      );
       returning = false;
     });
   }
@@ -1142,68 +1159,154 @@ class _GameScreenState extends State<GameScreen>
         game.finished)
       return null;
     final step = tutorialStep;
-    final guidedPlay = step.scripted && game.infinite;
+    final guidedPlay = tutorialBoard && step.scripted && game.infinite;
     final objective =
+        tutorialBoard &&
         step == TutorialStep.classicPlay &&
         game.mode == GameMode.classic &&
         game.waitingForInput;
-    final menu =
-        game.waitingForInput && entrance.isDismissed && !step.inInfinite;
+    final menu = !tutorialBoard && game.waitingForInput && entrance.isDismissed;
     if (!guidedPlay && !objective && !menu) return null;
-    if (step == TutorialStep.freePlay) return null;
-    final message = switch (step) {
-      TutorialStep.controls =>
-        game.oneFinger
-            ? game.haloJoystick
-                  ? 'Touch anywhere on the board. Drag sideways to tilt, up or down to lift. The Halo hides when you release.'
-                  : 'Drag the thumb pad: sideways to tilt, up or down to lift. Hold still to keep the height.'
-            : 'Drag up or down on the left or right side. Move both sides to lift; move one to tilt.',
-      TutorialStep.heartsHoles => 'Avoid holes. A fall costs 1 heart.',
-      TutorialStep.heartsFeedback =>
-        game.misses > 0
-            ? 'One heart lost. Keep going.'
-            : 'Keep going. Protect your hearts.',
-      TutorialStep.coins => 'Collect coins.',
-      TutorialStep.coinsFeedback => 'Coin saved. Spend it later.',
-      TutorialStep.shield => 'Shield protects you from danger.',
-      TutorialStep.shieldFeedback => 'Protected! Watch the blue ring.',
-      TutorialStep.magnet =>
-        'Collect the red-and-blue magnet. It pulls nearby rewards toward you.',
-      TutorialStep.magnetFeedback =>
-        'The magnet icon and seconds show how long the pickup lasts.',
-      TutorialStep.metrics => 'Climb higher. Grow your score.',
-      TutorialStep.combo => 'Collect the gold crystal.',
-      TutorialStep.comboFeedback => 'Collect crystals to grow your Combo.',
-      TutorialStep.shop ||
-      TutorialStep.shopBall ||
-      TutorialStep.shopPlatform ||
-      TutorialStep.shopBrowse =>
-        'Buy stronger balls, platforms and Infinite upgrades. A gold dot on Shop means you can afford an improvement.',
-      TutorialStep.levels => 'There are more ways to play. Open Levels.',
-      TutorialStep.level1 => 'Open Levels, then choose Level 1.',
-      TutorialStep.classicPlay =>
-        game.oneFinger
-            ? game.haloJoystick
-                  ? 'Same floating Halo controls. Lift to glowing holes in order, 1–10. Avoid dark holes. Drag anywhere to begin.'
-                  : 'Same thumb-pad controls. Lift to glowing holes in order, 1–10. Avoid dark holes. Drag to begin.'
-            : 'Reach glowing holes in order, 1–10. Avoid dark holes. Drag on either side to begin.',
-      TutorialStep.dailyChallenge =>
-        'Daily Challenge: a new board each day. Earn stars and beat your best.',
-      _ => '',
-    };
+    // The boss card introduces the fight, then clears the sky for it.
+    if (guidedPlay &&
+        step == TutorialStep.boss &&
+        (game.boss?.phase ?? BossPhase.arriving) != BossPhase.arriving)
+      return null;
+    final controlsText = game.oneFinger
+        ? game.haloJoystick
+              ? 'Touch anywhere on the board. Drag sideways to tilt, up or down to lift. The Halo hides when you release.'
+              : 'Drag the thumb pad: sideways to tilt, up or down to lift. Hold still to keep the height.'
+        : 'Drag up or down on the left or right side. Move both sides to lift; move one to tilt.';
+    final (String title, IconData icon, String message) = menu
+        ? step.inShop
+              ? (
+                  'Gear Shop',
+                  Icons.storefront_rounded,
+                  'Coins buy balls, platforms and permanent Infinite upgrades. A gold dot on Shop means you can afford something new. Open Shop.',
+                )
+              : tutorialOnLevels
+              ? (
+                  'Handmade levels',
+                  Icons.route_rounded,
+                  'Classic is a road of handmade boards with stars to earn. Tap Choose Level.',
+                )
+              : step == TutorialStep.dailyChallenge
+              ? (
+                  'Daily Challenge',
+                  Icons.today_rounded,
+                  'Daily Challenge: a new board each day. Earn stars and beat your best. It lives in Modes with Practice and How to Play. Tap Modes to finish.',
+                )
+              : (
+                  'Back to practice',
+                  Icons.play_arrow_rounded,
+                  'Your Infinite lessons pick up where you left off. Tap Play.',
+                )
+        : switch (step) {
+            TutorialStep.controls => (
+              'Move the platform',
+              Icons.open_with_rounded,
+              controlsText,
+            ),
+            TutorialStep.heartsHoles => (
+              'Dodge the holes',
+              Icons.favorite_rounded,
+              'Avoid holes. A fall costs 1 heart, and the run ends when they run out. Steer around this one.',
+            ),
+            TutorialStep.heartsFeedback => (
+              'Hearts',
+              Icons.favorite_rounded,
+              game.misses > 0
+                  ? 'One heart lost. Keep going; your hearts sit top left.'
+                  : 'Nicely dodged. Keep going and protect your hearts.',
+            ),
+            TutorialStep.coins => (
+              'Grab the coin',
+              Icons.toll_rounded,
+              'Collect coins. They fill your wallet for the Shop.',
+            ),
+            TutorialStep.coinsFeedback => (
+              'Coin saved',
+              Icons.toll_rounded,
+              'Coin saved. Spend it later. Coins are kept even when a run ends.',
+            ),
+            TutorialStep.shield => (
+              'Shield',
+              Icons.shield_rounded,
+              'Shield protects you from danger for a few seconds. Grab the blue pickup.',
+            ),
+            TutorialStep.shieldFeedback => (
+              'Protected',
+              Icons.shield_rounded,
+              'Protected! Watch the blue ring around your ball.',
+            ),
+            TutorialStep.magnet => (
+              'Magnet',
+              Icons.attractions_rounded,
+              'Collect the red-and-blue magnet. It pulls nearby rewards toward you.',
+            ),
+            TutorialStep.magnetFeedback => (
+              'Magnet on',
+              Icons.attractions_rounded,
+              'The magnet icon and seconds show how long the pickup lasts.',
+            ),
+            TutorialStep.metrics => (
+              'Climb for points',
+              Icons.trending_up_rounded,
+              'Climb higher. Grow your score.',
+            ),
+            TutorialStep.combo => (
+              'Combo crystal',
+              Icons.diamond_rounded,
+              'Collect the gold crystal. Crystals multiply your points.',
+            ),
+            TutorialStep.comboFeedback => (
+              'Combo',
+              Icons.diamond_rounded,
+              'Collect crystals to grow your Combo. A lost heart resets it.',
+            ),
+            TutorialStep.boss => (
+              'Boss incoming',
+              Icons.local_fire_department_rounded,
+              'Bosses arrive as your score climbs. This practice boss is gentle: slip between its bullets and leave the marked laser lines until its timer ends.',
+            ),
+            TutorialStep.bossFeedback => (
+              'Boss cleared',
+              Icons.emoji_events_rounded,
+              'Real bosses hit harder and stay longer. Next: 45 seconds of free play.',
+            ),
+            TutorialStep.classicPlay => (
+              'Level 1',
+              Icons.flag_rounded,
+              game.oneFinger
+                  ? game.haloJoystick
+                        ? 'Same floating Halo controls. Lift to glowing holes in order, 1–10. Avoid dark holes. Drag anywhere to begin.'
+                        : 'Same thumb-pad controls. Lift to glowing holes in order, 1–10. Avoid dark holes. Drag to begin.'
+                  : 'Reach glowing holes in order, 1–10. Avoid dark holes. Drag on either side to begin.',
+            ),
+            _ => ('', Icons.school_rounded, ''),
+          };
+    if (message.isEmpty) return null;
     return TutorialSpotlight(
       key: const ValueKey('onboarding-spotlight'),
+      title: title,
+      icon: icon,
+      badge:
+          !menu &&
+              (step == TutorialStep.coins || step == TutorialStep.coinsFeedback)
+          ? const CoinIcon(size: 30)
+          : null,
+      lesson: step.lesson,
+      lessons: TutorialStep.lessons,
       message: message,
       onSkip: skipTutorial,
       listenable: frame,
-      blockOutside: menu && !objective,
+      blockOutside: menu,
       bottomInset: guidedPlay || objective
           ? OneFingerControls.heightFor(game) + 12
           : 100,
       messageTop: guidedPlay || objective
           ? MediaQuery.paddingOf(context).top + 118
           : null,
-      centerSkip: game.controlMode == ControlMode.twoFinger,
       targets: (layer) {
         final result = <Rect>[];
         void ui(GlobalKey key) {
@@ -1212,16 +1315,19 @@ class _GameScreenState extends State<GameScreen>
         }
 
         final board = boardKey.currentContext?.findRenderObject() as RenderBox?;
-        void worldPoint(double x, double y, [double radius = 22]) {
+        void boardPoint(Offset at, double radius) {
           if (board == null || !board.hasSize) return;
           final viewport = boardViewport(board.size);
           final point = layer.globalToLocal(
-            board.localToGlobal(viewport.project(Offset(x, game.screenY(y)))),
+            board.localToGlobal(viewport.project(at)),
           );
           result.add(
             Rect.fromCircle(center: point, radius: radius * viewport.scale),
           );
         }
+
+        void worldPoint(double x, double y, [double radius = 22]) =>
+            boardPoint(Offset(x, game.screenY(y)), radius);
 
         void controls() {
           if (game.boardTilt) {
@@ -1277,10 +1383,12 @@ class _GameScreenState extends State<GameScreen>
         } else if (menu) {
           ui(
             step.inShop
-                ? tutorialShopKey
+                ? shopOriginKey
+                : tutorialOnLevels
+                ? tutorialLevelsKey
                 : step == TutorialStep.dailyChallenge
                 ? tutorialDailyKey
-                : tutorialLevelsKey,
+                : tutorialPlayKey,
           );
         } else {
           switch (step) {
@@ -1308,6 +1416,9 @@ class _GameScreenState extends State<GameScreen>
               worldPoint(game.ballX, game.ballY - 35, 40);
             case TutorialStep.metrics || TutorialStep.comboFeedback:
               ui(tutorialScoreKey);
+            case TutorialStep.boss:
+              if (game.boss case final boss?)
+                boardPoint(Offset(boss.position.x, boss.position.y), 50);
             default:
               break;
           }
@@ -1582,7 +1693,7 @@ class _GameScreenState extends State<GameScreen>
   );
 
   Widget boardChrome() {
-    if (!tutorialActive && game.waitingForInput) {
+    if (!tutorialBoard && game.waitingForInput) {
       if (!playArmed) return const SizedBox();
       return Center(
         child: IgnorePointer(
@@ -1957,7 +2068,7 @@ class _GameScreenState extends State<GameScreen>
         ? IgnorePointer(
             ignoring:
                 carouselMoving ||
-                (!tutorialActive && !playArmed && game.waitingForInput),
+                (!tutorialBoard && !playArmed && game.waitingForInput),
             child: PivotBoard(
               key: boardKey,
               game: game,
@@ -1965,8 +2076,7 @@ class _GameScreenState extends State<GameScreen>
               fillWidth: expansion,
               bottomInset:
                   controlStrip(game) +
-                  bottomControlHeight(context) *
-                      (tutorialActive ? 1 : expansion) +
+                  bottomControlHeight(context) * expansion +
                   MediaQuery.paddingOf(context).bottom * expansion,
               bottomPadding: MediaQuery.paddingOf(context).bottom * expansion,
               overlay: Padding(
@@ -1979,10 +2089,10 @@ class _GameScreenState extends State<GameScreen>
               dimUntilInput:
                   game.infinite &&
                   game.waitingForInput &&
-                  (tutorialActive || playArmed) &&
+                  (tutorialBoard || playArmed) &&
                   !returning,
               showHint:
-                  (tutorialActive || playArmed) &&
+                  (tutorialBoard || playArmed) &&
                   game.waitingForInput &&
                   !carouselMoving &&
                   !returning &&
@@ -2013,7 +2123,7 @@ class _GameScreenState extends State<GameScreen>
       fit: StackFit.expand,
       children: [
         Opacity(
-          opacity: tutorialActive ? 1 : 1 - chromeOpacity,
+          opacity: 1 - chromeOpacity,
           child: LayoutBuilder(
             builder: (context, bounds) => OverflowBox(
               minHeight: math.max(200, bounds.maxHeight),
@@ -2022,7 +2132,7 @@ class _GameScreenState extends State<GameScreen>
             ),
           ),
         ),
-        if (!tutorialActive && chromeOpacity > 0)
+        if (chromeOpacity > 0)
           IgnorePointer(
             child: ExcludeSemantics(
               child: Opacity(
@@ -2044,343 +2154,15 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  /// Selection shortcuts share a dock below the unchanged world carousel.
-  Widget menuDock(
-    String title,
-    IconData icon,
-    String tooltip,
-    VoidCallback action, {
-    Key? targetKey,
-    Key? tapKey,
-    bool upgradeAvailable = false,
-  }) => Expanded(
-    child: Tooltip(
-      message: tooltip,
-      child: Material(
-        key: targetKey,
-        color: menuPanel,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: menuLine),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          key: tapKey,
-          onTap: carouselMoving ? null : action,
-          child: SizedBox(
-            height: 44,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ShopHintIcon(
-                  icon,
-                  size: 17,
-                  color: menuGold,
-                  available: upgradeAvailable,
-                ),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      title,
-                      style: const TextStyle(
-                        color: menuText,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-
-  Widget shopButton() => menuDock(
-    'Shop',
-    Icons.storefront_rounded,
-    'Gear shop',
-    showBallShop,
-    targetKey: tutorialShopKey,
-    tapKey: game.waitingForInput ? const ValueKey('board-shop') : null,
-    upgradeAvailable: profile.shopUpgradeAvailable,
-  );
-
-  Widget tutorialSelectionHeader(double page) {
-    final index = page.round().clamp(0, arcadeModes.length - 1);
-    final distance = page - index;
-    final reduced = MediaQuery.disableAnimationsOf(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Expanded(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'ROLLRISE',
-                      style: TextStyle(
-                        color: menuText,
-                        fontSize: 23,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 4,
-                      ),
-                    ),
-                    Text(
-                      'PRECISION ARCADE',
-                      style: TextStyle(
-                        color: menuMuted,
-                        fontSize: 8,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            if (!tutorialActive)
-              Flexible(
-                child: MenuPill(
-                  profile.unlimitedCoins ? '∞' : '${profile.wallet}',
-                  icon: Icons.toll_rounded,
-                ),
-              ),
-            const SizedBox(width: 10),
-            MenuIconButton(
-              icon: Icons.redeem_rounded,
-              tooltip: 'Daily prizes',
-              badge: profile.dailyPrizes.canClaim(DateTime.now()),
-              onPressed: carouselMoving ? null : showDailyPrizes,
-            ),
-            if (tutorialActive &&
-                game.waitingForInput &&
-                !returning &&
-                [
-                  TutorialStep.levels,
-                  TutorialStep.level1,
-                  TutorialStep.classicPlay,
-                ].contains(tutorialStep))
-              MenuIconButton(
-                key: tutorialLevelsKey,
-                icon: Icons.grid_view_rounded,
-                tooltip: 'Classic levels',
-                onPressed: selectLevel,
-              ),
-            if (tutorialActive &&
-                game.waitingForInput &&
-                !returning &&
-                tutorialStep == TutorialStep.dailyChallenge)
-              MenuIconButton(
-                key: tutorialDailyKey,
-                icon: Icons.today_outlined,
-                tooltip: 'Daily Challenge',
-                onPressed: () {
-                  skipTutorial();
-                  showDaily();
-                },
-              ),
-          ],
-        ),
-        Expanded(
-          child: Transform.translate(
-            offset: Offset(reduced ? 0 : distance * -28, 0),
-            child: Opacity(
-              opacity: reduced ? 1 : 1 - distance.abs() * .8,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            worldTitle(index),
-                            key: const ValueKey('selected-mode-title'),
-                            style: TextStyle(
-                              color: menuText,
-                              fontSize: MediaQuery.sizeOf(context).height < 650
-                                  ? 29
-                                  : 38,
-                              height: 1.05,
-                              letterSpacing: -1.3,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            worldSubtitle(index),
-                            key: const ValueKey('selected-mode-subtitle'),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: menuMuted,
-                              fontSize: 9,
-                              letterSpacing: 1,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: menuGold.withAlpha(70)),
-                    ),
-                    child: Center(
-                      child: Text(
-                        '0${index + 1}',
-                        style: const TextStyle(
-                          color: menuGold,
-                          fontSize: 11,
-                          fontFamily: 'monospace',
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget tutorialCarouselFooter(double page) => Padding(
-    padding: const EdgeInsets.fromLTRB(18, 0, 18, 4),
-    child: Column(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        SizedBox(
-          height: 32,
-          child: Row(
-            children: [
-              IconButton(
-                tooltip: 'Previous mode',
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints.tightFor(
-                  width: 28,
-                  height: 30,
-                ),
-                onPressed: selectedMode > 0 && !carouselMoving
-                    ? () => carouselKey.currentState?.select(selectedMode - 1)
-                    : null,
-                icon: Icon(
-                  Icons.chevron_left_rounded,
-                  color: selectedMode > 0 ? menuMuted : menuLine,
-                  size: 20,
-                ),
-              ),
-              for (var index = 0; index < arcadeModes.length; index++)
-                Expanded(
-                  child: Semantics(
-                    label:
-                        '${worldTitle(index)}, ${index + 1} of ${arcadeModes.length}',
-                    selected: selectedMode == index,
-                    button: true,
-                    child: GestureDetector(
-                      key: ValueKey('mode-$index'),
-                      behavior: HitTestBehavior.opaque,
-                      onTap: carouselMoving
-                          ? null
-                          : () => carouselKey.currentState?.select(index),
-                      child: Container(
-                        height: 30,
-                        margin: const EdgeInsets.symmetric(horizontal: 3),
-                        decoration: BoxDecoration(
-                          color: Color.lerp(
-                            Colors.transparent,
-                            menuGold.withAlpha(22),
-                            1 - (page - index).abs().clamp(0.0, 1.0),
-                          ),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Center(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 5),
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                ['Infinite', 'Classic', 'Merge'][index],
-                                style: TextStyle(
-                                  color: selectedMode == index
-                                      ? menuGold
-                                      : menuMuted,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              IconButton(
-                tooltip: 'Next mode',
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints.tightFor(
-                  width: 28,
-                  height: 30,
-                ),
-                onPressed:
-                    selectedMode < arcadeModes.length - 1 && !carouselMoving
-                    ? () => carouselKey.currentState?.select(selectedMode + 1)
-                    : null,
-                icon: Icon(
-                  Icons.chevron_right_rounded,
-                  color: selectedMode < 2 ? menuMuted : menuLine,
-                  size: 20,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            shopButton(),
-            const SizedBox(width: 8),
-            menuDock('Arcade', Icons.apps_rounded, 'Modes', showModes),
-            const SizedBox(width: 8),
-            menuDock('Options', Icons.tune_rounded, 'Settings', showSettings),
-          ],
-        ),
-      ],
-    ),
-  );
-
-  Widget bottomInput(bool ready, double controlHeight) => SizedBox(
+  Widget bottomInput(double controlHeight) => SizedBox(
     key: analogKey,
     height: controlHeight,
     child: IgnorePointer(
       ignoring:
           carouselMoving ||
-          (!tutorialActive && !playArmed && game.waitingForInput),
+          (!tutorialBoard && !playArmed && game.waitingForInput),
       child: Opacity(
-        opacity: tutorialActive ? 1 : 1 - chromeOpacity,
+        opacity: 1 - chromeOpacity,
         child: LayoutBuilder(
           builder: (context, bounds) => Stack(
             fit: StackFit.expand,
@@ -2393,8 +2175,8 @@ class _GameScreenState extends State<GameScreen>
                       : AnalogControls(game: game, frame: frame),
                 ),
               ),
-              if ((tutorialActive && ready ||
-                      playArmed && game.waitingForInput) &&
+              if ((tutorialBoard || playArmed) &&
+                  game.waitingForInput &&
                   !carouselMoving)
                 ControlHint(
                   sideways: game.tiltLift,
@@ -2443,16 +2225,24 @@ class _GameScreenState extends State<GameScreen>
           MediaQuery.paddingOf(context).vertical <
       560;
 
+  /// Modes holds Daily Challenge, where the tutorial hands over.
+  void openModes() {
+    if (tutorialActive && tutorialStep == TutorialStep.dailyChallenge) {
+      skipTutorial();
+    }
+    showModes();
+  }
+
   Widget selectionHeader(double page) {
-    if (tutorialActive) return tutorialSelectionHeader(page);
     return Row(
       children: [
         // Modes are also one swipe away in the carousel, so the full mode
         // list sits in the quiet corner and Achievements gets the big button.
         MenuQuietButton(
+          key: tutorialDailyKey,
           icon: Icons.grid_view_rounded,
           tooltip: 'Modes',
-          onPressed: carouselMoving ? null : showModes,
+          onPressed: carouselMoving ? null : openModes,
         ),
         MenuQuietButton(
           icon: Icons.redeem_outlined,
@@ -2530,7 +2320,6 @@ class _GameScreenState extends State<GameScreen>
   }
 
   Widget carouselFooter(double page) {
-    if (tutorialActive) return tutorialCarouselFooter(page);
     final index = page.round().clamp(0, arcadeModes.length - 1);
     final classic = index == 1;
     final landscape = usesLandscapeMenu(MediaQuery.sizeOf(context));
@@ -2599,6 +2388,7 @@ class _GameScreenState extends State<GameScreen>
                       Expanded(
                         child: Center(
                           child: Tooltip(
+                            key: tutorialLevelsKey,
                             message: 'Level ${worldLevel(index)}',
                             child: SizedBox(
                               height: 40,
@@ -2667,12 +2457,18 @@ class _GameScreenState extends State<GameScreen>
                 ],
               ),
               const SizedBox(height: 8),
-              PremiumPlayButton(
-                height: compactMenu ? 56 : 64,
-                key: game.waitingForInput ? const ValueKey('menu-play') : null,
-                onPressed: carouselMoving || !game.waitingForInput || returning
-                    ? null
-                    : playSelectedWorld,
+              KeyedSubtree(
+                key: tutorialPlayKey,
+                child: PremiumPlayButton(
+                  height: compactMenu ? 56 : 64,
+                  key: game.waitingForInput
+                      ? const ValueKey('menu-play')
+                      : null,
+                  onPressed:
+                      carouselMoving || !game.waitingForInput || returning
+                      ? null
+                      : playSelectedWorld,
+                ),
               ),
               SizedBox(height: compactMenu ? 8 : 14),
               Row(
@@ -2744,7 +2540,7 @@ class _GameScreenState extends State<GameScreen>
   Widget playScreen(BuildContext context) => Scaffold(
     body: MenuMotion(
       enabled:
-          !tutorialActive && !playArmed && game.waitingForInput && !returning,
+          !tutorialBoard && !playArmed && game.waitingForInput && !returning,
       builder: (context, drift, reveal) => ModeCarousel(
         key: carouselKey,
         selected: selectedMode,
@@ -2759,7 +2555,7 @@ class _GameScreenState extends State<GameScreen>
         acceptSwipe: acceptsWorldSwipe,
         onMoving: (moving) => setState(() {
           carouselMoving = moving;
-          game.inputLocked = moving || (!tutorialActive && !playArmed);
+          game.inputLocked = moving || (!tutorialBoard && !playArmed);
         }),
         onSelected: (index) => setState(() {
           if (index != selectedMode) prepareWorld(index);
@@ -2784,24 +2580,12 @@ class _GameScreenState extends State<GameScreen>
           final ready =
               game.waitingForInput && !returning && entrance.isDismissed;
           final menuScale = wideMenuScale(MediaQuery.sizeOf(context));
-          final landscapeMenu =
-              !tutorialActive && usesLandscapeMenu(MediaQuery.sizeOf(context));
+          final landscapeMenu = usesLandscapeMenu(MediaQuery.sizeOf(context));
           final menuFooterWidth = 460.0 * menuScale;
-          final menuHeaderHeight = !tutorialActive
-              ? compactMenu
-                    ? 64.0
-                    : 88.0 * menuScale
-              : MediaQuery.sizeOf(context).height < 650 &&
-                    MediaQuery.textScalerOf(context).scale(10) <= 10
-              ? 104.0
-              : 144.0;
+          final menuHeaderHeight = compactMenu ? 64.0 : 88.0 * menuScale;
           final headerHeight = menuHeaderHeight * (1 - expansion);
-          final menuFooterHeight = tutorialActive
-              ? 84.0
-              : compactMenu
-              ? 284.0
-              : 310.0 * menuScale;
-          final menuGap = !tutorialActive && compactMenu ? 4.0 : 12.0;
+          final menuFooterHeight = compactMenu ? 284.0 : 310.0 * menuScale;
+          final menuGap = compactMenu ? 4.0 : 12.0;
           final controlHeight = bottomControlHeight(context);
           final stageBackground = Color.lerp(
             background,
@@ -2831,13 +2615,11 @@ class _GameScreenState extends State<GameScreen>
                           opacity: chromeOpacity,
                           child: RepaintBoundary(
                             child: CustomPaint(
-                              painter: tutorialActive
-                                  ? MenuBackdrop()
-                                  : PremiumMenuBackdrop(
-                                      profile.selectedBall,
-                                      drift,
-                                      page: page,
-                                    ),
+                              painter: PremiumMenuBackdrop(
+                                profile.selectedBall,
+                                drift,
+                                page: page,
+                              ),
                             ),
                           ),
                         ),
@@ -2894,15 +2676,9 @@ class _GameScreenState extends State<GameScreen>
                                               vertical: 4,
                                             ),
                                             child: MenuReveal(
-                                              animation: tutorialActive
-                                                  ? const AlwaysStoppedAnimation(
-                                                      1.0,
-                                                    )
-                                                  : reveal,
+                                              animation: reveal,
                                               child: ScaledMenuChrome(
-                                                scale: tutorialActive
-                                                    ? 1
-                                                    : menuScale,
+                                                scale: menuScale,
                                                 child: selectionHeader(page),
                                               ),
                                             ),
@@ -2959,15 +2735,9 @@ class _GameScreenState extends State<GameScreen>
                                             child: Opacity(
                                               opacity: chromeOpacity,
                                               child: MenuReveal(
-                                                animation: tutorialActive
-                                                    ? const AlwaysStoppedAnimation(
-                                                        1.0,
-                                                      )
-                                                    : reveal,
+                                                animation: reveal,
                                                 child: ScaledMenuChrome(
-                                                  scale: tutorialActive
-                                                      ? 1
-                                                      : menuScale,
+                                                  scale: menuScale,
                                                   child: carouselFooter(page),
                                                 ),
                                               ),
@@ -2989,10 +2759,8 @@ class _GameScreenState extends State<GameScreen>
                             bottom:
                                 MediaQuery.paddingOf(context).bottom *
                                     expansion +
-                                (tutorialActive
-                                    ? 0
-                                    : menuFooterHeight * (1 - expansion)),
-                            child: bottomInput(ready, controlHeight),
+                                menuFooterHeight * (1 - expansion),
+                            child: bottomInput(controlHeight),
                           ),
                       ],
                     ),
@@ -3490,7 +3258,13 @@ class _GameScreenState extends State<GameScreen>
                         pauseAction(
                           'RETRY THIS BOARD',
                           Icons.refresh_rounded,
-                          () => start(game.mode, challengeDate: game.dailyDate),
+                          () {
+                            // The win already moved progress to the next level.
+                            if (game.mode == GameMode.classic) {
+                              profile.selectClassicLevel(game.level);
+                            }
+                            start(game.mode, challengeDate: game.dailyDate);
+                          },
                         ),
                       // A paused run can be dropped for a fresh one in any mode.
                       if (game.paused)

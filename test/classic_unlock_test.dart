@@ -62,6 +62,37 @@ void main() {
     },
   );
 
+  test(
+    'a win moves Classic to the next open level, from any result button',
+    () {
+      BalanceGame win(int level, {bool clean = true}) {
+        final game = BalanceGame()
+          ..start(gameMode: GameMode.classic, levelNumber: level);
+        game.won = true;
+        game.phase = GamePhase.over;
+        if (!clean) {
+          game.misses = 1;
+          game.elapsed = 9999;
+        }
+        return game;
+      }
+
+      // One star from Level 1 is not enough to open Level 2: stay on Level 1.
+      final short = PlayerProfile(temporaryLevelAccess: false);
+      short.recordResult(win(1, clean: false));
+      expect(short.isClassicLevelUnlocked(2), isFalse);
+      expect(short.classicLevel, 1);
+
+      // A three-star win opens Level 2, and the menu continues there.
+      final p = PlayerProfile(temporaryLevelAccess: false);
+      p.recordResult(win(1));
+      expect(p.classicLevel, 2);
+      // Replaying an earlier level keeps the furthest place.
+      p.recordResult(win(1));
+      expect(p.classicLevel, 2);
+    },
+  );
+
   test('goals recommend earning a missing star instead of a locked level', () {
     final p = PlayerProfile(temporaryLevelAccess: false)
       ..controlMode = ControlMode.twoFinger

@@ -2,6 +2,7 @@ import 'menu_design.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'daily_prizes.dart';
+import 'infinite_coin_chip.dart';
 import 'profile.dart';
 
 class DailyPrizeSheet extends StatefulWidget {
@@ -75,13 +76,11 @@ class _DailyPrizeSheetState extends State<DailyPrizeSheet> {
                 Card(
                   color: i == day ? const Color(0xFF2C4140) : menuPanel,
                   child: ListTile(
-                    leading: Icon(
-                      i < day || (i == day && !ready)
-                          ? Icons.check_circle_rounded
-                          : i == 5
-                          ? Icons.redeem_rounded
-                          : Icons.toll_rounded,
-                    ),
+                    leading: i < day || (i == day && !ready)
+                        ? const Icon(Icons.check_circle_rounded)
+                        : i == 5
+                        ? const Icon(Icons.redeem_rounded)
+                        : const CoinIcon(size: 22),
                     title: Text(
                       'Day $i',
                       style: const TextStyle(fontWeight: FontWeight.w800),
