@@ -160,10 +160,14 @@ class ShopGalleryCard extends StatelessWidget {
     this.worldName,
     this.selected = false,
     this.artHeight = 188,
+    this.footer,
   });
   final String name, description, status, detail;
   final String? worldName;
   final Widget artwork, action;
+
+  /// Shown under the price row, such as a way to get more coins.
+  final Widget? footer;
   final bool selected;
   final double artHeight;
 
@@ -288,6 +292,7 @@ class ShopGalleryCard extends StatelessWidget {
                       Flexible(child: action),
                     ],
                   ),
+                  if (footer != null) ...[const SizedBox(height: 6), footer!],
                 ],
               ),
             ),

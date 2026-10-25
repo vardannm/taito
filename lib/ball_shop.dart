@@ -11,7 +11,7 @@ import 'menu_design.dart';
 import 'survival_upgrades.dart';
 import 'shop_design.dart';
 import 'premium_menu.dart';
-import 'infinite_coin_chip.dart';
+import 'coin_store.dart';
 
 class BallShop extends StatefulWidget {
   const BallShop({
@@ -160,6 +160,14 @@ class _BallShopState extends State<BallShop>
                   : preview,
             ),
     ),
+    footer: owned || widget.profile.canAfford(cost)
+        ? null
+        : GetCoinsLink(
+            key: ValueKey('get-coins-$id'),
+            profile: widget.profile,
+            needed: cost - widget.profile.wallet,
+            onClosed: () => setState(() {}),
+          ),
     detail: purchaseOnly
         ? 'Premium · +${formatBoost(bonus)}× Infinite points'
         : bonus == 0
@@ -255,10 +263,10 @@ class _BallShopState extends State<BallShop>
                     Flexible(
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
-                        child: MenuPill(
-                          p.unlimitedCoins ? '∞' : formatMenuScore(p.wallet),
+                        child: WalletButton(
                           key: const ValueKey('wallet'),
-                          leading: const CoinIcon(size: 18),
+                          profile: p,
+                          onClosed: () => setState(() {}),
                         ),
                       ),
                     ),
@@ -481,10 +489,11 @@ class _BallShopState extends State<BallShop>
               ),
               if (!maxed && !p.canAfford(cost))
                 Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: Text(
-                    'Need ${cost - p.wallet} more coins',
-                    style: const TextStyle(color: menuMuted, fontSize: 11),
+                  padding: const EdgeInsets.only(top: 6),
+                  child: GetCoinsLink(
+                    profile: p,
+                    needed: cost - p.wallet,
+                    onClosed: () => setState(() {}),
                   ),
                 ),
             ],
