@@ -67,8 +67,14 @@ Future<void> main() async {
       systemNavigationBarIconBrightness: Brightness.light,
     ),
   );
-  final profile = PlayerProfile();
+  // TEMPORARY store-screenshot build: every level open and at least 300,000
+  // coins. Remove both before release.
+  final profile = PlayerProfile(temporaryLevelAccess: true);
   await profile.load();
+  if (profile.wallet < 300000) {
+    profile.wallet = 300000;
+    await profile.saveEconomy();
+  }
   final analytics = await AppAnalytics.initialize();
   final adConsent = AdConsent();
   runApp(
@@ -234,6 +240,10 @@ class _GameScreenState extends State<GameScreen>
   }
 
   bool readyRetry = false;
+
+  /// TEMPORARY store-screenshot tool: hides the pause menu over the frozen
+  /// run until the next tap. Remove before release.
+  bool screenshotMode = false;
   final carouselKey = GlobalKey<ModeCarouselState>();
   final boardKey = GlobalKey();
   final analogKey = GlobalKey();
@@ -984,6 +994,7 @@ class _GameScreenState extends State<GameScreen>
     if (adBusy) return;
     cancelResumeCountdown();
     if (game.finished) recordFinalResult();
+    screenshotMode = false;
     reviveDeclined = false;
     reviveError = null;
     coinDoubleError = null;
@@ -1141,6 +1152,10 @@ class _GameScreenState extends State<GameScreen>
   /// returns to the menu (recording any finished result) instead of exiting.
   void handleBack() {
     if (adBusy || returning) return;
+    if (screenshotMode) {
+      setState(() => screenshotMode = false);
+      return;
+    }
     if (game.started &&
         !game.finished &&
         !game.paused &&
@@ -2767,12 +2782,22 @@ class _GameScreenState extends State<GameScreen>
                   ),
                   if (!returning &&
                       resumeSeconds == 0 &&
-                      (game.paused || game.finished))
+                      (game.paused || game.finished) &&
+                      !screenshotMode)
                     SafeArea(
                       key: const ValueKey('run-overlay'),
                       child: Padding(
                         padding: const EdgeInsets.all(12),
                         child: responsiveRunOverlay(context),
+                      ),
+                    ),
+                  // TEMPORARY: any tap leaves the frozen screenshot view.
+                  if (screenshotMode)
+                    Positioned.fill(
+                      child: GestureDetector(
+                        key: const ValueKey('screenshot-mode'),
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => setState(() => screenshotMode = false),
                       ),
                     ),
                   if (resumeSeconds > 0)
@@ -3272,6 +3297,13 @@ class _GameScreenState extends State<GameScreen>
                           'RESTART RUN',
                           Icons.restart_alt_rounded,
                           () => start(game.mode, challengeDate: game.dailyDate),
+                        ),
+                      // TEMPORARY store-screenshot tool. Remove before release.
+                      if (game.paused || game.finished)
+                        pauseAction(
+                          'SCREENSHOT MODE',
+                          Icons.photo_camera_outlined,
+                          () => setState(() => screenshotMode = true),
                         ),
                       if (tutorialActive)
                         TextButton(

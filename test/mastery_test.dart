@@ -27,6 +27,25 @@ void finish(
 }
 
 void main() {
+  testWidgets('earned stars fill from the left, empty stars come last', (
+    tester,
+  ) async {
+    // Finished, missed the no-miss goal, beat the time, took the bonus star.
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: StarRow(1 | 4 | 8, count: 4))),
+    );
+    final icons = tester
+        .widgetList<Icon>(find.byType(Icon))
+        .map((icon) => icon.icon)
+        .toList();
+    expect(icons, [
+      Icons.star_rounded,
+      Icons.star_rounded,
+      Icons.star_rounded,
+      Icons.star_outline_rounded,
+    ]);
+    expect(find.bySemanticsLabel('3 of 4 stars'), findsOneWidget);
+  });
   setUp(
     () => SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty(),

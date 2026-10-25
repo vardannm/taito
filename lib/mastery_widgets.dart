@@ -18,25 +18,27 @@ class StarRow extends StatelessWidget {
   final double size;
   final bool dark;
   @override
-  Widget build(BuildContext context) => Semantics(
-    label:
-        '${LevelRecord.starCount(mask & ((1 << count) - 1))} of $count stars',
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (var i = 0; i < count; i++)
-          Icon(
-            (mask & (1 << i)) != 0
-                ? Icons.star_rounded
-                : Icons.star_outline_rounded,
-            size: size,
-            color: (mask & (1 << i)) != 0
-                ? (dark ? brass : const Color(0xFFA76D20))
-                : (dark ? cream.withAlpha(80) : ink.withAlpha(80)),
-          ),
-      ],
-    ),
-  );
+  Widget build(BuildContext context) {
+    // Earned stars fill from the left whichever goals earned them; the goal
+    // list beside a result says which ones they were.
+    final earned = LevelRecord.starCount(mask & ((1 << count) - 1));
+    return Semantics(
+      label: '$earned of $count stars',
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < count; i++)
+            Icon(
+              i < earned ? Icons.star_rounded : Icons.star_outline_rounded,
+              size: size,
+              color: i < earned
+                  ? (dark ? brass : const Color(0xFFA76D20))
+                  : (dark ? cream.withAlpha(80) : ink.withAlpha(80)),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class MasteryResult extends StatelessWidget {
