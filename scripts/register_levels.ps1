@@ -6,7 +6,6 @@ try {
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   & $dartExecutable format 'lib/classic_levels.dart' 'lib/classic_levels'
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-  & (Join-Path $PSScriptRoot 'flutter.ps1') test --no-pub 'tool/bake_mode_previews.dart'
   $registrationExitCode = $LASTEXITCODE
 }
 finally { Pop-Location }

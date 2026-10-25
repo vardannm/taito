@@ -1,5 +1,324 @@
 # Validation record
 
+## Android AdMob integration — 2026-10-23
+
+- Added launch-time UMP update/form handling, SDK-based eligibility checks
+  before loading/showing rewarded ads, and the required privacy-options entry.
+- Android release builds use the registered real IDs. Debug/profile and
+  explicit `AD_TEST_MODE=true` release QA builds retain sample rewarded units.
+- Analytics is now a separate persisted opt-in, off by default. Updated and
+  deployed the public/bundled privacy policy to describe both controls.
+- Focused consent, rewarded-ad and analytics tests: **22 passed**. Analysis of
+  `lib` and `test`: **no issues**. Full suite: **749 passed, 2 failed**, both in
+  current Classic-layout assumptions (`classic_progression_test.dart` and
+  `spiders_test.dart`); no Classic level source was edited for this integration.
+- Signed release AAB built and verified for ZIP integrity, real IDs, upload
+  signer and native ELF alignment. Physical Android device QA is pending.
+- European and US privacy messages are published. The signed QA APK was
+  verified to contain sample rewarded creatives only. A separate AdSense
+  payment-account verification alert remains in the console.
+- AdMob message/account status and test commands: `release/ADMOB_SETUP.md`.
+  Current bundle fingerprint: `release/ANDROID_SIGNING.md`.
+
+## Google Play screenshots — 2026-10-23
+
+- Prepared six current Android-target Flutter UI renders for each of phone,
+  7-inch tablet and 10-inch tablet: 18 screenshots in total. Gameplay is
+  staged; these are not physical-device captures. Native-device comparison
+  remains part of release QA.
+- RGB PNGs passed dimension, aspect-ratio, transparency, chunk integrity,
+  decoded-pixel and source-identity checks. Contact sheets were reviewed.
+- Capture and overview render tests passed; static analysis of both render
+  tools reported no issues. Production gameplay code was unchanged.
+- Upload map, provenance, accessibility descriptions and checksums are in
+  `release/google-play/2026-10-23/`. No store upload was performed.
+
+## Release regression fixtures — 2026-10-23
+
+- Reproduced all nine failures from the launch audit before editing. Each
+  came from an outdated test setup or expectation; gameplay code did not need
+  to change.
+- Infinite's current manual-lift cap places the platform at screen y=321,
+  with the ball at y=314. Updated the camera-limit assertion and safe-height
+  helper to respect that cap. Shield-order tests now put the later shield on
+  the reachable sweep instead of beyond the lift limit; the exact heart-loss,
+  shield collection and projectile cleanup assertions remain in place.
+- Classic placement checks now distinguish timed hazards from moving holes
+  that persist from level start. They retain authored-position checks and
+  add coverage for the same moving-hole instances advancing across target
+  changes. The isolated test ball also stays clear of later side lasers.
+- Replaced the removed `First steps` level-name locator with `level-1`, so
+  the safe-area test reaches its layout assertions again.
+- Full suite: **743 passed, zero failures**. Static analysis of `lib` and
+  `test`: **no issues found**. Logs:
+  `artifacts/failing-checks-baseline-2026-10-23.log` and
+  `artifacts/regression-suite-2026-10-23.log`.
+- These are test/documentation changes. The signed Android bundle built
+  earlier on 23 October contains the same gameplay code; it was not rebuilt.
+  Ads/consent integration, store approvals and physical-device QA still need
+  their separate release sign-off.
+
+## Enemy and weapon sound effects — 2026-10-09
+
+- Added 21 original synthesized mono 44.1 kHz / 16-bit PCM cues (872 KB):
+  enemy arrivals/hisses, three distinct boss entrances, bullets, ricochets,
+  rebounds, petals/crystals, laser charge/fire, bomb throws, pool landings,
+  mine charge/burst, comet warning/fire, webs and quill bursts.
+- A pure observer captures actual transitions at each fixed physics tick;
+  paired projectiles/volleys share one cue and close rebounds coalesce.
+  Sound settings remain independent from music/haptics. Low-latency pools
+  use shared audio focus and a global four-voice limit, with explicit timers
+  returning SoundPool players. Muting, pausing, backgrounding, returning home
+  and disposal stop active effects and invalidate pending starts.
+- All 13 focused audio checks passed, including asset duration/format/peak
+  bounds/fades, boss cue counts, firing transitions, whole-volley grouping,
+  waiting/pause/restart, voice limits, pending cancellation and platform
+  failures. Log: `artifacts/enemy-audio-focused-tests.txt`.
+- Broader run: 150 passed; two unchanged experience tests failed (early pace
+  ceiling and obsolete Choose Level finder). Both reproduce in the unchanged
+  baseline. Logs: `artifacts/enemy-audio-regression-tests.txt`,
+  `artifacts/enemy-audio-baseline-tests.txt`. Analysis: six files, no issues.
+- Sound-design report: `artifacts/enemy-sound-report.json`; all asset peaks
+  are 0.72 with click-free fades. Preview: `artifacts/enemy-sound-preview.wav`
+  (15.2 seconds). Background music and existing UI sound assets are unchanged.
+- ARM64 release APK rebuilt successfully (29.9 MB); verified all 21 cues are
+  packaged. Build log: `artifacts/enemy-audio-apk-build.txt`. No phone connected
+  for installation or real-device listening verification.
+
+## Eclipse Seraph and boss animation upgrades — 2026-10-09
+
+- Added the third second-tier Infinite boss at a seeded 550,000–650,000
+  score threshold. Existing order, three-second warning, damage delays,
+  60-second active rest, clean arena, pause/revive and restart rules apply.
+- Its 28-second encounter fires 16 curved crystal petals, six laser curtains
+  with 1.2-second warnings and broad escape lanes, and nine comets with
+  0.9-second marked trails. All attacks finish before the exit phase.
+- Gold/rose feather gradients, entrance unfolding, segmented rotating halo,
+  swaying ribbons, pulsing crystal and scheduled firing/charging reactions.
+  Sky Warden gains wing motion, body sway and core pulses; Colossus gains
+  independently floating/recoiling gauntlets, turbine rotation, thruster
+  flames and a charging reactor. Reduced motion keeps decorative poses still.
+- All 151 focused tests passed, covering three-boss order/cooldowns, attack
+  counts, locked warnings, tall boards, damage/protection, pause/revive,
+  ordinary encounters, UI flows and rendering. Log:
+  `artifacts/seraph-regression-tests.txt`. Analysis: seven files, no issues.
+- Every phase of every boss stays within 65 drawing calls, without blur or
+  offscreen layers, in both motion settings. Inspected light/dark galleries:
+  `artifacts/infinite-seraph.png`, `artifacts/infinite-boss.png`,
+  `artifacts/infinite-colossus.png`. Animation preview:
+  `artifacts/boss-animations.gif` (84 frames at 12 fps).
+- ARM64 release APK built successfully (29.1 MB). Build log:
+  `artifacts/seraph-apk-build.txt`. No phone connected for installation.
+
+## Random boss windows and pacing — 2026-10-09
+
+- Sky Warden draws a threshold in 90,000–120,000; Storm Colossus draws in
+  270,000–330,000. Seeded draws happen once per run and survive pause/revive.
+- After a boss ends, ordinary active gameplay continues for at least 60
+  seconds before the next warning. Committed attacks/mazes finish first;
+  entry also waits for recovery and five seconds after losing a heart.
+  A three-second arrival warning freezes on pause and restarts after damage.
+- All 23 boss simulation/pacing checks passed. Broader regression run:
+  147 passed, one unchanged spider-web timing check failed (expected x=118,
+  actual x=136). The same failure was reproduced in the unchanged baseline.
+  Logs: `artifacts/boss-pacing-tests.txt`,
+  `artifacts/boss-pacing-regression-tests.txt`,
+  `artifacts/boss-pacing-baseline-web-test.txt`.
+- Static analysis found no issues in all seven updated Dart files.
+- ARM64 release APK rebuilt successfully. Log:
+  `artifacts/boss-pacing-apk-build.txt`. No phone connected for installation.
+
+## Colossus black circles with red lasers — 2026-10-09
+
+- Replaced the board mine circles' scope-like rings and spokes with solid
+  black discs and diagonal red laser streaks. The charging rim stays red;
+  active streaks have bright cores. Updated player hints to match the effect.
+- All 23 focused boss, rendering and preview checks passed; static analysis
+  found no issues. Inspected light/dark previews in `artifacts/infinite-colossus.png`.
+  Shooting, activation timing and damage mechanics remain as verified.
+  Log: `artifacts/colossus-red-lasers-tests.txt`.
+- ARM64 release APK rebuilt successfully. Build log:
+  `artifacts/colossus-red-lasers-apk-build.txt`. Phone disconnected; installation pending.
+
+## Colossus milestone moved to 500,000 — 2026-10-09
+
+- Storm Colossus now triggers at 500,000 points. Sky Warden remains at 100,000.
+- All 19 boss checks passed, including no Colossus at 200,000 or just below
+  500,000, the new trigger, milestone order, revive and restart.
+  Log: `artifacts/colossus-500k-tests.txt`.
+- ARM64 release APK rebuilt successfully. Build log:
+  `artifacts/colossus-500k-apk-build.txt`.
+
+## Storm Colossus at 200,000 points — 2026-10-09
+
+- Added a second 28-second Infinite boss with cyan/violet armor and floating
+  gauntlets. Its three weapon phases fire eight rail-bouncing energy orbs,
+  eight curving crescent blades, and six stationary shock mines. Mines warn
+  for 1.35 seconds before their whole disk becomes damaging for 0.65 seconds.
+- Boss milestones now track both encounters: Sky Warden at 100,000 and
+  Colossus at 200,000, once each per run and in order even after a score jump.
+  Revive preserves encountered milestones; restart resets them. The same clear
+  arena, pause, heart/recovery rules, and return to ordinary generation apply.
+- All 129 focused boss, enemy, maze, revive, control and preview checks passed.
+  Static analysis of ten changed files found no issues. Both bosses stay within
+  65 draw calls with no blur or offscreen layers. Inspected light/dark previews
+  in `artifacts/infinite-colossus.png`. Logs:
+  `artifacts/colossus-focused-tests.txt` and `artifacts/colossus-regression-tests.txt`.
+- ARM64 release APK rebuilt successfully and verified to contain both bosses
+  and the Colossus mine weapon. SHA-256:
+  `7E7CBEC6C4BE2E00AC9529E1975CB76489DFB0EDABE768F74E97AD96660F0AA6`.
+  Build log: `artifacts/colossus-apk-build.txt`. The phone is disconnected;
+  installation and physical gameplay verification of this update are pending.
+
+## Infinite second-tier boss — 2026-10-08
+
+- Sky Warden appears once per run at 100,000 points, after any committed
+  attack or maze and its final gates have finished. The 28-second encounter
+  replaces ordinary terrain and enemies with a clear arena and holds the red
+  floor below play. The boss stays above the climbing player, fires five
+  bullet fans, three warned lasers, then three pairs of thrown amber pools.
+- Boss damage uses the existing swept collision and reward ordering, heart,
+  shield, recovery, pause and revive rules. Pools warn before landing and then
+  scroll with the floor. Bullet flight reaches expanded portrait boards.
+  After the boss exits, holes generate ahead of the viewport without backlog.
+- All 119 focused boss, render, encounter, maze, revive, mode and pause/resume
+  checks passed. Static analysis of the nine boss-related files found no
+  issues. Boss rendering stays within 65 draw calls with zero blur/layer
+  passes. Inspected light and dark phase previews in `artifacts/infinite-boss.png`.
+- Broader Infinite testing also found six existing failures in ascent speed,
+  pivot limits, red-floor timing, shield tuning and pickup counts. The same
+  six failures reproduce in an isolated copy of unchanged HEAD; no new boss
+  regression was found. Logs: `artifacts/boss-regression-tests.txt` and
+  `artifacts/boss-baseline-tests.txt`. Physical-device playtesting is pending.
+- Rebuilt the ARM64 release APK with the boss, 12-bullet Moth and three-second
+  resume countdown. Installed successfully on the Redmi Note 8 Pro and verified
+  the launched process remains running. Installed version 0.11.1, ABI version
+  code 2016. SHA-256:
+  `FB1E91F230927DD59B38FAF022B2EF8C3D0AD2D68CCDF4E017A88835AFA3558A`.
+  Build log: `artifacts/boss-apk-build.txt`. Extended gameplay is still pending.
+
+## Scorpion laser attack — 2026-10-07
+
+- Replaced the three-needle burst with one fixed laser: a dashed 1.2-second
+  warning followed by a continuous 1.5-second beam to the board edge. The
+  renderer and collision use the same finite segment; camera scrolling and
+  player movement do not retarget it. Hint and guide text describe the laser.
+- Swept capsule contact handles fast crossings, round end caps, and partial
+  activation/expiration ticks. Laser contact does not consume the beam; shields
+  and recovery protect the player while the beam remains visible. Acid alone
+  remains attached to scrolling terrain.
+- All 56 focused laser, late enemy, rendering, director, maze, and revive
+  checks passed. Rendering remains within the existing 65-call budget with
+  zero blur/offscreen layers. Inspected `artifacts/scorpion-laser-preview.png`.
+- ARM64 release APK built successfully. Physical playtesting is pending because
+  the phone is disconnected. Test log:
+  `artifacts/android-crash/scorpion-laser-tests.txt`.
+
+## Animated late enemy artwork — 2026-10-06
+
+- Added stepping legs, antenna sway, breathing, and shell opening to the
+  beetle; crouch/kick anticipation to the cricket; stronger patterned wingbeats
+  and hover to the moth; leg steps, curling tail, and claw movement to the
+  scorpion; leaf sway and spit recoil to the seed spitter. Firing recoil follows
+  actual projectile delays. Snake, spider, and porcupine artwork is unchanged.
+- Movement uses the existing encounter age, small vector transforms, and
+  batched paths, with reused body paints. No new ticker, simulation state,
+  blur, or offscreen layer. Aim and hitboxes stay fixed. Reduced-motion raster
+  checks confirm steady character poses while the normal poses visibly change.
+- All 34 enemy/render/gallery checks passed. Static analysis of the changed
+  renderer, render tests, and preview tool found no issues. Inspected full-board
+  renders on light/dark worlds and enlarged anticipation/firing poses.
+- Identical 72-frame draw-call samples: beetle 51→36, cricket 60→27, moth
+  103→52, scorpion 74→37, seed spitter 73→31. These include warnings and shots;
+  each sample has zero blur/layer passes. Hardware FPS is not measured because
+  the Xiaomi is disconnected.
+- Preview: `artifacts/infinite-enemy-motion.gif`. Logs:
+  `artifacts/android-crash/enemy-animation-tests.txt`,
+  `enemy-animation-preview.txt`, and `enemy-original-draw-budget.txt`.
+- ARM64 release APK built successfully with both earlier fixes included.
+  Installation of this animation update awaits reconnection of the phone.
+
+## Late enemies finish their attacks — 2026-10-06
+
+- Recovery-section transitions previously discarded active visitors during
+  their warning or attack. Pending laser mazes could interrupt them too.
+  Active visitors now finish their warning, projectiles, and normal exit;
+  recovery blocks new visitors and an approaching maze waits for completion.
+- Reproduced the recovery interruption with a failing regression check before
+  the fix. All 67 focused enemy, maze, snake, hazard, porcupine, and revive
+  checks pass afterward. Boundary checks cover all five enemies; three seeded
+  260-second runs require every departing encounter to have fully expired.
+- The long-run fixture refreshes its test shield each tick because collecting
+  a normal shield replaces its artificial duration. This keeps scheduler
+  verification independent of pickup placement and survivability.
+- Test log: `artifacts/android-crash/enemy-regression-tests.txt`.
+- Static analysis found no issues. The ARM64 release APK rebuilt successfully
+  with the startup keep rule included. The phone disconnected before this
+  update could be installed, so physical gameplay verification remains pending.
+
+## Android release startup crash — 2026-10-06
+
+- Reproduced the immediate startup crash on a USB-connected Redmi Note 8 Pro
+  running Android 11. AndroidX Startup failed to initialize WorkManager with
+  `Failed to create an instance of androidx.work.impl.WorkDatabase`.
+- The original R8 usage report listed `WorkDatabase_Impl`'s public no-argument
+  constructor as removed. Added a targeted keep rule in
+  `android/app/proguard-rules.pro`, which Flutter includes in release builds.
+- Built the ARM64 release APK with shrinking enabled, confirmed its mapping
+  retains the constructor, and installed it with `adb install -r` without
+  clearing app data. Launch succeeded; a second force-stop/relaunch also
+  remained running with no crash entries for either new process.
+- Device logs are saved in `artifacts/android-crash/`. This verifies startup;
+  extended gameplay and frame-rate testing were not performed.
+
+## Late Infinite enemy roster — 2026-10-06
+
+- Added the Bombardier Beetle (2,600m), Ricochet Cricket (3,100m), Moth
+  (3,600m), Scorpion (4,100m), and Seed Spitter (4,600m). Their attacks use
+  fixed aim, a 1.2-second warning, and distinct vector silhouettes and markers.
+  Beetle acid scrolls with the terrain; flying projectiles remain in screen space.
+- One visitor at a time, at most six projectiles, and a 14-second minimum rest
+  after departure. Introductions take priority over repeats; other ranged
+  hazards and snakes wait. Breathing/maze sections clear visitors. Beetles wait
+  for a clear side-step route through existing terrain. Pause, shields, recovery,
+  lethal hits, restart, and rewarded revive retain their normal behavior.
+- All 62 focused checks passed, including 21 new enemy checks, existing hazard,
+  porcupine, snake and revive coverage, plus the render fixture. Three seeded
+  260-second simulations introduced every kind without overlapping attack
+  systems. Swept collision checks cover rebound corners, curved streams, delayed
+  needles, seed splitting/cancellation, and pickup-versus-damage ordering.
+- Inspected `artifacts/infinite-late-enemies.png`: warning, in-flight, and late
+  attack states for every enemy on light and dark combo boards. Release web build
+  succeeded, including the compiler's Wasm dry run. Static analysis was clean.
+- The full suite initially reported 421 passes and 19 failures. The ordinary
+  hazard scheduler fixture now disables late visitors, consistent with its
+  existing maze/snake isolation, and passes in the focused run. All other 18
+  failures were reproduced against an unchanged HEAD snapshot: existing speed,
+  shield/magnet duration, pickup frequency, web speed, menu/tutorial and viewport
+  expectations. Logs are in `artifacts/late-enemies-regression.log`,
+  `artifacts/late-enemies-baseline.log`, and `artifacts/late-enemies-baseline-ui.log`.
+  No physical-device playtest was performed.
+
+## Ball and world art refresh — 2026-10-04
+
+- Replaced the nineteen pattern backgrounds with layered vector scenery: reef silhouettes, city skylines, faceted mountains, dunes, crystalline borders, foliage and architectural framing. Revised every base palette and retained Singularity's absence of a black-hole disk.
+- Added ball-specific faceting, circuitry, ice/metal bands, plasma lightning and a quasar core; refined outlines and shared surface reflections. Removed the shop preview's Gaussian shadow blur.
+- Scenery is recorded once per ball into a bounded set of nineteen immutable pictures, shared by shop, previews and gameplay. It has no per-frame geometry generation or animation ticker. Existing combo colors and animated ball effects remain.
+- Eighteen targeted checks passed, including the render fixture, world selection/persistence, large-text shop layout, all-world contrast, combo draw budgets and Infinite culling. Static analysis found no issues. Inspected the gallery and actual gameplay/shop renders. Xiaomi frame times remain unmeasured.
+
+## Infinite rendering optimizations — 2026-10-04
+
+- Skip off-screen holes, coins, spider territories/bodies and snakes before issuing drawing commands. Snake culling includes the tail. Remove the redundant combo background gradient pass.
+- Reuse board text layouts in a 128-entry cache with disposal on eviction. Precompute fixed snake radii, sample distances and wave amplitudes while preserving the existing body/collision geometry.
+- All 27 targeted rendering-budget, off-screen-culling, snake, contrast, ball-world and Board Tilt tests passed. Culling tests confirm that adding 100 off-screen holes adds no drawing commands and that visible snake tails remain drawn.
+- These checks demonstrate reduced work, not a measured FPS improvement. The reported Xiaomi device has not been profiled; no device-specific FPS claim or new APK is included.
+
+## Retire the standalone Maze mode — 2026-10-04
+
+- Removed the Maze carousel page, route picker/results, route engine, paintings, bundled previews, and three route achievements. The carousel now contains Infinite, Classic and 2048 Merge. Infinite's separate laser-wall obstacle sections remain.
+- Removed active Maze profile fields while retaining version 1 backup compatibility and onboarding recognition for returning Maze-only players. Remaining progress, wallet and equipment survive legacy backup restore.
+- Targeted navigation, controls, achievements, save migration, ball-world, Merge and Infinite laser-wall tests passed. Static analysis reported no issues. Rendered and inspected the three remaining worlds. No new APK was built for this change.
+
 ## Interactive onboarding, goals, friend codes and backups — 2026-09-16
 
 - Replaced the illustrated tutorial with three real touch exercises using the shared PivotBoard and AnalogControls: lift/release, tilt, and target capture. Each control mode is selectable. The simulation is isolated from profile rewards. Compact screens scroll outside the active controls; control gestures do not scroll the lesson.
@@ -295,3 +614,315 @@ Not verified here: native iOS compilation/signing, iPhone audio/haptic feel, sus
 - Documented units, supported ranges, hot-restart workflow and an easier example. Debug assertions reject unsupported settings before generating a run.
 - 53 Merge and mode-carousel regression tests passed. A separate Dart smoke check on copied sources changed every setting and verified alternate speeds, spawn cadence, 100 seeded safe-wave layouts, gate milestones, requirements and cooldown. Production defaults were not changed by that check.
 - Logs: artifacts/merge-difficulty-tests.log and artifacts/merge-difficulty-analysis.log. No release build or deployment.
+
+## Classic campaign progression review — 2026-10-18
+
+- Reviewed all 80 boards and revised levels 2–80, keeping the onboarding board,
+  names, permanent IDs, earned records and star gates stable. Early steering
+  grows gradually; static routes use slaloms, staggered gates, paired bays and
+  alternate passages. Familiar light gates and roaming holes return between
+  introductions, and later chapters recombine them with territories and orbits.
+- New patterns allow six seconds before the first warning and at least 2.8
+  seconds of warning. All authored waves have at least 2.4 seconds of warning,
+  32 units of target clearance and 1.2 seconds of quiet after expiration.
+  The existing one-wave-at-a-time simulation is unchanged.
+- All 800 targets are reachable from launch in a four-unit grid search with
+  16-unit hole clearance and 12 units beyond the marked spider territories.
+  Route segments also pass actual swept-contact checks. Complete hazard cycles
+  stay in bounds and clear their assigned targets. These checks do not measure
+  human dexterity or establish that difficulty feels comfortable.
+- All 651 regression tests pass; analysis of lib, test and the new review tools
+  reports no issues. Two old timing assertions now read the authored timing.
+  git diff --check passes. Logs: artifacts/classic-progression-regression-final.log,
+  artifacts/classic-progression-analysis-final.log, and
+  artifacts/classic-progression-guards.log.
+- Regenerated all 80 tracked Classic preview assets. The preview bake and
+  campaign renderer pass. Inspected actual renders for all 80 boards plus
+  representative warning and active states. Images are in
+  artifacts/classic-progression; reproduce with tool/render_classic_progression.dart.
+  CLASSIC_PROGRESSION.md records every board's intent and the next phone
+  playtest checkpoints. No release binary rebuild, deployment or human phone
+  playtest was performed.
+
+## Remove obsolete preview assets — 2026-10-18
+
+- Removed the 82 unused mode-preview PNGs (3,385,154 bytes), their baker and the
+  unused asset-path helper. The app draws frozen previews from current level data.
+- Level registration no longer invokes the removed baker; documentation now
+  reflects the direct rendering workflow. App Store screenshots are retained.
+- Analysis of lib, test and the level registration tool reports no issues.
+  The PowerShell registration script passes syntax parsing. No remaining source
+  references to the removed assets or tooling were found.
+
+## Number Merge naming and progression — 2026-10-18
+
+- Renamed visible mode branding, help, achievement titles and store materials to
+  Number Merge / Merge. Preserved saved identifiers and numerical milestones.
+- Opening waves are safe; danger ramps from 25% at 8 to full strength at 64.
+  The second safe pickup now favours existing segments while retaining gap fillers.
+- Preserved wave timing remainders and age through frame partitions. Gate cooldown
+  starts at swept contact. Cascading arithmetic and ordered collisions are retained.
+- All 656 regression tests pass. New checks cover 10,000 value-conserving pickups,
+  difficulty rates, useful food, frame partitioning and exact gate cooldown timing.
+  Static analysis reports no issues. Logs: artifacts/number-merge-regression.log,
+  artifacts/number-merge-focused.log, artifacts/number-merge-analysis.log.
+- Regenerated all five Merge store cards and their source UI images, preserving
+  landscape Duo inner and the later shop designs. All 60 deliverable PNGs pass
+  dimension, RGB/no-alpha and integrity checks. No native iOS build was produced.
+
+## Rollrise branding and publishing audit — 2026-10-18
+
+- Renamed public app/store branding to Rollrise: Ball Balance (launcher name:
+  Rollrise), including native labels, web metadata, app UI, policy and store copy.
+  Package/Firebase identifiers and saved-data formats remain compatible.
+- All 656 regression tests pass; static analysis of lib, test and the store
+  rendering tools reports no issues. Native plist/Android XML, web manifest,
+  store-name length and policy branding checks pass.
+- Regenerated all 30 branded App Store cards and 30 plain UI renders. Final
+  RGB/no-alpha, dimensions, PNG integrity and metadata checks pass. Later shop
+  designs and landscape Duo inner frames are retained. These are Flutter renders.
+- Firebase is Analytics-only; there is no implemented restorable cloud player
+  profile, authentication or online leaderboard. Live analytics delivery remains
+  unverified. release/PUBLISHING_CHECKLIST.md records launch requirements and
+  optional cloud-save work without claiming a backend has been deployed.
+- Read-only release preflight reports missing publisher/contact/policy URL,
+  Android upload signing and the iOS signing team. Ads use sample IDs and have no
+  UMP/ATT flow. Native orientation currently requests portrait despite landscape
+  Duo inner screenshot targets; native support/testing must resolve this before
+  submission. No release binaries, live Firebase settings or listings changed.
+- Logs: artifacts/rollrise-regression.log, artifacts/rollrise-analysis.log,
+  artifacts/app-store-rollrise.log, artifacts/rollrise-store-validation.log,
+  artifacts/rollrise-release-preflight.log.
+
+## Floating Halo joystick trial — 2026-10-18
+
+- Completed the Halo Joystick choice as the third control option, preserving the
+  original one-finger pad and two-finger controls. It shares one-finger physics
+  and records. The existing persisted trial preference and backup field are used.
+- Halo has no fixed pad or reserved bottom strip. It appears at the active touch
+  point on the board at 42% opacity and hides on release, cancel, pause or reset.
+  Relative input, second-pointer rejection and held-touch resize behaviour are
+  preserved. Controls/HUD and the Play-then-input flow remain available.
+- Retained the user's latest committed rail/visible-bottom and menu-flow changes.
+  Updated the tutorial target area and copy for the floating control surface.
+- All 663 regression tests pass. Static analysis and git diff --check pass.
+  Tests cover preference/backup compatibility, shared records, all five game
+  modes, touch anchors, dragging, second touches, release/cancel/pause, entry
+  expansion, third-choice activation and returning to the original pad.
+- Actual Flutter idle/left-touch/right-touch frames are in artifacts/halo-*.png.
+  Contact sheet: artifacts/halo-floating-preview.png. Logs: halo-regression.log,
+  halo-focused.log, halo-analysis-final.log and halo-render.log in artifacts/.
+  No native release binaries were built or published.
+## Ball price balance — 2026-10-21
+
+- Raised every paid coin ball price, with smaller early increases and larger
+  late increases: Coral 35 → 60, Nova 700 → 6,200, and Singularity (Black Hole)
+  2,400 → 13,500. Existing gear ownership, wallets, earning rates, daily gifts,
+  platform prices and store-only items retain their current behavior.
+- Updated existing purchase and affordability fixtures to use catalog prices.
+  The focused eight-file run reports 75 passing tests and one failure:
+  `infinite_systems_test.dart`: `fast swipe resolves shield after hole in travel
+  order`, at line 183 (the later shield is not collected). That case exercises
+  swept gameplay movement with the default ball; it does not buy gear or read
+  prices. Gameplay files already had local edits before this pricing change
+  and were not changed by this pass.
+- Static analysis of the changed Dart files reports no issues; diff whitespace
+  checks pass. Logs: artifacts/ball-pricing-tests.log and
+  artifacts/ball-pricing-analysis.log. No release binary was rebuilt. Human
+  unlock-time balancing still needs playtesting against the new curve.
+- Follow-up price adjustment: Black Hole is 13,500 coins per the owner's
+  request; Comet is 11,500 and Quasar is 12,500 to retain their order below it.
+  This numeric-only adjustment passes diff whitespace checks; the test results
+  above were recorded before this follow-up. No binary was rebuilt.
+
+## Fixed controls, Settings dismissal and run coins — 2026-10-21
+
+- Removed movement fine-tuning. Touch input uses full response with no
+  adjustable multiplier; old save preferences and imported backup settings
+  cannot lower it. Legacy backup slots and stored values export/save as 1.0.
+- Settings has a pinned X and closes on a deliberate right swipe. Vertical
+  gestures scroll the content; dragging the sheet down is disabled.
+- The revive offer places a gold total-wallet / mint run-coins summary with a
+  coin icon above the heart and hides the floating gameplay badge. The total
+  includes the run coins; counting, banking, rewards and purchases are intact.
+  Small-screen spacing keeps the primary actions accessible; larger text and
+  longer content can scroll. Removed the Daily Prizes reset-time footer.
+- All 68 focused tests pass across controls, settings, save migration, backup,
+  tutorial, daily gifts, revive and coin doubling. Static analysis of lib, test
+  and the changed render tools reports no issues. Diff whitespace checks pass.
+  Logs: artifacts/settings-coins-tests.log, settings-coins-layout-tests.log and
+  settings-coins-analysis.log. The separate render check also passes.
+- Inspected actual 390×844 and 320×568 Flutter renders in
+  artifacts/settings-fixed-390.png, settings-fixed-320.png,
+  revive-coins-390.png and revive-coins-320.png. Reproduce with
+  tool/render_settings_and_coins.dart. No native binary rebuilt or deployed.
+
+## Classic collectible stars and score removal — 2026-10-22
+
+- Removed Classic points from target rewards, HUD, result screens, level-road
+  personal bests and Settings. The HUD now shows targets completed and time.
+  Daily, Practice, Infinite and Number Merge retain their own scoring rules.
+- Each of the 80 Classic levels has one gold star instead of coins. A swept
+  pickup immediately saves a permanent fourth star, even before finishing the
+  run. Ball resets, retries and changing controls cannot award it again. Owned
+  stars disappear from gameplay and frozen carousel previews. Wallet coins are
+  unaffected. Four-star progress appears in results, the road, goals and totals.
+- New records accept the fourth star bit; existing three-star records remain
+  intact, and backups round-trip both formats. The collected star is shared
+  across controls. Star placement is deterministic, cached and checked against
+  connected space, holes and spider territories on every authored level.
+- Six dedicated tests pass, including all 80 placements, actual swept pickup,
+  saving before run completion, failure/replay, cross-control deduplication,
+  legacy backups, live HUD/results and unaffected modes. The final combined
+  81-test run also passes tutorial large-text checks and existing progression.
+- Inspected actual 390×844 and 320×568 phone renders of gameplay, collection,
+  four-star results and the level road. Reproduce with
+  tool/render_classic_stars.dart; images are artifacts/classic-star-*.png.
+  Existing App Store Classic screenshots are marked for regeneration.
+
+## Harder Number Merge — 2026-10-22
+
+- Start speed 30 → 42, growth per doubling 5 → 8, cap 66 → 112 and wave
+  spacing 110 → 96. The third pickup becomes dangerous earlier, reaching full
+  probability at head 16. Second-pickup danger rises from 15% at head 64 to
+  45% at 256. Every wave retains one safe tail match and separated choices.
+- Safe secondary food explicitly favours existing segments 40% of the time.
+  Gates start at 900 points, move 22 units/second faster than the stream, and
+  have a three-second cooldown. New gates require growth beyond the current
+  head; their visible number stays fixed. Gate reaction-window checks allow
+  more than three seconds and multiple new waves at tested stages.
+- All 45 Merge tests pass: safe openings, 600-wave danger distributions at
+  nine head sizes, useful safe food, value conservation, contact order, frame
+  partitioning, gates, saves, controls and UI. New balance remains provisional
+  until human playtesting. NUMBER_MERGE_REVIEW.md records exact values.
+- The combined final run of Merge, Classic stars, tutorials, progression and
+  experience tests passes all 81 checks. Static analysis of lib, test and the
+  Classic renderer reports no issues. Diff whitespace checks pass. Logs:
+  artifacts/merge-harder-and-classic-tests.log and merge-harder-analysis.log.
+- The earlier full-suite run reported 670 passes and 12 failures. The final
+  focused run resolves four of those (the shop price fixture, a Classic HUD
+  finder, and two large-text tutorial overflows). Eight movement/hazard cases
+  remain unresolved: ascent_test, classic_placements_test,
+  infinite_systems_test, infinite_test, late_enemies_test, porcupines_test,
+  snakes_test and spider_web_test. These involve the lift-limit and hazard
+  code with local changes already present at the start of this work; no source
+  repair for those cases is claimed. Full log: artifacts/classic-star-regression.log.
+- No native binary was rebuilt or deployed.
+
+## Adaptive Duo and large-screen controls — 2026-10-22
+
+- Compact windows, including a closed Duo, offer One-Finger Control,
+  Two-Finger Control and Halo Joystick. Windows with a shortest side of at
+  least 600 logical pixels offer Two-Finger and Halo in Settings and the level
+  picker. Rotating a compact phone does not remove One-Finger Control.
+- Expanding while using the original One-Finger pad temporarily activates
+  Two-Finger controls and releases held input without restarting the run.
+  Folding back restores the saved compact preference unless the player has
+  explicitly selected another control. Saves and backups preserve that
+  preference; Halo remains available in either layout.
+- All 49 focused tests and render checks pass, covering live resizing,
+  initial defaults, saves/backups, Halo, level selection, tutorial replay and
+  existing control flows. Static analysis of lib, test and the adaptive render
+  tool reports no issues. Logs: artifacts/adaptive-controls-tests.log and
+  artifacts/adaptive-controls-analysis.log.
+- Inspected Flutter renders at 540×720 (closed Duo), 1114×720 (expanded Duo)
+  and 820×1180 (tablet). Reproduce with tool/render_adaptive_controls.dart;
+  images are artifacts/controls-duo-closed.png, controls-duo-expanded.png and
+  controls-tablet.png. No physical Duo posture test or native build was run.
+
+## Wide-screen board and menu proportions — 2026-10-22
+
+- Windows at least 600 logical pixels wide fit the full board vertically and
+  horizontally instead of zooming to fill their width. A separate 96-pixel
+  HUD area keeps top targets visible. Ball, holes, platform and effects retain
+  uniform scaling; platform movement does not pan the fitted viewport.
+  Infinite's simulation camera still follows actual climbing.
+- Two-Finger input extends across both window halves, including the themed
+  surround, so players can hold the device near its edges. Paint, input deltas,
+  grip markers and heart feedback still share one viewport transform. Resizing
+  a live run preserves its board, progress, lives and input ownership.
+- Wide main menus scale text and controls together by 1.15–1.5. Landscape
+  windows at least 1000 pixels wide place the world preview beside the actions.
+  Tablets retain stacked menus. Sheets have bounded reading widths and larger
+  type; pause/results use larger centered panels. Accessibility scaling is
+  retained without applying the wide multiplier twice. Compact phone menu
+  dimensions and full-width gameplay are unchanged, including rotated phones'
+  compact menu sizing.
+- The broad regression run passed all 92 checks across layouts, phone width,
+  controls, start flows, transitions and tutorials. After reserving the HUD
+  area, all 45 final layout/control/transition/render checks passed. These
+  include 1.8x accessibility text, live folding, edge input, circular geometry,
+  camera stability and all three world launches. Logs:
+  artifacts/wide-layout-tests.log and wide-layout-final-tests.log.
+- Static analysis reports no issues; diff whitespace checks pass. Analysis log:
+  artifacts/wide-layout-analysis.log. Inspected actual Flutter renders of menu,
+  Classic play, pause and Settings at 390×844, 540×720, 1114×720, 820×1180,
+  1440×900 and 1024×500. Additional geometry/UI checks cover 600×900 and
+  1920×1080. Reproduce with tool/render_wide_layout.dart; previews are
+  artifacts/wide-*.png.
+- Restarted the local web preview at http://127.0.0.1:7357 and verified the
+  updated menu in the browser. No native binary or physical Duo posture test
+  was performed. The earlier unrelated movement/hazard suite failures remain
+  documented above; this task does not claim a clean full project suite.
+
+## Full-width scenery and border rails — 2026-10-22
+
+- Wide gameplay now paints one continuous world background across the window,
+  replacing the distinct central backdrop and dark side margins. A smooth
+  gradient blends zero blur around the central playfield into full blur at
+  the edges. Two filtered passes reuse one cached scenery picture; actors,
+  HUD and rails paint afterward and remain sharp. The cache holds one scene
+  and refreshes when viewport, equipment or the combo palette changes.
+- Decorative rails move to 24 logical pixels from either window border.
+  Ball, targets, platform and input retain their fitted geometry. Late Classic
+  laser rails remain at the actual collision boundaries and are separate from
+  the decorative outer rails. Phone and carousel rail positions remain 20/340
+  world units with no panorama blur layers.
+- All 48 focused checks pass across all five modes, rail placement, laser
+  alignment, blur progression, unchanged simulation state, live resizing,
+  accessibility, phone controls and render culling. Static analysis reports no
+  issues; whitespace checks pass. Logs: artifacts/wide-panorama-tests.log and
+  artifacts/wide-panorama-analysis.log.
+- Inspected actual gameplay renders for Classic, Infinite, Number Merge,
+  Daily and Practice at 390×844, 1114×720 and 1920×1080, plus all five modes
+  with Nebula scenery at 1114×720. Reproduce with
+  tool/render_wide_panorama.dart; images are artifacts/panorama-*.png.
+- Refreshed the local web preview at http://127.0.0.1:7357. No native binary
+  was rebuilt and no physical-device frame-rate result is claimed.
+
+## Connected wide arena and hazard readability — 2026-10-22
+
+- Replaced detached decorative rails with a connected arena spanning about
+  74% of wide windows. Positions spread horizontally while balls, targets,
+  sprites, platform thickness and text retain their proportions. Input,
+  swept contacts, laser clearances, spider territories and Merge contacts use
+  the same physical spacing. The viewport metric is transient and updates on
+  resize without restarting a run. Compact phone geometry is unchanged.
+- Darkened wide scenery, extended ambient ribbons across the whole window,
+  kept background particles round and reduced platform energy effects. Lives
+  and progress share a left HUD group; wallet, run earnings and pause share
+  the right group. The background retains two cached scenery blur passes.
+- Moving lasers display blinking chevrons during their warning period,
+  pointing along their initial travel direction. Fixed beams show no arrows;
+  countdown labels distinguish FIXED and MOVING. Reduced-motion mode keeps
+  arrows steady. Starting Steel-world spiders have light bodies and legs,
+  dark eyes and visible web boundaries; other worlds keep their palette.
+- All 70 final focused checks pass across geometry, wide layouts, phone safe
+  areas, five gameplay modes, contrast, hazard warnings and rendering budgets.
+  New tests exercise actual raster proportions, physical contact footprints,
+  arrow timing/directions (including turning points), reduced motion and
+  starting-world spider contrast. Log: artifacts/connected-arena-final-tests.log.
+- Static analysis of lib, test and the panorama renderer reports no issues;
+  whitespace checks pass. Analysis log: artifacts/connected-arena-final-analysis.log.
+- The full regression run completed with 721 passes and nine failures:
+  eight previously documented simulation failures (ascent, Classic placements,
+  Infinite contact order/generation, late enemies, porcupines, snakes and web
+  contact order), plus an old phone-pad test using a tablet-sized viewport.
+  Updated that test to use a phone viewport, consistent with the existing
+  adaptive control policy; it passes in the final focused run. Full-run log:
+  artifacts/connected-arena-regression.log. No clean full-suite claim is made.
+- Inspected 25 Flutter gameplay renders: all five modes at phone, Duo and
+  desktop sizes, all five Nebula samples, three maximum-combo scenes and two
+  fixed/moving-laser and spider warning scenes. Reproduce with
+  tool/render_wide_panorama.dart; images are artifacts/panorama-*.png.
+- No native binary or physical-device frame-rate/balance test was performed.

@@ -1,42 +1,52 @@
-# GILT — store copy draft
+# Rollrise — App Store copy
 
-Status: ready for owner review; not submitted. Do not claim online rankings or cloud sync in the current offline build.
+Prepared 2026-10-18 from version 0.13.6+24 source. Not submitted.
 
 ## Name
-GILT: Precision Arcade
 
-## Short description
-Tilt the platform, guide the ball, and master one more run.
+Rollrise: Ball Balance
 
-## Full description
-A little tilt. A lot of nerve.
+## Subtitle
 
-GILT puts a steel ball and a moving platform in your hands. Lift the ends, find your balance and guide the ball toward the glow.
+Balance, dodge, merge & climb
 
-- Master 50 Classic levels, earn stars and improve your personal records.
-- Survive an Infinite climb with crystals, shields and changing hazards.
-- Combine matching numbers in 2048 / Merge.
-- Follow twisting Laser Maze routes or tackle an endless maze.
-- Learn by playing with Two-finger, One-finger or Vertical Analog controls.
-- Challenge a friend on the same Daily board using a shared record code.
-- Unlock cabinet finishes and collect gear.
-- Copy and restore a manual progress backup between devices.
+## Promotional text
 
-Practice at your own pace, then take another shot at your next goal.
+A little tilt. A lot of nerve. Master 80 Classic levels, climb through changing hazards, face bosses, and keep the numbers rolling in Number Merge.
 
-## Screenshot sequence
-1. Classic gameplay — A little tilt. A lot of nerve.
-2. Playable tutorial — Find your touch.
-3. Infinite gameplay — How far can you climb?
-4. Laser Maze — Every turn takes precision.
-5. Merge gameplay — Match. Merge. Keep rolling.
-6. Arcade club — Your next goal is waiting.
+## Description
 
-Use real release captures with normal economy and authentic progression. Review the final captures on both stores' device previews; screenshots of fixtures are internal layout review only.
+One ball. A moving platform. One more try.
 
-## Owner inputs still required
-- Confirm the final name and app identifiers you own.
-- Supply public support email/URL and privacy-policy URL.
-- Supply publisher identity, territories, pricing and age-rating questionnaire answers.
-- Review privacy disclosures against the final enabled services. The current optional playtest recorder is local and user-exported; clipboard backups can contain progress and settings.
-- Complete Apple/Google developer account and signing setup.
+Rollrise turns a simple balancing act into an arcade challenge. Lift and tilt your platform, control the ball's momentum, and find your opening. Every small movement matters.
+
+MASTER 80 CLASSIC LEVELS
+Guide the ball into ten numbered targets in order. Discover new routes, read moving holes and laser lanes, and stay clear of watchful spider territories. Familiar skills return in new combinations as the campaign grows more demanding.
+
+FIND YOUR FLOW IN INFINITE
+Keep climbing through a changing course. Collect coins and combo crystals, grab useful power-ups, and steer through incoming hazards. Build your score and face boss encounters with distinct attack patterns.
+
+MATCH, MERGE, KEEP ROLLING
+Discover Number Merge. Steer the head of a numbered snake into equal or smaller numbers, combine matching values, avoid larger numbers, and beat the gates. Build a bigger chain with every run.
+
+MAKE EVERY RUN YOURS
+- Choose one-finger control or move the two platform ends independently.
+- Earn Classic stars for finishing, completing a clean run, and beating the time goal.
+- Return for a fresh Daily board and chase your personal best.
+- Practice at your own pace.
+- Unlock balls, platforms, and different visual worlds with coins earned in play.
+- Track achievements and local records as you improve.
+
+Learn the feel. Read the pattern. Take one more shot.
+
+## Keywords
+
+physics,ball,tilt,reflex,skill,puzzle,numbers,merge,endless,platform,casual,challenge
+
+## What’s New (for an update)
+
+Classic has a smoother progression across 80 levels, with gentler introductions, more varied routes, returning hazards, and new combinations of familiar skills.
+
+## Deliverables
+
+Individual copy-and-paste fields, screenshot sets, raw UI renders, and upload instructions are in app-store/2026-10-18/. The copy describes current implemented features and does not claim online rankings, automatic cloud sync, or unavailable premium purchases.

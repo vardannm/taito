@@ -60,9 +60,12 @@ void main() {
       }
       expect(
         previous,
-        68 +
-            112 * InfiniteDifficulty.speedGrowth +
-            36 * InfiniteDifficulty.paceGrowth,
+        InfiniteTuning.startSpeed +
+            (InfiniteTuning.baseTopSpeed - InfiniteTuning.startSpeed) *
+                InfiniteDifficulty.speedGrowth +
+            InfiniteTuning.paceSpeedBonus *
+                (InfiniteTuning.maxPace - 1) *
+                InfiniteDifficulty.paceGrowth,
       );
       expect(InfiniteTuning.difficultyAt(900), lessThan(.35));
       expect(InfiniteTuning.difficultyAt(2400), 1);
@@ -71,7 +74,7 @@ void main() {
       expect(InfiniteTuning.runDensity(60000, 2400), 1);
       expect(InfiniteTuning.complexityAt(2400), 0);
       expect(InfiniteTuning.complexityAt(4200), 1);
-      expect(InfiniteTuning.startingPace(999999), 1);
+      expect(InfiniteTuning.startingPace(999999), closeTo(13 / 6, .00001));
     },
   );
   test(
@@ -89,19 +92,17 @@ void main() {
     'level chooser is centered inside the preview and run HUD uses the reclaimed header space',
     (tester) async {
       final game = await launch(tester, ControlMode.twoFinger);
-      for (final mode in [1, 2]) {
-        await selectWorld(tester, mode);
-        final board = tester.getRect(find.byType(PivotBoard));
-        final button = tester.getRect(
-          find.byKey(const ValueKey('choose-level')),
-        );
-        expect(board.contains(button.center), true);
-        expect(button.center.dx, closeTo(board.center.dx, 1));
-        expect(find.byKey(const ValueKey('board-level-name')), findsOneWidget);
-        expect(game.waitingForInput, true);
-      }
+      await selectWorld(tester, 1);
+      expect(game.mode, GameMode.classic);
+      final preview = tester.getRect(find.byType(PivotBoard));
+      final button = tester.getRect(find.byKey(const ValueKey('choose-level')));
+      expect(button.top, greaterThan(preview.bottom));
+      expect(game.waitingForInput, true);
+      await selectWorld(tester, 2);
+      expect(find.byKey(const ValueKey('choose-level')), findsNothing);
       await selectWorld(tester, 0);
       final before = tester.getRect(find.byType(PivotBoard));
+      await armWorld(tester);
       await tester.tapAt(contact(tester, game));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 600));
@@ -124,9 +125,10 @@ void main() {
   testWidgets('shop includes cabinets and new premium gear persists', (
     tester,
   ) async {
-    final profile = PlayerProfile()..wallet = 10000;
-    expect(BallCosmetic.values.length, 19);
-    expect(PlatformStyle.values.length, 12);
+    final profile = PlayerProfile()
+      ..wallet = BallCosmetic.singularity.cost + PlatformStyle.sovereign.cost;
+    expect(BallCosmetic.values.length, 23);
+    expect(PlatformStyle.values.length, 16);
     expect(profile.selectBall(BallCosmetic.singularity), true);
     expect(profile.selectPlatform(PlatformStyle.sovereign), true);
     await profile.save();
@@ -139,9 +141,9 @@ void main() {
         home: Scaffold(body: BallShop(profile: restored)),
       ),
     );
-    await tester.tap(find.text('Cabinet Styles'));
     await tester.pump();
-    expect(find.byKey(const ValueKey('cabinet-brass')), findsOneWidget);
+    expect(find.text('Cabinet Styles'), findsNothing);
+    expect(find.byKey(const ValueKey('cabinet-brass')), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

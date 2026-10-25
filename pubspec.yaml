@@ -1,7 +1,7 @@
 name: balance_arcade
-description: GILT â€” a precision mechanical arcade game.
+description: Rollrise â€” a precision mechanical arcade game.
 publish_to: none
-version: 0.11.1+16
+version: 0.13.6+24
 environment:
   sdk: '>=3.9.0 <4.0.0'
   flutter: '>=3.44.0'
@@ -13,6 +13,7 @@ dependencies:
   cupertino_icons: ^1.0.9
   firebase_core: ^4.15.0
   firebase_analytics: ^12.6.0
+  google_mobile_ads: ^9.1.0
 dev_dependencies:
   shared_preferences_platform_interface: ^2.4.2
   flutter_test:
@@ -20,6 +21,30 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/audio/
-    - assets/mode_previews/
+    - assets/privacy/policy.json
+    # Music is off; every soundtrack stays archived on disk, outside the bundle.
+    - assets/audio/complete.wav
+    - assets/audio/enemy_bombThrow.wav
+    - assets/audio/enemy_bounce.wav
+    - assets/audio/enemy_bullet.wav
+    - assets/audio/enemy_colossusArrival.wav
+    - assets/audio/enemy_cometCharge.wav
+    - assets/audio/enemy_cometFire.wav
+    - assets/audio/enemy_crystal.wav
+    - assets/audio/enemy_insectArrival.wav
+    - assets/audio/enemy_laserCharge.wav
+    - assets/audio/enemy_laserFire.wav
+    - assets/audio/enemy_mineCharge.wav
+    - assets/audio/enemy_mineFire.wav
+    - assets/audio/enemy_petal.wav
+    - assets/audio/enemy_poolLand.wav
+    - assets/audio/enemy_quills.wav
+    - assets/audio/enemy_ricochet.wav
+    - assets/audio/enemy_seraphArrival.wav
+    - assets/audio/enemy_snakeHiss.wav
+    - assets/audio/enemy_wardenArrival.wav
+    - assets/audio/enemy_web.wav
+    - assets/audio/enemy_wingArrival.wav
+    - assets/audio/miss.wav
+    - assets/audio/target.wav
 

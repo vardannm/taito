@@ -4,6 +4,8 @@ Status: physical-device sessions and iOS build NOT RUN in this Windows workspace
 
 ## Build and distribution
 
+- Privacy: finish `release/APP_PRIVACY.md`, verify Settings > Privacy Policy offline, and reconcile the final archive Privacy Report with App Store Connect disclosures.
+
 - Android: copy `android/key.properties.example` to ignored `android/key.properties`, supply an existing upload keystore, and confirm the application ID. Do not commit signing secrets. Gradle selects the real key when supplied; otherwise APKs remain development-signed playtest builds.
 - Run `python scripts/release_check.py`. Fix every release blocker before producing a store candidate.
 - Run `.\scripts\flutter.ps1 analyze --no-pub`, `.\scripts\flutter.ps1 test --no-pub`, and `.\scripts\flutter.ps1 build appbundle --release --no-pub` after the gate passes.

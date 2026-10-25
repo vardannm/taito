@@ -6,8 +6,61 @@ import 'package:balance_arcade/one_finger_controls.dart';
 import 'package:balance_arcade/pivot_board.dart';
 
 void main() {
+  for (final mode in GameMode.values) {
+    testWidgets('one-finger drag and hold behave consistently in $mode', (
+      tester,
+    ) async {
+      final game = BalanceGame(seed: 8)
+        ..setControlMode(ControlMode.oneFinger)
+        ..start(gameMode: mode);
+      if (!game.merging) {
+        game.board.clear();
+        game.coins.clear();
+        game.specialHazards.clear();
+      }
+      game.left = game.right = 440;
+      if (game.infinite) {
+        game.tutorialCourse = true;
+        game.tutorialAscent = 0;
+      }
+      if (game.merging) {
+        game.mergeRun.orbs.clear();
+        game.mergeRun.gates.clear();
+      }
+      final frame = ValueNotifier(0);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Center(
+            child: SizedBox(
+              width: 360,
+              height: 656,
+              child: PivotBoard(game: game, frame: frame),
+            ),
+          ),
+        ),
+      );
+      final pad = find.byType(OneFingerControls);
+      final scale = tester.widget<OneFingerControls>(pad).boardScale;
+      final finger = await tester.startGesture(tester.getCenter(pad));
+      await finger.moveBy(Offset(0, -24 * scale));
+      game.step(1 / 120);
+      expect(game.left, closeTo(416, .001));
+      for (var i = 0; i < 60; i++) {
+        game.step(1 / 120);
+      }
+      expect(game.left, closeTo(416, .001));
+      await finger.moveBy(Offset(0, 10 * scale));
+      game.step(1 / 120);
+      expect(game.left, closeTo(426, .001));
+      await finger.up();
+      game.step(.1);
+      expect(game.left, closeTo(426, .001));
+      await tester.pumpWidget(const SizedBox());
+      frame.dispose();
+    });
+  }
   testWidgets(
-    'thumb pad is below the board; re-grabbing anywhere preserves the platform',
+    'thumb pad overlays the board; re-grabbing anywhere preserves the platform',
     (tester) async {
       tester.view.physicalSize = const Size(400, 800);
       tester.view.devicePixelRatio = 1;
@@ -34,7 +87,7 @@ void main() {
       );
       expect(
         tester.getRect(board).bottom,
-        lessThanOrEqualTo(tester.getRect(pad).top),
+        closeTo(tester.getRect(pad).bottom, .001),
       );
       expect(tester.getSize(pad).height, 96);
       // Touching the playfield cannot take ownership of the one-finger control.
@@ -46,13 +99,13 @@ void main() {
       await finger.moveBy(const Offset(33, -24));
       game.step(1 / 120);
       expect(game.controlPosition, closeTo(.3, .001));
-      // Vertical is a stick: held up, it keeps climbing without more movement.
+      // Vertical follows the finger exactly, then holds without more movement.
       final lifted = (game.left + game.right) / 2;
-      expect(lifted, lessThan(500));
+      expect(lifted, closeTo(476, .001));
       for (var i = 0; i < 60; i++) {
         game.step(1 / 120);
       }
-      expect((game.left + game.right) / 2, lessThan(lifted - 25));
+      expect((game.left + game.right) / 2, closeTo(lifted, .001));
       await finger.up();
       final left = game.left, right = game.right;
       game.step(.1);
@@ -68,10 +121,9 @@ void main() {
       await finger.moveBy(const Offset(-11, 10));
       game.step(1 / 120);
       expect(game.controlPosition, closeTo(.2, .001));
-      // Ten pixels below the new grab point is a gentle, controllable descent.
+      // Ten pixels below the new grab point lowers the bar by ten units.
       final eased = (game.left + game.right) / 2;
-      expect(eased, greaterThan(held));
-      expect(eased, lessThan(held + 1));
+      expect(eased, closeTo(held + 10, .001));
       await finger.up();
       await tester.pumpWidget(const SizedBox());
       frame.dispose();
@@ -79,7 +131,7 @@ void main() {
   );
 
   testWidgets(
-    'a held stick climbs outside the thumb area and reverses immediately; cancel stops input',
+    'drag follows the finger outside the thumb area and reverses immediately; cancel stops input',
     (tester) async {
       tester.view.physicalSize = const Size(400, 800);
       tester.view.devicePixelRatio = 1;
@@ -102,24 +154,27 @@ void main() {
       );
       final pad = find.byType(OneFingerControls);
       final finger = await tester.startGesture(tester.getCenter(pad));
-      // Held far above the pad: a full-speed climb that needs no more motion.
+      // Drag far above the pad, then hold: movement stops with the finger.
       await finger.moveBy(const Offset(0, -300));
       for (var i = 0; i < 120; i++) {
         game.step(1 / 120);
       }
-      expect(game.left, closeTo(500 - BalanceGame.liftMotor, .001));
+      expect(game.left, closeTo(200, .001));
       await finger.moveBy(const Offset(0, -50));
       for (var i = 0; i < 60; i++) {
         game.step(1 / 120);
       }
-      expect(game.left, closeTo(500 - BalanceGame.liftMotor * 1.5, .001));
+      expect(game.left, closeTo(150, .001));
       // Reverse while the finger is still far above the pad.
       final top = game.left;
       await finger.moveBy(const Offset(0, 400));
       for (var i = 0; i < 60; i++) {
         game.step(1 / 120);
       }
-      expect(game.left, closeTo(top + BalanceGame.liftMotor / 2, .001));
+      expect(
+        game.left,
+        closeTo((top + 400).clamp(game.minPivot, game.maxPivot), .001),
+      );
       await finger.up();
       final released = game.left;
       game.step(.5);
@@ -129,7 +184,10 @@ void main() {
       for (var i = 0; i < 60; i++) {
         game.step(1 / 120);
       }
-      expect(game.left, closeTo(released + BalanceGame.liftMotor / 2, .001));
+      expect(
+        game.left,
+        closeTo((released + 150).clamp(game.minPivot, game.maxPivot), .001),
+      );
       final lowered = game.left;
       await next.moveBy(const Offset(0, -15));
       await next.cancel();
@@ -141,7 +199,7 @@ void main() {
     },
   );
   testWidgets(
-    'resizing a held thumb pad preserves ownership and a held stick',
+    'resizing a held thumb pad preserves ownership and relative dragging',
     (tester) async {
       final game = BalanceGame()
         ..setControlMode(ControlMode.oneFinger)
@@ -180,9 +238,10 @@ void main() {
       await finger.moveBy(const Offset(-3, -4));
       game.step(1 / 120);
       expect(game.controlPosition, closeTo(tilt - 3 / (110 * scale), .00001));
-      // A resize rebases tilt but never re-centres a stick still held up, so
-      // the climb carries on from the height it had reached.
-      expect((game.left + game.right) / 2, lessThan(height));
+      expect((game.left + game.right) / 2, closeTo(height - 4 / scale, .001));
+      final afterDrag = (game.left + game.right) / 2;
+      game.step(.25);
+      expect((game.left + game.right) / 2, closeTo(afterDrag, .001));
       await finger.up();
       expect(game.controlHeld, isFalse);
       await tester.pumpWidget(const SizedBox());

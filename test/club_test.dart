@@ -33,7 +33,7 @@ void main() {
     }
     expect(NextGoal.forProfile(p).title, contains('without a miss'));
     for (var i = 1; i <= ClassicLevels.count; i++) {
-      p.levelRecords['twoFinger:$i'] = const LevelRecord(starMask: 7);
+      p.levelRecords['twoFinger:$i'] = const LevelRecord(starMask: 15);
     }
     expect(NextGoal.forProfile(p).mode, GameMode.daily);
     p.controlMode = ControlMode.oneFinger;
@@ -58,15 +58,15 @@ void main() {
         bestTime: 80,
         attempts: 2,
       );
-      p.mazeBestTimes['oneFinger:2'] = 42.5;
       final restored = ProgressBackup.decode(
         ProgressBackup.encode(p),
         testEconomy: false,
       );
       expect(restored.wallet, 80);
-      expect(restored.selectedBall, p.selectedBall);
+      // Premium gear is bought with coins, so it restores like other gear.
+      expect(restored.ownedBalls, contains(BallCosmetic.values.last));
+      expect(restored.selectedBall, BallCosmetic.values.last);
       expect(restored.levelRecord(9).starMask, 7);
-      expect(restored.mazeBestTimes, p.mazeBestTimes);
       final target = PlayerProfile();
       await ProgressBackup.restore(target, restored);
       expect(target.mergeHighest, 4096);
@@ -74,7 +74,8 @@ void main() {
       await fresh.load();
       expect(fresh.classicLevel, 9);
       expect(fresh.sound, false);
-      expect(fresh.levelRecord(9).bestTime, 80);
+      expect(fresh.controlMode, ControlMode.oneFinger);
+      expect(fresh.levelRecord(9, ControlMode.analog).bestTime, 80);
       expect(fresh.tutorialSeen, true);
       expect(fresh.wallet, 80);
     },

@@ -5,6 +5,7 @@ import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/profile.dart';
 import 'game_test.dart' show advance, placeAt;
+import 'support/mode_navigation.dart';
 
 // Isolate score/idle-floor tests from the independent trap collision system.
 void advanceWithoutTraps(BalanceGame game, double seconds) {
@@ -17,7 +18,9 @@ void advanceWithoutTraps(BalanceGame game, double seconds) {
 
 void placeAtSafeHeight(BalanceGame game, double height) {
   final y = BalanceGame.infiniteStart - BalanceGame.ballRadius - height;
-  game.cameraOffset = math.max(0, 300 - y);
+  final topBallScreenY =
+      game.minPivot + game.cameraOffset - BalanceGame.ballRadius;
+  game.cameraOffset = math.max(0, topBallScreenY - y);
   game.ensureInfiniteBoard();
   final x = [180.0, 70.0, 290.0, 120.0, 240.0].firstWhere(
     (x) => game.board.every(
@@ -60,7 +63,10 @@ void main() {
       expect(game.metres, 500);
       expect(game.score, greaterThan(500));
       expect(game.cameraOffset, greaterThan(4500));
-      expect(game.screenY(game.ballY), closeTo(300, .01));
+      expect(
+        game.screenY(game.ballY),
+        closeTo(321 - BalanceGame.ballRadius, .01),
+      );
       expect(game.board.length, lessThan(40));
       expect(game.board.every((h) => h.target == 0), isTrue);
     },
@@ -68,7 +74,7 @@ void main() {
   test('staying still raises the red floor and ends the last life', () {
     final game = BalanceGame()..start(gameMode: GameMode.infinite);
     game.lives = 1;
-    advanceWithoutTraps(game, 2.8);
+    advanceWithoutTraps(game, 9.8);
     expect(game.dangerActive, isFalse);
     expect(game.score, greaterThan(0));
     advanceWithoutTraps(game, .5);
@@ -82,7 +88,7 @@ void main() {
   test('old-height movement cannot farm score or reset the stall timer', () {
     final game = BalanceGame()..start(gameMode: GameMode.infinite);
     placeAtSafeHeight(game, 60);
-    advanceWithoutTraps(game, 1.5);
+    advanceWithoutTraps(game, 8.5);
     final peakScore = game.score;
     for (int i = 0; i < 30; i++) {
       game.board.clear();
@@ -168,6 +174,7 @@ void main() {
         isTrue,
       );
       await tester.pump();
+      await armWorld(tester);
       final game = tester.widget<PivotBoard>(find.byType(PivotBoard)).game;
       game.beginInput();
       await tester.pump();

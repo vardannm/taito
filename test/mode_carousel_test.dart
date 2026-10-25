@@ -22,7 +22,12 @@ Future<void> swipe(
 }) async {
   final board = find.byType(PivotBoard);
   await tester.dragFrom(
-    from ?? tester.getCenter(board),
+    from ??
+        (tester.widget<PivotBoard>(board).game.boardTilt
+            ? tester.getCenter(
+                find.byKey(const ValueKey('selected-mode-title')),
+              )
+            : tester.getCenter(board)),
     Offset(forward ? -230 : 230, 0),
   );
   await tester.pump();
@@ -36,39 +41,40 @@ void main() {
         InMemorySharedPreferencesAsync.empty(),
   );
 
-  testWidgets('every world swipes in order, snaps, and never simulates previews', (
-    tester,
-  ) async {
-    final game = await launch(tester, ControlMode.twoFinger);
-    expect(
-      tester
-          .widget<PageView>(find.byType(PageView))
-          .childrenDelegate
-          .estimatedChildCount,
-      arcadeModes.length,
-    );
-    for (var index = 0; index < arcadeModes.length; index++) {
-      if (index > 0) await swipe(tester);
-      expect(carousel(tester).page, closeTo(index.toDouble(), .001));
-      expect(game.mode, arcadeModes[index]);
-      expect(game.waitingForInput, isTrue);
-      expect(game.elapsed, 0);
-      expect(game.score, 0);
-      expect(game.level, 1);
-      expect(tester.getCenter(find.byType(PivotBoard)).dx, closeTo(160, .01));
-      expect(tester.takeException(), isNull);
-    }
-    await swipe(tester); // End stays on 2048.
-    expect(carousel(tester).page, arcadeModes.length - 1);
-    for (var index = arcadeModes.length - 2; index >= 0; index--) {
+  testWidgets(
+    'every world swipes in order, snaps, and never simulates previews',
+    (tester) async {
+      final game = await launch(tester, ControlMode.twoFinger);
+      expect(
+        tester
+            .widget<PageView>(find.byType(PageView))
+            .childrenDelegate
+            .estimatedChildCount,
+        arcadeModes.length,
+      );
+      for (var index = 0; index < arcadeModes.length; index++) {
+        if (index > 0) await swipe(tester);
+        expect(carousel(tester).page, closeTo(index.toDouble(), .001));
+        expect(game.mode, arcadeModes[index]);
+        expect(game.waitingForInput, isTrue);
+        expect(game.elapsed, 0);
+        expect(game.score, 0);
+        expect(game.level, 1);
+        expect(tester.getCenter(find.byType(PivotBoard)).dx, closeTo(160, .01));
+        expect(tester.takeException(), isNull);
+      }
+      await swipe(tester); // End stays on 2048.
+      expect(carousel(tester).page, arcadeModes.length - 1);
+      for (var index = arcadeModes.length - 2; index >= 0; index--) {
+        await swipe(tester, forward: false);
+        expect(game.mode, arcadeModes[index]);
+        expect(carousel(tester).page, index);
+      }
       await swipe(tester, forward: false);
-      expect(game.mode, arcadeModes[index]);
-      expect(carousel(tester).page, index);
-    }
-    await swipe(tester, forward: false);
-    expect(carousel(tester).page, 0);
-    await tester.pumpWidget(const SizedBox());
-  });
+      expect(carousel(tester).page, 0);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
 
   for (final control in ControlMode.values) {
     for (var index = 0; index < arcadeModes.length; index++) {
@@ -77,9 +83,10 @@ void main() {
         (tester) async {
           final game = await launch(tester, control);
           await selectWorld(tester, index);
+          await armWorld(tester);
           expect(game.mode, arcadeModes[index]);
-          final state = tester.state(controller(control));
-          final rect = tester.getRect(controller(control));
+          final state = tester.state(controller(game.controlMode));
+          final rect = tester.getRect(controller(game.controlMode));
           final epoch = game.inputEpoch, serial = game.runSerial;
           final left = game.left;
           final finger = await tester.startGesture(
@@ -95,16 +102,16 @@ void main() {
           expect(game.left, lessThan(left));
           expect(game.inputEpoch, epoch);
           expect(game.runSerial, serial);
-          expect(tester.state(controller(control)), same(state));
+          expect(tester.state(controller(game.controlMode)), same(state));
           expect(
-            tester.getRect(controller(control)).width,
+            tester.getRect(controller(game.controlMode)).width,
             greaterThanOrEqualTo(rect.width - .001),
           );
           // The original controller and another pointer cannot page while playing.
           await finger.moveBy(const Offset(-160, 0));
           expect(carousel(tester).page, index);
           expectOwned(game);
-          // Restore the tilt before advancing physics into a narrow maze wall.
+          // Restore the tilt before advancing physics.
           await finger.moveBy(const Offset(160, 0));
           await swipe(tester, from: const Offset(200, 130));
           expect(carousel(tester).page, index);
@@ -113,7 +120,7 @@ void main() {
           await finger.up();
           await tester.tap(find.byTooltip('Pause'));
           await tester.pump();
-          await tester.tap(find.text('BACK TO CLUB'));
+          await tester.tap(find.text('BACK TO MENU'));
           await tester.pump();
           await tester.pump(const Duration(milliseconds: 600));
           await tester.pump();
@@ -135,8 +142,7 @@ void main() {
     final profile = PlayerProfile()
       ..sound = false
       ..haptics = false
-      ..classicLevel = 18
-      ..mazeLevel = 12;
+      ..classicLevel = 18;
     for (var i = 1; i <= 17; i++) {
       profile.levelRecords[profile.recordKey(i, ControlMode.twoFinger)] =
           const LevelRecord(starMask: 7);
@@ -161,9 +167,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pump();
     await selectWorld(tester, 2);
-    expect(find.text('Maze • Level 12'), findsOneWidget);
+    expect(find.text('Number Merge'), findsOneWidget);
     await startWorld(tester);
-    expect(game.level, 12);
+    expect(game.mode, GameMode.merge2048);
     expect(game.waitingForInput, isFalse);
     await tester.pumpWidget(const SizedBox());
   });
@@ -184,6 +190,7 @@ void main() {
       expect(carousel(tester).page, 0);
       await swipe(tester, from: const Offset(220, 110));
       expect(game.mode, GameMode.classic);
+      await armWorld(tester);
       await tester.sendKeyDownEvent(LogicalKeyboardKey.keyW);
       expect(game.waitingForInput, isFalse);
       expect(game.leftInput, -1);
@@ -232,12 +239,67 @@ void main() {
         await tester.pump(const Duration(milliseconds: 400));
         await tester.pump();
         expect(game.mode, GameMode.classic);
-        expect(game.inputLocked, isFalse);
+        expect(game.inputLocked, isTrue);
         await startWorld(tester);
         expect(game.waitingForInput, isFalse);
         await tester.pumpWidget(const SizedBox());
       },
     );
+  }
+
+  for (final mode in [GameMode.infinite, GameMode.merge2048]) {
+    testWidgets('$mode resumes only after a frozen three-second countdown', (
+      tester,
+    ) async {
+      final game = await launch(tester, ControlMode.oneFinger);
+      await selectWorld(tester, arcadeModes.indexOf(mode));
+      await startWorld(tester);
+      await tester.tap(find.byTooltip('Pause'));
+      await tester.pump();
+      final elapsed = game.elapsed;
+      final camera = game.cameraOffset;
+      final ball = game.ballX;
+      final score = game.score;
+      final countdown = find.byKey(const ValueKey('resume-countdown'));
+      await tester.tap(find.text('RESUME RUN'));
+      await tester.pump();
+      for (final seconds in [3, 2, 1]) {
+        expect(tester.widget<Text>(countdown).data, '$seconds');
+        expect(game.paused, isTrue);
+        expect(game.elapsed, elapsed);
+        expect(game.cameraOffset, camera);
+        expect(game.ballX, ball);
+        expect(game.score, score);
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.keyW);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.keyW);
+        expect(game.canControl, isFalse);
+        await tester.pump(const Duration(seconds: 1));
+      }
+      expect(countdown, findsNothing);
+      expect(game.paused, isFalse);
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(game.elapsed, greaterThan(elapsed));
+
+      await tester.tap(find.byTooltip('Pause'));
+      await tester.pump();
+      await tester.tap(find.text('RESUME RUN'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 3));
+      expect(game.paused, isTrue);
+      expect(countdown, findsNothing);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      await tester.tap(find.text('RESUME RUN'));
+      await tester.pump();
+      expect(tester.widget<Text>(countdown).data, '3');
+      // Disposing during the countdown must cancel the pending resume.
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 3));
+      expect(tester.takeException(), isNull);
+    });
   }
 
   for (var index = 0; index < arcadeModes.length; index++) {
@@ -274,7 +336,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.byType(BallShop), findsOneWidget);
-    await tester.tapAt(const Offset(8, 8));
+    await tester.tap(find.byTooltip('Done shopping'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.byType(BallShop), findsNothing);
@@ -297,7 +359,7 @@ void main() {
       );
       final game = await launch(tester, ControlMode.analog);
       for (var index = 1; index < arcadeModes.length; index++) {
-        await tester.tap(find.byTooltip('Next mode'));
+        await tester.tap(find.byKey(ValueKey('mode-$index')));
         await tester.pump();
         expect(game.mode, arcadeModes[index]);
         expect(carousel(tester).page, index);

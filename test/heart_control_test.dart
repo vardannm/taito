@@ -7,6 +7,7 @@ import 'package:balance_arcade/pivot_board.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'start_flow_test.dart' show launch, contact, controller, expectOwned;
+import 'support/mode_navigation.dart' show armWorld;
 
 void main() {
   setUp(
@@ -19,22 +20,29 @@ void main() {
       '$mode keeps the same held fingers through two lost hearts and protection expiry',
       (tester) async {
         final game = await launch(tester, mode);
+        await armWorld(tester);
         final first = await tester.startGesture(
           contact(tester, game),
           pointer: 61,
         );
         TestGesture? second;
-        if (!game.oneFinger) {
+        if (!game.oneFinger && !game.tiltOnly) {
           final board = find.byType(PivotBoard);
-          final right = game.analog
+          final right = game.tiltOnly
+              ? tester.getCenter(find.byKey(const ValueKey('tilt-lift-tilt')))
+              : game.analog
               ? tester.getCenter(find.byKey(const ValueKey('analog-right')))
               : tester.getTopLeft(board) +
-                    BoardViewport(
+                    BoardViewport.forGame(
                       tester.getSize(board),
-                    ).project(Offset(340, game.screenY(game.right)));
+                      game,
+                      fillWidth: tester.widget<PivotBoard>(board).fillWidth,
+                    ).gripCenter(game, 1);
           second = await tester.startGesture(right, pointer: 62);
         }
-        await first.moveBy(const Offset(0, -3));
+        await first.moveBy(
+          game.tiltOnly ? const Offset(3, 0) : const Offset(0, -3),
+        );
         await second?.moveBy(const Offset(0, -1));
         await tester.pump(const Duration(milliseconds: 16));
         await tester.pump(const Duration(milliseconds: 600));
@@ -60,17 +68,25 @@ void main() {
           expect(game.ballX, closeTo(x, game.velocity.abs() * .02 + .02));
           expect(game.controlPosition, tilt);
           expectOwned(game);
-          if (second != null) expect(game.pivotTargets[1], isNotNull);
+          if (game.tiltOnly) {
+            expect(game.tiltHeld, isTrue);
+          } else if (second != null) {
+            expect(game.pivotTargets[1], isNotNull);
+          }
           expect(tester.state(controller(mode)), same(state));
           expect(tester.getRect(controller(mode)), rect);
-          expect(find.textContaining('RECOVERY '), findsOneWidget);
+          // Recovery shows on the board itself (the blinking ball), not as HUD text.
+          expect(find.textContaining('RECOVERY '), findsNothing);
+          expect(find.byKey(const ValueKey('run-coins')), findsOneWidget);
 
           // No fresh touch: pending movement, expiry, and subsequent dragging all
           // belong to the original pointer(s).
           game.board.clear();
           game.survival.recovery = .01;
           final before = game.left;
-          await first.moveBy(const Offset(0, -5));
+          await first.moveBy(
+            game.tiltOnly ? const Offset(5, 0) : const Offset(0, -5),
+          );
           await second?.moveBy(const Offset(0, -4));
           await tester.pump(const Duration(milliseconds: 32));
           expect(game.survival.recovery, 0);
@@ -78,7 +94,9 @@ void main() {
           expect(game.lives, hearts);
           expect(game.inputEpoch, epoch);
           expectOwned(game);
-          await first.moveBy(const Offset(0, 2));
+          await first.moveBy(
+            game.tiltOnly ? const Offset(-2, 0) : const Offset(0, 2),
+          );
           await second?.moveBy(const Offset(0, 2));
           await tester.pump(const Duration(milliseconds: 16));
           expectOwned(game);
@@ -102,6 +120,7 @@ void main() {
     tester,
   ) async {
     final game = await launch(tester, ControlMode.twoFinger);
+    await armWorld(tester);
     await tester.sendKeyDownEvent(LogicalKeyboardKey.keyW);
     await tester.pump(const Duration(milliseconds: 16));
     game.board

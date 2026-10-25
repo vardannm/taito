@@ -5,6 +5,7 @@ import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/profile.dart';
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/board_painter.dart';
+import 'package:balance_arcade/one_finger_controls.dart';
 
 void main() {
   for (final size in [
@@ -22,7 +23,12 @@ void main() {
         ..sound = false
         ..haptics = false;
       await tester.pumpWidget(ArcadeApp(profile: profile));
-      expect(find.text('Infinite'), findsOneWidget);
+      expect(
+        tester
+            .widget<Text>(find.byKey(const ValueKey('selected-mode-title')))
+            .data,
+        'Infinite',
+      );
       expect(tester.takeException(), isNull);
       await tester.tap(find.byTooltip('Modes'));
       await tester.pump();
@@ -32,21 +38,69 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.text('A game of balance.'), findsOneWidget);
+      expect(find.text('One finger. Full control.'), findsOneWidget);
+      expect(find.text('Merge: grow your number.'), findsOneWidget);
+      expect(find.textContaining('unlock cabinet styles'), findsNothing);
       await tester.ensureVisible(find.text('TRY PRACTICE'));
       await tester.pump();
       await tester.tap(find.text('TRY PRACTICE'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
-      expect(find.text('PRACTICE'), findsOneWidget);
+      expect(find.textContaining('PRACTICE · '), findsOneWidget);
       expect(find.byType(PivotBoard), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
     });
   }
+  testWidgets('guide closes and side arrows switch modes', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final profile = PlayerProfile()
+      ..tutorialSeen = true
+      ..sound = false
+      ..haptics = false;
+    await tester.pumpWidget(ArcadeApp(profile: profile));
+    String title() => tester
+        .widget<Text>(find.byKey(const ValueKey('selected-mode-title')))
+        .data!;
+    expect(title(), 'Infinite');
+    Future<void> tapArrow(String key) async {
+      await tester.tap(find.byKey(ValueKey(key)));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump();
+    }
+
+    await tapArrow('mode-next');
+    expect(title(), isNot('Infinite'));
+    await tapArrow('mode-previous');
+    expect(title(), 'Infinite');
+
+    await tester.tap(find.byTooltip('Modes'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.ensureVisible(find.text('HOW TO PLAY'));
+    await tester.tap(find.text('HOW TO PLAY'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('A game of balance.'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('guide-close')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('A game of balance.'), findsNothing);
+    expect(find.textContaining('PRACTICE · '), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
   testWidgets(
     'pivot drags are independent, cancel safely and do not jump on grab',
     (tester) async {
-      final game = BalanceGame()..start(gameMode: GameMode.practice);
+      // No holes: a lift from the launch height must not end in a trap.
+      final game = BalanceGame()
+        ..start(gameMode: GameMode.practice)
+        ..board.clear();
       final frame = ValueNotifier(0);
       await tester.pumpWidget(
         MaterialApp(
@@ -56,33 +110,37 @@ void main() {
         ),
       );
       final rect = tester.getRect(find.byType(PivotBoard));
-      Offset point(double x, double y) =>
-          rect.topLeft + BoardViewport(rect.size).project(Offset(x, y));
-      final left = await tester.startGesture(point(20, 526), pointer: 1);
-      final right = await tester.startGesture(point(340, 526), pointer: 2);
-      expect(game.left, 526);
-      await left.moveBy(Offset(0, -20 * BoardViewport(rect.size).scale));
-      await right.moveBy(Offset(0, -10 * BoardViewport(rect.size).scale));
+      Offset point(int side) =>
+          rect.topLeft +
+          BoardViewport.forGame(rect.size, game).gripCenter(game, side);
+      final left = await tester.startGesture(point(0), pointer: 1);
+      final right = await tester.startGesture(point(1), pointer: 2);
+      expect(game.left, BalanceGame.launchHeight);
+      final scale = BoardViewport.forGame(rect.size, game).scale;
+      await left.moveBy(Offset(0, -20 * scale));
+      await right.moveBy(Offset(0, -10 * scale));
       for (int i = 0; i < 20; i++) {
         game.step(1 / 120);
       }
-      expect(game.left, closeTo(506, .01));
-      expect(game.right, closeTo(516, .01));
+      expect(game.left, closeTo(BalanceGame.launchHeight - 20, .01));
+      expect(game.right, closeTo(BalanceGame.launchHeight - 10, .01));
       await left.up();
       expect(game.pivotTargets[0], isNull);
       expect(game.pivotTargets[1], isNotNull);
       await right.cancel();
       expect(game.pivotTargets, [null, null]);
       game.setPaused(true);
-      await tester.tapAt(point(20, 506));
+      await tester.tapAt(point(0));
       expect(game.pivotTargets, [null, null]);
       await tester.pumpWidget(const SizedBox());
       frame.dispose();
     },
   );
 
-  testWidgets('gameplay viewport respects tablet safe area', (tester) async {
-    tester.view.physicalSize = const Size(800, 1200);
+  testWidgets('board fills the screen while HUD and pad respect safe area', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     tester.view.padding = FakeViewPadding(
       top: 44,
@@ -95,6 +153,7 @@ void main() {
       ArcadeApp(
         profile: PlayerProfile()
           ..tutorialSeen = true
+          ..controlMode = ControlMode.oneFinger
           ..sound = false
           ..haptics = false,
       ),
@@ -102,14 +161,32 @@ void main() {
     await openClassicLevels(tester);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    await tester.tap(find.text('First steps'));
+    await tester.tap(find.byKey(const ValueKey('level-1')));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
     final rect = tester.getRect(find.byType(PivotBoard));
-    expect(rect.left, greaterThanOrEqualTo(12));
-    expect(rect.right, lessThanOrEqualTo(788));
-    expect(rect.bottom, lessThanOrEqualTo(1166));
-    expect(rect.top, greaterThanOrEqualTo(44));
-    expect(rect.height, greaterThan(850));
+    expect(rect.left, greaterThanOrEqualTo(12 - .001));
+    expect(rect.right, lessThanOrEqualTo(378 + .001));
+    expect(rect.bottom, closeTo(844, .001));
+    // The pad grows down into the 34-point inset, 8 points above the edge.
+    expect(
+      tester.getRect(find.byType(OneFingerControls)).bottom,
+      closeTo(844 - OneFingerControls.bottomMargin(34), .001),
+    );
+    expect(rect.top, closeTo(0, .001));
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('board-hud'))).dy,
+      closeTo(56, .001),
+    );
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('board-pause'))).dy,
+      closeTo(56, .001),
+    );
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('board-hearts'))).dy,
+      closeTo(66, .001),
+    );
+    expect(rect.height, greaterThan(700));
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

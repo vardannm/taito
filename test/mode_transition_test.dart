@@ -17,14 +17,13 @@ void main() {
   );
 
   testWidgets(
-    'inactive worlds are images and partial swipes allocate no game resources',
+    'inactive themed worlds stay frozen and partial swipes leave the live game untouched',
     (tester) async {
       final game = await launch(tester, ControlMode.twoFinger);
       final dynamic state = screen(tester);
       final serial = game.runSerial;
       final frame = state.frame.value;
       expect(state.ticker.isActive, isFalse);
-      expect(game.hasMazeResources, isFalse);
       expect(game.hasMergeResources, isFalse);
       await tester.pump(const Duration(seconds: 5));
       expect(state.frame.value, frame);
@@ -39,7 +38,7 @@ void main() {
       expect(find.byKey(const ValueKey('mode-preview-1')), findsOneWidget);
       expect(
         tester.widget(find.byKey(const ValueKey('mode-preview-1'))),
-        isA<Image>(),
+        isA<CustomPaint>(),
       );
       expect(
         find.byWidgetPredicate(
@@ -57,13 +56,8 @@ void main() {
       expect(game.runSerial, serial + 1);
       expect(state.ticker.isActive, isFalse);
       await selectWorld(tester, 2);
-      expect(game.hasMazeResources, isTrue);
-      expect(game.hasMergeResources, isFalse);
-      await selectWorld(tester, 3);
-      expect(game.hasMazeResources, isFalse);
       expect(game.hasMergeResources, isTrue);
       await selectWorld(tester, 0);
-      expect(game.hasMazeResources, isFalse);
       expect(game.hasMergeResources, isFalse);
       expect(state.ticker.isActive, isFalse);
       expect(tester.takeException(), isNull);
@@ -82,6 +76,8 @@ void main() {
         final preview = tester.getRect(board);
         final boardState = tester.state(board);
         final controlState = tester.state(controller(control));
+        await tester.tap(find.byKey(const ValueKey('menu-play')));
+        await tester.pump();
         final finger = await tester.startGesture(
           contact(tester, game),
           pointer: 72,
@@ -113,7 +109,9 @@ void main() {
         expect(game.controlPosition, tilt);
         expectOwned(game);
         final left = game.left;
-        await finger.moveBy(const Offset(0, -4));
+        await finger.moveBy(
+          game.tiltOnly ? const Offset(4, 0) : const Offset(0, -4),
+        );
         await tester.pump(const Duration(milliseconds: 16));
         expect(game.left, lessThan(left));
         await finger.up();
@@ -149,6 +147,7 @@ void main() {
         ControlMode.oneFinger,
         size: const Size(390, 844),
       );
+      await armWorld(tester);
       final dynamic state = screen(tester);
       final finger = await tester.startGesture(
         contact(tester, game),

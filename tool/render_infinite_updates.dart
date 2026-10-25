@@ -44,8 +44,8 @@ void main() {
         ..tutorialSeen = true
         ..sound = false
         ..music = false
-        ..haptics = false;
-      await profile.grantBallTestCoins();
+        ..haptics = false
+        ..wallet = 500;
       await tester.pumpWidget(
         RepaintBoundary(
           key: key,

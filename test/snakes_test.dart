@@ -10,6 +10,7 @@ import 'package:balance_arcade/spider_web.dart';
 BalanceGame run({double metres = 0}) {
   final g = BalanceGame(seed: 12)..start(gameMode: GameMode.infinite);
   g.mazeSectionsEnabled = false;
+  g.lateEnemiesEnabled = false;
   g.maxHeight = metres * 10;
   g.board.clear();
   g.survival.items.clear();
@@ -45,29 +46,33 @@ void main() {
     },
   );
 
-  test('only hard encounters spawn a snake above the visible board', () {
-    for (final metres in [0.0, 1000.0, 1200.0, 1300.0]) {
-      final g = run(metres: metres);
-      g.step(1 / 120);
-      expect(g.snakes, isEmpty);
-    }
-    for (var seed = 0; seed < 12; seed++) {
-      final g = BalanceGame(seed: seed)..start(gameMode: GameMode.infinite);
-      g.mazeSectionsEnabled = false;
-      g.maxHeight = 14000;
-      g.visibleTop = -160;
-      g.step(1 / 120);
-      expect(g.snakes.length, 1);
-      expect(
-        g.snakes.single.points.every((p) => g.screenY(p.y) < g.visibleTop),
-        isTrue,
-      );
-      expect(g.specialHazards, isEmpty);
-      g.snakes.clear();
-      g.step(1 / 120);
-      expect(g.snakes, isEmpty); // No backlog or immediate second arrival.
-    }
-  });
+  test(
+    'snake unlock is randomized and active sections spawn it above the board',
+    () {
+      for (final metres in [0.0, 200.0, 700.0]) {
+        final g = run(metres: metres);
+        g.step(1 / 120);
+        expect(g.snakes, isEmpty);
+      }
+      for (var seed = 0; seed < 12; seed++) {
+        final g = BalanceGame(seed: seed)..start(gameMode: GameMode.infinite);
+        g.mazeSectionsEnabled = false;
+        g.lateEnemiesEnabled = false;
+        g.maxHeight = 50000;
+        g.visibleTop = -160;
+        g.step(1 / 120);
+        expect(g.snakes.length, 1);
+        expect(
+          g.snakes.single.points.every((p) => g.screenY(p.y) < g.visibleTop),
+          isTrue,
+        );
+        expect(g.specialHazards, isEmpty);
+        g.snakes.clear();
+        g.step(1 / 120);
+        expect(g.snakes, isEmpty); // No backlog or immediate second arrival.
+      }
+    },
+  );
 
   test('snake scheduling waits for ranged attacks and special hazards', () {
     for (var blocker = 0; blocker < 4; blocker++) {
@@ -126,7 +131,11 @@ void main() {
       final g = run();
       g.snakes.add(BoardSnake(x: 180, y: 350));
       g.survival.items.add(
-        InfiniteItem(InfiniteItemKind.shield, 180, shieldFirst ? 400 : 280),
+        InfiniteItem(
+          InfiniteItemKind.shield,
+          180,
+          shieldFirst ? 400 : g.minPivot,
+        ),
       );
       g.grabPivot(0);
       g.grabPivot(1);
@@ -162,18 +171,23 @@ void main() {
     },
   );
 
-  test('breathing sections, mazes and restart clear snakes', () {
-    for (final maze in [false, true]) {
+  test(
+    'section changes preserve active snakes and mazes wait for their exit',
+    () {
+      for (final maze in [false, true]) {
+        final g = run();
+        g.snakes.add(BoardSnake(x: 100, y: 200));
+        g.maxHeight = maze ? 8000 : 1800;
+        g.mazeSectionsEnabled = maze;
+        g.step(1 / 120);
+        expect(g.snakes, hasLength(1));
+        expect(g.snakes.single.age, greaterThan(0));
+        if (maze) expect(g.mazeSection, isFalse);
+      }
       final g = run();
       g.snakes.add(BoardSnake(x: 100, y: 200));
-      g.maxHeight = maze ? 8000 : 1800;
-      g.mazeSectionsEnabled = maze;
-      g.step(1 / 120);
+      g.start(gameMode: GameMode.classic, levelNumber: 31);
       expect(g.snakes, isEmpty);
-    }
-    final g = run();
-    g.snakes.add(BoardSnake(x: 100, y: 200));
-    g.start(gameMode: GameMode.classic, levelNumber: 31);
-    expect(g.snakes, isEmpty);
-  });
+    },
+  );
 }

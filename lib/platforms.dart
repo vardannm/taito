@@ -23,9 +23,40 @@ enum PlatformStyle {
     2300,
     0xFFFFD380,
     3,
+  ),
+  aether(
+    'Aether bridge',
+    'Platinum filigree and rose-gold starlight',
+    6000,
+    0xFFCFEAFF,
+    3.5,
+  ),
+  phoenix(
+    'Phoenix forge',
+    'Ruby enamel with flowing golden feathers',
+    9500,
+    0xFFFFAB65,
+    4,
+  ),
+  chrono(
+    'Chrono relay',
+    'Teal sapphire, precision gears and gold seams',
+    14000,
+    0xFF83F1E0,
+    4.5,
+  ),
+  genesis(
+    'Genesis arc',
+    'Iridescent crystal petals and luminous pearl',
+    20000,
+    0xFFF4B6F0,
+    5,
   );
 
   bool get energized => index >= aurora.index;
+
+  /// Premium tier: the most expensive coin rails, never given as a prize.
+  bool get purchaseOnly => index >= aether.index;
 
   const PlatformStyle(
     this.label,
@@ -38,3 +69,9 @@ enum PlatformStyle {
   final int cost, color;
   final double scoreBonus;
 }
+
+/// Shop order, weakest first, by price. Also ranks strength, so the shop
+/// never suggests a weaker rail.
+final List<PlatformStyle> platformShopOrder = List.unmodifiable(
+  [...PlatformStyle.values]..sort((a, b) => a.cost.compareTo(b.cost)),
+);

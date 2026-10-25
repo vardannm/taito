@@ -70,8 +70,8 @@ class ClassicLevels {
         if (x < 44 || x > 316 || y < 55 || y > 470) continue;
         if (board.any(
           (h) =>
-              math.pow(h.x - x, 2) + math.pow(h.y - y, 2) <
-              math.pow(h.target > 0 ? 34 : 25, 2),
+              math.pow(h.homeX - x, 2) + math.pow(h.homeY - y, 2) <
+              math.pow((h.target > 0 ? 34 : 25) + h.extraReach, 2),
         ))
           continue;
         if (spiders.any(
@@ -93,6 +93,89 @@ class ClassicLevels {
   }
 
   static String finaleTitle(int level) => definition(level).finaleTitle;
+
+  static final _starLocations = <int, (double, double)>{};
+  static LevelStar starForLevel(int level) {
+    final (x, y) = _starLocations.putIfAbsent(level, () {
+      final data = definition(level);
+      final star = starFor(
+        data.holes,
+        data.spiders.map((s) => s.create()).toList(),
+      );
+      return (star.x, star.y);
+    });
+    return LevelStar(x, y);
+  }
+
+  /// A single optional reward in connected space, clear of holes and territories.
+  static LevelStar starFor(List<Hole> board, List<BoardSpider> spiders) {
+    const columns = 71, rows = 121;
+    bool clear(double x, double y, {bool pickup = false}) =>
+        !board.any(
+          (h) =>
+              math.pow(h.homeX - x, 2) + math.pow(h.homeY - y, 2) <
+              math.pow(
+                pickup
+                    ? (h.target > 0 ? 34 : 25) + h.extraReach
+                    : 16 + h.passReach,
+                2,
+              ),
+        ) &&
+        !spiders.any(
+          (s) =>
+              math.pow(s.homeX - x, 2) + math.pow(s.homeY - y, 2) <
+              math.pow(s.zoneRadius + 12, 2),
+        );
+    final visited = List<bool>.filled(columns * rows, false);
+    final queue = <int>[120 * columns + 35];
+    visited[queue.first] = true;
+    for (var head = 0; head < queue.length; head++) {
+      final cell = queue[head], cx = cell % columns, cy = cell ~/ columns;
+      for (final (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)]) {
+        final nx = cx + dx, ny = cy + dy;
+        if (nx < 0 || nx >= columns || ny < 0 || ny >= rows) continue;
+        final next = ny * columns + nx;
+        if (visited[next] || !clear(40 + nx * 4.0, 40 + ny * 4.0)) continue;
+        visited[next] = true;
+        queue.add(next);
+      }
+    }
+    bool reachable(double x, double y) {
+      final cx = ((x - 40) / 4).round(), cy = ((y - 40) / 4).round();
+      return cx >= 0 &&
+          cx < columns &&
+          cy >= 0 &&
+          cy < rows &&
+          visited[cy * columns + cx];
+    }
+
+    final candidates = coinsFor(board, spiders)
+      ..sort((a, b) => (a.y - 280).abs().compareTo((b.y - 280).abs()));
+    for (final c in candidates) {
+      if (reachable(c.x, c.y)) return LevelStar(c.x, c.y);
+    }
+    // Dense layouts can lack a safe coin candidate. Search reachable grid cells.
+    final cells = [...queue]
+      ..sort(
+        (a, b) => (40 + (a ~/ columns) * 4 - 280).abs().compareTo(
+          (40 + (b ~/ columns) * 4 - 280).abs(),
+        ),
+      );
+    for (final cell in cells) {
+      final x = 40 + (cell % columns) * 4.0, y = 40 + (cell ~/ columns) * 4.0;
+      if (x >= 44 &&
+          x <= 316 &&
+          y >= 100 &&
+          y <= 440 &&
+          clear(x, y, pickup: true)) {
+        return LevelStar(x, y);
+      }
+    }
+    throw StateError(
+      'Classic board has no reachable collectible star position.',
+    );
+  }
+
   static String finaleRule(int level) => definition(level).finaleRule;
 
   /// Check connected space around all targets before accepting a territory.
@@ -110,7 +193,9 @@ class ClassicLevels {
         if (visited[next]) continue;
         final x = 30 + nx * 6.0, y = 36 + ny * 6.0;
         if (board.any(
-              (h) => math.pow(h.x - x, 2) + math.pow(h.y - y, 2) < 14 * 14,
+              (h) =>
+                  math.pow(h.homeX - x, 2) + math.pow(h.homeY - y, 2) <
+                  math.pow(14 + h.passReach, 2),
             ) ||
             spiders.any(
               (s) =>
@@ -127,9 +212,9 @@ class ClassicLevels {
         .every(
           (h) => queue.any(
             (cell) =>
-                math.pow(30 + (cell % columns) * 6 - h.x, 2) +
-                    math.pow(36 + (cell ~/ columns) * 6 - h.y, 2) <
-                22 * 22,
+                math.pow(30 + (cell % columns) * 6 - h.homeX, 2) +
+                    math.pow(36 + (cell ~/ columns) * 6 - h.homeY, 2) <
+                math.pow(22 + math.max(0, h.passReach), 2),
           ),
         );
   }

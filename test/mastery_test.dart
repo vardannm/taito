@@ -64,7 +64,7 @@ void main() {
       g.start();
       finish(g, time: 130, score: 1000);
       p.recordResult(g);
-      expect(p.levelRecord(1).bestScore, 2000);
+      expect(p.levelRecord(1).bestScore, 0);
       expect(p.levelRecord(1).bestTime, 100);
       g.setControlMode(ControlMode.oneFinger);
       g.start();
@@ -101,7 +101,7 @@ void main() {
       expect(restored.cabinet, CabinetStyle.jade);
       expect(restored.levelRecord(1).starMask, 7);
       expect(restored.dailyRecord('2026-09-09').attempts, 1);
-      expect(restored.best, 1500);
+      expect(restored.best, 0);
     },
   );
   test(
@@ -184,12 +184,17 @@ void main() {
     expect(p.dailyRecord('2026-02-14').attempts, 1);
   });
   test(
-    'coins sit near traps without overlapping holes or spider territories',
+    'pickup candidates sit near traps clear of holes and spider territories',
     () {
       for (var level = 1; level <= 50; level++) {
         final g = BalanceGame()..start(levelNumber: level);
-        expect(g.coins.length, inInclusiveRange(2, 3), reason: 'Level $level');
-        for (final c in g.coins) {
+        final candidates = ClassicLevels.coinsFor(g.board, g.spiders);
+        expect(
+          candidates.length,
+          inInclusiveRange(2, 3),
+          reason: 'Level $level',
+        );
+        for (final c in candidates) {
           expect(
             g.board.any(
               (h) =>
@@ -220,7 +225,7 @@ void main() {
   test(
     'fast swipes collect a coin once, retain controls, and cannot farm a reset',
     () {
-      final g = BalanceGame()..start();
+      final g = BalanceGame()..start(gameMode: GameMode.daily);
       g.board.clear();
       g.coins
         ..clear()
@@ -240,12 +245,12 @@ void main() {
       g.step(1 / 120);
       expect(g.coinsCollected, 1);
       expect(g.score, 250);
-      g.start();
+      g.start(gameMode: GameMode.daily);
       expect(g.coins.every((c) => !c.collected), isTrue);
     },
   );
   test('a fatal hole stops collection behind it on the same swipe', () {
-    final g = BalanceGame()..start();
+    final g = BalanceGame()..start(gameMode: GameMode.daily);
     g.board
       ..clear()
       ..add(const Hole(180, 480));
@@ -296,7 +301,7 @@ void main() {
     expect(g.targetTime, greaterThan(two + 40));
   });
   test(
-    'finale laser warns, pauses, takes one life, and resets between attempts',
+    'finale laser warns, pauses, takes one life, and advances through ball return',
     () {
       final g = BalanceGame()..start(levelNumber: 10);
       g.board
@@ -304,7 +309,7 @@ void main() {
         ..add(const Hole(300, 450, target: 1));
       g.coins.clear();
       g.ballX = 30;
-      advance(g, 3.1);
+      advance(g, ClassicLevels.definition(10).firstHazardAfter + .1);
       expect(g.specialHazards.length, 1);
       final h = g.specialHazards.first;
       expect(h.warning, isTrue);
@@ -317,10 +322,13 @@ void main() {
       g.left = g.right = 400;
       advance(g, 1);
       expect(g.lives, 3);
-      advance(g, 1.5);
+      advance(g, h.warningSeconds - h.age + .05);
       expect(g.lives, 2);
       expect(g.phase, GamePhase.sinking);
+      final ageAtHit = h.age;
       advance(g, 1.5);
+      expect(h.age, greaterThan(ageAtHit));
+      expect(h.expired, isTrue);
       expect(g.specialHazards, isEmpty);
       expect(g.phase, GamePhase.playing);
       g.start(gameMode: GameMode.daily);

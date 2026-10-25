@@ -4,10 +4,11 @@ import 'dart:convert';
 import 'game.dart';
 import 'profile.dart';
 import 'levels.dart';
-import 'laser_maze.dart';
 import 'ball_cosmetics.dart';
 import 'platforms.dart';
 import 'rewards.dart';
+import 'survival_upgrades.dart';
+import 'achievements.dart';
 
 /// Portable, versioned profile data. No credentials or device identifiers.
 class ProgressBackup {
@@ -27,18 +28,23 @@ class ProgressBackup {
       p.mergeBest,
       p.mergeHighest,
       p.mergeRuns,
-      p.mazeRuns,
+      0, // Retired Maze run counter; keep version 1 positions stable.
       // Two retired Maze Infinite counters. The slots stay so codes written
       // before the mode was removed still decode by position.
       0,
       0,
       p.wallet,
     ],
-    'control': p.controlMode.name,
+    'control': p.preferredControlMode.name,
+    'haloJoystick': p.haloJoystick,
     'level': p.classicLevel,
-    'maze': p.mazeLevel,
+    'maze': 1, // Reserved for version 1 readers.
     'sound': p.sound,
+    'music': p.music,
     'haptics': p.haptics,
+    'fastStart': p.infiniteFastStart,
+    'bestBosses': p.infiniteBestBosses,
+    'achievements': p.claimedAchievements.map((a) => a.name).toList(),
     'tutorial': p.tutorialSeen,
     'onboarding':
         (p.tutorialSeen
@@ -51,9 +57,12 @@ class ProgressBackup {
     'ball': p.selectedBall.name,
     'platforms': p.ownedPlatforms.map((e) => e.name).toList(),
     'platform': p.selectedPlatform.name,
+    'survivalUpgrades': p.survivalUpgrades.map(
+      (upgrade, level) => MapEntry(upgrade.name, level),
+    ),
     'levels': p.levelRecords.map((k, v) => MapEntry(k, v.toJson())),
     'daily': p.dailyRecords.map((k, v) => MapEntry(k, v.toJson())),
-    'times': p.mazeBestTimes,
+    'times': <String, double>{}, // Retired route records.
   });
 
   static PlayerProfile decode(String raw, {required bool testEconomy}) {
@@ -63,12 +72,12 @@ class ProgressBackup {
     try {
       decoded = jsonDecode(raw);
     } catch (_) {
-      throw const FormatException('Paste a complete GILT backup.');
+      throw const FormatException('Paste a complete Rollrise backup.');
     }
     if (decoded is! Map<String, dynamic> ||
         decoded['format'] != 'gilt-progress' ||
         decoded['version'] != 1) {
-      throw const FormatException('This is not a supported GILT backup.');
+      throw const FormatException('This is not a supported Rollrise backup.');
     }
     final d = decoded;
     Never invalid() => throw const FormatException(
@@ -102,16 +111,39 @@ class ProgressBackup {
       ..mergeBest = n[5]
       ..mergeHighest = n[6]
       ..mergeRuns = n[7]
-      ..mazeRuns = n[8]
-      // n[9] and n[10] are the retired Maze Infinite counters.
-      ..wallet = n[11]
+      // n[8], n[9] and n[10] belong to retired modes.
+      // The same ceiling the saved wallet uses on load.
+      ..wallet = n[11].clamp(0, 1 << 30)
       ..controlMode = choice(d['control'], ControlMode.values)
       ..classicLevel = integer(d['level'], ClassicLevels.count)
-      ..mazeLevel = integer(d['maze'], LaserMazeRoute.count)
       ..sound = flag('sound')
       ..haptics = flag('haptics')
       ..tutorialSeen = flag('tutorial');
+    // Older backups predate the music switch; music followed sound then.
+    p.music = d['music'] != null ? flag('music') : p.sound;
+    p.haloJoystick = d['haloJoystick'] != null ? flag('haloJoystick') : false;
+    if (d['fastStart'] != null) p.infiniteFastStart = flag('fastStart');
+    // Older backups predate boss records; they restore as none outlasted.
+    if (d['bestBosses'] != null)
+      p.infiniteBestBosses = integer(d['bestBosses'], 99);
+    final upgrades = d['survivalUpgrades'];
+    if (upgrades != null) {
+      if (upgrades is! Map) invalid();
+      for (final upgrade in SurvivalUpgrade.values) {
+        p.survivalUpgrades[upgrade] = integer(
+          upgrades[upgrade.name] ?? 0,
+          upgrade.maxLevel,
+        );
+      }
+    }
     p.dailyPrizes = DailyPrizes.fromJson(d['dailyPrizes']);
+    final achievements = d['achievements'];
+    if (achievements != null) {
+      if (achievements is! List) invalid();
+      p.replaceClaimedAchievements(
+        achievements.map((name) => choice(name, Achievement.values)),
+      );
+    }
     p.tutorial = d['onboarding'] is Map<String, dynamic>
         ? TutorialProgress.fromJson(d['onboarding'] as Map<String, dynamic>)
         : TutorialProgress(
@@ -120,14 +152,13 @@ class ProgressBackup {
                 : TutorialStep.controls,
           );
     p.tutorialSeen = !p.tutorial.active;
-    if (p.classicLevel < 1 || p.mazeLevel < 1 || p.mergeHighest < 2) invalid();
+    if (p.classicLevel < 1 || p.mergeHighest < 2) invalid();
     final sensitivity = d['sensitivity'];
     if (sensitivity is! List ||
         sensitivity.length != 2 ||
         sensitivity.any((v) => v is! num || !v.isFinite || v < 0 || v > 1))
       invalid();
-    p.analogSensitivity = (sensitivity[0] as num).toDouble();
-    p.twoFingerSensitivity = (sensitivity[1] as num).toDouble();
+    // Validate old exports, but movement now always uses full response.
     void records(String name, Map<String, LevelRecord> target, RegExp key) {
       final source = d[name];
       final maxRecords = name == 'levels' ? ClassicLevels.count * 3 : 160;
@@ -139,7 +170,7 @@ class ProgressBackup {
         if (name == 'levels' &&
             int.parse(entry.key.split(':').last) > ClassicLevels.count)
           invalid();
-        integer(v['stars'], 7);
+        integer(v['stars'], name == 'levels' ? 15 : 7);
         integer(v['score']);
         integer(v['attempts']);
         final t = v['time'];
@@ -152,27 +183,16 @@ class ProgressBackup {
     records(
       'levels',
       p.levelRecords,
-      RegExp(r'^(oneFinger|twoFinger|analog):[1-9]\d*$'),
+      RegExp(r'^(oneFinger|twoFinger|analog|tiltLift|boardTilt):[1-9]\d*$'),
     );
     records(
       'daily',
       p.dailyRecords,
-      RegExp(r'^(oneFinger|twoFinger|analog):\d{4}-\d{2}-\d{2}$'),
+      RegExp(
+        r'^(oneFinger|twoFinger|analog|tiltLift|boardTilt):\d{4}-\d{2}-\d{2}$',
+      ),
     );
-    final times = d['times'];
-    if (times is! Map<String, dynamic> ||
-        times.length > LaserMazeRoute.count * 3)
-      invalid();
-    for (final entry in times.entries) {
-      final parts = entry.key.split(':');
-      if (parts.length != 2) invalid();
-      choice(parts[0], ControlMode.values);
-      final route = int.tryParse(parts[1]);
-      if (route == null || route < 1 || route > LaserMazeRoute.count) invalid();
-      final t = entry.value;
-      if (t is! num || !t.isFinite || t <= 0 || t > 1e9) invalid();
-      p.mazeBestTimes[entry.key] = t.toDouble();
-    }
+    p.clearUnwonLevelStars();
     void owned<T extends Enum>(String key, Set<T> target, List<T> values) {
       final source = d[key];
       if (source is! List || source.isEmpty || source.length > values.length)
@@ -185,9 +205,20 @@ class ProgressBackup {
 
     owned('balls', p.ownedBalls, BallCosmetic.values);
     owned('platforms', p.ownedPlatforms, PlatformStyle.values);
-    p.selectedBall = choice(d['ball'], p.ownedBalls.toList());
-    p.selectedPlatform = choice(d['platform'], p.ownedPlatforms.toList());
+    final ball = choice(d['ball'], BallCosmetic.values);
+    p.selectedBall = p.ownedBalls.contains(ball) ? ball : BallCosmetic.steel;
+    final platform = choice(d['platform'], PlatformStyle.values);
+    p.selectedPlatform = p.ownedPlatforms.contains(platform)
+        ? platform
+        : PlatformStyle.classic;
     p.cabinet = choice(d['cabinet'], CabinetStyle.values);
+    // Backups written before claims were exported carry coins already paid
+    // for every earned achievement; treat those as claimed.
+    if (achievements == null) {
+      p.replaceClaimedAchievements(
+        Achievement.values.where(p.achievementEarned),
+      );
+    }
     if (!p.ownedBalls.contains(BallCosmetic.steel) ||
         !p.ownedPlatforms.contains(PlatformStyle.classic) ||
         !p.isUnlocked(p.cabinet))
@@ -208,33 +239,37 @@ class ProgressBackup {
       ..infiniteBest = source.infiniteBest
       ..infiniteRuns = source.infiniteRuns
       ..infiniteBestScore = source.infiniteBestScore
+      ..infiniteBestBosses = source.infiniteBestBosses
       ..mergeBest = source.mergeBest
       ..mergeHighest = source.mergeHighest
       ..mergeRuns = source.mergeRuns
-      ..mazeRuns = source.mazeRuns
       ..wallet = source.wallet
       ..dailyPrizes = DailyPrizes.fromJson(source.dailyPrizes.toJson())
-      ..controlMode = source.controlMode
+      ..controlMode = source.preferredControlMode.supportedMode
+      ..haloJoystick = source.haloJoystick
       ..classicLevel = source.classicLevel
-      ..mazeLevel = source.mazeLevel
       ..sound = source.sound
+      ..music = source.music
+      ..infiniteFastStart = source.infiniteFastStart
       ..haptics = source.haptics
       ..tutorialSeen = source.tutorialSeen
       ..tutorial = TutorialProgress.fromJson(source.tutorial.toJson())
-      ..analogSensitivity = source.analogSensitivity
-      ..twoFingerSensitivity = source.twoFingerSensitivity
       ..cabinet = source.cabinet
       ..selectedBall = source.selectedBall
       ..selectedPlatform = source.selectedPlatform;
+    target.replaceClaimedAchievements(source.claimedAchievements);
+    // Every saved field now comes from the backup, so it is safe to write
+    // even if this session's own load had failed.
+    target.resumeSavingAfterRestore();
+    target.survivalUpgrades
+      ..clear()
+      ..addAll(source.survivalUpgrades);
     target.levelRecords
       ..clear()
       ..addAll(source.levelRecords);
     target.dailyRecords
       ..clear()
       ..addAll(source.dailyRecords);
-    target.mazeBestTimes
-      ..clear()
-      ..addAll(source.mazeBestTimes);
     target.ownedBalls
       ..clear()
       ..addAll(source.ownedBalls);

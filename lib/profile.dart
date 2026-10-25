@@ -1,38 +1,124 @@
 import 'dart:convert';
 import 'dart:async';
 import 'ball_cosmetics.dart';
+import 'control_layout.dart';
 import 'platforms.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'game.dart';
+import 'enemy_sounds.dart';
+import 'enemy_audio.dart';
+import 'music_output.dart';
 import 'levels.dart';
 import 'rewards.dart';
-import 'laser_maze.dart';
 import 'onboarding.dart';
 import 'daily_prizes.dart';
 import 'achievements.dart';
+import 'survival_upgrades.dart';
+import 'infinite_progress.dart';
 
 class PlayerProfile {
   PlayerProfile({
-    this.unlimitedCoins = const bool.fromEnvironment('GILT_UNLIMITED_COINS'),
+    this.unlimitedCoins = false,
+    this.temporaryLevelAccess =
+        !kReleaseMode &&
+        const bool.fromEnvironment(
+          'GILT_UNLOCK_ALL_LEVELS',
+          defaultValue: false,
+        ),
   });
 
   final bool unlimitedCoins;
+  // Explicit development opt-in only; normal builds enforce star unlocks.
+  // Never persisted as stars or completion records.
+  final bool temporaryLevelAccess;
   String get _economyKey =>
       unlimitedCoins ? 'gilt.economy.coinsTest.v1' : 'gilt.economy.v1';
   bool canAfford(int cost) => unlimitedCoins || wallet >= cost;
 
+  /// Hint only for a purchasable improvement beyond the gear already owned.
+  bool get shopUpgradeAvailable {
+    // Only gear ranked above the strongest owned piece is worth suggesting;
+    // a cheaper ball after buying a better one would be a downgrade.
+    int strongest<T>(List<T> order, Set<T> owned) =>
+        owned.map(order.indexOf).fold(0, (a, b) => a > b ? a : b);
+    final ballRank = strongest(ballShopOrder, ownedBalls);
+    final strongerBall = ballShopOrder
+        .skip(ballRank + 1)
+        .any((ball) => canAfford(ball.cost));
+    final platformRank = strongest(platformShopOrder, ownedPlatforms);
+    final strongerPlatform = platformShopOrder
+        .skip(platformRank + 1)
+        .any((platform) => canAfford(platform.cost));
+    return strongerBall ||
+        strongerPlatform ||
+        SurvivalUpgrade.values.any(
+          (upgrade) =>
+              upgradeLevel(upgrade) < upgrade.maxLevel &&
+              canAfford(upgrade.costAt(upgradeLevel(upgrade))),
+        );
+  }
+
   late final SharedPreferencesAsync storage = SharedPreferencesAsync();
   int best = 0, runs = 0;
   int infiniteBest = 0, infiniteRuns = 0, infiniteBestScore = 0;
+
+  /// Most bosses outlasted in one Infinite run.
+  int infiniteBestBosses = 0;
+  bool infiniteFastStart = true;
+
+  void applyInfiniteStart(BalanceGame game, {bool tutorial = false}) {
+    final bestScore = infiniteFastStart && !tutorial ? infiniteBestScore : 0;
+    game.infiniteStartingPace = InfiniteTuning.startingPace(bestScore);
+    game.infiniteStartingSpeedMultiplier =
+        InfiniteTuning.startingSpeedMultiplier(bestScore);
+  }
+
   int wallet = 0;
+  final survivalUpgrades = <SurvivalUpgrade, int>{};
+  int upgradeLevel(SurvivalUpgrade upgrade) => survivalUpgrades[upgrade] ?? 0;
+  double get magnetDuration =>
+      SurvivalUpgrade.magnet.valueAt(upgradeLevel(SurvivalUpgrade.magnet));
+  double get shieldDuration =>
+      SurvivalUpgrade.shield.valueAt(upgradeLevel(SurvivalUpgrade.shield));
+  int get startingHearts => SurvivalUpgrade.hearts
+      .valueAt(upgradeLevel(SurvivalUpgrade.hearts))
+      .toInt();
+
+  bool buySurvivalUpgrade(SurvivalUpgrade upgrade) {
+    final level = upgradeLevel(upgrade);
+    if (level >= upgrade.maxLevel || !canAfford(upgrade.costAt(level)))
+      return false;
+    if (!unlimitedCoins) wallet -= upgrade.costAt(level);
+    survivalUpgrades[upgrade] = level + 1;
+    unawaited(saveEconomy());
+    return true;
+  }
+
+  void applySurvivalUpgrades(BalanceGame game) {
+    game.infiniteMaxLives = startingHearts;
+    game.shieldDuration = shieldDuration;
+    game.magnetDuration = magnetDuration;
+  }
+
   DailyPrizes dailyPrizes = DailyPrizes();
   final _claimedAchievements = <Achievement>{};
 
   bool achievementClaimed(Achievement achievement) =>
       _claimedAchievements.contains(achievement);
+
+  Set<Achievement> get claimedAchievements =>
+      Set.unmodifiable(_claimedAchievements);
+
+  /// Restores claim history with a backup, so its rewards are not paid twice.
+  void replaceClaimedAchievements(Iterable<Achievement> claimed) {
+    _claimedAchievements
+      ..clear()
+      ..addAll(claimed);
+  }
 
   int achievementProgress(Achievement achievement) {
     if (achievementClaimed(achievement)) return achievement.target;
@@ -44,13 +130,19 @@ class PlayerProfile {
       Achievement.distance1000 ||
       Achievement.distance2500 ||
       Achievement.distance5000 => infiniteBest,
-      Achievement.score10000 || Achievement.score25000 => infiniteBestScore,
+      Achievement.score10000 ||
+      Achievement.score25000 ||
+      Achievement.score100000 ||
+      Achievement.score500000 ||
+      Achievement.score1000000 => infiniteBestScore,
+      Achievement.boss1 ||
+      Achievement.boss3 ||
+      Achievement.boss6 => infiniteBestBosses,
       Achievement.stars12 ||
       Achievement.stars30 ||
       Achievement.stars60 ||
-      Achievement.stars120 => totalStars,
-      Achievement.mazeClear || Achievement.maze5 || Achievement.maze10 =>
-        mazeBestTimes.keys.map((key) => key.split(':').last).toSet().length,
+      Achievement.stars120 ||
+      Achievement.stars200 => totalStars,
       Achievement.merge128 ||
       Achievement.merge256 ||
       Achievement.merge512 ||
@@ -87,14 +179,18 @@ class PlayerProfile {
 
   BallCosmetic? get prizeBall {
     final choices =
-        BallCosmetic.values.where((b) => !ownedBalls.contains(b)).toList()
+        BallCosmetic.values
+            .where((b) => !b.purchaseOnly && !ownedBalls.contains(b))
+            .toList()
           ..sort((a, b) => a.cost.compareTo(b.cost));
     return choices.firstOrNull;
   }
 
   PlatformStyle? get prizePlatform {
     final choices =
-        PlatformStyle.values.where((p) => !ownedPlatforms.contains(p)).toList()
+        PlatformStyle.values
+            .where((p) => !p.purchaseOnly && !ownedPlatforms.contains(p))
+            .toList()
           ..sort((a, b) => a.cost.compareTo(b.cost));
     return choices.firstOrNull;
   }
@@ -132,35 +228,42 @@ class PlayerProfile {
     return reward;
   }
 
-  bool _ballTestCreditApplied = false;
-  bool _temporaryNormalCreditApplied = false;
-
-  /// Temporary one-time credit, including release builds, in the normal wallet.
-  Future<void> grantTemporaryNormalCoins() async {
-    if (_temporaryNormalCreditApplied || unlimitedCoins || !available) return;
-    wallet += 100000;
-    _temporaryNormalCreditApplied = true;
-    await saveEconomy();
-  }
-
-  /// One development credit, persisted with the balance so it cannot refill
-  /// spent coins on every restart. Called by the debug app entry point only.
-  Future<void> grantBallTestCoins() async {
-    if (_ballTestCreditApplied || unlimitedCoins || !available) return;
-    wallet += 10000;
-    _ballTestCreditApplied = true;
-    await saveEconomy();
-  }
-
   BallCosmetic selectedBall = BallCosmetic.steel;
-  double analogSensitivity = 1, twoFingerSensitivity = 1;
+  // Retain the legacy backup fields at full response for older app versions.
+  double get analogSensitivity => 1.0;
+  double get twoFingerSensitivity => 1.0;
   PlatformStyle selectedPlatform = PlatformStyle.classic;
   final ownedPlatforms = <PlatformStyle>{PlatformStyle.classic};
   double get equipmentMultiplier =>
       1 + selectedBall.scoreBonus + selectedPlatform.scoreBonus;
   final ownedBalls = <BallCosmetic>{BallCosmetic.steel};
   final _bankedCoins = Expando<({int serial, int count})>();
+  final _doubledCoinRuns = Expando<int>();
   Future<void> _economyWrites = Future<void>.value();
+
+  bool infiniteCoinsDoubled(BalanceGame game) =>
+      _doubledCoinRuns[game] == game.runSerial;
+
+  bool canDoubleInfiniteCoins(BalanceGame game) =>
+      game.started &&
+      game.infinite &&
+      game.finished &&
+      game.lives <= 0 &&
+      !game.won &&
+      !game.practice &&
+      game.coinsCollected > 10 &&
+      !infiniteCoinsDoubled(game);
+
+  /// Called only after the ad reward is earned and the ad has closed.
+  /// The collected-coin ledger stays unchanged, so banking cannot pay again.
+  bool doubleInfiniteCoins(BalanceGame game) {
+    if (!canDoubleInfiniteCoins(game)) return false;
+    bankCoins(game);
+    _doubledCoinRuns[game] = game.runSerial;
+    wallet += game.coinsCollected;
+    unawaited(saveEconomy());
+    return true;
+  }
 
   bool bankCoins(BalanceGame game) {
     if (!game.infinite) return false;
@@ -197,16 +300,21 @@ class PlayerProfile {
   }
 
   Future<void> saveEconomy() {
+    if (_loadFailed) return _economyWrites;
     // Snapshot and serialize wallet transactions; an older save cannot undo a purchase.
     final data = jsonEncode({
       'wallet': wallet,
+      'survivalUpgrades': survivalUpgrades.map(
+        (upgrade, level) => MapEntry(upgrade.name, level),
+      ),
       'dailyPrizes': dailyPrizes.toJson(),
       'claimedAchievements': _claimedAchievements.map((a) => a.name).toList(),
-      'ballTestCreditApplied': _ballTestCreditApplied,
-      'temporaryNormalCreditApplied': _temporaryNormalCreditApplied,
       'owned': ownedBalls.map((b) => b.name).toList(),
       'selected': selectedBall.name,
-      'bestScore': infiniteBestScore,
+      'bestScore': infiniteBestScore > _pendingBestScore
+          ? infiniteBestScore
+          : _pendingBestScore,
+      'bestBosses': infiniteBestBosses,
       'platforms': ownedPlatforms.map((p) => p.name).toList(),
       'platform': selectedPlatform.name,
     });
@@ -225,6 +333,14 @@ class PlayerProfile {
     try {
       final data = jsonDecode(raw);
       if (data is! Map<String, dynamic>) return;
+      final upgrades = data['survivalUpgrades'];
+      if (upgrades is Map) {
+        for (final upgrade in SurvivalUpgrade.values) {
+          final level = upgrades[upgrade.name];
+          if (level is int)
+            survivalUpgrades[upgrade] = level.clamp(0, upgrade.maxLevel);
+        }
+      }
       dailyPrizes = DailyPrizes.fromJson(data['dailyPrizes']);
       final claimed = data['claimedAchievements'];
       if (claimed is List) {
@@ -232,13 +348,12 @@ class PlayerProfile {
           Achievement.values.where((a) => claimed.contains(a.name)),
         );
       }
-      _ballTestCreditApplied = data['ballTestCreditApplied'] == true;
-      _temporaryNormalCreditApplied =
-          data['temporaryNormalCreditApplied'] == true;
       if (data['wallet'] is int)
         wallet = (data['wallet'] as int).clamp(0, 1 << 30);
       if (data['bestScore'] is int)
         infiniteBestScore = (data['bestScore'] as int).clamp(0, 1 << 30);
+      if (data['bestBosses'] is int)
+        infiniteBestBosses = (data['bestBosses'] as int).clamp(0, 99);
       final platforms = data['platforms'];
       if (platforms is List)
         ownedPlatforms.addAll(
@@ -263,23 +378,104 @@ class PlayerProfile {
   int mergeBest = 0, mergeHighest = 2, mergeRuns = 0;
   bool sound = true, music = true, haptics = true;
   bool available = true;
+
+  /// A failed read leaves defaults in memory; writing them would erase the
+  /// player's real save, so this session keeps its progress in memory only.
+  bool _loadFailed = false;
+
+  void resumeSavingAfterRestore() => _loadFailed = false;
   bool tutorialSeen = false;
   TutorialProgress tutorial = TutorialProgress();
   Future<void> _tutorialWrites = Future<void>.value();
-  ControlMode controlMode = ControlMode.oneFinger;
+  ControlMode _controlMode = ControlMode.oneFinger;
+  bool haloJoystick = false;
+  bool _oneFingerPadAvailable = true;
+  bool get oneFingerPadAvailable => _oneFingerPadAvailable;
+  bool _needsInitialControlDefault = false;
+  ControlMode get preferredControlMode => _controlMode;
+  ControlMode get controlMode =>
+      !_oneFingerPadAvailable &&
+          _controlMode == ControlMode.oneFinger &&
+          !haloJoystick
+      ? ControlMode.twoFinger
+      : _controlMode;
+  set controlMode(ControlMode value) {
+    _controlMode = value;
+    _needsInitialControlDefault = false;
+  }
+
+  /// Layout fallback is temporary; save/export the player's actual choice.
+  void applyControlLayout({required double shortestSide}) {
+    if (!shortestSide.isFinite || shortestSide <= 0) return;
+    _oneFingerPadAvailable = allowsOneFingerPad(shortestSide);
+  }
+
+  /// Choose once from the first usable app window, including foldable screens.
+  bool applyInitialControlDefault({required double shortestSide}) {
+    if (!_needsInitialControlDefault ||
+        !shortestSide.isFinite ||
+        shortestSide <= 0) {
+      return false;
+    }
+    controlMode = allowsOneFingerPad(shortestSide)
+        ? ControlMode.oneFinger
+        : ControlMode.twoFinger;
+    return true;
+  }
+
   int classicLevel = 1;
-  int mazeLevel = 1, mazeRuns = 0;
-  final mazeBestTimes = <String, double>{};
-  double? mazeBestTime(int route, [ControlMode? control]) =>
-      mazeBestTimes[recordKey(route, control ?? controlMode)];
   CabinetStyle cabinet = CabinetStyle.brass;
   final levelRecords = <String, LevelRecord>{};
   final dailyRecords = <String, LevelRecord>{};
   final _recordedRuns = Expando<int>();
   String recordKey(int level, ControlMode control) => '${control.name}:$level';
-  LevelRecord levelRecord(int level, [ControlMode? control]) =>
-      levelRecords[recordKey(level, control ?? controlMode)] ??
-      const LevelRecord();
+  bool hasCollectedLevelStar(int level) => ControlMode.values.any(
+    (mode) => ((levelRecords[recordKey(level, mode)]?.starMask ?? 0) & 8) != 0,
+  );
+  LevelRecord levelRecord(int level, [ControlMode? control]) {
+    final record =
+        levelRecords[recordKey(level, control ?? controlMode)] ??
+        const LevelRecord();
+    return hasCollectedLevelStar(level) ? record.withCollectedStar() : record;
+  }
+
+  /// A pickup becomes permanent only after winning the current run.
+  bool bankLevelStar(BalanceGame game) {
+    if (game.mode != GameMode.classic ||
+        !game.finished ||
+        !game.won ||
+        !game.levelStarCollected ||
+        hasCollectedLevelStar(game.level))
+      return false;
+    final key = recordKey(game.level, game.controlMode);
+    levelRecords[key] = (levelRecords[key] ?? const LevelRecord())
+        .withCollectedStar();
+    unawaited(save());
+    return true;
+  }
+
+  /// Remove pickups saved by the old rules on levels never completed.
+  void clearUnwonLevelStars() {
+    for (var level = 1; level <= ClassicLevels.count; level++) {
+      final completed = ControlMode.values.any(
+        (mode) =>
+            ((levelRecords[recordKey(level, mode)]?.starMask ?? 0) & 1) != 0,
+      );
+      if (completed) continue;
+      for (final mode in ControlMode.values) {
+        final key = recordKey(level, mode);
+        final record = levelRecords[key];
+        if (record == null || (record.starMask & 8) == 0) continue;
+        levelRecords[key] = LevelRecord(
+          starMask: record.starMask & 7,
+          bestScore: record.bestScore,
+          bestTime: record.bestTime,
+          attempts: record.attempts,
+        );
+      }
+    }
+  }
+
   LevelRecord dailyRecord(String date, [ControlMode? control]) =>
       dailyRecords['${(control ?? controlMode).name}:$date'] ??
       const LevelRecord();
@@ -297,7 +493,9 @@ class PlayerProfile {
   }
 
   bool isClassicLevelUnlocked(int level) =>
-      ClassicLevels.isUnlocked(level, totalStars);
+      level >= 1 &&
+      level <= ClassicLevels.count &&
+      (temporaryLevelAccess || ClassicLevels.isUnlocked(level, totalStars));
 
   bool selectClassicLevel(int level) {
     if (!isClassicLevelUnlocked(level)) return false;
@@ -316,6 +514,7 @@ class PlayerProfile {
     tutorialSeen = true;
     tutorial.step = TutorialStep.completed;
     await saveTutorial();
+    if (_loadFailed) return;
     try {
       await storage.setBool('gilt.tutorial.v1.seen', true);
     } catch (_) {
@@ -324,6 +523,7 @@ class PlayerProfile {
   }
 
   Future<void> saveTutorial() {
+    if (_loadFailed) return _tutorialWrites;
     final snapshot = jsonEncode(tutorial.toJson());
     _tutorialWrites = _tutorialWrites.then((_) async {
       try {
@@ -341,25 +541,40 @@ class PlayerProfile {
     return saveTutorial();
   }
 
-  bool recordResult(BalanceGame game) {
-    bankCoins(game);
-    if (game.maze) {
-      if (!game.finished || _recordedRuns[game] == game.runSerial) return false;
-      _recordedRuns[game] = game.runSerial;
-      mazeRuns++;
-      if (!game.won) return false;
-      final key = recordKey(game.level, game.controlMode);
-      final previous = mazeBestTimes[key];
-      final improved = previous == null || game.elapsed < previous;
-      if (improved) mazeBestTimes[key] = game.elapsed;
-      return improved;
+  /// A finished Infinite run still waiting on the revive offer. Saves count
+  /// it, so a process kill in the background cannot lose a new best; the
+  /// final [recordResult] supersedes it.
+  int _pendingRuns = 0, _pendingBestScore = 0, _pendingBest = 0;
+
+  Future<void> saveProvisionalInfinite(BalanceGame game) {
+    if (game.infinite &&
+        game.finished &&
+        !game.practice &&
+        _recordedRuns[game] != game.runSerial) {
+      bankCoins(game);
+      _pendingRuns = 1;
+      if (game.score > _pendingBestScore) _pendingBestScore = game.score;
+      if (game.metres > _pendingBest) _pendingBest = game.metres;
     }
+    return save();
+  }
+
+  bool recordResult(BalanceGame game) {
+    bankLevelStar(game);
+    bankCoins(game);
     if (game.merging && game.finished) {
       final improved = game.score > mergeBest;
       if (improved) mergeBest = game.score;
       if (game.mergeRun.highest > mergeHighest)
         mergeHighest = game.mergeRun.highest;
-      if (_recordedRuns[game] != game.runSerial) mergeRuns++;
+      if (_recordedRuns[game] != game.runSerial) {
+        mergeRuns++;
+        if (game.mergeRun.highest >= mergeCoinPrizeTarget) {
+          game.coinsCollected += mergeCoinPrize;
+          wallet += mergeCoinPrize;
+          unawaited(saveEconomy());
+        }
+      }
       _recordedRuns[game] = game.runSerial;
       return improved;
     }
@@ -368,11 +583,21 @@ class PlayerProfile {
         _recordedRuns[game] == game.runSerial)
       return false;
     _recordedRuns[game] = game.runSerial;
+    if (game.mode == GameMode.classic && game.won) {
+      game.coinsCollected += classicLevelCoinPrize;
+      wallet += classicLevelCoinPrize;
+      unawaited(saveEconomy());
+    }
     if (game.infinite) {
+      _pendingRuns = 0;
       infiniteRuns++;
       final improved = game.score > infiniteBestScore;
       if (improved) infiniteBestScore = game.score;
       if (game.metres > infiniteBest) infiniteBest = game.metres;
+      if (game.bossesCleared > infiniteBestBosses) {
+        infiniteBestBosses = game.bossesCleared;
+        unawaited(saveEconomy());
+      }
       return improved;
     }
     final records = game.daily ? dailyRecords : levelRecords;
@@ -382,7 +607,7 @@ class PlayerProfile {
     final previous = records[key] ?? const LevelRecord();
     records[key] = previous.withRun(
       mask: game.earnedStarMask,
-      score: game.score,
+      score: game.mode == GameMode.classic ? 0 : game.score,
       seconds: game.elapsed,
       won: game.won,
     );
@@ -396,9 +621,16 @@ class PlayerProfile {
       dailyRecords.removeWhere((k, _) => expired.contains(k.split(':').last));
     } else {
       runs++;
-      if (game.score > best) best = game.score;
+      if (game.mode != GameMode.classic && game.score > best) best = game.score;
     }
-    return game.score > previous.bestScore;
+    // A win moves the menu on to the next level, whichever button leaves the
+    // result screen. Replaying an older level does not pull progress back.
+    if (game.mode == GameMode.classic &&
+        game.won &&
+        classicLevel == game.level) {
+      selectClassicLevel(game.level + 1);
+    }
+    return game.mode != GameMode.classic && game.score > previous.bestScore;
   }
 
   void _loadRecords(String? raw) {
@@ -411,17 +643,18 @@ class PlayerProfile {
         for (final entry in source.entries) {
           final validKey = pair.$1 == 'levels'
               ? RegExp(
-                      r'^(oneFinger|twoFinger|analog):[1-9]\d*$',
+                      r'^(oneFinger|twoFinger|analog|tiltLift|boardTilt):[1-9]\d*$',
                     ).hasMatch(entry.key) &&
                     int.parse(entry.key.split(':').last) <= ClassicLevels.count
               : RegExp(
-                  r'^(oneFinger|twoFinger|analog):\d{4}-\d{2}-\d{2}$',
+                  r'^(oneFinger|twoFinger|analog|tiltLift|boardTilt):\d{4}-\d{2}-\d{2}$',
                 ).hasMatch(entry.key);
           if (validKey && entry.value is Map<String, dynamic>) {
             pair.$2[entry.key] = LevelRecord.fromJson(entry.value);
           }
         }
       }
+      clearUnwonLevelStars();
       final saved = CabinetStyle.values
           .where((c) => c.name == data['cabinet'])
           .firstOrNull;
@@ -431,52 +664,33 @@ class PlayerProfile {
     }
   }
 
-  void _loadMaze(String? raw) {
-    if (raw == null) return;
+  // Recognize returning players without loading retired route records.
+  static bool _hasLegacyMazeProgress(String? raw) {
+    if (raw == null) return false;
     try {
       final data = jsonDecode(raw);
-      if (data is! Map<String, dynamic>) return;
-      if (data['selected'] is int)
-        mazeLevel = (data['selected'] as int).clamp(1, LaserMazeRoute.count);
-      if (data['runs'] is int)
-        mazeRuns = (data['runs'] as int).clamp(0, 1 << 30);
-      final times = data['times'];
-      if (times is! Map<String, dynamic>) return;
-      for (final entry in times.entries) {
-        final match = RegExp(
-          r'^(oneFinger|twoFinger|analog):([1-9][0-9]*)$',
-        ).firstMatch(entry.key);
-        if (match == null ||
-            (int.tryParse(match.group(2)!) ?? (LaserMazeRoute.count + 1)) >
-                LaserMazeRoute.count)
-          continue;
-        final value = entry.value;
-        if (value is num && value.isFinite && value > 0)
-          mazeBestTimes[entry.key] = value.toDouble();
-      }
+      return data is Map &&
+          ((data['runs'] is num && data['runs'] > 0) ||
+              (data['times'] is Map && (data['times'] as Map).isNotEmpty));
     } catch (_) {
-      // Ignore a damaged route record without affecting the other modes.
+      return false;
     }
   }
 
   Future<void> load() async {
     try {
       tutorialSeen = await storage.getBool('gilt.tutorial.v1.seen') ?? false;
-      controlMode = await storage.getBool('gilt.oneFinger') == false
+      final savedOneFinger = await storage.getBool('gilt.oneFinger');
+      haloJoystick = await storage.getBool('gilt.haloJoystick') ?? false;
+      controlMode = savedOneFinger == false
           ? ControlMode.twoFinger
           : ControlMode.oneFinger;
-      final analog = await storage.getDouble('gilt.analogSensitivity');
-      final direct = await storage.getDouble('gilt.twoFingerSensitivity');
-      analogSensitivity = analog != null && analog.isFinite
-          ? analog.clamp(0.0, 1.0)
-          : 1;
-      twoFingerSensitivity = direct != null && direct.isFinite
-          ? direct.clamp(0.0, 1.0)
-          : 1;
       final savedMode = await storage.getString('gilt.controlMode');
       controlMode =
-          ControlMode.values.where((m) => m.name == savedMode).firstOrNull ??
-          controlMode;
+          (ControlMode.values.where((m) => m.name == savedMode).firstOrNull ??
+                  _controlMode)
+              .supportedMode;
+      _needsInitialControlDefault = savedMode == null && savedOneFinger == null;
       classicLevel = (await storage.getInt('gilt.classicLevel') ?? 1).clamp(
         1,
         ClassicLevels.count,
@@ -488,12 +702,14 @@ class PlayerProfile {
       mergeRuns = await storage.getInt('gilt.merge.runs') ?? 0;
       infiniteBest = await storage.getInt('gilt.ascent.best') ?? 0;
       infiniteRuns = await storage.getInt('gilt.ascent.runs') ?? 0;
+      infiniteFastStart =
+          await storage.getBool('gilt.ascent.fastStart') ?? true;
       sound = await storage.getBool('gilt.sound') ?? true;
       // Preserve an existing player's mute preference when migrating.
       music = await storage.getBool('gilt.music') ?? sound;
       haptics = await storage.getBool('gilt.haptics') ?? true;
       _loadRecords(await storage.getString('gilt.mastery.v1'));
-      _loadMaze(await storage.getString('gilt.maze.v1'));
+      final legacyMaze = await storage.getString('gilt.maze.v1');
       _loadEconomy(await storage.getString(_economyKey));
       final savedTutorial = await storage.getString('gilt.tutorial.v2');
       if (savedTutorial != null) {
@@ -506,44 +722,43 @@ class PlayerProfile {
         }
         tutorialSeen = !tutorial.active;
       } else if (tutorialSeen ||
-          runs + infiniteRuns + mergeRuns + mazeRuns > 0 ||
+          runs + infiniteRuns + mergeRuns > 0 ||
           levelRecords.isNotEmpty ||
           dailyRecords.isNotEmpty ||
-          mazeBestTimes.isNotEmpty) {
+          _hasLegacyMazeProgress(legacyMaze)) {
         tutorial = TutorialProgress(step: TutorialStep.completed);
         tutorialSeen = true;
       }
     } catch (_) {
       available = false;
+      _loadFailed = true;
     }
   }
 
   Future<void> save() async {
+    if (_loadFailed) return;
     await saveEconomy();
     try {
-      await storage.setString(
-        'gilt.maze.v1',
-        jsonEncode({
-          'selected': mazeLevel,
-          'runs': mazeRuns,
-          'times': mazeBestTimes,
-        }),
-      );
       await storage.setInt('gilt.merge.best', mergeBest);
       await storage.setInt('gilt.merge.highest', mergeHighest);
       await storage.setInt('gilt.merge.runs', mergeRuns);
       await storage.setInt('gilt.best', best);
       await storage.setInt('gilt.runs', runs);
-      await storage.setInt('gilt.ascent.best', infiniteBest);
-      await storage.setInt('gilt.ascent.runs', infiniteRuns);
+      await storage.setInt(
+        'gilt.ascent.best',
+        infiniteBest > _pendingBest ? infiniteBest : _pendingBest,
+      );
+      await storage.setInt('gilt.ascent.runs', infiniteRuns + _pendingRuns);
+      await storage.setBool('gilt.ascent.fastStart', infiniteFastStart);
       await storage.setBool('gilt.sound', sound);
       await storage.setBool('gilt.music', music);
       await storage.setBool('gilt.haptics', haptics);
       await storage.setBool(
         'gilt.oneFinger',
-        controlMode == ControlMode.oneFinger,
+        _controlMode == ControlMode.oneFinger,
       );
-      await storage.setString('gilt.controlMode', controlMode.name);
+      await storage.setString('gilt.controlMode', _controlMode.name);
+      await storage.setBool('gilt.haloJoystick', haloJoystick);
       await storage.setDouble('gilt.analogSensitivity', analogSensitivity);
       await storage.setDouble(
         'gilt.twoFingerSensitivity',
@@ -565,7 +780,14 @@ class PlayerProfile {
 }
 
 class GameFeedback {
-  AudioPlayer? _player;
+  GameFeedback({MusicOutput Function()? musicOutput})
+    : _musicFactory = musicOutput ?? AudioMusicOutput.new;
+  final MusicOutput Function() _musicFactory;
+  // One low-latency player per effect, so a coin cannot cut off a target.
+  final _players = <String, AudioPlayer>{};
+  final _enemyAudio = EnemyAudio();
+  void setEnemyEffectsEnabled(bool enabled) => _enemyAudio.setEnabled(enabled);
+  Future<void> playEnemy(EnemyCue cue) => _enemyAudio.play(cue);
   static bool _sharedContext = false;
 
   /// Effects and music are two players in one app. Left at the plugin's
@@ -576,11 +798,7 @@ class GameFeedback {
     if (_sharedContext) return;
     _sharedContext = true;
     try {
-      await AudioPlayer.global.setAudioContext(
-        AudioContextConfig(
-          focus: AudioContextConfigFocus.mixWithOthers,
-        ).build(),
-      );
+      await AudioPlayer.global.setAudioContext(gameAudioContext());
     } catch (_) {
       /* An unavailable audio platform must never interrupt a run. */
     }
@@ -597,14 +815,18 @@ class GameFeedback {
     if (!profile.sound) return;
     try {
       await _shareAudioFocus();
-      await (_player ??= AudioPlayer()).play(
-        AssetSource(
-          'audio/${event == GameEvent.merge
-              ? 'target'
-              : event == GameEvent.coin
-              ? 'target'
-              : event.name}.wav',
-        ),
+      final sound = switch (event) {
+        GameEvent.merge || GameEvent.coin || GameEvent.star => 'target',
+        _ => event.name,
+      };
+      final key = '$sound:${event == GameEvent.coin}';
+      var player = _players[key];
+      if (player == null) {
+        player = _players[key] = AudioPlayer();
+        await player.setPlayerMode(PlayerMode.lowLatency);
+      }
+      await player.play(
+        AssetSource('audio/$sound.wav'),
         volume: event == GameEvent.coin ? .25 : .55,
       );
     } catch (_) {
@@ -612,9 +834,17 @@ class GameFeedback {
     }
   }
 
-  AudioPlayer? _music;
+  MusicOutput? _music;
   String? _track;
+  int? _musicSession;
   bool _musicPlaying = false;
+  bool _disposed = false;
+  double _musicRate = 1, _musicVolume = .32;
+  ({String? track, bool playing, double volume, double rate, int? session})?
+  _wantedMusic;
+  ({String? track, bool playing, double volume, double rate, int? session})?
+  _handledMusic;
+  Future<void>? _musicUpdate;
 
   /// Background music for the modes that want one. Passing a null track stops
   /// it; [playing] false holds it where it is, so pausing a run and resuming
@@ -623,37 +853,110 @@ class GameFeedback {
     required String? track,
     required bool playing,
     double volume = .32,
+    double playbackRate = 1,
+    int? playbackSession,
   }) async {
-    if (track == _track && (track == null || playing == _musicPlaying)) return;
-    try {
-      if (track == null) {
-        _track = null;
+    if (_disposed ||
+        (track == null && _track == null && _musicUpdate == null)) {
+      return;
+    }
+    final request = (
+      track: track,
+      playing: playing,
+      volume: volume.clamp(0.0, 1.0),
+      rate: playbackRate.clamp(.5, 2.0),
+      session: playbackSession,
+    );
+    _wantedMusic = request;
+    // Coalesce ticker updates during asset loading. A later mute, pause or
+    // rate replaces pending work instead of starting overlapping players.
+    while (!_disposed && _handledMusic != _wantedMusic) {
+      final pending = _musicUpdate;
+      if (pending != null) {
+        await pending;
+        continue;
+      }
+      final completion = Completer<void>();
+      _musicUpdate = completion.future;
+      try {
+        await _flushMusic();
+      } finally {
+        _musicUpdate = null;
+        completion.complete();
+      }
+    }
+  }
+
+  Future<void> _flushMusic() async {
+    while (!_disposed) {
+      final request = _wantedMusic!;
+      try {
+        await _applyMusic(request);
+      } catch (_) {
+        /* Audio restrictions must never interrupt a run. */
+      }
+      _handledMusic = request;
+      if (request == _wantedMusic) return;
+    }
+  }
+
+  Future<void> _applyMusic(
+    ({String? track, bool playing, double volume, double rate, int? session})
+    request,
+  ) async {
+    final track = request.track;
+    if (track == null) {
+      _track = null;
+      _musicPlaying = false;
+      _musicRate = 1;
+      _musicSession = null;
+      await _music?.stop();
+      return;
+    }
+    if (_disposed) return;
+    final newRecording = track != _track || request.session != _musicSession;
+    // A prepared board must not briefly play audio before its starting touch.
+    // Defer a new run's opening until play, while an existing pause holds it.
+    if (newRecording && !request.playing) {
+      if (_musicPlaying) {
+        await _music?.pause();
         _musicPlaying = false;
-        await _music?.stop();
-        return;
       }
-      await _shareAudioFocus();
-      final music = _music ??= AudioPlayer()..setReleaseMode(ReleaseMode.loop);
-      if (track != _track) {
-        _track = track;
-        _musicPlaying = true;
-        await music.setVolume(volume);
-        await music.play(AssetSource(track), volume: volume);
-        if (!playing) {
-          _musicPlaying = false;
-          await music.pause();
-        }
-        return;
-      }
-      _musicPlaying = playing;
-      await (playing ? music.resume() : music.pause());
-    } catch (_) {
-      /* Audio restrictions must never interrupt a run. */
+      return;
+    }
+    final music = _music ??= _musicFactory();
+    if (newRecording) {
+      await music.play(track, request.volume);
+      _track = track;
+      _musicSession = request.session;
+      _musicPlaying = true;
+      _musicVolume = request.volume;
+      _musicRate = double.nan;
+    }
+    if (_disposed || request != _wantedMusic) return;
+    if (request.playing != _musicPlaying) {
+      await (request.playing ? music.resume() : music.pause());
+      _musicPlaying = request.playing;
+    }
+    // The platform expects playback to have started before changing rate.
+    // Pause keeps position; resume re-applies a changed rate without seeking.
+    if (request.playing && request.rate != _musicRate) {
+      await music.setPlaybackRate(request.rate);
+      _musicRate = request.rate;
+    }
+    if (request.volume != _musicVolume) {
+      await music.setVolume(request.volume);
+      _musicVolume = request.volume;
     }
   }
 
   void dispose() {
-    _player?.dispose();
+    _disposed = true;
+    _enemyAudio.dispose();
+    for (final player in _players.values) {
+      player.dispose();
+    }
+    _players.clear();
     _music?.dispose();
   }
 }

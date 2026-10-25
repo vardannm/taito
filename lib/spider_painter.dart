@@ -2,9 +2,14 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'game.dart';
 import 'infinite_painter.dart';
+import 'arena_canvas.dart';
+import 'ball_cosmetics.dart';
+import 'ball_world.dart';
 
 void paintSpiderBackdrop(Canvas c, BalanceGame game) {
   if (game.spiders.isEmpty) return;
+  final projection = c is ArenaCanvas ? c : null;
+  if (projection != null) c = projection.canvas;
   final thread = Paint()
     ..color = const Color(0xFF193C38).withAlpha(32)
     ..style = PaintingStyle.stroke
@@ -18,7 +23,8 @@ void paintSpiderBackdrop(Canvas c, BalanceGame game) {
             ]
           : <(Offset, double)>[]) {
     c.save();
-    c.translate(corner.dx, corner.dy);
+    final point = projection?.point(corner) ?? corner;
+    c.translate(point.dx, point.dy);
     c.rotate(rotation);
     for (var spoke = 0; spoke <= 7; spoke++) {
       final a = spoke * math.pi / 14;
@@ -45,8 +51,20 @@ void paintSpiderBackdrop(Canvas c, BalanceGame game) {
   }
   for (final s in game.spiders) {
     final radius = s.zoneRadius;
-    final center = Offset(s.zoneX, game.screenY(s.zoneY));
-    final webInk = game.infinite ? infiniteBoardInk(game, center) : null;
+    final center =
+        projection?.point(Offset(s.zoneX, game.screenY(s.zoneY))) ??
+        Offset(s.zoneX, game.screenY(s.zoneY));
+    if (center.dy + radius + 2 < game.visibleTop ||
+        center.dy - radius - 2 > 560)
+      continue;
+    // Dark Classic worlds get light webs, like the steel world always did.
+    final webInk =
+        game.cosmetic == BallCosmetic.steel ||
+            (!game.infinite && BallWorld.of(game.cosmetic).dark)
+        ? const Color(0xFFCCE6E2)
+        : game.infinite
+        ? infiniteBoardInk(game, center)
+        : null;
     thread.color =
         webInk?.withAlpha(180) ?? const Color(0xFF193C38).withAlpha(32);
     final color = s.chasing
@@ -89,6 +107,9 @@ void paintSpiderBackdrop(Canvas c, BalanceGame game) {
 
 void paintSpiders(Canvas c, BalanceGame game, bool reducedMotion) {
   for (final spider in game.spiders) {
+    final y = game.screenY(spider.y);
+    final extent = spider.bodyRadius * 3;
+    if (y + extent < game.visibleTop || y - extent > 560) continue;
     c.save();
     c.translate(spider.x, game.screenY(spider.y));
     c.rotate(spider.heading);
@@ -96,7 +117,13 @@ void paintSpiders(Canvas c, BalanceGame game, bool reducedMotion) {
     final webInk = game.infinite
         ? infiniteBoardInk(game, Offset(spider.x, game.screenY(spider.y)))
         : null;
-    final color = webInk == Colors.white
+    // A light spider on dark boards (Infinite's dark sections and dark
+    // Classic worlds), a dark one on light boards; never dark on dark.
+    final lightSpider =
+        game.cosmetic == BallCosmetic.steel ||
+        webInk == Colors.white ||
+        (!game.infinite && BallWorld.of(game.cosmetic).dark);
+    final color = lightSpider
         ? (spider.chasing ? const Color(0xFFFFB5A3) : const Color(0xFFF5EFDC))
         : spider.chasing
         ? const Color(0xFF80251F)
@@ -121,6 +148,14 @@ void paintSpiders(Canvas c, BalanceGame game, bool reducedMotion) {
         );
       }
     }
+    // A thin contrasting rim keeps the body readable over any scenery.
+    final rim = Paint()
+      ..color = (lightSpider ? const Color(0xFF10201C) : Colors.white)
+          .withAlpha(150)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+    c.drawOval(const Rect.fromLTWH(-9, -5, 12, 10), rim);
+    c.drawCircle(const Offset(4, 0), 4, rim);
     c.drawOval(const Rect.fromLTWH(-9, -5, 12, 10), Paint()..color = color);
     c.drawCircle(const Offset(4, 0), 4, Paint()..color = color);
     for (final y in [-1.5, 1.5]) {
@@ -128,7 +163,7 @@ void paintSpiders(Canvas c, BalanceGame game, bool reducedMotion) {
         Offset(6, y),
         .85,
         Paint()
-          ..color = webInk == Colors.white
+          ..color = lightSpider
               ? const Color(0xFF253C34)
               : const Color(0xFFEAD8A6),
       );

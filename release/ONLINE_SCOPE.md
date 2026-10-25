@@ -1,6 +1,9 @@
 # Online services: pending backend selection
 
-Status: not deployed or connected. The app currently provides local friend challenges and manual snapshots only.
+Status: player accounts, automatic cloud saves and online rankings are not
+deployed or connected. Firebase Analytics is configured separately; it does not
+provide player-profile storage. Friend challenges and progress snapshots are
+currently local/manual. See PUBLISHING_CHECKLIST.md for the launch requirements.
 
 ## Inputs needed
 

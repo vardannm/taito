@@ -21,18 +21,26 @@ void main() {
       await normal.saveEconomy();
       final testing = PlayerProfile(unlimitedCoins: true);
       await testing.load();
-      for (final ball in BallCosmetic.values) {
+      for (final ball in BallCosmetic.values.where((b) => !b.purchaseOnly)) {
         expect(testing.selectBall(ball), isTrue);
       }
-      for (final platform in PlatformStyle.values) {
+      for (final platform in PlatformStyle.values.where(
+        (p) => !p.purchaseOnly,
+      )) {
         expect(testing.selectPlatform(platform), isTrue);
       }
       expect(testing.wallet, 0);
       await testing.saveEconomy();
       final reloaded = PlayerProfile(unlimitedCoins: true);
       await reloaded.load();
-      expect(reloaded.ownedBalls, containsAll(BallCosmetic.values));
-      expect(reloaded.ownedPlatforms, containsAll(PlatformStyle.values));
+      expect(
+        reloaded.ownedBalls,
+        containsAll(BallCosmetic.values.where((b) => !b.purchaseOnly)),
+      );
+      expect(
+        reloaded.ownedPlatforms,
+        containsAll(PlatformStyle.values.where((p) => !p.purchaseOnly)),
+      );
       final original = PlayerProfile(unlimitedCoins: false);
       await original.load();
       expect(original.wallet, 100 - BallCosmetic.coral.cost);
@@ -42,47 +50,31 @@ void main() {
     },
   );
 
-  test(
-    'temporary normal credit is additive and granted once across restarts',
-    () async {
-      final profile = PlayerProfile(unlimitedCoins: false)..wallet = 42;
-      await profile.grantTemporaryNormalCoins();
-      expect(profile.wallet, 100042);
-      await profile.grantTemporaryNormalCoins();
-      expect(profile.wallet, 100042);
-      expect(profile.selectBall(BallCosmetic.singularity), isTrue);
-      await profile.saveEconomy();
-      final reloaded = PlayerProfile(unlimitedCoins: false);
-      await reloaded.load();
-      await reloaded.grantTemporaryNormalCoins();
-      expect(reloaded.wallet, 100042 - BallCosmetic.singularity.cost);
-      final unlimited = PlayerProfile(unlimitedCoins: true);
-      await unlimited.grantTemporaryNormalCoins();
-      expect(unlimited.wallet, 0);
-    },
-  );
+  test('fresh profiles stay at zero coins across saves and reloads', () async {
+    final profile = PlayerProfile();
+    await profile.load();
+    expect(profile.wallet, 0);
+    expect(profile.selectBall(BallCosmetic.coral), isFalse);
+    await profile.saveEconomy();
+    final reloaded = PlayerProfile();
+    await reloaded.load();
+    expect(reloaded.wallet, 0);
+  });
 
-  test('build flag selects the expected coin mode', () {
-    expect(
-      PlayerProfile().unlimitedCoins,
-      const bool.fromEnvironment('GILT_UNLIMITED_COINS'),
-    );
+  test('normal profiles never enable unlimited coins from build flags', () {
+    expect(PlayerProfile().unlimitedCoins, isFalse);
   });
 
   test(
-    '10,000 test coins are added once and spent purchases survive restart',
+    'saved coins and purchased gear survive reload without launch credits',
     () async {
-      final profile = PlayerProfile(unlimitedCoins: false)..wallet = 42;
+      final profile = PlayerProfile()..wallet = 100;
+      expect(profile.selectBall(BallCosmetic.coral), isTrue);
       await profile.saveEconomy();
-      await profile.grantBallTestCoins();
-      expect(profile.wallet, 10042);
-      expect(profile.selectBall(BallCosmetic.singularity), isTrue);
-      await profile.saveEconomy();
-      final reloaded = PlayerProfile(unlimitedCoins: false);
+      final reloaded = PlayerProfile();
       await reloaded.load();
-      await reloaded.grantBallTestCoins();
-      expect(reloaded.wallet, 10042 - BallCosmetic.singularity.cost);
-      expect(reloaded.ownedBalls, contains(BallCosmetic.singularity));
+      expect(reloaded.wallet, 100 - BallCosmetic.coral.cost);
+      expect(reloaded.ownedBalls, contains(BallCosmetic.coral));
     },
   );
 
@@ -93,7 +85,6 @@ void main() {
         home: Scaffold(body: BallShop(profile: profile)),
       ),
     );
-    expect(find.text('TEST BUILD - Unlimited coins'), findsOneWidget);
     expect(find.text('\u221e'), findsOneWidget);
     await tester.tap(find.text('Platforms'));
     await tester.pump();

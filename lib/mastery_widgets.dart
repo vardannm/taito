@@ -1,3 +1,4 @@
+import 'menu_design.dart';
 import 'package:flutter/material.dart';
 import 'board_painter.dart';
 import 'game.dart';
@@ -6,17 +7,24 @@ import 'profile.dart';
 import 'rewards.dart';
 
 class StarRow extends StatelessWidget {
-  const StarRow(this.mask, {super.key, this.size = 18, this.dark = false});
-  final int mask;
+  const StarRow(
+    this.mask, {
+    super.key,
+    this.size = 18,
+    this.dark = false,
+    this.count = 3,
+  });
+  final int mask, count;
   final double size;
   final bool dark;
   @override
   Widget build(BuildContext context) => Semantics(
-    label: '${LevelRecord.starCount(mask)} of 3 stars',
+    label:
+        '${LevelRecord.starCount(mask & ((1 << count) - 1))} of $count stars',
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        for (var i = 0; i < 3; i++)
+        for (var i = 0; i < count; i++)
           Icon(
             (mask & (1 << i)) != 0
                 ? Icons.star_rounded
@@ -45,12 +53,24 @@ class MasteryResult extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     children: [
       const SizedBox(height: 14),
-      StarRow(game.earnedStarMask, size: 34, dark: true),
+      StarRow(
+        game.earnedStarMask | (record.starMask & 8),
+        size: 34,
+        dark: true,
+        count: game.mode == GameMode.classic ? 4 : 3,
+      ),
       const SizedBox(height: 8),
       for (final (bit, label) in [
         (1, 'Finish the board'),
         (2, 'Finish without a miss'),
         (4, 'Finish in ${formatRunTime(game.targetTime)} active time'),
+        if (game.mode == GameMode.classic)
+          (
+            8,
+            game.levelStarAlreadyOwned
+                ? 'Bonus star already collected'
+                : 'Collect the bonus star',
+          ),
       ])
         Padding(
           padding: const EdgeInsets.only(bottom: 3),
@@ -58,11 +78,12 @@ class MasteryResult extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                (game.earnedStarMask & bit) != 0
+                ((game.earnedStarMask | (record.starMask & 8)) & bit) != 0
                     ? Icons.star_rounded
                     : Icons.star_outline_rounded,
                 size: 15,
-                color: (game.earnedStarMask & bit) != 0
+                color:
+                    ((game.earnedStarMask | (record.starMask & 8)) & bit) != 0
                     ? brass
                     : const Color(0xFFB5C5BB),
               ),
@@ -73,7 +94,9 @@ class MasteryResult extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,
-                    color: (game.earnedStarMask & bit) != 0
+                    color:
+                        ((game.earnedStarMask | (record.starMask & 8)) & bit) !=
+                            0
                         ? brass
                         : const Color(0xFFB5C5BB),
                   ),
@@ -84,13 +107,19 @@ class MasteryResult extends StatelessWidget {
         ),
       const SizedBox(height: 10),
       Text(
-        '${formatRunTime(game.elapsed)} active time  ·  ${game.coinsCollected}/${game.coins.length} coins',
+        '${formatRunTime(game.elapsed)} active time' +
+            (game.mode == GameMode.classic
+                ? ''
+                : '  ·  ${game.coinsCollected}/${game.coins.length} coins'),
         textAlign: TextAlign.center,
         style: const TextStyle(fontSize: 12, color: cream),
       ),
       const SizedBox(height: 5),
       Text(
-        'Saved: ${record.stars}/3 stars  ·  Best ${record.bestScore}' +
+        'Saved: ${record.stars}/${game.mode == GameMode.classic ? 4 : 3} stars' +
+            (game.mode == GameMode.classic
+                ? ''
+                : '  ·  Best ${record.bestScore}') +
             (record.bestTime == null
                 ? ''
                 : '  ·  ${formatRunTime(record.bestTime!)}'),
@@ -131,56 +160,57 @@ class DailyCard extends StatelessWidget {
       ..setControlMode(profile.controlMode)
       ..start(gameMode: GameMode.daily, challengeDate: date)
       ..cabinet = profile.cabinet;
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'A fresh board. One day.',
-              style: TextStyle(
-                fontSize: 27,
-                fontWeight: FontWeight.w800,
-                color: ink,
+    return MenuSurface(
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const MenuHeading(
+                'A fresh board. One day.',
+                eyebrow: 'DAILY CHALLENGE',
               ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '${DailyChallenge.key(date)} · UTC',
-              style: const TextStyle(color: ink, fontFamily: 'monospace'),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 180,
-              child: CustomPaint(
-                painter: BoardPainter(preview, reducedMotion: true),
+              const SizedBox(height: 6),
+              Text(
+                '${DailyChallenge.key(date)} · UTC',
+                style: const TextStyle(
+                  color: menuText,
+                  fontFamily: 'monospace',
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Ten targets. Three balls. Same layout on every retry. A new board arrives at midnight UTC.',
-              style: TextStyle(color: ink.withAlpha(190), height: 1.5),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Time star: ${formatRunTime(preview.targetTime)} active time',
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 12),
-            StarRow(record.starMask),
-            Text(
-              'Your best: ${record.bestScore} · ${record.attempts} attempts',
-              style: const TextStyle(fontSize: 13),
-            ),
-            Text(
-              '${profile.controlMode.label} records on this device',
-              style: TextStyle(fontSize: 11, color: ink.withAlpha(170)),
-            ),
-            const SizedBox(height: 18),
-            FilledButton(onPressed: onPlay, child: const Text('PLAY DAILY')),
-          ],
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 180,
+                child: CustomPaint(
+                  painter: BoardPainter(preview, reducedMotion: true),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Ten targets. Three balls. Same layout on every retry. A new board arrives at midnight UTC.',
+                style: TextStyle(color: menuMuted, height: 1.5),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Time star: ${formatRunTime(preview.targetTime)} active time',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 12),
+              StarRow(record.starMask, dark: true),
+              Text(
+                'Your best: ${record.bestScore} · ${record.attempts} attempts',
+                style: const TextStyle(fontSize: 13),
+              ),
+              Text(
+                '${profile.controlMode.label} records on this device',
+                style: TextStyle(fontSize: 11, color: menuMuted),
+              ),
+              const SizedBox(height: 18),
+              FilledButton(onPressed: onPlay, child: const Text('PLAY DAILY')),
+            ],
+          ),
         ),
       ),
     );
@@ -203,25 +233,22 @@ class CabinetPicker extends StatelessWidget {
     physics: embedded ? const NeverScrollableScrollPhysics() : null,
     padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
     children: [
-      const Text(
-        'Make it yours.',
-        style: TextStyle(fontSize: 27, fontWeight: FontWeight.w800, color: ink),
-      ),
+      const MenuHeading('Make it yours.', eyebrow: 'CABINET STYLES'),
       const SizedBox(height: 6),
       Text(
-        '${profile.totalStars} / ${ClassicLevels.count * 3} Classic stars · identical handling in every style',
-        style: TextStyle(fontSize: 12, color: ink.withAlpha(180)),
+        '${profile.totalStars} / ${ClassicLevels.count * 4} Classic stars · identical handling in every style',
+        style: TextStyle(fontSize: 12, color: menuMuted),
       ),
       const SizedBox(height: 16),
       for (final style in CabinetStyle.values)
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Material(
-            color: const Color(0xFFFFFAEE),
+            color: menuPanel,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
               side: BorderSide(
-                color: profile.cabinet == style ? ink : ink.withAlpha(40),
+                color: profile.cabinet == style ? menuGold : menuLine,
                 width: profile.cabinet == style ? 2 : 1,
               ),
             ),
@@ -262,10 +289,7 @@ class CabinetPicker extends StatelessWidget {
                                       ? 'Equipped'
                                       : 'Tap to equip')
                                 : 'Earn ${style.requiredStars} Classic stars',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: ink.withAlpha(180),
-                            ),
+                            style: TextStyle(fontSize: 12, color: menuMuted),
                           ),
                         ],
                       ),
@@ -277,7 +301,7 @@ class CabinetPicker extends StatelessWidget {
                           ? Icons.arrow_forward_rounded
                           : Icons.lock_outline_rounded,
                       size: 21,
-                      color: ink,
+                      color: menuText,
                     ),
                   ],
                 ),
@@ -295,7 +319,7 @@ class FinaleBriefing extends StatelessWidget {
   final VoidCallback onPlay;
   @override
   Widget build(BuildContext context) => ColoredBox(
-    color: ink.withAlpha(242),
+    color: menuBackground.withAlpha(245),
     child: Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(28),
@@ -311,7 +335,7 @@ class FinaleBriefing extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'LEVEL ${game.level} · FINALE',
+                'FINALE',
                 style: const TextStyle(
                   color: brass,
                   fontSize: 11,
@@ -320,7 +344,7 @@ class FinaleBriefing extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                game.finaleTitle,
+                'Level ${game.level}',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: cream,
@@ -342,8 +366,8 @@ class FinaleBriefing extends StatelessWidget {
               const SizedBox(height: 22),
               FilledButton(
                 style: FilledButton.styleFrom(
-                  backgroundColor: brass,
-                  foregroundColor: ink,
+                  backgroundColor: menuGold,
+                  foregroundColor: menuBackground,
                 ),
                 onPressed: onPlay,
                 child: const Text('START FINALE'),

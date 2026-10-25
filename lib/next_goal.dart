@@ -11,7 +11,7 @@ class NextGoal {
   final DateTime? date;
   static NextGoal forProfile(PlayerProfile p) {
     // Recommend only reachable boards; improve stars to unlock more of them.
-    for (final bit in [1, 2, 4]) {
+    for (final bit in [1, 2, 4, 8]) {
       for (var offset = 0; offset < ClassicLevels.count; offset++) {
         final level = (p.classicLevel - 1 + offset) % ClassicLevels.count + 1;
         if (!p.isClassicLevelUnlocked(level)) continue;
@@ -20,7 +20,9 @@ class NextGoal {
             ? 'Clear level $level'
             : bit == 2
             ? 'Clear level $level without a miss'
-            : 'Earn level $level’s time star';
+            : bit == 4
+            ? 'Earn level $level’s time star'
+            : 'Collect level $level’s bonus star';
         final probe = BalanceGame()
           ..setControlMode(p.controlMode)
           ..start(levelNumber: level);
@@ -30,7 +32,9 @@ class NextGoal {
               ? 'Reach all ten glowing holes with ${p.controlMode.label} controls.'
               : bit == 2
               ? 'Finish all ten holes without losing a ball.'
-              : 'Finish within ${formatRunTime(probe.targetTime)}. Pause time does not count.',
+              : bit == 4
+              ? 'Finish within ${formatRunTime(probe.targetTime)}. Pause time does not count.'
+              : 'Find the gold star on the board. It saves as soon as you collect it.',
           GameMode.classic,
           level,
         );
@@ -38,7 +42,7 @@ class NextGoal {
     }
     return NextGoal(
       'Beat today’s Daily record',
-      'All ${ClassicLevels.count * 3} stars earned with these controls. Try today’s shared board.',
+      'All ${ClassicLevels.count * 4} stars earned with these controls. Try today’s shared board.',
       GameMode.daily,
       15,
       date: DailyChallenge.day(DateTime.now()),

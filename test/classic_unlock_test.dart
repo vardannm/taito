@@ -17,6 +17,14 @@ void main() {
         InMemorySharedPreferencesAsync.empty(),
   );
 
+  test('normal profiles keep the playtest level bypass disabled', () {
+    final profile = PlayerProfile();
+    expect(profile.temporaryLevelAccess, isFalse);
+    expect(profile.isClassicLevelUnlocked(1), isTrue);
+    expect(profile.isClassicLevelUnlocked(2), isFalse);
+    expect(profile.isClassicLevelUnlocked(80), isFalse);
+  });
+
   test('all star thresholds are reachable and exact, with level 1 free', () {
     expect(ClassicLevels.isUnlocked(1, 0), isTrue);
     for (var level = 2; level <= ClassicLevels.count; level++) {
@@ -33,7 +41,7 @@ void main() {
   test(
     'unlocks use unique Classic stars across controls, persist and cost nothing',
     () async {
-      final p = PlayerProfile();
+      final p = PlayerProfile(temporaryLevelAccess: false);
       p.levelRecords['twoFinger:1'] = const LevelRecord(starMask: 1);
       p.levelRecords['analog:1'] = const LevelRecord(starMask: 1);
       p.dailyRecords['twoFinger:2026-09-16'] = const LevelRecord(starMask: 7);
@@ -44,7 +52,7 @@ void main() {
       expect(p.selectClassicLevel(2), isTrue);
       expect(p.totalStars, 2);
       await p.save();
-      final restored = PlayerProfile();
+      final restored = PlayerProfile(temporaryLevelAccess: false);
       await restored.load();
       expect(restored.isClassicLevelUnlocked(2), isTrue);
       expect(restored.classicLevel, 2);
@@ -54,8 +62,39 @@ void main() {
     },
   );
 
+  test(
+    'a win moves Classic to the next open level, from any result button',
+    () {
+      BalanceGame win(int level, {bool clean = true}) {
+        final game = BalanceGame()
+          ..start(gameMode: GameMode.classic, levelNumber: level);
+        game.won = true;
+        game.phase = GamePhase.over;
+        if (!clean) {
+          game.misses = 1;
+          game.elapsed = 9999;
+        }
+        return game;
+      }
+
+      // One star from Level 1 is not enough to open Level 2: stay on Level 1.
+      final short = PlayerProfile(temporaryLevelAccess: false);
+      short.recordResult(win(1, clean: false));
+      expect(short.isClassicLevelUnlocked(2), isFalse);
+      expect(short.classicLevel, 1);
+
+      // A three-star win opens Level 2, and the menu continues there.
+      final p = PlayerProfile(temporaryLevelAccess: false);
+      p.recordResult(win(1));
+      expect(p.classicLevel, 2);
+      // Replaying an earlier level keeps the furthest place.
+      p.recordResult(win(1));
+      expect(p.classicLevel, 2);
+    },
+  );
+
   test('goals recommend earning a missing star instead of a locked level', () {
-    final p = PlayerProfile()
+    final p = PlayerProfile(temporaryLevelAccess: false)
       ..controlMode = ControlMode.twoFinger
       ..classicLevel = 50;
     expect(NextGoal.forProfile(p).level, 1);
@@ -93,6 +132,10 @@ void main() {
         ),
       );
       await show(1);
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('level-2')),
+        150,
+      );
       expect(find.text('1 / 2 STARS'), findsOneWidget);
       expect(
         tester.widget<InkWell>(find.byKey(const ValueKey('level-2'))).onTap,
@@ -100,9 +143,11 @@ void main() {
       );
       await tester.tap(find.byKey(const ValueKey('level-2')));
       expect(selected, isNull);
+      await tester.ensureVisible(find.byKey(const ValueKey('level-1')));
       await tester.tap(find.byKey(const ValueKey('level-1')));
       expect(selected, 1);
       await show(2);
+      await tester.ensureVisible(find.byKey(const ValueKey('level-2')));
       await tester.tap(find.byKey(const ValueKey('level-2')));
       expect(selected, 2);
       expect(tester.takeException(), isNull);
@@ -115,7 +160,7 @@ void main() {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    final p = PlayerProfile()
+    final p = PlayerProfile(temporaryLevelAccess: false)
       ..tutorialSeen = true
       ..sound = false
       ..haptics = false;
@@ -164,7 +209,7 @@ void main() {
   testWidgets(
     'stale selections cannot bypass the central Classic launch gate',
     (tester) async {
-      final p = PlayerProfile()
+      final p = PlayerProfile(temporaryLevelAccess: false)
         ..classicLevel = 50
         ..sound = false
         ..haptics = false;

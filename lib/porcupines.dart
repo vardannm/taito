@@ -29,6 +29,7 @@ class BoardPorcupine {
 }
 
 class PorcupineQuill {
+  double arenaStretch = 1;
   PorcupineQuill({required this.x, required this.y, required this.angle});
 
   double x, y, age = 0;
@@ -59,6 +60,7 @@ class PorcupineQuill {
       0,
       0,
       7 + InfiniteTuning.quillRadius,
+      xScale: arenaStretch,
     );
     return t == null ? null : t * _until;
   }

@@ -2,6 +2,9 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
+    // START: FlutterFire Configuration
+    id("com.google.gms.google-services")
+    // END: FlutterFire Configuration
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -55,6 +58,19 @@ android {
                 if (releaseKeyFile.exists()) "release" else "debug"
             )
         }
+    }
+}
+
+// Debug signing keeps local playtest APKs possible, but a store bundle must
+// never be signed with it.
+gradle.taskGraph.whenReady {
+    if (!releaseKeyFile.exists() &&
+        allTasks.any { it.project == project && it.name == "bundleRelease" }
+    ) {
+        throw GradleException(
+            "android/key.properties is missing. Store bundles need the upload key; " +
+                "see android/key.properties.example."
+        )
     }
 }
 

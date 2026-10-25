@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/merge.dart';
+import 'package:balance_arcade/merge_difficulty.dart';
+import 'dart:math' as math;
 import 'package:balance_arcade/board_painter.dart';
 import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/profile.dart';
@@ -187,41 +189,81 @@ void main() {
       }
     }
   });
-  test('the full tail fits below the platform for every control mode', () {
-    for (final control in ControlMode.values) {
-      final g = BalanceGame()
-        ..preferredControlMode = control
-        ..start(gameMode: GameMode.merge2048);
-      clearStream(g);
-      g.mergeRun.segments
-        ..clear()
-        ..addAll(fullSnake());
-      g.step(1 / 120);
-      final run = g.mergeRun;
-      expect(
-        run.segmentY(g.ballY, run.segments.length - 1) +
-            run.segmentRadius(run.segments.length - 1),
-        lessThan(550),
-      );
-      for (final size in [const Size(320, 300), const Size(390, 580)]) {
-        final viewport = BoardViewport.forGame(size, g, fillWidth: 1);
-        final tailBottom = viewport.project(
-          Offset(
-            g.ballX,
-            g.ballY +
-                run.tailExtent +
-                run.segmentRadius(run.segments.length - 1),
-          ),
-        );
-        expect(tailBottom.dy, lessThan(size.height));
-        expect(
-          viewport.project(Offset(g.ballX, g.ballY - MergeRun.ballRadius)).dy,
-          greaterThan(0),
-        );
+  for (final control in ControlMode.values) {
+    test(
+      'growing and merging a tail never lifts the platform with $control',
+      () {
+        final g = BalanceGame()
+          ..setControlMode(control)
+          ..start(gameMode: GameMode.merge2048);
+        clearStream(g);
+        g.left = g.right = 526;
+        g.mergeRun.segments[0] = 32768;
+        final headY = g.ballY;
+        final serial = g.runSerial, epoch = g.inputEpoch;
+        for (var value = 16384; value >= 2; value ~/= 2) {
+          clearStream(g);
+          final count = g.mergeRun.segments.length;
+          g.mergeRun.orbs.add(NumberOrb(g.ballX, g.ballY, value));
+          g.step(1 / 120);
+          expect(g.mergeRun.segments, hasLength(count + 1));
+          expect(g.maxPivot, 526);
+          expect(g.left, 526);
+          expect(g.right, 526);
+          expect(g.ballY, headY);
+          expect(g.finished, isFalse);
+        }
+        expect(g.mergeRun.segments.length, greaterThan(MergeRun.maxSegments));
+        clearStream(g);
+        g.mergeRun.orbs.add(NumberOrb(g.ballX, g.ballY, 2));
+        g.step(1 / 120);
+        expect(g.mergeRun.segments, [65536]);
+        expect(g.left, 526);
+        expect(g.right, 526);
+        expect(g.ballY, headY);
+        expect(g.runSerial, serial);
+        expect(g.inputEpoch, epoch);
+        expect(g.canControl, isTrue);
+      },
+    );
+  }
+  test(
+    'offscreen tails do not shift the viewport or platform touch targets',
+    () {
+      for (final control in ControlMode.values) {
+        for (final size in [const Size(320, 300), const Size(390, 580)]) {
+          final g = BalanceGame()
+            ..setControlMode(control)
+            ..start(gameMode: GameMode.merge2048);
+          clearStream(g);
+          final before = BoardViewport.forGame(size, g, fillWidth: 1);
+          final leftGrip = before.project(Offset(20, g.left));
+          final rightGrip = before.project(Offset(340, g.right));
+          g.mergeRun.segments
+            ..clear()
+            ..addAll(fullSnake());
+          g.step(1 / 120);
+          final after = BoardViewport.forGame(size, g, fillWidth: 1);
+          expect(after.offset, before.offset);
+          expect(after.scale, before.scale);
+          expect(after.project(Offset(20, g.left)), leftGrip);
+          expect(after.project(Offset(340, g.right)), rightGrip);
+          final run = g.mergeRun;
+          final tailBottom = after.project(
+            Offset(
+              g.ballX,
+              run.segmentY(g.ballY, run.segments.length - 1) +
+                  run.segmentRadius(run.segments.length - 1),
+            ),
+          );
+          expect(tailBottom.dy, greaterThan(size.height));
+          final head = after.project(Offset(g.ballX, g.ballY));
+          expect(head.dy, inInclusiveRange(0, size.height));
+          expect(g.finished, isFalse);
+        }
       }
-      expect(g.finished, false);
-    }
-  });
+    },
+  );
   test('large number labels use binary thousands and millions', () {
     for (final entry in {
       2: '2',
@@ -237,26 +279,168 @@ void main() {
       expect(formatMergeNumber(entry.key), entry.value);
     }
   });
-  test('each wave has reachable food and a separated larger hazard', () {
-    for (var seed = 0; seed < 40; seed++) {
-      final run = MergeRun(seed: seed);
-      expect(run.orbs.length, 9);
-      for (var row = 0; row < 3; row++) {
-        final wave = run.orbs.skip(row * 3).take(3).toList();
-        expect(wave[0].value, run.tail);
-        expect(wave[1].value, lessThanOrEqualTo(run.head));
-        expect(wave[2].value, greaterThan(run.head));
-        expect(wave[0].x, inInclusiveRange(run.minHeadX, run.maxHeadX));
-        for (var a = 0; a < 3; a++) {
-          for (var b = a + 1; b < 3; b++) {
-            expect((wave[a].x - wave[b].x).abs(), greaterThanOrEqualTo(60));
+  test(
+    'opening waves are safe, separated and have reachable matching food',
+    () {
+      for (var seed = 0; seed < 40; seed++) {
+        final run = MergeRun(seed: seed);
+        expect(run.orbs.length, 9);
+        for (var row = 0; row < 3; row++) {
+          final wave = run.orbs.skip(row * 3).take(3).toList();
+          expect(wave[0].value, run.tail);
+          expect(wave[1].value, lessThanOrEqualTo(run.head));
+          expect(wave[2].value, lessThanOrEqualTo(run.head));
+          expect(wave[0].x, inInclusiveRange(run.minHeadX, run.maxHeadX));
+          for (var a = 0; a < 3; a++) {
+            for (var b = a + 1; b < 3; b++) {
+              expect((wave[a].x - wave[b].x).abs(), greaterThanOrEqualTo(60));
+            }
           }
         }
+        for (var i = 0; i < 200; i++) run.step(.1, -100, -100, -100, -100);
+        expect(run.ended, false);
+        expect(run.orbs.length, lessThan(22));
       }
-      for (var i = 0; i < 200; i++) run.step(.1, -100, -100, -100, -100);
-      expect(run.ended, false);
-      expect(run.orbs.length, lessThan(22));
+    },
+  );
+  test(
+    'danger ramps earlier and later waves still retain a safe tail match',
+    () {
+      for (final head in [2, 4, 8, 16, 32, 64, 128, 256, 1024]) {
+        final run = emptyRun(seed: head)
+          ..highest = head
+          ..segments[0] = head;
+        var dangerous = 0, secondaryDangerous = 0;
+        const waves = 600;
+        for (var i = 0; i < waves; i++) {
+          run.orbs.clear();
+          run.step(
+            MergeDifficulty.waveSpacing / run.speed + 1e-8,
+            -1000,
+            -1000,
+            -1000,
+            -1000,
+          );
+          expect(run.orbs, hasLength(3));
+          expect(run.orbs[0].value, run.tail);
+          if (run.orbs[1].value > head) secondaryDangerous++;
+          if (run.orbs[2].value > head) dangerous++;
+        }
+        final expected = switch (head) {
+          2 => 0.0,
+          4 => 1 / 3,
+          8 => 2 / 3,
+          _ => 1.0,
+        };
+        expect(dangerous / waves, closeTo(expected, .07), reason: 'head $head');
+        final secondaryExpected = switch (head) {
+          2 || 4 || 8 || 16 || 32 => 0.0,
+          64 => .15,
+          128 => .3,
+          _ => .45,
+        };
+        expect(
+          secondaryDangerous / waves,
+          closeTo(secondaryExpected, .07),
+          reason: 'head $head',
+        );
+      }
+    },
+  );
+  test('safe secondary food offers matches and gaps among later dangers', () {
+    final run = emptyRun(seed: 81)..highest = 2048;
+    run.segments
+      ..clear()
+      ..addAll([2048, 128, 8, 2]);
+    var matches = 0, safeFood = 0;
+    for (var i = 0; i < 600; i++) {
+      run.orbs.clear();
+      run.step(
+        MergeDifficulty.waveSpacing / run.speed + 1e-8,
+        -1000,
+        -1000,
+        -1000,
+        -1000,
+      );
+      expect(run.orbs.first.value, 2);
+      final food = run.orbs[1].value;
+      if (food <= run.head) {
+        safeFood++;
+        if (run.canMerge(food)) matches++;
+      }
     }
+    expect(safeFood, inExclusiveRange(270, 390));
+    expect(matches / safeFood, inExclusiveRange(.5, .75));
+  });
+  test(
+    'random merge sequences conserve value and leave unique descending powers',
+    () {
+      final random = math.Random(741);
+      for (var seed = 0; seed < 50; seed++) {
+        final run = emptyRun(seed: seed);
+        for (var pickup = 0; pickup < 200; pickup++) {
+          final value =
+              1 << (1 + random.nextInt(math.min(16, run.head.bitLength - 1)));
+          final before = run.segments.fold<int>(0, (sum, v) => sum + v);
+          final oldScore = run.score;
+          run.collect(value);
+          expect(run.ended, isFalse);
+          expect(
+            run.segments.fold<int>(0, (sum, v) => sum + v),
+            before + value,
+          );
+          expect(run.score - oldScore, run.lastMergeScore);
+          expect(run.segments.toSet().length, run.segments.length);
+          for (var i = 0; i < run.segments.length; i++) {
+            final v = run.segments[i];
+            expect(v & (v - 1), 0);
+            if (i > 0) expect(v, lessThan(run.segments[i - 1]));
+          }
+        }
+        final before = List<int>.of(run.segments), score = run.score;
+        run.collect(run.head * 2);
+        expect(run.ended, isTrue);
+        expect(run.segments, before);
+        expect(run.score, score);
+      }
+    },
+  );
+  test(
+    'wave timing and positions do not drift with different frame partitions',
+    () {
+      final runs = <MergeRun>[];
+      for (final dt in [.01, .1, 1.0, 20.0]) {
+        final run = emptyRun(seed: 91)
+          ..highest = 128
+          ..segments[0] = 128;
+        for (var i = 0; i < (20 / dt).round(); i++) {
+          run.step(dt, -1000, -1000, -1000, -1000);
+        }
+        runs.add(run);
+      }
+      final expected = runs.first;
+      for (final run in runs.skip(1)) {
+        expect(run.orbs.length, expected.orbs.length);
+        expect(run.spawnTime, closeTo(expected.spawnTime, 1e-7));
+        for (var i = 0; i < run.orbs.length; i++) {
+          expect(run.orbs[i].value, expected.orbs[i].value);
+          expect(run.orbs[i].x, expected.orbs[i].x);
+          expect(run.orbs[i].y, closeTo(expected.orbs[i].y, 1e-7));
+        }
+      }
+    },
+  );
+  test('gate cooldown begins at swept contact, not at the frame start', () {
+    final run = emptyRun()..segments[0] = 64;
+    run.gates.add(
+      MergeGate(32, y: 300 - (MergeRun.ballRadius + 3) - run.gateSpeed * .75),
+    );
+    run.step(1, 180, 300, 180, 300);
+    expect(run.gatesPassed, 1);
+    expect(
+      run.gateCooldown,
+      closeTo(MergeDifficulty.gateCooldownSeconds - .25, 1e-9),
+    );
   });
   test('only the head collects; tail passes through dangerous numbers', () {
     final g = BalanceGame()..start(gameMode: GameMode.merge2048);
@@ -344,32 +528,93 @@ void main() {
     expect(failed.failedGate, 64);
     expect(failed.collected, 0);
   });
-  test(
-    '400-point milestones queue exactly once with only one gate on screen',
-    () {
-      final run = emptyRun()..score = 399;
-      run.step(.01, 180, 500, 180, 500);
-      expect(run.gates, isEmpty);
-      run.score = 1200;
-      run.step(.01, 180, 500, 180, 500);
-      expect(run.gates.single.scoreAt, 400);
-      expect(run.gates.single.y, lessThan(0));
-      expect(run.pendingGates, 2);
-      run.segments[0] = 1024;
-      for (final scoreAt in [400, 800, 1200]) {
-        expect(run.gates.single.scoreAt, scoreAt);
-        run.gates.single.y = 500;
-        run.step(.01, 180, 500, 180, 500);
-        for (var i = 0; i < 13; i++) run.step(.1, 180, 500, 180, 500);
-      }
-      expect(run.gatesPassed, 3);
-      expect(run.gates, isEmpty);
-      expect(run.nextGateScore, 1600);
-      expect(MergeRun.gateValueAt(400), 128);
-      expect(MergeRun.gateValueAt(16400), 8192);
-      expect(MergeRun.gateValueAt(4398046511104), 2199023255552);
-    },
-  );
+  test('gates follow the current head and discard score backlogs', () {
+    final run = emptyRun()..score = MergeRun.gateInterval - 1;
+    run.segments[0] = 8192;
+    run.step(.01, 180, 500, 180, 500);
+    expect(run.gates, isEmpty);
+    run.score = 50000; // A large chain crosses many old milestones.
+    run.step(.01, 180, 500, 180, 500);
+    expect(run.gates.single.requiredValue, 8192);
+    expect(run.gates.single.scoreAt, 50000);
+    run.score = 90000;
+    run.segments[0] = 16384;
+    run.step(.01, 180, 500, 180, 500);
+    expect(run.gates.single.requiredValue, 8192); // Fixed once visible.
+    run.gates.single.y = 500;
+    run.step(.01, 180, 500, 180, 500);
+    expect(run.gatesPassed, 1);
+    expect(run.nextGateScore, 90000 + 16384);
+    for (var i = 0; i < 50; i++) {
+      run.orbs.clear();
+      run.step(.1, 180, 500, 180, 500);
+    }
+    expect(run.gates, isEmpty); // No old gates to drain after cooldown.
+    run.score = run.nextGateScore;
+    run.step(.01, 180, 500, 180, 500);
+    expect(run.gates.single.requiredValue, 16384);
+  });
+  test('fresh score cannot bypass the gate cooldown', () {
+    final run = emptyRun()..score = MergeRun.gateInterval;
+    run.segments[0] = 8192;
+    run.step(.01, 180, 500, 180, 500);
+    run.segments[0] = 16384;
+    run.gates.single.y = 500;
+    run.step(.01, 180, 500, 180, 500);
+    run.score = run.nextGateScore;
+    final cooldownSteps = (MergeDifficulty.gateCooldownSeconds * 10).round();
+    for (var i = 0; i < cooldownSteps - 2; i++) {
+      run.orbs.clear();
+      run.step(.1, 180, 500, 180, 500);
+    }
+    expect(run.gates, isEmpty);
+    for (var i = 0; i < 3; i++) {
+      run.orbs.clear();
+      run.step(.1, 180, 500, 180, 500);
+    }
+    expect(run.gates.single.requiredValue, 16384);
+    expect(run.upcomingGateValue, 16384);
+  });
+  test('gate values catch up, double, and reset on a fresh run', () {
+    expect(MergeRun.gateValueForHead(8192), 8192);
+    expect(MergeRun.gateValueForHead(8192, previous: 4096), 8192);
+    expect(MergeRun.gateValueForHead(65536, previous: 512), 65536);
+    expect(MergeRun.gateValueForHead(2), 2);
+    final fresh = emptyRun();
+    expect(fresh.nextGateScore, MergeRun.gateInterval);
+    expect(fresh.lastGateValue, 0);
+    expect(fresh.gateCooldown, 0);
+  });
+  test('generated gates require growth and leave multiple waves to react', () {
+    for (final head in [32, 64, 256, 4096, 65536]) {
+      final run = emptyRun()
+        ..highest = head
+        ..score = MergeRun.gateInterval
+        ..segments[0] = head;
+      run.step(.01, 180, 440, 180, 440);
+      final gate = run.gates.single;
+      expect(gate.requiredValue, head);
+      final reactionTime =
+          (440 - MergeRun.ballRadius - 3 - gate.y) / run.gateSpeed;
+      final waveTime = MergeDifficulty.waveSpacing / run.speed;
+      expect(reactionTime, greaterThan(3));
+      expect(reactionTime / waveTime, greaterThan(2.5));
+      run.collect(head);
+      expect(run.head, head * 2);
+      gate.y = 440;
+      run.step(.01, 180, 440, 180, 440);
+      expect(run.gatesPassed, 1);
+      expect(run.ended, isFalse);
+    }
+    final failed = emptyRun()
+      ..highest = 64
+      ..score = MergeRun.gateInterval
+      ..segments[0] = 64;
+    failed.step(.01, 180, 440, 180, 440);
+    failed.gates.single.y = 440;
+    failed.step(.01, 180, 440, 180, 440);
+    expect(failed.failedGate, 64);
+  });
   test(
     '2048 and later merges keep simulation, input, and records in one run',
     () async {
@@ -500,7 +745,7 @@ void main() {
         ..controlMode = ControlMode.analog;
       await tester.pumpWidget(ArcadeApp(profile: p));
 
-      await selectWorld(tester, 3);
+      await selectWorld(tester, 2);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 600));
       await startWorld(tester);

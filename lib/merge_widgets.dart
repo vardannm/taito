@@ -1,5 +1,7 @@
 import 'dart:math' as math;
+import 'arena_canvas.dart';
 import 'package:flutter/material.dart';
+import 'menu_design.dart';
 import 'merge.dart';
 
 Color numberColor(int value) {
@@ -20,39 +22,46 @@ Color numberColor(int value) {
 }
 
 class MergeStatus extends StatelessWidget {
-  const MergeStatus({super.key, required this.run});
+  const MergeStatus({super.key, required this.run, this.color = menuText});
   final MergeRun run;
 
+  /// Matches the HUD ink, which adapts to the board behind it.
+  final Color color;
+
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
-    child: Semantics(
+  Widget build(BuildContext context) {
+    final danger = !run.ended && run.head <= run.upcomingGateValue;
+    final style = TextStyle(
+      color: color,
+      fontSize: 11,
+      fontWeight: FontWeight.w700,
+    );
+    return Semantics(
       label:
           'Snake from largest at the top to smallest at the bottom: ${run.segments.join(', ')}. '
           'Next gate requires more than ${run.upcomingGateValue}. '
           'Collect equal or smaller numbers with the solid head ball. Larger numbers are fatal.',
       excludeSemantics: true,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            run.ended ? 'RUN ENDED' : 'GATE > ${run.upcomingGateValue}',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              color: run.head <= run.upcomingGateValue
-                  ? const Color(0xFFCD542F)
-                  : const Color(0xFF163D3B),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('MATCH ${formatMergeNumber(run.tail)}', style: style),
+            Text('  ·  ', style: style.copyWith(color: color.withAlpha(140))),
+            Text(
+              run.ended ? 'RUN ENDED' : 'GATE > ${run.upcomingGateValue}',
+              style: style.copyWith(
+                // A gate the head cannot pass yet is the one real warning.
+                color: danger ? const Color(0xFFEF6958) : color,
+                fontWeight: FontWeight.w800,
+              ),
             ),
-          ),
-          Text(
-            'MATCH ${formatMergeNumber(run.tail)}',
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 void paintNumberOrb(
@@ -64,6 +73,23 @@ void paintNumberOrb(
   bool danger = false,
   double opacity = 1,
 }) {
+  if (canvas is ArenaCanvas) {
+    final projected = canvas;
+    projected.canvas.save();
+    final p = projected.point(center);
+    projected.canvas.translate(p.dx, p.dy);
+    paintNumberOrb(
+      projected.canvas,
+      Offset.zero,
+      value,
+      radius,
+      match: match,
+      danger: danger,
+      opacity: opacity,
+    );
+    projected.canvas.restore();
+    return;
+  }
   if (danger) {
     canvas.drawCircle(
       center,
@@ -86,6 +112,8 @@ void paintNumberOrb(
       textDirection: TextDirection.ltr,
     )..layout();
     warning.paint(canvas, center + Offset(-warning.width / 2, -radius - 19));
+    // Release the native paragraph now instead of waiting for GC.
+    warning.dispose();
   }
   if (match)
     canvas.drawCircle(
@@ -128,6 +156,7 @@ void paintNumberOrb(
   final scale = math.min(1.0, radius * 1.7 / text.width);
   canvas.scale(scale);
   text.paint(canvas, Offset(-text.width / 2, -text.height / 2));
+  text.dispose();
   canvas.restore();
 }
 
@@ -138,15 +167,17 @@ class MergeResult extends StatelessWidget {
     required this.newBest,
     required this.onRetry,
     required this.onHome,
+    this.coinsEarned = 0,
   });
   final MergeRun run;
+  final int coinsEarned;
   final bool newBest;
   final VoidCallback onRetry, onHome;
   @override
   Widget build(BuildContext context) => Container(
     decoration: BoxDecoration(
-      color: const Color(0xF0163D3B),
-      borderRadius: BorderRadius.circular(20),
+      color: menuBackground.withAlpha(245),
+      borderRadius: BorderRadius.circular(28),
     ),
     alignment: Alignment.center,
     child: SingleChildScrollView(
@@ -161,7 +192,7 @@ class MergeResult extends StatelessWidget {
                   : 'Number too large.',
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: Color(0xFFF2ECDD),
+                color: menuText,
                 fontSize: 24,
                 fontWeight: FontWeight.w900,
               ),
@@ -171,18 +202,30 @@ class MergeResult extends StatelessWidget {
               '${newBest ? 'NEW BEST' : 'SCORE'} ${run.score}  ·  HIGHEST ${formatMergeNumber(run.highest)}',
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: Color(0xFFFFDF88),
+                color: menuGold,
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
             ),
+            if (coinsEarned > 0) ...[
+              const SizedBox(height: 12),
+              Text(
+                '+$coinsEarned coins · 2,048 reached',
+                key: const ValueKey('merge-coin-prize'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: menuGold,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               child: FilledButton(
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFFFDF88),
-                  foregroundColor: const Color(0xFF163D3B),
+                  backgroundColor: menuGold,
+                  foregroundColor: menuBackground,
                 ),
                 onPressed: onRetry,
                 child: const Text('PLAY AGAIN'),
@@ -192,7 +235,7 @@ class MergeResult extends StatelessWidget {
             Text(
               run.notice,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFFCAD5CD), fontSize: 11),
+              style: const TextStyle(color: menuMuted, fontSize: 11),
             ),
             Wrap(
               alignment: WrapAlignment.center,
@@ -201,7 +244,7 @@ class MergeResult extends StatelessWidget {
                   onPressed: onHome,
                   child: const Text(
                     'BACK TO CLUB',
-                    style: TextStyle(color: Color(0xFFCAD5CD)),
+                    style: TextStyle(color: menuMuted),
                   ),
                 ),
               ],

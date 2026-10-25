@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "level-builder",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": ["-ExecutionPolicy", "Bypass", "-File", "scripts/level_builder.ps1", "-Port", "8766", "-NoBrowser"],
+      "port": 8766,
+      "url": "http://127.0.0.1:8766"
+    },
+    {
+      "name": "game-web",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": ["-ExecutionPolicy", "Bypass", "-File", "scripts/flutter.ps1", "run", "--device-id=web-server", "--web-port", "5180", "--web-hostname", "127.0.0.1"],
+      "port": 5180,
+      "url": "http://127.0.0.1:5180"
+    }
+  ]
+}

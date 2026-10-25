@@ -1,7 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'game.dart';
-import 'cabinet.dart';
+import 'ball_world.dart';
+import 'ball_cosmetics.dart';
 import 'infinite_progress.dart';
 import 'maze_gates.dart';
 import 'pickup_painter.dart';
@@ -51,10 +52,40 @@ Color comboColor(double power, {bool background = false}) {
       : color;
 }
 
+/// Combo energy recolors the equipped world without replacing its identity.
+List<Color> boardFieldColors(BalanceGame game) {
+  final world = BallWorld.of(game.cosmetic);
+  if (!game.infinite) return world.field;
+  final power = (game.survival.visualCombo * InfiniteTuning.visualIntensity)
+      .clamp(0.0, 1.0);
+  var tint = comboColor(power);
+  if (game.cosmetic != BallCosmetic.steel) {
+    tint = Color.lerp(
+      tint,
+      Color.lerp(world.field[1], world.accent, .35),
+      .65,
+    )!;
+    tint = Color.lerp(
+      tint,
+      Color.lerp(world.top, const Color(0xFF090D1D), .75),
+      comboDarkness(power) * .8,
+    )!;
+  }
+  final energized = [
+    Color.lerp(tint, Colors.white, .3)!,
+    tint,
+    Color.lerp(tint, const Color(0xFF77BBB5), .2)!,
+  ];
+  return [
+    for (var i = 0; i < 3; i++)
+      Color.lerp(world.field[i], energized[i], (power * 4).clamp(0.0, 1.0))!,
+  ];
+}
+
 /// Match the playfield gradient so foreground colors follow the visible fade,
 /// including transitions back to x1 after a hit, rather than the target combo.
 Color infiniteFieldColor(BalanceGame game, Offset point) {
-  final area = Rect.fromLTRB(10, game.visibleTop + 10, 350, 550);
+  final area = Rect.fromLTRB(0, game.visibleTop, 360, game.visibleBottom);
   final delta = point - area.topLeft;
   final t =
       ((delta.dx * area.width + delta.dy * area.height) /
@@ -63,18 +94,7 @@ Color infiniteFieldColor(BalanceGame game, Offset point) {
   Color sample(List<Color> colors) => t <= .5
       ? Color.lerp(colors[0], colors[1], t * 2)!
       : Color.lerp(colors[1], colors[2], (t - .5) * 2)!;
-  final power = (game.survival.visualCombo * InfiniteTuning.visualIntensity)
-      .clamp(0.0, 1.0);
-  final tint = comboColor(power);
-  return Color.lerp(
-    sample(CabinetPalette.of(game.cabinet).field),
-    sample([
-      Color.lerp(tint, Colors.white, .3)!,
-      tint,
-      Color.lerp(tint, const Color(0xFF77BBB5), .2)!,
-    ]),
-    (power * 4).clamp(0.0, 1.0),
-  )!;
+  return sample(boardFieldColors(game));
 }
 
 /// Choose the higher-contrast opposite tone; never fade through muddy grey.
@@ -82,7 +102,9 @@ Color contrastInk(Color background) =>
     background.computeLuminance() > .179 ? Colors.black : Colors.white;
 
 Color infiniteBoardInk(BalanceGame game, Offset point) =>
-    contrastInk(infiniteFieldColor(game, point));
+    game.arenaStretch > 1.0001
+    ? Colors.white
+    : contrastInk(infiniteFieldColor(game, point));
 
 /// Paints behind the entire game, including HUD, controls and screen margins.
 class InfiniteBackdropPainter extends CustomPainter {
@@ -90,82 +112,94 @@ class InfiniteBackdropPainter extends CustomPainter {
     this.game, {
     required this.reducedMotion,
     Listenable? repaint,
-  }) : super(repaint: repaint);
+  }) : world = BallWorld.of(game.cosmetic),
+       super(repaint: repaint);
   final BalanceGame game;
+  final BallWorld world;
   final bool reducedMotion;
   @override
   void paint(Canvas c, Size size) {
     final power = game.survival.visualCombo;
-    final color = comboColor(power, background: true);
+    // Keep the control area light enough for every controller's dark labels.
+    final color = Color.lerp(
+      world.surround,
+      boardFieldColors(game)[1],
+      power * .12,
+    )!;
     c.drawRect(
       Offset.zero & size,
       Paint()
         ..shader = LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [color, Color.lerp(color, comboColor(power), .65)!],
+          colors: [color, Color.lerp(color, world.surround, .35)!],
         ).createShader(Offset.zero & size),
     );
   }
 
   @override
   bool shouldRepaint(InfiniteBackdropPainter old) =>
-      old.game != game || old.reducedMotion != reducedMotion;
+      old.game != game ||
+      old.world != world ||
+      old.reducedMotion != reducedMotion;
 }
 
-void paintInfiniteAtmosphere(Canvas c, BalanceGame game, bool reducedMotion) {
+void paintInfiniteAtmosphere(
+  Canvas c,
+  BalanceGame game,
+  bool reducedMotion, {
+  bool subdued = false,
+  double horizontalSpread = 1,
+}) {
   if (!game.infinite) return;
   final power = (game.survival.visualCombo * InfiniteTuning.visualIntensity)
       .clamp(0.0, 1.0);
   if (power < .005) return;
-  final tint = comboColor(power);
-  final area = Rect.fromLTRB(10, game.visibleTop + 10, 350, 550);
-  // Opaque color transforms the whole playfield; the start fades in smoothly.
-  c.drawRect(
-    area,
-    Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors:
-            [
-                  Color.lerp(tint, Colors.white, .3)!,
-                  tint,
-                  Color.lerp(tint, const Color(0xFF77BBB5), .2)!,
-                ]
-                .map(
-                  (color) =>
-                      color.withValues(alpha: (power * 4).clamp(0.0, 1.0)),
-                )
-                .toList(),
-      ).createShader(area),
-  );
+  // BoardPainter already paints the combo-colored field. Avoid a second
+  // full-screen gradient pass on every frame.
   if (reducedMotion) return;
   final darkness = comboDarkness(power);
   for (var band = 0; band < 3; band++) {
     final drift = math.sin(game.clock * .45 + band * 2) * 45;
     final y = 80.0 + band * 160;
     final path = Path()
-      ..moveTo(10, y + drift)
-      ..cubicTo(115, y - 95, 210, y + 80, 350, y - 35 + drift)
-      ..lineTo(350, y + 30 + drift)
-      ..cubicTo(210, y + 120, 115, y - 50, 10, y + 65 + drift)
+      ..moveTo(10 * horizontalSpread, y + drift)
+      ..cubicTo(
+        115 * horizontalSpread,
+        y - 95,
+        210 * horizontalSpread,
+        y + 80,
+        350 * horizontalSpread,
+        y - 35 + drift,
+      )
+      ..lineTo(350 * horizontalSpread, y + 30 + drift)
+      ..cubicTo(
+        210 * horizontalSpread,
+        y + 120,
+        115 * horizontalSpread,
+        y - 50,
+        10 * horizontalSpread,
+        y + 65 + drift,
+      )
       ..close();
     c.drawPath(
       path,
       Paint()
         ..color = Colors.white.withValues(
-          alpha: (.08 + .05 * power) * (1 - .55 * darkness),
+          alpha:
+              (.08 + .05 * power) * (1 - .55 * darkness) * (subdued ? .35 : 1),
         ),
     );
   }
   // The pale streaks hand their frame budget over to the embers as the board
   // darkens, so the dark tiers cost no more to draw than the bright ones.
   final streakPaint = Paint()
-    ..color = Colors.white.withValues(alpha: .18 + .18 * power)
+    ..color = Colors.white.withValues(
+      alpha: (.18 + .18 * power) * (subdued ? .3 : 1),
+    )
     ..strokeWidth = 1 + power;
   for (var i = 0; i < (12 * power * (1 - darkness)).ceil(); i++) {
-    final x = 28.0 + (i * 83 % 304),
+    final x = (28.0 + (i * 83 % 304)) * horizontalSpread,
         y = 16 + (i * 137 + game.clock * (25 + 75 * power)) % 520;
     c.drawLine(Offset(x, y), Offset(x, y - 3 - 18 * power), streakPaint);
   }
@@ -173,8 +207,9 @@ void paintInfiniteAtmosphere(Canvas c, BalanceGame game, bool reducedMotion) {
     paintComboEmbers(
       c,
       game.clock,
-      darkness * (.25 + .75 * power),
+      darkness * (.25 + .75 * power) * (subdued ? .25 : 1),
       power: power,
+      horizontalSpread: horizontalSpread,
     );
 }
 
@@ -186,6 +221,7 @@ void paintComboEmbers(
   double clock,
   double darkness, {
   double power = 1,
+  double horizontalSpread = 1,
 }) {
   final violet = comboEnergyColor(power);
   const spark = Color(0xFFFFE6B8);
@@ -201,7 +237,7 @@ void paintComboEmbers(
         (life / 90).clamp(0.0, 1.0) * ((600 - life) / 200).clamp(0.0, 1.0);
     if (fade <= .02) continue;
     final sway = math.sin(clock * 1.7 + i * .8) * (5 + i % 4);
-    final p = Offset((i * 97) % 320 + 22.0 + sway, y);
+    final p = Offset(((i * 97) % 320 + 22.0 + sway) * horizontalSpread, y);
     final twinkle = .75 + .25 * math.sin(clock * 4 + i * 1.3);
     final radius = (1.3 + (i % 3) * .55) * twinkle * fade;
     glow.addOval(Rect.fromCircle(center: p, radius: radius * 3.4));
@@ -223,7 +259,9 @@ void paintInfiniteItems(Canvas c, BalanceGame game, bool reducedMotion) {
   if (!game.infinite) return;
   for (final item in game.survival.items) {
     final p = Offset(item.x, game.screenY(item.y));
-    if (p.dy < game.visibleTop - 14 || p.dy > 574) continue;
+    if (p.dy < game.visibleTop - 14 || p.dy > game.visibleBottom + 14) {
+      continue;
+    }
     // Each pickup bobs on its own phase, so a row of them never pulses as one.
     final phase = item.x * .07;
     final bob = reducedMotion ? 0.0 : math.sin(game.clock * 2.2 + phase) * 1.4;
@@ -238,12 +276,17 @@ void paintInfiniteItems(Canvas c, BalanceGame game, bool reducedMotion) {
 
 /// Bounded, blur-free energy: gradients and shared paths avoid a separate
 /// blur render pass for every spark/arc. Cost does not grow with pace/combo.
-void paintInfiniteEnergy(Canvas c, BalanceGame game, bool reducedMotion) {
+void paintInfiniteEnergy(
+  Canvas c,
+  BalanceGame game,
+  bool reducedMotion, {
+  double horizontalStretch = 1,
+}) {
   if (!game.infinite || game.survival.visualCombo < .15) return;
   final power = game.survival.visualCombo.clamp(0.0, 1.0);
   final strength = ((power - .15) / .85).clamp(0.0, 1.0);
-  final a = Offset(20, game.screenY(game.left));
-  final b = Offset(340, game.screenY(game.right));
+  final a = Offset(20 * horizontalStretch, game.screenY(game.left));
+  final b = Offset(340 * horizontalStretch, game.screenY(game.right));
   if (math.max(a.dy, b.dy) < -40 || math.min(a.dy, b.dy) > 610) return;
   final direction = b - a, span = direction.distance;
   if (span <= 0) return;
@@ -350,7 +393,10 @@ void paintInfiniteEnergy(Canvas c, BalanceGame game, bool reducedMotion) {
   );
   c.restore();
   if (game.ballScale > 0) {
-    final ball = Offset(game.visualX, game.screenY(game.visualY));
+    final ball = Offset(
+      game.visualX * horizontalStretch,
+      game.screenY(game.visualY),
+    );
     c.drawCircle(
       ball,
       9 + 6 * strength,
@@ -369,7 +415,7 @@ void paintInfiniteMagnet(Canvas c, BalanceGame game, bool reducedMotion) {
   const tint = Color(0xFF8655CF);
   final radius = game.magnetRadius;
   c.save();
-  c.clipRect(Rect.fromLTRB(20, game.visibleTop, 340, 574));
+  c.clipRect(Rect.fromLTRB(20, game.visibleTop, 340, game.visibleBottom + 14));
   c.drawCircle(
     p,
     radius,
@@ -396,36 +442,112 @@ void paintInfiniteMagnet(Canvas c, BalanceGame game, bool reducedMotion) {
   }
   c.restore();
   if (game.survival.magnet > 0) {
+    final remaining = (game.survival.magnet / game.magnetDuration).clamp(
+      0.0,
+      1.0,
+    );
     c.drawArc(
       Rect.fromCircle(center: p, radius: 21),
       -math.pi / 2,
-      math.pi * 2 * game.survival.magnet / InfiniteTuning.magnetSeconds,
+      math.pi * 2 * remaining,
       false,
       Paint()
         ..color = tint
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2,
     );
-    final label = TextPainter(
+    final time = TextPainter(
       text: TextSpan(
-        text: 'MAGNET ${game.survival.magnet.ceil()}s',
+        text: '${game.survival.magnet.ceil()}s',
         style: const TextStyle(
-          fontFamily: 'monospace',
-          fontSize: 9,
-          fontWeight: FontWeight.w800,
-          color: tint,
-          backgroundColor: Color(0xEFFFF9ED),
+          fontFamily: 'sans-serif',
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFFF8F2FF),
         ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    label.paint(
-      c,
-      Offset(
-        (p.dx - label.width / 2).clamp(22.0, 338 - label.width),
-        p.dy - 37,
-      ),
+    final width = 30 + time.width;
+    final left = (p.dx - width / 2).clamp(22.0, 338 - width);
+    final above = p.dy - 49;
+    final top = (above < game.visibleTop + 4 ? p.dy + 27 : above).clamp(
+      game.visibleTop + 4,
+      548.0,
     );
+    final bounds = Rect.fromLTWH(left, top, width, 23);
+    final badge = RRect.fromRectAndRadius(bounds, const Radius.circular(11.5));
+    c.drawRRect(
+      badge.shift(const Offset(0, 2)),
+      Paint()..color = const Color(0x30000000),
+    );
+    c.drawRRect(
+      badge,
+      Paint()
+        ..shader = const LinearGradient(
+          colors: [Color(0xF21A2730), Color(0xF22D2540)],
+        ).createShader(bounds),
+    );
+    c.drawRRect(
+      badge,
+      Paint()
+        ..color = const Color(0xFFB49AD7).withAlpha(125)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .7,
+    );
+    // A tiny horseshoe magnet, with the pickup's blue and red pole tips.
+    final icon = Offset(left + 11, top + 10.5);
+    c.drawPath(
+      Path()
+        ..moveTo(icon.dx - 3.5, icon.dy - 3)
+        ..lineTo(icon.dx - 3.5, icon.dy + 1)
+        ..cubicTo(
+          icon.dx - 3.5,
+          icon.dy + 5.5,
+          icon.dx + 3.5,
+          icon.dy + 5.5,
+          icon.dx + 3.5,
+          icon.dy + 1,
+        )
+        ..lineTo(icon.dx + 3.5, icon.dy - 3),
+      Paint()
+        ..color = const Color(0xFFDDCFF2)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2
+        ..strokeCap = StrokeCap.round,
+    );
+    for (final pole in [
+      (icon.dx - 3.5, const Color(0xFF7BD6E2)),
+      (icon.dx + 3.5, const Color(0xFFF498A8)),
+    ]) {
+      c.drawLine(
+        Offset(pole.$1, icon.dy - 3.5),
+        Offset(pole.$1, icon.dy - 1.5),
+        Paint()
+          ..color = pole.$2
+          ..strokeWidth = 2.2
+          ..strokeCap = StrokeCap.round,
+      );
+    }
+    time.paint(c, Offset(left + 22, top + (21 - time.height) / 2));
+    final track = Rect.fromLTWH(left + 12, top + 19, width - 24, 1.5);
+    c.drawRRect(
+      RRect.fromRectAndRadius(track, const Radius.circular(1)),
+      Paint()..color = const Color(0xFFB49AD7).withAlpha(45),
+    );
+    c.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          track.left,
+          track.top,
+          track.width * remaining,
+          track.height,
+        ),
+        const Radius.circular(1),
+      ),
+      Paint()..color = const Color(0xFFC7A4F4),
+    );
+    time.dispose();
   }
 }
 
@@ -466,7 +588,9 @@ void paintMazeGates(Canvas c, BalanceGame game, bool reducedMotion) {
   final beams = Path(), posts = Path();
   var brightest = 0.0;
   for (final gate in game.mazeGates) {
-    if (gate.y < game.visibleTop - 20 || gate.y > 580) continue;
+    if (gate.y < game.visibleTop - 20 || gate.y > game.visibleBottom + 20) {
+      continue;
+    }
     final lit = gate.intensity;
     brightest = math.max(brightest, lit);
     beams

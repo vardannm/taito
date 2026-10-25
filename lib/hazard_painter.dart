@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'game.dart';
 import 'hazards.dart';
 import 'infinite_painter.dart';
+import 'arena_canvas.dart';
 
 const _red = Color(0xFFE34336), _white = Color(0xFFFFF1D6);
 
@@ -63,7 +64,7 @@ void paintSpecialHazards(Canvas c, BalanceGame game, bool reducedMotion) {
       Offset point(double along) =>
           horizontal ? Offset(along, h.y) : Offset(h.x, along);
       final low = horizontal ? 24.0 : SpecialHazard.laserTop(game.visibleTop),
-          high = horizontal ? 336.0 : 537.0;
+          high = horizontal ? 336.0 : h.laserBottom;
       if (h.sweeping && h.warning) {
         c.drawLine(
           Offset(h.originX - 65, low + 15),
@@ -71,46 +72,66 @@ void paintSpecialHazards(Canvas c, BalanceGame game, bool reducedMotion) {
           warning,
         );
       }
+      // A dashed beam's warning already shows where its dashes and gaps are.
+      final segments = h.laserSegments(low, high);
       if (h.warning) {
-        c.drawRect(
-          horizontal
-              ? Rect.fromLTRB(24, h.y - 10, 336, h.y + 10)
-              : Rect.fromLTRB(h.x - 10, low, h.x + 10, high),
-          Paint()..color = _red.withAlpha(30),
-        );
-        for (var along = low + 6; along < high - 8; along += 16) {
-          c.drawLine(point(along), point(along + 8), warning);
+        for (final (a, b) in segments) {
+          final rect = horizontal
+              ? Rect.fromLTRB(a, h.y - 10, b, h.y + 10)
+              : Rect.fromLTRB(h.x - 10, a, h.x + 10, b);
+          c.drawRect(rect, Paint()..color = _red.withAlpha(30));
+          if (h.dashed) {
+            c.drawRRect(
+              RRect.fromRectAndRadius(rect.deflate(6), const Radius.circular(4)),
+              Paint()
+                ..color = _red.withAlpha(alpha)
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = 1.5,
+            );
+          }
+        }
+        if (!h.dashed) {
+          for (var along = low + 6; along < high - 8; along += 16) {
+            c.drawLine(point(along), point(along + 8), warning);
+          }
         }
         _caption(
           c,
           game,
-          '${h.countdown.toStringAsFixed(1)}s',
+          '${h.laserWarningDirection == null ? 'FIXED' : 'MOVING'} ${h.countdown.toStringAsFixed(1)}s',
           point(low + 29),
           _red,
         );
+        _paintLaserMotionCue(c, h, low, high, reducedMotion);
       } else if (h.active) {
-        c.drawLine(
-          point(low),
-          point(high),
-          Paint()
-            ..color = _red.withAlpha(160)
-            ..strokeWidth = 14
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
-        );
-        c.drawLine(
-          point(low),
-          point(high),
-          Paint()
-            ..color = _red
-            ..strokeWidth = 6,
-        );
-        c.drawLine(
-          point(low),
-          point(high),
-          Paint()
-            ..color = _white
-            ..strokeWidth = 2,
-        );
+        final cap = h.dashed ? StrokeCap.round : StrokeCap.butt;
+        for (final (a, b) in segments) {
+          c.drawLine(
+            point(a),
+            point(b),
+            Paint()
+              ..color = _red.withAlpha(160)
+              ..strokeWidth = 14
+              ..strokeCap = cap
+              ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+          );
+          c.drawLine(
+            point(a),
+            point(b),
+            Paint()
+              ..color = _red
+              ..strokeWidth = 6
+              ..strokeCap = cap,
+          );
+          c.drawLine(
+            point(a),
+            point(b),
+            Paint()
+              ..color = _white
+              ..strokeWidth = 2
+              ..strokeCap = cap,
+          );
+        }
       }
       for (final end in [low, high]) {
         c.drawRRect(
@@ -163,6 +184,52 @@ void paintSpecialHazards(Canvas c, BalanceGame game, bool reducedMotion) {
         c.drawLine(tip, tip + Offset(-d * 5, 5), warning);
       }
     }
+  }
+}
+
+void _paintLaserMotionCue(
+  Canvas c,
+  SpecialHazard hazard,
+  double low,
+  double high,
+  bool reducedMotion,
+) {
+  final direction = hazard.laserWarningDirection;
+  if (direction == null) return;
+  final stretch = c is ArenaCanvas ? c.stretch : 1.0;
+  final angle = math.atan2(direction.y, direction.x * stretch);
+  final alpha = reducedMotion || (hazard.age * 4).floor().isEven ? 255 : 70;
+  final arrow = Paint()
+    ..color = const Color(0xFFFFDA82).withAlpha(alpha)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2.2
+    ..strokeCap = StrokeCap.round
+    ..strokeJoin = StrokeJoin.round;
+  for (final fraction in [.25, .5, .75]) {
+    final along = low + (high - low) * fraction;
+    final anchor = hazard.orientation == LaserOrientation.horizontal
+        ? Offset(along, hazard.y - 23)
+        : Offset(hazard.x + 23 / stretch, along);
+    c.save();
+    c.translate(anchor.dx, anchor.dy);
+    c.rotate(angle);
+    c.drawRRect(
+      RRect.fromRectAndRadius(
+        const Rect.fromLTWH(-14, -10, 28, 20),
+        const Radius.circular(6),
+      ),
+      Paint()..color = const Color(0xFF10242B).withAlpha(215),
+    );
+    for (final x in [-5.0, 3.0]) {
+      c.drawPath(
+        Path()
+          ..moveTo(x - 3, -4)
+          ..lineTo(x + 1, 0)
+          ..lineTo(x - 3, 4),
+        arrow,
+      );
+    }
+    c.restore();
   }
 }
 
@@ -230,4 +297,6 @@ void _caption(
     textDirection: TextDirection.ltr,
   )..layout();
   text.paint(c, center - Offset(text.width / 2, text.height / 2));
+  // Countdown captions change every frame; release each paragraph promptly.
+  text.dispose();
 }

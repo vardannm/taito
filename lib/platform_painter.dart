@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'platforms.dart';
+import 'premium_gear_painter.dart';
 
 void paintPlatformDetail(
   Canvas canvas,
@@ -15,6 +16,11 @@ void paintPlatformDetail(
   canvas.save();
   canvas.translate(a.dx, a.dy);
   canvas.rotate(math.atan2(b.dy - a.dy, b.dx - a.dx));
+  if (style.purchaseOnly) {
+    paintPremiumPlatform(canvas, span, style, time, reducedMotion);
+    canvas.restore();
+    return;
+  }
   if (style == PlatformStyle.ion || style == PlatformStyle.solar) {
     canvas.drawLine(
       const Offset(0, -1),

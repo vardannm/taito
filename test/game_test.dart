@@ -39,22 +39,25 @@ void main() {
     advance(left, .1);
     expect(left.ballX, greaterThan(previous));
   });
-  test('target sinks, scores once, returns and rearms controls', () {
-    final game = BalanceGame()..start();
-    placeAt(game, game.activeHole);
-    final score = game.score;
-    expect(game.phase, GamePhase.sinking);
-    expect(game.target, 2);
-    expect(game.completed, 1);
-    expect(score, greaterThanOrEqualTo(100));
-    advance(game, .5);
-    expect(game.score, score);
-    advance(game, 1);
-    expect(game.canControl, isTrue);
-    expect(game.left, 526);
-    expect(game.ballX, 180);
-    expect(game.leftInput, 0);
-  });
+  test(
+    'Classic target advances once without score, returns and rearms controls',
+    () {
+      final game = BalanceGame()..start();
+      placeAt(game, game.activeHole!);
+      final score = game.score;
+      expect(game.phase, GamePhase.sinking);
+      expect(game.target, 2);
+      expect(game.completed, 1);
+      expect(score, 0);
+      advance(game, .5);
+      expect(game.score, score);
+      advance(game, 1);
+      expect(game.canControl, isTrue);
+      expect(game.left, BalanceGame.launchHeight);
+      expect(game.ballX, 180);
+      expect(game.leftInput, 0);
+    },
+  );
   test('three misses end classic, practice has unlimited attempts', () {
     for (final practice in [false, true]) {
       final game = BalanceGame()
@@ -71,7 +74,7 @@ void main() {
   test('clearing ten targets wins; replay resets the whole run', () {
     final game = BalanceGame()..start();
     for (int i = 1; i <= 10; i++) {
-      placeAt(game, game.activeHole);
+      placeAt(game, game.activeHole!);
       advance(game, 1.5);
     }
     expect(game.won, isTrue);
@@ -90,10 +93,10 @@ void main() {
     game.leftInput = -1;
     game.setPaused(true);
     advance(game, 2);
-    expect(game.left, 526);
+    expect(game.left, BalanceGame.launchHeight);
     expect(game.leftInput, 0);
     game.setPaused(false);
-    placeAt(game, game.activeHole);
+    placeAt(game, game.activeHole!);
     game.setPaused(true);
     advance(game, 2);
     expect(game.phase, GamePhase.sinking);

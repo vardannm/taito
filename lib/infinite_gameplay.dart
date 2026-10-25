@@ -1,5 +1,8 @@
 part of 'game.dart';
 
+/// Also tells the fall-through animation that the ball dropped into a gap.
+const _platformGapReason = 'The platform broke beneath you.';
+
 extension InfiniteGameplay on BalanceGame {
   int get metres => (maxHeight / 10).floor();
   int get paceLevel => survival.levelAt(maxHeight / 10);
@@ -23,10 +26,22 @@ extension InfiniteGameplay on BalanceGame {
     ({double x, double y}) pull(Object reward, double x, double y) {
       before[reward] = (x: x, y: y);
       if (magnetRadius <= 0 ||
-          circleContact(oldX, oldY, ballX, ballY, x, y, magnetRadius) == null)
+          circleContact(
+                oldX,
+                oldY,
+                ballX,
+                ballY,
+                x,
+                y,
+                magnetRadius,
+                xScale: arenaStretch,
+              ) ==
+              null)
         return (x: x, y: y);
       final dx = ballX - x, dy = ballY - y;
-      final distance = math.sqrt(dx * dx + dy * dy);
+      final distance = math.sqrt(
+        dx * dx * arenaStretch * arenaStretch + dy * dy,
+      );
       if (distance == 0) return (x: x, y: y);
       final travel = math.min(
         distance,
@@ -58,26 +73,220 @@ extension InfiniteGameplay on BalanceGame {
     porcupines.removeWhere((p) => screenY(p.y) > 640);
   }
 
-  void _updateSnakes(double dt) {
-    if (!snakeEncountersEnabled ||
+  void _tryStartInfiniteBoss() {
+    if (!bossPending ||
+        boss != null ||
         mazeSection ||
-        section == InfiniteSection.breath) {
+        mazeGates.isNotEmpty ||
+        lateEnemy != null ||
+        specialHazards.isNotEmpty ||
+        snakes.isNotEmpty ||
+        webShots.isNotEmpty ||
+        quills.isNotEmpty ||
+        porcupines.any((p) => p.charge != null) ||
+        survival.recovery > 0 ||
+        elapsed - _lastDamageAt < 5) {
+      _bossWarningAt = null;
+      return;
+    }
+    _bossWarningAt ??= elapsed;
+    if (elapsed - _bossWarningAt! < 3) return;
+    _bossWarningAt = null;
+    boss = InfiniteBoss(
+      top: visibleTop,
+      kind: bossOrder[bossesEncountered],
+      seed: bossScoreThresholds[bossesEncountered],
+    );
+    bossesEncountered++;
+    // The boss replaces the whole course for this interlude. Clear ordinary
+    // terrain and enemies, while keeping the player's run, rewards and score.
+    _endlessHoles.clear();
+    spiders.clear();
+    porcupines.clear();
+    stallTime = 0;
+    dangerY = 580 - cameraOffset;
+    survival.announce('BOSS · ${boss!.displayName}');
+  }
+
+  void _updateInfiniteBoss(double dt, double scrollDistance) {
+    final active = boss;
+    if (active == null) return;
+    if (bossesEnabled) {
+      active.step(
+        dt,
+        target: (x: ballX, y: screenY(ballY)),
+        scrollDistance: scrollDistance,
+        visibleTop: visibleTop,
+      );
+      message = active.hint;
+      if (!active.expired) return;
+      // The tutorial's practice boss is not a run achievement.
+      if (!active.training) bossesCleared++;
+    }
+    boss = null;
+    _nextBossAt = elapsed + 60;
+    // Resume generation ahead of the viewport, with no backlog from the fight.
+    _nextRowY = -cameraOffset + visibleTop - 121;
+    _nextSpiderY = math.min(_nextSpiderY, -cameraOffset - 900);
+    _nextPorcupineY = math.min(_nextPorcupineY, -cameraOffset - 1200);
+    _nextMazeMetres = metres + InfiniteTuning.mazeRestMetres;
+    _nextHazardTime = math.max(_nextHazardTime, elapsed + 3);
+    _nextWebTime = math.max(_nextWebTime, elapsed + 3);
+    _nextQuillTime = math.max(_nextQuillTime, elapsed + 3);
+    enemyDirector.rest(elapsed, metres.toDouble());
+    stallTime = 0;
+    dangerY = 580 - cameraOffset;
+    survival.announce('BOSS CLEARED · Keep climbing');
+    message = survival.notice;
+  }
+
+  void _updateLateEnemies(double dt, double scrollDistance) {
+    if (mazeSection || (!lateEnemiesEnabled && !snakeEncountersEnabled)) {
+      if (lateEnemy != null) {
+        enemyDirector.rest(elapsed, metres.toDouble());
+      }
+      lateEnemy = null;
+      enemyDirector.deferUntil(elapsed + 2);
+      return;
+    }
+    if (!lateEnemiesEnabled && lateEnemy != null) {
+      lateEnemy = null;
+      enemyDirector.rest(elapsed, metres.toDouble());
+    }
+    final active = lateEnemy;
+    if (active != null) {
+      active.step(dt, scrollDistance: scrollDistance);
+      // The exit lasts longer than one physics tick, so all live contacts have
+      // resolved before the visitor is discarded.
+      if (active.expired) {
+        lateEnemy = null;
+        enemyDirector.rest(elapsed, metres.toDouble());
+        _nextHazardTime = math.max(_nextHazardTime, elapsed + 1);
+        _nextWebTime = math.max(_nextWebTime, elapsed + 1);
+        _nextQuillTime = math.max(_nextQuillTime, elapsed + 1);
+      }
+      return;
+    }
+    if (boss != null || bossPending) return;
+    // Recovery blocks new visitors, but never erases one that has already
+    // announced its attack. Finish its warning, projectiles, and normal exit.
+    if (section == InfiniteSection.breath) {
+      enemyDirector.deferUntil(elapsed + 2);
+      return;
+    }
+    if (elapsed < enemyDirector.nextEncounterAt ||
+        survival.recovery > 0 ||
+        specialHazards.isNotEmpty ||
+        snakes.isNotEmpty ||
+        webShots.isNotEmpty ||
+        quills.isNotEmpty ||
+        porcupines.any((p) => p.charge != null))
+      return;
+    final candidates = <EncounterEnemy>[
+      if (snakeEncountersEnabled) EncounterEnemy.snake,
+      if (lateEnemiesEnabled)
+        for (final kind in LateEnemyKind.values)
+          if (kind != LateEnemyKind.beetle ||
+              (metres >= enemyDirector.unlockMetres(kind.encounterKind) &&
+                  _hasBeetleEscape()))
+            kind.encounterKind,
+    ];
+    final selected = enemyDirector.choose(
+      metres: metres.toDouble(),
+      elapsed: elapsed,
+      candidates: candidates,
+    );
+    if (selected == null) return;
+    if (selected == EncounterEnemy.snake) {
+      _spawnSnakeEncounter();
+      if (enemyDirector.spawned(selected, elapsed)) {
+        survival.announce('SNAKE · Dodge its slithering body');
+      }
+      return;
+    }
+    final kind = switch (selected) {
+      EncounterEnemy.beetle => LateEnemyKind.beetle,
+      EncounterEnemy.cricket => LateEnemyKind.cricket,
+      EncounterEnemy.moth => LateEnemyKind.moth,
+      EncounterEnemy.scorpion => LateEnemyKind.scorpion,
+      EncounterEnemy.seedSpitter => LateEnemyKind.seedSpitter,
+      EncounterEnemy.snake => throw StateError('Snakes spawn above.'),
+    };
+    final targetY = screenY(ballY).clamp(visibleTop + 160, 500.0);
+    // Enter on the farther rail, well above the ball. The moth uses the center
+    // so both curved streams have room to spread without crossing the rails.
+    final origin = (
+      x: kind == LateEnemyKind.moth
+          ? 180.0
+          : ballX < 180
+          ? 317.0
+          : 43.0,
+      y: (targetY - 220).clamp(visibleTop + 70, 210.0),
+    );
+    lateEnemy = LateEnemyEncounter(
+      kind: kind,
+      origin: origin,
+      target: (x: ballX.clamp(50.0, 310.0), y: targetY),
+    );
+    if (enemyDirector.spawned(selected, elapsed)) {
+      survival.announce('${kind.name} · ${kind.hint}');
+    }
+  }
+
+  bool _hasBeetleEscape() {
+    // Check both simple side-step routes against the terrain that will reach
+    // the player before impact. Skip the attack if neither route is clear.
+    final turnY = ballY - ascentSpeed * .65;
+    final landingY =
+        ballY - ascentSpeed * (InfiniteTuning.lateEnemyWarning + .95);
+    for (final x in [ballX - 70, ballX + 70]) {
+      if (x < 40 || x > 320) continue;
+      bool blocks(double ox, double oy, double radius) =>
+          circleContact(
+                ballX,
+                ballY,
+                x,
+                turnY,
+                ox,
+                oy,
+                radius,
+                xScale: arenaStretch,
+              ) !=
+              null ||
+          circleContact(
+                x,
+                turnY,
+                x,
+                landingY,
+                ox,
+                oy,
+                radius,
+                xScale: arenaStretch,
+              ) !=
+              null;
+      if (board.any((h) => blocks(h.x, h.y, 24)) ||
+          porcupines.any((p) => blocks(p.x, p.y, 30)) ||
+          spiders.any((s) => blocks(s.zoneX, s.zoneY, s.zoneRadius + 20)))
+        continue;
+      return true;
+    }
+    return false;
+  }
+
+  void _updateSnakes(double dt) {
+    if (boss != null) return;
+    if (!snakeEncountersEnabled) {
+      if (snakes.isNotEmpty) enemyDirector.rest(elapsed, metres.toDouble());
       snakes.clear();
-      _nextSnakeTime = math.max(_nextSnakeTime, elapsed + 2);
+      enemyDirector.deferUntil(elapsed + 2);
       return;
     }
     for (final snake in snakes) {
       snake.step(dt);
     }
-    if (metres < InfiniteTuning.snakeUnlockMetres ||
-        section != InfiniteSection.encounter ||
-        elapsed < _nextSnakeTime ||
-        snakes.isNotEmpty ||
-        specialHazards.isNotEmpty ||
-        webShots.isNotEmpty ||
-        quills.isNotEmpty ||
-        porcupines.any((p) => p.charge != null))
-      return;
+  }
+
+  void _spawnSnakeEncounter() {
     final fromLeft = _random.nextBool();
     snakes.add(
       BoardSnake(
@@ -90,8 +299,6 @@ extension InfiniteGameplay on BalanceGame {
         variant: _random.nextInt(3),
       ),
     );
-    _nextSnakeTime =
-        elapsed + InfiniteTuning.snakeInterval + _random.nextDouble() * 5;
   }
 
   void _spawnInfinitePorcupine(
@@ -130,6 +337,7 @@ extension InfiniteGameplay on BalanceGame {
   }
 
   void _updatePorcupines(double dt) {
+    if (boss != null) return;
     if (mazeSection || section == InfiniteSection.breath) {
       quills.clear();
       for (final p in porcupines) {
@@ -159,13 +367,22 @@ extension InfiniteGameplay on BalanceGame {
         return;
       }
     }
-    if (elapsed < _nextQuillTime ||
-        snakes.isNotEmpty ||
-        quills.isNotEmpty ||
-        webShots.isNotEmpty ||
-        specialHazards.isNotEmpty)
-      return;
+    // Big encounters own the screen; no porcupine starts a burst during them.
+    if (bossPending || lateEnemy != null || snakes.isNotEmpty) return;
+    // Repeat bursts wait for a calm moment. Holes that form or wander are
+    // board obstacles, not timed attacks, so they never hold one back.
+    final calm =
+        elapsed >= _nextQuillTime &&
+        quills.isEmpty &&
+        webShots.isEmpty &&
+        !specialHazards.any(
+          (h) =>
+              h.kind == HazardKind.laser || h.kind == HazardKind.platformGap,
+        );
     for (final p in porcupines) {
+      // A porcupine's first burst does not wait for calm: otherwise a busy
+      // stretch lets it scroll past without ever firing.
+      if (p.bursts > 0 && !calm) continue;
       final sy = screenY(p.y);
       final distance = math.sqrt(
         math.pow(p.x - ballX, 2) + math.pow(p.y - ballY, 2),
@@ -239,6 +456,7 @@ extension InfiniteGameplay on BalanceGame {
   }
 
   void _updateSpiderWebs(double dt) {
+    if (boss != null) return;
     // Maze and breathing sections provide a clean break from ranged attacks.
     if (mazeSection || section == InfiniteSection.breath) {
       webShots.clear();
@@ -250,6 +468,8 @@ extension InfiniteGameplay on BalanceGame {
       shot.step(dt);
     }
     if (elapsed < _nextWebTime ||
+        bossPending ||
+        lateEnemy != null ||
         snakes.isNotEmpty ||
         quills.isNotEmpty ||
         porcupines.any((p) => p.charge != null) ||
@@ -323,7 +543,7 @@ extension InfiniteGameplay on BalanceGame {
       survival.nextShieldY -= InfiniteTuning.shieldSpacing;
     }
     while (survival.nextHeartY >= ahead) {
-      if (lives < InfiniteTuning.maxLives)
+      if (lives < infiniteMaxLives)
         spawn(InfiniteItemKind.heart, survival.nextHeartY);
       survival.nextHeartY -=
           InfiniteTuning.heartSpacing +
@@ -347,6 +567,10 @@ extension InfiniteGameplay on BalanceGame {
     final climbed = maxHeight / 10;
     if (!mazeSection) {
       if (!mazeSectionsEnabled || climbed < _nextMazeMetres) return;
+      // A maze clears ranged attacks. Wait for the current visitor to leave
+      // rather than cancelling its warning or deleting live projectiles.
+      if (lateEnemy != null || snakes.isNotEmpty || boss != null || bossPending)
+        return;
       _mazeEndMetres = climbed + InfiniteTuning.mazeSectionMetres;
       _mazeSectionTime = 0;
       _lastGateY = 90;
@@ -404,17 +628,14 @@ extension InfiniteGameplay on BalanceGame {
           capped ? 'MAX COMBO  +$points' : 'COMBO x${survival.combo}  +$points',
         );
       case InfiniteItemKind.shield:
-        survival.shield = InfiniteTuning.shieldSeconds;
+        survival.shield = shieldDuration;
         survival.announce(
-          'SHIELD · ${InfiniteTuning.shieldSeconds} seconds of invincibility',
+          'SHIELD · ${shieldDuration} seconds of invincibility',
         );
       case InfiniteItemKind.magnet:
-        survival.magnet = InfiniteTuning.magnetSeconds;
-        survival.announce(
-          'MAGNET · ${InfiniteTuning.magnetSeconds} seconds of nearby rewards',
-        );
+        survival.magnet = magnetDuration;
       case InfiniteItemKind.heart:
-        if (lives < InfiniteTuning.maxLives) {
+        if (lives < infiniteMaxLives) {
           lives++;
           survival.announce('HEART RESTORED');
         } else {
@@ -434,6 +655,7 @@ extension InfiniteGameplay on BalanceGame {
     double oldScreenY,
     double dt,
   ) {
+    _syncArenaGeometry();
     final rewardStarts = _pullInfiniteRewards(dt, oldX, oldY);
     final events =
         <
@@ -444,9 +666,57 @@ extension InfiniteGameplay on BalanceGame {
             Hole? hole,
             SpiderWebShot? web,
             PorcupineQuill? quill,
+            LateEnemyShot? lateShot,
             String? reason,
           })
         >[];
+    final visitor = lateEnemy;
+    if (visitor != null) {
+      final t = visitor.bodyContact(oldX, oldScreenY, ballX, screenY(ballY));
+      if (t != null) {
+        events.add((
+          t: t,
+          item: null,
+          coin: null,
+          hole: null,
+          web: null,
+          quill: null,
+          lateShot: null,
+          reason:
+              'Touched the ${visitor.kind.name.toLowerCase()}. Keep clear of its body.',
+        ));
+      }
+      for (final shot in visitor.shots) {
+        final t = shot.contact(oldX, oldScreenY, ballX, screenY(ballY));
+        if (t != null) {
+          events.add((
+            t: t,
+            item: null,
+            coin: null,
+            hole: null,
+            web: null,
+            quill: null,
+            lateShot: shot,
+            reason: shot.reason,
+          ));
+        }
+      }
+    }
+    for (final shot in boss?.shots ?? <LateEnemyShot>[]) {
+      final t = shot.contact(oldX, oldScreenY, ballX, screenY(ballY));
+      if (t != null) {
+        events.add((
+          t: t,
+          item: null,
+          coin: null,
+          hole: null,
+          web: null,
+          quill: null,
+          lateShot: shot,
+          reason: shot.reason,
+        ));
+      }
+    }
     for (final snake in snakes) {
       final t = snake.contact(oldX, oldY, ballX, ballY);
       if (t != null)
@@ -457,6 +727,7 @@ extension InfiniteGameplay on BalanceGame {
           hole: null,
           web: null,
           quill: null,
+          lateShot: null,
           reason: 'Hit a snake. Dodge its slithering body.',
         ));
     }
@@ -471,6 +742,7 @@ extension InfiniteGameplay on BalanceGame {
         0,
         0,
         BalanceGame.ballRadius + spider.bodyRadius,
+        xScale: arenaStretch,
       );
       if (t != null)
         events.add((
@@ -480,10 +752,12 @@ extension InfiniteGameplay on BalanceGame {
           hole: null,
           web: null,
           quill: null,
+          lateShot: null,
           reason: 'Caught by a spider. Stay outside its territory.',
         ));
     }
     _updatePorcupines(dt);
+    _syncArenaGeometry();
     for (final p in porcupines) {
       final t = circleContact(
         oldX,
@@ -493,6 +767,7 @@ extension InfiniteGameplay on BalanceGame {
         p.x,
         p.y,
         BalanceGame.ballRadius + BoardPorcupine.bodyRadius,
+        xScale: arenaStretch,
       );
       if (t != null)
         events.add((
@@ -502,6 +777,7 @@ extension InfiniteGameplay on BalanceGame {
           hole: null,
           web: null,
           quill: null,
+          lateShot: null,
           reason: 'Touched a porcupine. Keep clear of its quills.',
         ));
     }
@@ -515,10 +791,12 @@ extension InfiniteGameplay on BalanceGame {
           hole: null,
           web: null,
           quill: q,
+          lateShot: null,
           reason: 'Hit by a porcupine quill. Dodge between the spikes.',
         ));
     }
     _updateSpiderWebs(dt);
+    _syncArenaGeometry();
     for (final web in webShots) {
       final t = web.contact(oldX, oldY, ballX, ballY);
       if (t != null)
@@ -529,6 +807,7 @@ extension InfiniteGameplay on BalanceGame {
           hole: null,
           web: web,
           quill: null,
+          lateShot: null,
           reason: 'Hit by a web. Dodge the aimed shot.',
         ));
     }
@@ -545,6 +824,7 @@ extension InfiniteGameplay on BalanceGame {
           0,
           0,
           13,
+          xScale: arenaStretch,
         );
         if (t != null)
           events.add((
@@ -554,6 +834,7 @@ extension InfiniteGameplay on BalanceGame {
             hole: null,
             web: null,
             quill: null,
+            lateShot: null,
             reason: null,
           ));
       }
@@ -567,6 +848,7 @@ extension InfiniteGameplay on BalanceGame {
           0,
           0,
           12,
+          xScale: arenaStretch,
         );
         if (t != null)
           events.add((
@@ -576,6 +858,7 @@ extension InfiniteGameplay on BalanceGame {
             hole: null,
             web: null,
             quill: null,
+            lateShot: null,
             reason: null,
           ));
       }
@@ -583,7 +866,16 @@ extension InfiniteGameplay on BalanceGame {
 
     queueRewards();
     for (final hole in board) {
-      final t = circleContact(oldX, oldY, ballX, ballY, hole.x, hole.y, 8.5);
+      final t = circleContact(
+        oldX,
+        oldY,
+        ballX,
+        ballY,
+        hole.x,
+        hole.y,
+        8.5,
+        xScale: arenaStretch,
+      );
       if (t != null)
         events.add((
           t: t,
@@ -592,6 +884,7 @@ extension InfiniteGameplay on BalanceGame {
           hole: hole,
           web: null,
           quill: null,
+          lateShot: null,
           reason: 'Into a trap.',
         ));
     }
@@ -611,9 +904,10 @@ extension InfiniteGameplay on BalanceGame {
           hole: null,
           web: null,
           quill: null,
+          lateShot: null,
           reason: switch (hazard.kind) {
             HazardKind.laser => 'Laser hit. Move out of the blinking beam.',
-            HazardKind.platformGap => 'The platform broke beneath you.',
+            HazardKind.platformGap => _platformGapReason,
             HazardKind.formingHole => 'The warning hole opened beneath you.',
             HazardKind.movingHole => 'Caught by a moving hole.',
           },
@@ -635,6 +929,7 @@ extension InfiniteGameplay on BalanceGame {
           hole: null,
           web: null,
           quill: null,
+          lateShot: null,
           reason: 'Laser wall. Steer through the gap.',
         ));
     }
@@ -646,6 +941,7 @@ extension InfiniteGameplay on BalanceGame {
         hole: null,
         web: null,
         quill: null,
+        lateShot: null,
         reason: 'The red caught you. Keep steering.',
       ));
     }
@@ -665,10 +961,15 @@ extension InfiniteGameplay on BalanceGame {
       } else if (contact.coin != null) {
         _takeCoin(contact.coin!);
       } else {
+        final shot = contact.lateShot;
+        if (shot != null) {
+          if (shot.cancelled) continue;
+          if (!shot.persistent) shot.consumed = true;
+        }
         if (contact.web != null) contact.web!.consumed = true;
         if (contact.quill != null) contact.quill!.consumed = true;
         if (survival.protected) continue;
-        fellThroughGap = contact.reason == 'The platform broke beneath you.';
+        fellThroughGap = contact.reason == _platformGapReason;
         _loseClimb(contact.reason!, hole: contact.hole);
         if (phase != GamePhase.playing) return;
       }

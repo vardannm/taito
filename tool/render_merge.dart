@@ -75,7 +75,7 @@ void main() {
 
     await capture('merge-home');
 
-    await selectWorld(tester, 3);
+    await selectWorld(tester, 2);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
     await capture('merge-guide');

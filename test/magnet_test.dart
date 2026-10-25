@@ -25,6 +25,18 @@ void pullFor(BalanceGame g, int ticks) {
 }
 
 void main() {
+  test('magnet pickup starts its timer without a text announcement', () {
+    final g = cleanRun();
+    g.survival.notice = '';
+    g.survival.noticeTime = 0;
+    g.survival.items.add(
+      InfiniteItem(InfiniteItemKind.magnet, g.ballX, g.ballY),
+    );
+    tick(g);
+    expect(g.survival.magnet, InfiniteTuning.magnetSeconds);
+    expect(g.survival.notice, isEmpty);
+    expect(g.survival.noticeTime, 0);
+  });
   test('smaller magnet pulls only rewards inside its visible radius', () {
     for (final ball in [BallCosmetic.steel, BallCosmetic.singularity]) {
       final g = cleanRun(ball: ball)..survival.magnet = 10;
@@ -83,7 +95,7 @@ void main() {
       expect(g.coins.first.collected, false);
       pullFor(g, 70);
       expect(g.survival.combo, 2);
-      expect(g.survival.shield, greaterThan(9));
+      expect(g.survival.shield, greaterThan(g.shieldDuration - 1));
       expect(g.lives, 3);
       expect(g.coinsCollected, 1);
       expect(far.collected, false);
@@ -111,7 +123,7 @@ void main() {
       for (var i = 0; i < 120 && g.survival.magnet < 4; i++) {
         tick(g);
       }
-      expect(g.survival.magnet, 12);
+      expect(g.survival.magnet, g.magnetDuration);
       g.survival.magnet = .001;
       tick(g);
       expect(g.survival.magnet, 0);
@@ -138,10 +150,10 @@ void main() {
         pullFor(g, 60);
         expect(near.collected, ball.magnetRadius >= 30, reason: ball.name);
         expect(medium.collected, ball.magnetRadius >= 75, reason: ball.name);
-        expect(far.collected, false, reason: ball.name);
+        expect(far.collected, ball.magnetRadius >= 120, reason: ball.name);
         g.start(gameMode: GameMode.classic);
         expect(g.magnetRadius, 0);
-        g.start(gameMode: GameMode.laserMaze);
+        g.start(gameMode: GameMode.classic);
         expect(g.magnetRadius, 0);
       }
     },

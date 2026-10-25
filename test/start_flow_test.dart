@@ -1,7 +1,8 @@
+import 'support/mode_navigation.dart' show armWorld;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:balance_arcade/analog_controls.dart';
+import 'package:balance_arcade/board_tilt_controls.dart';
 import 'package:balance_arcade/board_painter.dart';
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/infinite_progress.dart';
@@ -15,18 +16,20 @@ import 'package:shared_preferences_platform_interface/shared_preferences_async_p
 Finder controller(ControlMode mode) => switch (mode) {
   ControlMode.oneFinger => find.byType(OneFingerControls),
   ControlMode.analog => find.byKey(const ValueKey('analog-left')),
+  ControlMode.tiltLift => find.byKey(const ValueKey('tilt-lift-tilt')),
+  ControlMode.boardTilt => find.byType(BoardTiltControls),
   ControlMode.twoFinger => find.byType(PivotBoard),
 };
 
 Offset contact(WidgetTester tester, BalanceGame game) {
-  if (!game.oneFinger && !game.analog) {
+  if (!game.oneFinger && !game.bottomControls && !game.boardTilt) {
     final board = find.byType(PivotBoard);
     return tester.getTopLeft(board) +
         BoardViewport.forGame(
           tester.getSize(board),
           game,
           fillWidth: tester.widget<PivotBoard>(board).fillWidth,
-        ).project(Offset(20, game.screenY(game.left)));
+        ).gripCenter(game, 0);
   }
   return tester.getCenter(controller(game.controlMode));
 }
@@ -54,7 +57,7 @@ Future<BalanceGame> launch(
 }
 
 void expectOwned(BalanceGame game) {
-  if (game.oneFinger) {
+  if (game.oneFinger || game.tiltOnly) {
     expect(game.controlHeld, isTrue);
   } else {
     expect(game.pivotTargets[0], isNotNull);
@@ -84,9 +87,11 @@ void main() {
       expect(game.left, left);
       expect(game.cameraOffset, camera);
       expect(game.board, holes);
-      // Non-control touches cannot start the run.
-      await tester.tapAt(tester.getCenter(find.byType(PivotBoard)));
-      expect(game.waitingForInput, isTrue);
+      // Board Tilt and Two-finger intentionally start anywhere on the board.
+      if (!game.boardTilt && game.controlMode != ControlMode.twoFinger) {
+        await tester.tapAt(tester.getCenter(find.byType(PivotBoard)));
+        expect(game.waitingForInput, isTrue);
+      }
 
       final boardState = tester.state(find.byType(PivotBoard));
       final controlState = tester.state(controller(mode));
@@ -101,6 +106,8 @@ void main() {
       await finger.moveBy(const Offset(6, -4));
       if (game.oneFinger)
         expect(game.controlPosition, greaterThan(0));
+      else if (game.tiltOnly)
+        expect(game.controlPosition, greaterThan(0));
       else
         expect(game.pivotTargets[0], lessThan(left));
       await tester.pump(const Duration(milliseconds: 16));
@@ -114,7 +121,9 @@ void main() {
         greaterThanOrEqualTo(rect.width - .001),
       );
       final moved = game.left;
-      await finger.moveBy(const Offset(0, -4));
+      await finger.moveBy(
+        game.tiltOnly ? const Offset(4, 0) : const Offset(0, -4),
+      );
       await tester.pump(const Duration(milliseconds: 16));
       expect(game.left, lessThan(moved));
       expectOwned(game);
@@ -128,6 +137,7 @@ void main() {
         tester,
       ) async {
         final game = await launch(tester, mode, size: size);
+        await armWorld(tester);
         final finger = await tester.startGesture(
           contact(tester, game),
           pointer: 23,
@@ -146,8 +156,12 @@ void main() {
           );
           game.step(1 / 120);
           await tester.pump(const Duration(milliseconds: 16));
-          expect(game.survival.shield, greaterThan(9));
-          expect(find.textContaining('SHIELD '), findsWidgets);
+          expect(
+            game.survival.shield,
+            greaterThan(InfiniteTuning.shieldSeconds - .1),
+          );
+          // The shield's time shows as the ring around the ball, not as HUD text.
+          expect(find.textContaining('SHIELD '), findsNothing);
         }
 
         await pickup();
@@ -157,7 +171,9 @@ void main() {
         expectOwned(game);
         final before = game.left;
         // Pending movement must survive the exact tick when the shield expires.
-        await finger.moveBy(const Offset(0, -3));
+        await finger.moveBy(
+          game.tiltOnly ? const Offset(3, 0) : const Offset(0, -3),
+        );
         game.survival.shield = .01;
         await tester.pump(const Duration(milliseconds: 32));
         expect(game.survival.protected, isFalse);
@@ -173,7 +189,9 @@ void main() {
         expectOwned(game);
 
         final after = game.left;
-        await finger.moveBy(const Offset(0, -3));
+        await finger.moveBy(
+          game.tiltOnly ? const Offset(3, 0) : const Offset(0, -3),
+        );
         await tester.pump(const Duration(milliseconds: 16));
         expect(game.left, lessThan(after));
         if (game.analog) expect(game.analogInputs[0], lessThan(0));
@@ -190,6 +208,7 @@ void main() {
     tester,
   ) async {
     final game = await launch(tester, ControlMode.oneFinger);
+    await armWorld(tester);
     final left = game.left, run = game.runSerial, epoch = game.inputEpoch;
     await tester.sendKeyDownEvent(LogicalKeyboardKey.keyW);
     expect(game.waitingForInput, isFalse);
@@ -213,20 +232,25 @@ void main() {
       await tester.sendKeyDownEvent(LogicalKeyboardKey.keyW);
       await tester.sendKeyUpEvent(LogicalKeyboardKey.keyW);
       expect(game.waitingForInput, isTrue);
-      await tester.ensureVisible(find.byKey(const ValueKey('control-analog')));
-      await tester.tap(find.byKey(const ValueKey('control-analog')));
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('control-oneFinger')),
+      );
+      await tester.tap(find.byKey(const ValueKey('control-oneFinger')));
       await tester.pump();
-      Navigator.of(tester.element(find.text('Make yourself at home.'))).pop();
+      Navigator.of(tester.element(find.byTooltip('Close settings'))).pop();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
-      expect(game.analog, isTrue);
-      expect(find.byType(AnalogControls), findsOneWidget);
+      expect(game.oneFinger, isTrue);
+      expect(find.byType(OneFingerControls), findsOneWidget);
       expect(game.waitingForInput, isTrue);
       expect(game.elapsed, 0);
+      await armWorld(tester);
       final finger = await tester.startGesture(contact(tester, game));
-      await finger.moveBy(const Offset(0, -3));
+      await finger.moveBy(
+        game.tiltOnly ? const Offset(3, 0) : const Offset(0, -3),
+      );
       expect(game.waitingForInput, isFalse);
-      expect(game.analogInputs[0], lessThan(0));
+      expect(game.controlHeld, isTrue);
       await finger.up();
       await tester.pumpWidget(const SizedBox());
     },
@@ -241,13 +265,14 @@ void main() {
       await tester.pump();
       expect(game.waitingForInput, isTrue);
       expect(game.paused, isFalse);
+      await armWorld(tester);
       final finger = await tester.startGesture(contact(tester, game));
       await tester.pump();
       await finger.up();
       await tester.tap(find.byTooltip('Pause'));
       await tester.pump();
       expect(game.paused, isTrue);
-      await tester.tap(find.text('BACK TO CLUB'));
+      await tester.tap(find.text('BACK TO MENU'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 600));
       await tester.pump();
@@ -264,6 +289,7 @@ void main() {
       '$mode preserves both fingers through expiry and cancels on pause',
       (tester) async {
         final game = await launch(tester, mode);
+        await armWorld(tester);
         final left = await tester.startGesture(
           contact(tester, game),
           pointer: 31,
@@ -273,9 +299,11 @@ void main() {
         final rightPoint = game.analog
             ? tester.getCenter(find.byKey(const ValueKey('analog-right')))
             : tester.getTopLeft(board) +
-                  BoardViewport(
+                  BoardViewport.forGame(
                     tester.getSize(board),
-                  ).project(Offset(340, game.screenY(game.right)));
+                    game,
+                    fillWidth: tester.widget<PivotBoard>(board).fillWidth,
+                  ).gripCenter(game, 1);
         final right = await tester.startGesture(rightPoint, pointer: 32);
         await left.moveBy(const Offset(0, -2));
         await right.moveBy(const Offset(0, -3));
@@ -298,6 +326,7 @@ void main() {
         expect(game.pivotTargets, [null, null]);
         await tester.tap(find.text('RESUME RUN'));
         await tester.pump();
+        await tester.pump(const Duration(seconds: 3));
         final next = await tester.startGesture(
           contact(tester, game),
           pointer: 33,
@@ -323,6 +352,7 @@ void main() {
     expect(tester.takeException(), isNull);
     final pad = find.byType(OneFingerControls);
     expect(tester.getRect(pad).bottom, lessThanOrEqualTo(568));
+    await armWorld(tester);
     final finger = await tester.startGesture(contact(tester, game));
     await finger.moveBy(const Offset(3, -3));
     await tester.pump();
@@ -336,6 +366,7 @@ void main() {
     'Infinite retry prepares a fresh run that waits for control input',
     (tester) async {
       final game = await launch(tester, ControlMode.oneFinger);
+      await armWorld(tester);
       var finger = await tester.startGesture(contact(tester, game));
       await finger.up();
       game.phase = GamePhase.over;
@@ -350,6 +381,7 @@ void main() {
       expect(game.controlHeld, isFalse);
       await tester.pump(const Duration(seconds: 1));
       expect(game.elapsed, 0);
+      await armWorld(tester);
       finger = await tester.startGesture(contact(tester, game));
       await finger.moveBy(const Offset(3, -3));
       await tester.pump(const Duration(milliseconds: 16));

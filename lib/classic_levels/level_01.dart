@@ -18,8 +18,12 @@ const classicLevel01 = ClassicLevelDefinition(
     Hole(292, 338),
     Hole(72, 266),
   ],
-  // Spider patrol centers and movement settings.
-  spiders: [],
-  // Spawn positions for each numbered target; waves repeat in order.
-  hazards: [],
+  spiders: [
+  ],
+  finaleTitle: "",
+  finaleRule: "",
+  hazards: [
+  ],
+  firstHazardAfter: 3,
+  hazardInterval: 9,
 );

@@ -91,12 +91,12 @@ void main() {
     },
   );
   test(
-    'shield lasts ten active seconds, pause freezes timers, hits preserve combo',
+    'shield lasts its configured duration, pause freezes timers, hits preserve combo',
     () {
       final g = run();
       pickup(g, InfiniteItemKind.combo);
       pickup(g, InfiniteItemKind.shield);
-      expect(g.survival.shield, 10);
+      expect(g.survival.shield, g.shieldDuration);
       hit(g);
       expect(g.lives, 3);
       expect(g.survival.combo, 2);
@@ -107,7 +107,7 @@ void main() {
       }
       expect(g.survival.shield, shield);
       g.setPaused(false);
-      for (var i = 0; i < 1200; i++) {
+      for (var i = 0; i < (g.shieldDuration * 120).ceil() + 1; i++) {
         g.board.clear();
         g.specialHazards.clear();
         g.survival.items.clear();
@@ -170,7 +170,11 @@ void main() {
         g.survival.items.clear();
         g.board.add(const Hole(180, 350));
         g.survival.items.add(
-          InfiniteItem(InfiniteItemKind.shield, 180, shieldFirst ? 400 : 300),
+          InfiniteItem(
+            InfiniteItemKind.shield,
+            180,
+            shieldFirst ? 400 : g.minPivot,
+          ),
         );
         g.grabPivot(0);
         g.grabPivot(1);
@@ -200,7 +204,11 @@ void main() {
           ),
         );
         g.survival.items.add(
-          InfiniteItem(InfiniteItemKind.shield, 180, shieldFirst ? 400 : 300),
+          InfiniteItem(
+            InfiniteItemKind.shield,
+            180,
+            shieldFirst ? 400 : g.minPivot,
+          ),
         );
         g.grabPivot(0);
         g.grabPivot(1);
@@ -267,7 +275,9 @@ void main() {
         final g = run();
         if (missingHeart) g.lives = 2;
         final seen = <InfiniteItem>{};
-        for (var i = 0; i < 550; i++) {
+        final steps = (InfiniteTuning.shieldSpacing * 3 / 60).ceil() + 20;
+        for (var i = 0; i < steps; i++) {
+          g.lives = missingHeart ? 2 : g.infiniteMaxLives;
           g.cameraOffset = i * 60.0;
           g.left = g.right = 440 - g.cameraOffset;
           g.stallTime = 0;
@@ -307,7 +317,7 @@ void main() {
         expect(combos, greaterThan(shields * 4));
         expect(shields, greaterThan(2));
         expect(hearts, missingHeart ? greaterThan(0) : 0);
-        expect(hearts, lessThan(shields));
+        expect(hearts, lessThan(combos));
       }
     },
   );
@@ -315,14 +325,14 @@ void main() {
     'wallet deposits are idempotent across frames and runs and purchases persist',
     () async {
       final p = PlayerProfile();
-      final g = run()..coinsCollected = 100;
+      final g = run()..coinsCollected = BallCosmetic.neon.cost;
       expect(p.bankCoins(g), true);
       expect(p.bankCoins(g), false);
-      expect(p.wallet, 100);
+      expect(p.wallet, BallCosmetic.neon.cost);
       expect(p.selectBall(BallCosmetic.neon), true);
       expect(p.wallet, 0);
       expect(p.selectBall(BallCosmetic.reactor), false);
-      g.coinsCollected = 105;
+      g.coinsCollected = BallCosmetic.neon.cost + 5;
       p.bankCoins(g);
       expect(p.wallet, 5);
       p.selectBall(BallCosmetic.steel);
@@ -379,7 +389,7 @@ void main() {
       tester.view.physicalSize = const Size(320, 568);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
-      final p = PlayerProfile()..wallet = 40;
+      final p = PlayerProfile()..wallet = BallCosmetic.coral.cost + 5;
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(body: BallShop(profile: p)),

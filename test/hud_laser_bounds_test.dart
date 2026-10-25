@@ -6,6 +6,7 @@ import 'package:balance_arcade/hazard_painter.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'start_flow_test.dart' show launch, contact;
+import 'support/mode_navigation.dart';
 
 class BeamCanvas implements Canvas {
   final lines = <(Offset, Offset)>[];
@@ -61,6 +62,7 @@ void main() {
       tester.platformDispatcher.textScaleFactorTestValue = 1.6;
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       final game = await launch(tester, ControlMode.twoFinger, size: size);
+      await armWorld(tester);
       await tester.tapAt(contact(tester, game));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 600));

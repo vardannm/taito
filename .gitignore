@@ -7,5 +7,12 @@ build/
 
 .tools/
 .pub-cache/
+firebase-debug*.log
 artifacts/
+__pycache__/
+*.pyc
 
+# Generated Google Play images and release archives; keep scripts and docs.
+/release/google-play/**/*.png
+/release/google-play/*.zip
+/release/google-play/*.zip.sha256

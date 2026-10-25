@@ -23,13 +23,13 @@ void main() {
     expect(web.x, 100);
     expect(web.contact(100, 200, 100, 200), isNull);
     web.step(.4); // Only 0.2 seconds of actual flight.
-    expect(web.x, closeTo(118, .001));
+    expect(web.x, closeTo(136, .001));
     expect(web.y, 200);
     expect(web.contact(115, 200, 115, 200), isNotNull);
     expect(web.contact(115, 235, 115, 235), isNull);
     web.step(.5);
-    expect(web.x, closeTo(163, .001));
-    expect(math.sqrt(web.vx * web.vx + web.vy * web.vy), 90);
+    expect(web.x, closeTo(226, .001));
+    expect(math.sqrt(web.vx * web.vx + web.vy * web.vy), 180);
     web.step(5);
     expect(web.expired, true);
     web.step(.01);
@@ -108,7 +108,11 @@ void main() {
         ),
       );
       g.survival.items.add(
-        InfiniteItem(InfiniteItemKind.shield, 180, shieldFirst ? 400 : 300),
+        InfiniteItem(
+          InfiniteItemKind.shield,
+          180,
+          shieldFirst ? 400 : g.minPivot,
+        ),
       );
       g.grabPivot(0);
       g.grabPivot(1);

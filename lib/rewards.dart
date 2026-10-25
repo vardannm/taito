@@ -2,6 +2,13 @@ import 'dart:math' as math;
 
 import 'infinite_difficulty.dart';
 
+/// Coins banked for each successful Classic level, including replays.
+const classicLevelCoinPrize = 50;
+
+/// One repeatable prize per finished Merge run reaching 2,048 or higher.
+const mergeCoinPrize = 30;
+const mergeCoinPrizeTarget = 2048;
+
 enum CabinetStyle { brass, jade, porcelain, ember }
 
 extension CabinetDetails on CabinetStyle {
@@ -26,7 +33,13 @@ class LevelRecord {
   final double? bestTime;
   int get stars => starCount(starMask);
   static int starCount(int mask) =>
-      (mask & 1) + ((mask >> 1) & 1) + ((mask >> 2) & 1);
+      (mask & 1) + ((mask >> 1) & 1) + ((mask >> 2) & 1) + ((mask >> 3) & 1);
+  LevelRecord withCollectedStar() => LevelRecord(
+    starMask: starMask | 8,
+    bestScore: bestScore,
+    bestTime: bestTime,
+    attempts: attempts,
+  );
   LevelRecord withRun({
     required int mask,
     required int score,
@@ -49,7 +62,7 @@ class LevelRecord {
         json[key] is num ? math.max(0, (json[key] as num).toInt()) : 0;
     final time = json['time'];
     return LevelRecord(
-      starMask: nonnegative('stars') & 7,
+      starMask: nonnegative('stars') & 15,
       bestScore: nonnegative('score'),
       attempts: nonnegative('attempts'),
       bestTime: time is num && time.isFinite && time > 0
@@ -62,6 +75,12 @@ class LevelRecord {
 class BrassCoin {
   BrassCoin(this.x, this.y);
   double x, y;
+  bool collected = false;
+}
+
+class LevelStar {
+  LevelStar(this.x, this.y);
+  final double x, y;
   bool collected = false;
 }
 

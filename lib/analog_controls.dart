@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'board_painter.dart';
-import 'cabinet.dart';
 import 'game.dart';
+import 'infinite_painter.dart';
 
 class AnalogControls extends StatelessWidget {
   const AnalogControls({super.key, required this.game, required this.frame});
@@ -21,9 +20,9 @@ class AnalogControls extends StatelessWidget {
             side: 0,
           ),
         ),
-        const Expanded(
+        Expanded(
           child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 6),
             child: Text(
               'UP TO LIFT\nDOWN TO LOWER',
               textAlign: TextAlign.center,
@@ -31,7 +30,10 @@ class AnalogControls extends StatelessWidget {
                 fontSize: 9,
                 height: 1.6,
                 letterSpacing: .8,
-                color: ink,
+                color: infiniteBoardInk(
+                  game,
+                  Offset(180, game.visibleBottom - 30),
+                ),
               ),
             ),
           ),
@@ -144,21 +146,18 @@ class _AnalogPainter extends CustomPainter {
   final double travel;
   @override
   void paint(Canvas c, Size size) {
-    final palette = CabinetPalette.of(game.cabinet),
+    final color = infiniteBoardInk(game, Offset(180, game.visibleBottom - 30)),
         center = Offset(size.width / 2, size.height / 2);
     final enabled = game.canControl;
     final track = RRect.fromRectAndRadius(
       Rect.fromCenter(center: center, width: 60, height: size.height - 4),
       const Radius.circular(30),
     );
-    c.drawRRect(
-      track,
-      Paint()..color = palette.frame.withAlpha(enabled ? 25 : 12),
-    );
+    c.drawRRect(track, Paint()..color = color.withAlpha(enabled ? 18 : 10));
     c.drawRRect(
       track,
       Paint()
-        ..color = palette.frame.withAlpha(80)
+        ..color = color.withAlpha(80)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1,
     );
@@ -166,7 +165,7 @@ class _AnalogPainter extends CustomPainter {
       center - Offset(0, travel),
       center + Offset(0, travel),
       Paint()
-        ..color = palette.frame.withAlpha(70)
+        ..color = color.withAlpha(70)
         ..strokeWidth = 5
         ..strokeCap = StrokeCap.round,
     );
@@ -178,7 +177,7 @@ class _AnalogPainter extends CustomPainter {
           ..lineTo(center.dx, y)
           ..lineTo(center.dx + 4, y - sign * 3),
         Paint()
-          ..color = palette.frame.withAlpha(140)
+          ..color = color.withAlpha(140)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1.5,
       );
@@ -189,16 +188,12 @@ class _AnalogPainter extends CustomPainter {
       22,
       Paint()..color = Colors.black.withAlpha(25),
     );
-    c.drawCircle(
-      knob,
-      22,
-      Paint()..color = palette.frame.withAlpha(enabled ? 255 : 115),
-    );
+    c.drawCircle(knob, 22, Paint()..color = color.withAlpha(enabled ? 26 : 14));
     c.drawCircle(
       knob,
       19,
       Paint()
-        ..color = palette.trim
+        ..color = color.withAlpha(enabled ? 160 : 80)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.2,
     );
@@ -207,7 +202,7 @@ class _AnalogPainter extends CustomPainter {
         knob + Offset(-6, dy),
         knob + Offset(6, dy),
         Paint()
-          ..color = palette.trim
+          ..color = color.withAlpha(enabled ? 230 : 120)
           ..strokeWidth = 1.5
           ..strokeCap = StrokeCap.round,
       );
