@@ -1589,80 +1589,84 @@ class _GameScreenState extends State<GameScreen>
                                 ),
                         ),
                         const SizedBox(width: 20),
-                        IgnorePointer(
-                          key: tutorialScoreKey,
-                          child: Column(
-                            key: const ValueKey('board-hud'),
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                game.mode == GameMode.classic
-                                    ? '${game.completed}/10'
-                                    : '${game.score}',
-                                key: game.infinite
-                                    ? const ValueKey('infinite-score')
-                                    : null,
-                                style: const TextStyle(
-                                  color: menuText,
-                                  fontSize: 32,
-                                  height: 1.1,
-                                  fontWeight: FontWeight.w800,
-                                  fontFamily: 'monospace',
-                                ),
-                              ),
-                              if (game.infinite)
+                        AnimatedOpacity(
+                          opacity: bossHidesHud ? 0 : 1,
+                          duration: const Duration(milliseconds: 250),
+                          child: IgnorePointer(
+                            key: tutorialScoreKey,
+                            child: Column(
+                              key: const ValueKey('board-hud'),
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                                 Text(
-                                  '${game.survival.combo}×${game.survival.combo == InfiniteTuning.maxCombo ? ' MAX' : ''}',
-                                  style: detail,
-                                )
-                              else if (game.merging) ...[
-                                Text(
-                                  'TOP ${formatMergeNumber(game.mergeRun.highest)}',
-                                  style: detail,
-                                ),
-                                MergeStatus(
-                                  run: game.mergeRun,
-                                  color: menuText,
-                                ),
-                              ] else
-                                Text(
-                                  game.practice
-                                      ? 'PRACTICE · ${formatRunTime(game.elapsed)}'
-                                      : game.daily
-                                      ? 'L${game.level} · TARGET ${game.target.clamp(1, 10)}/10 · ${formatRunTime(game.elapsed)}'
-                                      : 'LEVEL ${game.level} · ${formatRunTime(game.elapsed)}',
-                                  style: detail,
-                                ),
-                              if (game.mode == GameMode.classic)
-                                Row(
-                                  key: const ValueKey(
-                                    'classic-bonus-star-status',
+                                  game.mode == GameMode.classic
+                                      ? '${game.completed}/10'
+                                      : '${game.score}',
+                                  key: game.infinite
+                                      ? const ValueKey('infinite-score')
+                                      : null,
+                                  style: const TextStyle(
+                                    color: menuText,
+                                    fontSize: 32,
+                                    height: 1.1,
+                                    fontWeight: FontWeight.w800,
+                                    fontFamily: 'monospace',
                                   ),
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.star_rounded,
-                                      color: menuGold,
-                                      size: 16,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      game.levelStarAlreadyOwned
-                                          ? 'COLLECTED'
-                                          : game.levelStarCollected
-                                          ? 'WIN TO KEEP'
-                                          : 'BONUS STAR',
-                                      style: detail,
-                                    ),
-                                  ],
                                 ),
-                              if (game.infinite && !offeringRevive)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 6),
-                                  child: coinChip(menuText),
-                                ),
-                            ],
+                                if (game.infinite)
+                                  Text(
+                                    '${game.survival.combo}×${game.survival.combo == InfiniteTuning.maxCombo ? ' MAX' : ''}',
+                                    style: detail,
+                                  )
+                                else if (game.merging) ...[
+                                  Text(
+                                    'TOP ${formatMergeNumber(game.mergeRun.highest)}',
+                                    style: detail,
+                                  ),
+                                  MergeStatus(
+                                    run: game.mergeRun,
+                                    color: menuText,
+                                  ),
+                                ] else
+                                  Text(
+                                    game.practice
+                                        ? 'PRACTICE · ${formatRunTime(game.elapsed)}'
+                                        : game.daily
+                                        ? 'L${game.level} · TARGET ${game.target.clamp(1, 10)}/10 · ${formatRunTime(game.elapsed)}'
+                                        : 'LEVEL ${game.level} · ${formatRunTime(game.elapsed)}',
+                                    style: detail,
+                                  ),
+                                if (game.mode == GameMode.classic)
+                                  Row(
+                                    key: const ValueKey(
+                                      'classic-bonus-star-status',
+                                    ),
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.star_rounded,
+                                        color: menuGold,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        game.levelStarAlreadyOwned
+                                            ? 'COLLECTED'
+                                            : game.levelStarCollected
+                                            ? 'WIN TO KEEP'
+                                            : 'BONUS STAR',
+                                        style: detail,
+                                      ),
+                                    ],
+                                  ),
+                                if (game.infinite && !offeringRevive)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: coinChip(menuText),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       ],
@@ -1692,6 +1696,10 @@ class _GameScreenState extends State<GameScreen>
       ),
     ),
   );
+
+  /// A boss fight clears score, combo and coins from the HUD so the attacks
+  /// read clearly; they return when the boss leaves. Hearts stay visible.
+  bool get bossHidesHud => game.infinite && game.boss != null;
 
   /// Infinite's coin counter under the combo; [ink] is the HUD text color.
   Widget coinChip(Color ink) => KeyedSubtree(
@@ -1855,92 +1863,96 @@ class _GameScreenState extends State<GameScreen>
                             ),
                     ),
                     Expanded(
-                      child: IgnorePointer(
-                        key: tutorialScoreKey,
-                        child: Column(
-                          key: const ValueKey('board-hud'),
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                game.mode == GameMode.classic
-                                    ? '${game.completed}/10'
-                                    : '${game.score}',
-                                key: game.infinite
-                                    ? const ValueKey('infinite-score')
-                                    : null,
-                                style: TextStyle(
-                                  color: color,
-                                  fontSize: 30,
-                                  height: 1.15,
-                                  fontWeight: FontWeight.w800,
-                                  fontFamily: 'monospace',
-                                ),
-                              ),
-                            ),
-                            if (game.infinite)
-                              Text(
-                                '${game.survival.combo}×${game.survival.combo == InfiniteTuning.maxCombo ? ' MAX' : ''}',
-                                style: detail,
-                              )
-                            else if (game.merging) ...[
-                              Text(
-                                'TOP ${formatMergeNumber(game.mergeRun.highest)}',
-                                style: detail,
-                              ),
-                              MergeStatus(run: game.mergeRun, color: color),
-                            ] else
+                      child: AnimatedOpacity(
+                        opacity: bossHidesHud ? 0 : 1,
+                        duration: const Duration(milliseconds: 250),
+                        child: IgnorePointer(
+                          key: tutorialScoreKey,
+                          child: Column(
+                            key: const ValueKey('board-hud'),
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
                               FittedBox(
                                 fit: BoxFit.scaleDown,
                                 child: Text(
                                   game.mode == GameMode.classic
-                                      ? 'LEVEL ${game.level} · ${formatRunTime(game.elapsed)}'
-                                      : game.practice
-                                      ? 'PRACTICE · ${formatRunTime(game.elapsed)}'
-                                      : 'L${game.level} · TARGET ${game.target.clamp(1, 10)}/10 · ${formatRunTime(game.elapsed)}',
-                                  maxLines: 1,
+                                      ? '${game.completed}/10'
+                                      : '${game.score}',
+                                  key: game.infinite
+                                      ? const ValueKey('infinite-score')
+                                      : null,
+                                  style: TextStyle(
+                                    color: color,
+                                    fontSize: 30,
+                                    height: 1.15,
+                                    fontWeight: FontWeight.w800,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ),
+                              if (game.infinite)
+                                Text(
+                                  '${game.survival.combo}×${game.survival.combo == InfiniteTuning.maxCombo ? ' MAX' : ''}',
+                                  style: detail,
+                                )
+                              else if (game.merging) ...[
+                                Text(
+                                  'TOP ${formatMergeNumber(game.mergeRun.highest)}',
                                   style: detail,
                                 ),
-                              ),
-                            if (game.mode == GameMode.classic)
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Row(
-                                  key: const ValueKey(
-                                    'classic-bonus-star-status',
-                                  ),
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      game.levelStarAlreadyOwned ||
-                                              game.levelStarCollected
-                                          ? Icons.star_rounded
-                                          : Icons.star_outline_rounded,
-                                      size: 16,
-                                      color: const Color(0xFFE9B853),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      game.levelStarAlreadyOwned
-                                          ? 'COLLECTED'
-                                          : game.levelStarCollected
-                                          ? 'WIN TO KEEP'
-                                          : 'BONUS STAR',
-                                      style: detail.copyWith(fontSize: 10),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            if (game.infinite && !offeringRevive)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 6),
-                                child: FittedBox(
+                                MergeStatus(run: game.mergeRun, color: color),
+                              ] else
+                                FittedBox(
                                   fit: BoxFit.scaleDown,
-                                  child: coinChip(color),
+                                  child: Text(
+                                    game.mode == GameMode.classic
+                                        ? 'LEVEL ${game.level} · ${formatRunTime(game.elapsed)}'
+                                        : game.practice
+                                        ? 'PRACTICE · ${formatRunTime(game.elapsed)}'
+                                        : 'L${game.level} · TARGET ${game.target.clamp(1, 10)}/10 · ${formatRunTime(game.elapsed)}',
+                                    maxLines: 1,
+                                    style: detail,
+                                  ),
                                 ),
-                              ),
-                          ],
+                              if (game.mode == GameMode.classic)
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Row(
+                                    key: const ValueKey(
+                                      'classic-bonus-star-status',
+                                    ),
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        game.levelStarAlreadyOwned ||
+                                                game.levelStarCollected
+                                            ? Icons.star_rounded
+                                            : Icons.star_outline_rounded,
+                                        size: 16,
+                                        color: const Color(0xFFE9B853),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        game.levelStarAlreadyOwned
+                                            ? 'COLLECTED'
+                                            : game.levelStarCollected
+                                            ? 'WIN TO KEEP'
+                                            : 'BONUS STAR',
+                                        style: detail.copyWith(fontSize: 10),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              if (game.infinite && !offeringRevive)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 6),
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: coinChip(color),
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
