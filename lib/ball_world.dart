@@ -156,7 +156,7 @@ class BallWorld {
     ),
     BallCosmetic.aether => const BallWorld(
       'Aether Cathedral',
-      'Platinum arches under a lavender celestial dawn',
+      'A floating cathedral beneath rose-gold celestial rings',
       Color(0xFF26364F),
       Color(0xFF526276),
       Color(0xFFF1D0B6),

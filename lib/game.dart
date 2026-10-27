@@ -452,13 +452,19 @@ class BalanceGame {
   int? get bossWarningSeconds => _bossWarningAt == null
       ? null
       : math.max(1, (_bossWarningAt! + 3 - elapsed).ceil());
+  /// The first lap meets each boss at its score window. Overdrive laps
+  /// follow on time instead: top gear multiplies points, not the clock.
   bool get bossPending =>
       infinite &&
       !tutorialCourse &&
       bossesEnabled &&
-      bossesEncountered < BossKind.values.length &&
       elapsed >= _nextBossAt &&
-      score >= bossScoreThresholds[bossesEncountered];
+      (bossesEncountered >= BossKind.values.length ||
+          score >= bossScoreThresholds[bossesEncountered]);
+
+  /// The boss the next encounter brings, cycling through the run's order.
+  BossKind get nextBossKind =>
+      bossOrder[bossesEncountered % BossKind.values.length];
   EncounterDirector enemyDirector = EncounterDirector(0);
   // Like mazeSectionsEnabled, lets callers isolate the ordinary hazard stream.
   bool snakeEncountersEnabled = true;
@@ -789,7 +795,7 @@ class BalanceGame {
     if (boss != null) message = boss!.hint;
     if (bossWarningSeconds != null)
       message =
-          'BOSS · ${bossOrder[bossesEncountered].name} IN $bossWarningSeconds';
+          'BOSS · ${nextBossKind.name} IN $bossWarningSeconds';
   }
 
   void _loseClimb(String reason, {Hole? hole}) {

@@ -2170,6 +2170,7 @@ class _GameScreenState extends State<GameScreen>
                       profile.selectedBall,
                       drift,
                       mode: arcadeModes[index],
+                      platform: profile.selectedPlatform,
                       reducedMotion: MediaQuery.disableAnimationsOf(context),
                     ),
                   ),

@@ -269,11 +269,14 @@ void paintInfiniteBoss(Canvas canvas, BalanceGame game, bool reducedMotion) {
       } else if (shot.visible) {
         final radius = ring.radiusAt(shot.age);
         final rect = Rect.fromCircle(center: center, radius: radius);
+        // One path per layer, so more openings never mean more draws.
+        final arcs = Path();
         for (final (start, sweep) in _ringArcs(ring, shot.age)) {
-          canvas.drawArc(rect, start, sweep, false, _outline(ink, 12));
-          canvas.drawArc(rect, start, sweep, false, _outline(hot, 8));
-          canvas.drawArc(rect, start, sweep, false, _outline(pale, 2.5));
+          arcs.addArc(rect, start, sweep);
         }
+        canvas.drawPath(arcs, _outline(ink, 12));
+        canvas.drawPath(arcs, _outline(hot, 8));
+        canvas.drawPath(arcs, _outline(pale, 2.5));
       }
     } else if (shot.kind == LateShotKind.laser && shot.dashes != null) {
       final pattern = shot.dashes!;

@@ -159,50 +159,109 @@ void paintInfiniteAtmosphere(
   // full-screen gradient pass on every frame.
   if (reducedMotion) return;
   final darkness = comboDarkness(power);
-  for (var band = 0; band < 3; band++) {
-    final drift = math.sin(game.clock * .45 + band * 2) * 45;
-    final y = 80.0 + band * 160;
-    final path = Path()
-      ..moveTo(10 * horizontalSpread, y + drift)
-      ..cubicTo(
-        115 * horizontalSpread,
-        y - 95,
-        210 * horizontalSpread,
-        y + 80,
-        350 * horizontalSpread,
-        y - 35 + drift,
-      )
-      ..lineTo(350 * horizontalSpread, y + 30 + drift)
-      ..cubicTo(
-        210 * horizontalSpread,
-        y + 120,
-        115 * horizontalSpread,
-        y - 50,
-        10 * horizontalSpread,
-        y + 65 + drift,
-      )
-      ..close();
-    c.drawPath(
-      path,
-      Paint()
-        ..color = Colors.white.withValues(
-          alpha:
-              (.08 + .05 * power) * (1 - .55 * darkness) * (subdued ? .35 : 1),
-        ),
+  final time = game.clock, fade = subdued ? .35 : 1.0;
+  // Silk ribbons of light. Each one twists as it flows, so its fine strands
+  // cross and fan out like turning fabric; more ribbons join as combo grows.
+  final hue = Color.lerp(
+    comboEnergyColor(power),
+    BallWorld.of(game.cosmetic).accent,
+    .4,
+  )!;
+  final silk = boardFieldColors(game)[1].computeLuminance() > .3
+      ? Color.lerp(hue, const Color(0xFF243052), .55)!
+      : Color.lerp(hue, Colors.white, .3)!;
+  final glow = Color.lerp(silk, Colors.white, .5)!;
+  Offset silkAt(int ribbon, double u, double strand) {
+    final y =
+        110 +
+        ribbon * 165 +
+        math.sin(u * 5.2 + time * .5 + ribbon * 1.7) * 34 +
+        math.sin(u * 2.1 - time * .3 + ribbon) * 22;
+    final twist = math.cos(u * 6.5 + time * .8 + ribbon * 2.3);
+    return Offset(
+      (u * 380 - 20) * horizontalSpread,
+      y + strand * (9 + 7 * power) * twist,
     );
   }
+
+  final glints = Path();
+  final span = Rect.fromLTRB(0, 0, 340 * horizontalSpread, 1);
+  for (var ribbon = 0; ribbon < (1 + power * 2.2).floor(); ribbon++) {
+    final body = Path(), strands = Path(), edges = Path();
+    const samples = 28;
+    final upper = [
+      for (var i = 0; i <= samples; i++) silkAt(ribbon, i / samples, 1),
+    ];
+    final lower = [
+      for (var i = samples; i >= 0; i--) silkAt(ribbon, i / samples, -1),
+    ];
+    body.addPolygon([...upper, ...lower], true);
+    edges
+      ..addPolygon(upper, false)
+      ..addPolygon(lower, false);
+    for (final strand in [-.5, 0.0, .5]) {
+      strands.addPolygon([
+        for (var i = 0; i <= samples; i++) silkAt(ribbon, i / samples, strand),
+      ], false);
+    }
+    for (var j = 0; j < 3; j++) {
+      final u = (time * .09 + j / 3 + ribbon * .21) % 1;
+      glints.addOval(
+        Rect.fromCircle(
+          center: silkAt(ribbon, u, j.isEven ? 1 : -1),
+          radius: 1.4 + power,
+        ),
+      );
+    }
+    // Fade the ends into the board so no ribbon is cut off at the rails.
+    Shader along(double alpha) => LinearGradient(
+      colors: [
+        silk.withValues(alpha: 0),
+        silk.withValues(alpha: alpha * fade),
+        hue.withValues(alpha: alpha * .8 * fade),
+        silk.withValues(alpha: 0),
+      ],
+      stops: const [0, .3, .7, 1],
+    ).createShader(span);
+    c.drawPath(body, Paint()..shader = along(.1 + .06 * power));
+    c.drawPath(
+      strands,
+      Paint()
+        ..shader = along(.28 + .14 * power)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .6,
+    );
+    c.drawPath(
+      edges,
+      Paint()
+        ..shader = along(.55 + .2 * power)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.1,
+    );
+  }
+  c.drawPath(
+    glints,
+    Paint()..color = glow.withValues(alpha: (.55 + .35 * power) * fade),
+  );
   // The pale streaks hand their frame budget over to the embers as the board
   // darkens, so the dark tiers cost no more to draw than the bright ones.
-  final streakPaint = Paint()
-    ..color = Colors.white.withValues(
-      alpha: (.18 + .18 * power) * (subdued ? .3 : 1),
-    )
-    ..strokeWidth = 1 + power;
+  final streaks = Path();
   for (var i = 0; i < (12 * power * (1 - darkness)).ceil(); i++) {
     final x = (28.0 + (i * 83 % 304)) * horizontalSpread,
-        y = 16 + (i * 137 + game.clock * (25 + 75 * power)) % 520;
-    c.drawLine(Offset(x, y), Offset(x, y - 3 - 18 * power), streakPaint);
+        y = 16 + (i * 137 + time * (25 + 75 * power)) % 520;
+    streaks
+      ..moveTo(x, y)
+      ..lineTo(x, y - 3 - 18 * power);
   }
+  c.drawPath(
+    streaks,
+    Paint()
+      ..color = Colors.white.withValues(
+        alpha: (.18 + .18 * power) * (subdued ? .3 : 1),
+      )
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1 + power,
+  );
   if (darkness > 0)
     paintComboEmbers(
       c,

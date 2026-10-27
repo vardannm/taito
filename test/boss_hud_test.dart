@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/infinite_boss.dart';
 import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/one_finger_controls.dart';
 import 'package:balance_arcade/onboarding.dart';
-import 'package:balance_arcade/pivot_board.dart';
 import 'package:balance_arcade/profile.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';

@@ -213,6 +213,686 @@ class _Scenery {
     c.drawPath(lights, Paint()..color = accent.withAlpha(130));
   }
 
+  /// A four-pointed glint: brighter than a dot, still one small fill.
+  void sparkle(Offset p, double size, Color tint) {
+    polygon([
+      p.translate(0, -size),
+      p.translate(size * .18, -size * .18),
+      p.translate(size, 0),
+      p.translate(size * .18, size * .18),
+      p.translate(0, size),
+      p.translate(-size * .18, size * .18),
+      p.translate(-size, 0),
+      p.translate(-size * .18, -size * .18),
+    ], tint);
+  }
+
+  /// Pointed gothic window, [w] wide, from [bottom] up to its apex at [top].
+  Path lancet(double x, double top, double bottom, double w) => Path()
+    ..moveTo(x - w / 2, bottom)
+    ..lineTo(x - w / 2, top + w * .9)
+    ..quadraticBezierTo(x - w / 2, top + w * .15, x, top)
+    ..quadraticBezierTo(x + w / 2, top + w * .15, x + w / 2, top + w * .9)
+    ..lineTo(x + w / 2, bottom)
+    ..close();
+
+  /// Scalloped cloud bank: a row of overlapping lobes over a solid base, lit
+  /// along its upper edge by [rim].
+  void cloudBank(double y, Color body, Color rim, int seed, {double size = 1}) {
+    final path = Path()..addRect(Rect.fromLTRB(-20, y, 360, 560));
+    for (var i = 0; i < 11; i++) {
+      final x = i * 36.0 - 18 + (seed * 13 % 17);
+      final r = (17 + (i * 37 + seed * 11) % 19) * size;
+      path.addOval(
+        Rect.fromCircle(
+          center: Offset(x, y - (i * 53 + seed * 7) % 13 * size),
+          radius: r,
+        ),
+      );
+    }
+    c.drawPath(path.shift(const Offset(0, -2.2)), Paint()..color = rim);
+    c.drawPath(
+      path,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color.lerp(body, rim.withAlpha(255), .18)!, body],
+        ).createShader(Rect.fromLTRB(0, y - 40 * size, 340, y + 50)),
+    );
+  }
+
+  /// A gothic cathedral silhouette standing on [base], [s] times life size.
+  void cathedral(Offset base, double s, Color lit, Color body, Color shade) {
+    c.save();
+    c.translate(base.dx, base.dy);
+    c.scale(s);
+    final hull = Path()
+      // Nave and gable.
+      ..moveTo(-44, 0)
+      ..lineTo(-44, -64)
+      ..lineTo(0, -96)
+      ..lineTo(44, -64)
+      ..lineTo(44, 0)
+      ..close()
+      // Crossing tower and its needle spire.
+      ..addPolygon(const [
+        Offset(-10, -60),
+        Offset(-10, -122),
+        Offset(-4, -128),
+        Offset(0, -198),
+        Offset(4, -128),
+        Offset(10, -122),
+        Offset(10, -60),
+      ], true);
+    for (final side in [-1.0, 1.0]) {
+      // West towers with needle spires and corner pinnacles.
+      final x = side * 52;
+      hull
+        ..addPolygon([
+          Offset(x - 12, 0),
+          Offset(x - 12, -118),
+          Offset(x - 9, -124),
+          Offset(x, -160),
+          Offset(x + 9, -124),
+          Offset(x + 12, -118),
+          Offset(x + 12, 0),
+        ], true)
+        ..addPolygon([
+          Offset(x - 15, -112),
+          Offset(x - 13, -134),
+          Offset(x - 11, -112),
+        ], true)
+        ..addPolygon([
+          Offset(x + 11, -112),
+          Offset(x + 13, -134),
+          Offset(x + 15, -112),
+        ], true);
+      // Flying buttress piers.
+      hull.addPolygon([
+        Offset(side * 70, 0),
+        Offset(side * 70, -46),
+        Offset(side * 72, -60),
+        Offset(side * 74, -46),
+        Offset(side * 74, 0),
+      ], true);
+      hull.addPath(
+        Path()
+          ..moveTo(side * 72, -40)
+          ..quadraticBezierTo(side * 62, -62, side * 44, -58)
+          ..lineTo(side * 44, -54)
+          ..quadraticBezierTo(side * 62, -56, side * 72, -34)
+          ..close(),
+        Offset.zero,
+      );
+    }
+    c.drawPath(
+      hull,
+      Paint()
+        ..shader = LinearGradient(
+          colors: [lit, body, shade],
+          stops: const [0, .45, 1],
+        ).createShader(const Rect.fromLTRB(-76, -200, 76, 0)),
+    );
+    c.drawPath(
+      hull,
+      Paint()
+        ..color = accent.withAlpha(70)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .7 / s,
+    );
+    // Warm light behind the glass.
+    final glow = accent.withAlpha(185);
+    final windows = Path()
+      ..addPath(lancet(-22, -50, -14, 7), Offset.zero)
+      ..addPath(lancet(22, -50, -14, 7), Offset.zero)
+      ..addPath(lancet(0, -44, -6, 9), Offset.zero)
+      ..addPath(lancet(-52, -100, -70, 6), Offset.zero)
+      ..addPath(lancet(52, -100, -70, 6), Offset.zero)
+      ..addPath(lancet(-52, -52, -28, 6), Offset.zero)
+      ..addPath(lancet(52, -52, -28, 6), Offset.zero)
+      ..addPath(lancet(0, -112, -92, 5), Offset.zero);
+    c.drawPath(windows, Paint()..color = glow);
+    const rose = Offset(0, -68);
+    c.drawCircle(
+      rose,
+      14,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [accent.withAlpha(150), accent.withAlpha(0)],
+        ).createShader(Rect.fromCircle(center: rose, radius: 14)),
+    );
+    c.drawCircle(rose, 7.5, Paint()..color = glow);
+    final tracery = Path()..addOval(Rect.fromCircle(center: rose, radius: 7.5));
+    for (var i = 0; i < 8; i++) {
+      final a = i * math.pi / 4;
+      tracery
+        ..moveTo(rose.dx, rose.dy)
+        ..lineTo(rose.dx + math.cos(a) * 7.5, rose.dy + math.sin(a) * 7.5);
+    }
+    c.drawPath(
+      tracery,
+      Paint()
+        ..color = shade.withAlpha(200)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .9,
+    );
+    c.restore();
+  }
+
+  void aetherCathedral() {
+    const sun = Offset(170, 128);
+    // A lavender dawn above the cloud sea, warming to rose at the horizon.
+    const dawn = Rect.fromLTWH(0, 230, 340, 310);
+    c.drawRect(
+      dawn,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0x00C9B8F0),
+            Color(0x50C9B8F0),
+            Color(0x70F4CDBF),
+            Color(0x30F4CDBF),
+          ],
+          stops: [0, .45, .75, 1],
+        ).createShader(dawn),
+    );
+    wash(
+      Rect.fromCircle(center: sun, radius: 230),
+      color(0xFFDCD6FF).withAlpha(55),
+    );
+    stars(color(0xFFF8E6D2), 44);
+    const glints = [
+      Offset(38, 62),
+      Offset(292, 44),
+      Offset(64, 248),
+      Offset(306, 210),
+      Offset(250, 318),
+      Offset(22, 352),
+      Offset(118, 30),
+    ];
+    for (var i = 0; i < glints.length; i++) {
+      sparkle(glints[i], i.isEven ? 4.5 : 3, color(0xFFFFF1E2).withAlpha(170));
+    }
+    // A faint constellation drawn across the upper vault.
+    const figure = [
+      Offset(30, 118),
+      Offset(62, 92),
+      Offset(98, 104),
+      Offset(232, 66),
+      Offset(266, 96),
+      Offset(310, 84),
+    ];
+    c.drawPath(
+      Path()
+        ..addPolygon(figure.sublist(0, 3), false)
+        ..addPolygon(figure.sublist(3), false),
+      Paint()
+        ..color = color(0xFFF8E6D2).withAlpha(55)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .7,
+    );
+    for (final p in figure) {
+      c.drawCircle(p, 1.4, Paint()..color = color(0xFFFFF1E2).withAlpha(190));
+    }
+    // Long celestial rays from the aether sun.
+    final rays = Path();
+    for (var i = 0; i < 18; i++) {
+      final a = i * math.pi / 9 + .09;
+      final spread = i.isEven ? .035 : .018;
+      rays
+        ..moveTo(sun.dx, sun.dy)
+        ..lineTo(
+          sun.dx + math.cos(a - spread) * 420,
+          sun.dy + math.sin(a - spread) * 420,
+        )
+        ..lineTo(
+          sun.dx + math.cos(a + spread) * 420,
+          sun.dy + math.sin(a + spread) * 420,
+        )
+        ..close();
+    }
+    c.drawPath(
+      rays,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            Colors.white.withAlpha(34),
+            color(0xFFE6DCFF).withAlpha(16),
+            Colors.white.withAlpha(0),
+          ],
+          stops: const [0, .45, 1],
+        ).createShader(Rect.fromCircle(center: sun, radius: 420)),
+    );
+    // Rose-gold orbital rings: their back halves pass behind the sun.
+    const rings = [
+      (330.0, 96.0, 1.5, 120),
+      (250.0, 70.0, .8, 95),
+      (410.0, 128.0, 3.0, 45),
+    ];
+    void orbit(bool front) {
+      c.save();
+      c.translate(sun.dx, sun.dy);
+      c.rotate(-.3);
+      for (final (w, h, stroke, alpha) in rings) {
+        c.drawArc(
+          Rect.fromCenter(center: Offset.zero, width: w, height: h),
+          front ? 0 : math.pi,
+          math.pi,
+          false,
+          Paint()
+            ..color = (stroke < 1 ? color(0xFFD5ECFF) : accent).withAlpha(
+              front ? alpha : alpha ~/ 2,
+            )
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = stroke,
+        );
+      }
+      for (final (i, a) in [.7, 2.2, 3.6, 5.2].indexed) {
+        if ((math.sin(a) > 0) != front) continue;
+        final (w, h, _, _) = rings[i % 2];
+        final p = Offset(math.cos(a) * w / 2, math.sin(a) * h / 2);
+        c.drawCircle(p, 6, Paint()..color = accent.withAlpha(40));
+        c.drawCircle(p, 2.6, Paint()..color = color(0xFFFFE8D6));
+      }
+      c.restore();
+    }
+
+    orbit(false);
+    c.drawCircle(
+      sun,
+      58,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            Colors.white.withAlpha(95),
+            color(0xFFE9E1FF).withAlpha(45),
+            color(0xFFC9B8F0).withAlpha(0),
+          ],
+          stops: const [0, .4, 1],
+        ).createShader(Rect.fromCircle(center: sun, radius: 58)),
+    );
+    c.drawCircle(
+      sun,
+      17,
+      Paint()
+        ..shader = RadialGradient(
+          center: const Alignment(-.35, -.4),
+          colors: [color(0xFFF6F2FF), color(0xFFD9D4F2), color(0xFFA9B9DA)],
+        ).createShader(Rect.fromCircle(center: sun, radius: 17)),
+    );
+    orbit(true);
+    // Distant sister spires, then the cathedral itself above the clouds.
+    final haze = color(0xFF8D93BC);
+    final hazeLit = Color.lerp(haze, Colors.white, .25)!;
+    final hazeShade = Color.lerp(haze, top, .35)!;
+    cathedral(const Offset(44, 478), .5, hazeLit, haze, hazeShade);
+    cathedral(const Offset(300, 484), .45, hazeLit, haze, hazeShade);
+    cloudBank(468, color(0xFF7F84B0), color(0xFFF2D6D0).withAlpha(150), 2);
+    cathedral(
+      const Offset(170, 500),
+      .78,
+      color(0xFFB4BED6),
+      color(0xFF66739A),
+      color(0xFF3B4565),
+    );
+    cloudBank(500, color(0xFF5E6890), color(0xFFF4CDBF).withAlpha(170), 5);
+    cloudBank(
+      528,
+      color(0xFF39445F),
+      color(0xFFC9B8F0).withAlpha(150),
+      8,
+      size: 1.2,
+    );
+  }
+
+  /// Gear outline with [teeth] square-shouldered teeth.
+  Path gear(Offset center, double r, int teeth) {
+    final points = <Offset>[];
+    final step = math.pi * 2 / teeth;
+    for (var i = 0; i < teeth; i++) {
+      for (final (t, radius) in [
+        (0.0, r * .86),
+        (.18, r),
+        (.5, r),
+        (.68, r * .86),
+      ]) {
+        final angle = (i + t) * step;
+        points.add(center + Offset(math.cos(angle), math.sin(angle)) * radius);
+      }
+    }
+    return Path()..addPolygon(points, true);
+  }
+
+  void clockGear(Offset center, double r, int teeth, double turn) {
+    final outline = gear(center, r, teeth);
+    c.drawPath(outline, Paint()..color = accent.withAlpha(26));
+    c.drawPath(
+      outline,
+      Paint()
+        ..color = accent.withAlpha(80)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .9,
+    );
+    final detail = Path()
+      ..addOval(Rect.fromCircle(center: center, radius: r * .7))
+      ..addOval(Rect.fromCircle(center: center, radius: r * .2));
+    for (var i = 0; i < 5; i++) {
+      final a = turn + i * math.pi * 2 / 5;
+      final d = Offset(math.cos(a), math.sin(a));
+      detail
+        ..moveTo(center.dx + d.dx * r * .2, center.dy + d.dy * r * .2)
+        ..lineTo(center.dx + d.dx * r * .7, center.dy + d.dy * r * .7);
+    }
+    c.drawPath(
+      detail,
+      Paint()
+        ..color = accent.withAlpha(70)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(1, r * .05),
+    );
+    c.drawCircle(center, r * .08, Paint()..color = accent.withAlpha(150));
+  }
+
+  /// A faceted hexagonal crystal tower with gilded bands and lit windows.
+  /// [fade] sinks distant towers into the sky colour.
+  void crystalTower(
+    double x,
+    double base,
+    double w,
+    double h,
+    double fade, {
+    bool clock = false,
+  }) {
+    Color tone(int hex) => Color.lerp(color(hex), top, fade)!;
+    final roof = base - h, apex = roof - w * 1.7, inner = w * .38;
+    final shoulder = roof + w * .12;
+    final faces = [
+      (
+        [
+          Offset(x - w, 560),
+          Offset(x - w, roof),
+          Offset(x - inner, shoulder),
+          Offset(x - inner, 560),
+        ],
+        tone(0xFF2C7378),
+      ),
+      (
+        [
+          Offset(x - inner, 560),
+          Offset(x - inner, shoulder),
+          Offset(x + inner, shoulder),
+          Offset(x + inner, 560),
+        ],
+        tone(0xFF4FA6A2),
+      ),
+      (
+        [
+          Offset(x + inner, 560),
+          Offset(x + inner, shoulder),
+          Offset(x + w, roof),
+          Offset(x + w, 560),
+        ],
+        tone(0xFF19494F),
+      ),
+      // The crystal cap: lit, front and shaded facets meeting at the apex.
+      (
+        [Offset(x - w, roof), Offset(x, apex), Offset(x - inner, shoulder)],
+        tone(0xFF67C2B9),
+      ),
+      (
+        [
+          Offset(x - inner, shoulder),
+          Offset(x, apex),
+          Offset(x + inner, shoulder),
+        ],
+        tone(0xFF9AE6D9),
+      ),
+      (
+        [Offset(x + inner, shoulder), Offset(x, apex), Offset(x + w, roof)],
+        tone(0xFF2E7D7E),
+      ),
+    ];
+    for (final (points, tint) in faces) {
+      polygon(points, tint);
+    }
+    final gilt = Color.lerp(accent, top, fade)!.withAlpha(200);
+    final bands = Path();
+    for (final y in [shoulder, roof + h * .38, roof + h * .72]) {
+      bands
+        ..moveTo(x - w, y - w * .12)
+        ..lineTo(x - inner, y)
+        ..lineTo(x + inner, y)
+        ..lineTo(x + w, y - w * .12);
+    }
+    bands
+      ..moveTo(x, apex)
+      ..lineTo(x, shoulder);
+    c.drawPath(
+      bands,
+      Paint()
+        ..color = gilt
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = fade > .3 ? .6 : 1,
+    );
+    line(
+      Offset(x - inner, shoulder),
+      Offset(x - inner, 560),
+      Colors.white.withAlpha(fade > .3 ? 25 : 60),
+      .7,
+    );
+    final windows = Path();
+    for (var row = 0; row < 6; row++) {
+      final y = roof + h * .14 + row * h * .1;
+      if (y > base - 6 || (row + x.toInt()) % 3 == 0) continue;
+      windows.addRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: Offset(x, y), width: w * .22, height: 6),
+          const Radius.circular(2),
+        ),
+      );
+    }
+    c.drawPath(
+      windows,
+      Paint()..color = Color.lerp(accent, top, fade)!.withAlpha(180),
+    );
+    if (clock) {
+      final face = Offset(x, roof + h * .2);
+      c.drawCircle(face, inner * .85, Paint()..color = tone(0xFF123A44));
+      c.drawCircle(
+        face,
+        inner * .85,
+        Paint()
+          ..color = gilt
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2,
+      );
+      line(face, face + Offset(0, -inner * .6), gilt, 1);
+      line(face, face + Offset(inner * .45, inner * .2), gilt, 1);
+    }
+  }
+
+  void chronoCitadel() {
+    const o = Offset(170, 150);
+    final gold = accent;
+    wash(
+      Rect.fromCircle(center: o, radius: 250),
+      color(0xFF7CE6D6).withAlpha(42),
+    );
+    stars(color(0xFFEADAA6), 26);
+    // Gears turn behind the dial, half hidden past the board edges.
+    clockGear(const Offset(-8, 318), 76, 20, .2);
+    clockGear(const Offset(336, 254), 54, 15, .5);
+    clockGear(const Offset(292, 330), 31, 9, 0);
+    clockGear(const Offset(58, 40), 40, 12, .9);
+    // The astronomical dial: sapphire glass, bezel, ticks and a zodiac band.
+    c.drawCircle(
+      o,
+      130,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            color(0xFF8AF3E6).withAlpha(55),
+            color(0xFF1F7C80).withAlpha(30),
+            color(0xFF113D49).withAlpha(0),
+          ],
+          stops: const [0, .72, 1],
+        ).createShader(Rect.fromCircle(center: o, radius: 130)),
+    );
+    final rings = Path();
+    for (final r in [122.0, 98.0, 84.0, 40.0]) {
+      rings.addOval(Rect.fromCircle(center: o, radius: r));
+    }
+    c.drawPath(
+      rings,
+      Paint()
+        ..color = gold.withAlpha(75)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .9,
+    );
+    c.drawCircle(
+      o,
+      128,
+      Paint()
+        ..color = gold.withAlpha(95)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.6,
+    );
+    final ticks = Path(), markers = Path();
+    for (var i = 0; i < 60; i++) {
+      final a = i * math.pi / 30 - math.pi / 2;
+      final d = Offset(math.cos(a), math.sin(a));
+      final p = o + d * 122;
+      final q = o + d * (i % 5 == 0 ? 114 : 118);
+      ticks
+        ..moveTo(p.dx, p.dy)
+        ..lineTo(q.dx, q.dy);
+      if (i % 5 == 0) {
+        final n = Offset(-d.dy, d.dx) * (i % 15 == 0 ? 4.2 : 2.8);
+        markers.addPolygon([
+          o + d * 112,
+          o + d * 106 + n,
+          o + d * 99,
+          o + d * 106 - n,
+        ], true);
+      }
+    }
+    for (var i = 0; i < 12; i++) {
+      final a = i * math.pi / 6 + math.pi / 12;
+      final d = Offset(math.cos(a), math.sin(a));
+      final p = o + d * 84, q = o + d * 98;
+      ticks
+        ..moveTo(p.dx, p.dy)
+        ..lineTo(q.dx, q.dy);
+    }
+    c.drawPath(
+      ticks,
+      Paint()
+        ..color = gold.withAlpha(105)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+    c.drawPath(markers, Paint()..color = gold.withAlpha(150));
+    final signs = Path();
+    for (var i = 0; i < 12; i++) {
+      final a = i * math.pi / 6;
+      signs.addOval(
+        Rect.fromCircle(
+          center: o + Offset(math.cos(a), math.sin(a)) * 91,
+          radius: i % 3 == 0 ? 2.4 : 1.5,
+        ),
+      );
+    }
+    c.drawPath(signs, Paint()..color = color(0xFF9AF0E2).withAlpha(150));
+    // Guilloché rosette, engraved like a watch dial.
+    final rosette = Path();
+    for (var k = 0; k < 6; k++) {
+      for (var i = 0; i <= 180; i++) {
+        final a = i * math.pi / 90;
+        final r = 60 + 16 * math.sin(a * 9 + k * math.pi / 9);
+        final p = o + Offset(math.cos(a), math.sin(a)) * r;
+        if (i == 0) {
+          rosette.moveTo(p.dx, p.dy);
+        } else {
+          rosette.lineTo(p.dx, p.dy);
+        }
+      }
+    }
+    c.drawPath(
+      rosette,
+      Paint()
+        ..color = gold.withAlpha(34)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .6,
+    );
+    // Hands at ten past ten, with spade tips and a counterweighted seconds.
+    void hand(double turns, double length, double width) {
+      final a = turns * math.pi * 2 - math.pi / 2;
+      final d = Offset(math.cos(a), math.sin(a)), n = Offset(-d.dy, d.dx);
+      polygon([
+        o - d * 12,
+        o + n * width / 2,
+        o + d * length * .72 + n * width * .3,
+        o + d * length * .8 + n * width,
+        o + d * length,
+        o + d * length * .8 - n * width,
+        o + d * length * .72 - n * width * .3,
+        o - n * width / 2,
+      ], gold.withAlpha(150));
+    }
+
+    hand((10 + 9 / 60) / 12, 58, 5.5);
+    hand(9 / 60, 90, 4);
+    const second = 38 / 60 * math.pi * 2 - math.pi / 2;
+    final sd = Offset(math.cos(second), math.sin(second));
+    final teal = color(0xFF9AF0E2).withAlpha(160);
+    line(o - sd * 22, o + sd * 108, teal, .9);
+    c.drawCircle(o - sd * 18, 3, Paint()..color = teal);
+    c.drawCircle(o, 6, Paint()..color = gold.withAlpha(200));
+    c.drawCircle(o, 2.4, Paint()..color = color(0xFF4FD6C8));
+    // A sapphire moon riding the bezel.
+    final moon = o + Offset(math.cos(2.45), math.sin(2.45)) * 128;
+    c.drawCircle(moon, 9, Paint()..color = color(0xFF4FD6C8).withAlpha(45));
+    c.drawCircle(
+      moon,
+      4.5,
+      Paint()
+        ..shader = RadialGradient(
+          center: const Alignment(-.4, -.4),
+          colors: [color(0xFFD8FFF8), color(0xFF3FBFB4), color(0xFF145A63)],
+        ).createShader(Rect.fromCircle(center: moon, radius: 4.5)),
+    );
+    // Drifting gold chronons.
+    for (var i = 0; i < 9; i++) {
+      final p = Offset(
+        18 + (i * 113 % 304).toDouble(),
+        268 + (i * 71 % 150).toDouble(),
+      );
+      sparkle(p, i % 3 == 0 ? 3.5 : 2.2, gold.withAlpha(140));
+    }
+    // The citadel: pale far spires, then the gilded crystal towers.
+    for (final (x, h, w) in [
+      (22.0, 112.0, 13.0),
+      (98.0, 92.0, 11.0),
+      (244.0, 104.0, 12.0),
+      (318.0, 130.0, 14.0),
+    ]) {
+      crystalTower(x, 512, w, h * .8, .6);
+    }
+    for (final (x, h, w, clock) in [
+      (54.0, 84.0, 18.0, false),
+      (126.0, 118.0, 16.0, false),
+      (170.0, 168.0, 22.0, true),
+      (216.0, 108.0, 16.0, false),
+      (290.0, 92.0, 19.0, false),
+    ]) {
+      crystalTower(x, 540, w, h * .78, .3, clock: clock);
+    }
+    ridge(560, 34, color(0xFF0E3240), seed: 3);
+  }
+
   void paint(BallCosmetic ball) {
     switch (ball) {
       case BallCosmetic.steel:
@@ -636,27 +1316,7 @@ class _Scenery {
             ..strokeWidth = 1,
         );
       case BallCosmetic.aether:
-        wash(
-          const Rect.fromLTWH(-60, -140, 450, 350),
-          color(0xFFBAE5FF).withAlpha(65),
-        );
-        stars(color(0xFFF8DEBB), 36);
-        for (var i = 0; i < 4; i++) {
-          final inset = 10.0 + i * 23;
-          c.drawPath(
-            Path()
-              ..moveTo(inset, 550)
-              ..lineTo(inset, 174)
-              ..quadraticBezierTo(170, -90 + i * 25, 340 - inset, 174)
-              ..lineTo(340 - inset, 550),
-            Paint()
-              ..color = accent.withAlpha(30 + i * 10)
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = i == 0 ? 7 : 1.2,
-          );
-        }
-        ridge(501, 48, color(0xFF72869C), seed: 4);
-        ridge(553, 75, color(0xFF34435F), seed: 1);
+        aetherCathedral();
       case BallCosmetic.phoenix:
         wash(
           const Rect.fromLTWH(-40, -100, 420, 300),
@@ -678,37 +1338,7 @@ class _Scenery {
         ridge(494, 80, color(0xFFAA615D), seed: 2);
         ridge(550, 96, color(0xFF542B46), seed: 5);
       case BallCosmetic.chronosphere:
-        wash(
-          const Rect.fromLTWH(-45, -110, 450, 380),
-          color(0xFF7CDFCE).withAlpha(40),
-        );
-        stars(color(0xFFEADAA6), 28);
-        final ticks = Path();
-        for (var i = 0; i < 36; i++) {
-          final a = i * math.pi / 18;
-          final d = Offset(math.cos(a), math.sin(a));
-          final p = const Offset(170, 126) + d * 116;
-          final q = const Offset(170, 126) + d * (i % 3 == 0 ? 132 : 122);
-          ticks.moveTo(p.dx, p.dy);
-          ticks.lineTo(q.dx, q.dy);
-        }
-        c.drawPath(
-          ticks,
-          Paint()
-            ..color = accent.withAlpha(85)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.5,
-        );
-        c.drawCircle(
-          const Offset(170, 126),
-          106,
-          Paint()
-            ..color = accent.withAlpha(35)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1,
-        );
-        skyline(523, color(0xFF2D666B), 4);
-        ridge(561, 48, color(0xFF163B4C), seed: 3);
+        chronoCitadel();
       case BallCosmetic.genesis:
         wash(
           const Rect.fromLTWH(-100, -80, 410, 330),

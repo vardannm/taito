@@ -92,10 +92,12 @@ extension InfiniteGameplay on BalanceGame {
     _bossWarningAt ??= elapsed;
     if (elapsed - _bossWarningAt! < 3) return;
     _bossWarningAt = null;
+    final slot = bossesEncountered % BossKind.values.length;
     boss = InfiniteBoss(
       top: visibleTop,
-      kind: bossOrder[bossesEncountered],
-      seed: bossScoreThresholds[bossesEncountered],
+      kind: nextBossKind,
+      seed: bossScoreThresholds[slot] + bossesEncountered,
+      lap: bossesEncountered ~/ BossKind.values.length,
     );
     bossesEncountered++;
     // The boss replaces the whole course for this interlude. Clear ordinary
@@ -112,8 +114,9 @@ extension InfiniteGameplay on BalanceGame {
     final active = boss;
     if (active == null) return;
     if (bossesEnabled) {
+      // Overdrive laps run the whole fight faster: shots, timing and exit.
       active.step(
-        dt,
+        dt * active.pace,
         target: (x: ballX, y: screenY(ballY)),
         scrollDistance: scrollDistance,
         visibleTop: visibleTop,
@@ -124,7 +127,11 @@ extension InfiniteGameplay on BalanceGame {
       if (!active.training) bossesCleared++;
     }
     boss = null;
-    _nextBossAt = elapsed + 60;
+    _nextBossAt =
+        elapsed +
+        (bossesEncountered >= BossKind.values.length
+            ? InfiniteBoss.overdriveGapSeconds
+            : 60);
     // Resume generation ahead of the viewport, with no backlog from the fight.
     _nextRowY = -cameraOffset + visibleTop - 121;
     _nextSpiderY = math.min(_nextSpiderY, -cameraOffset - 900);

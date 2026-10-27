@@ -7,6 +7,8 @@ import 'ball_painter.dart';
 import 'ball_world.dart';
 import 'menu_design.dart';
 import 'game.dart' show GameMode;
+import 'platform_painter.dart';
+import 'platforms.dart';
 
 /// Menu clocks repaint the decorative canvases only. They never advance a run.
 class MenuMotion extends StatefulWidget {
@@ -300,9 +302,11 @@ class MenuBallStage extends CustomPainter {
     this.drift, {
     required this.reducedMotion,
     this.mode = GameMode.infinite,
+    this.platform = PlatformStyle.classic,
   }) : super(repaint: drift);
   final BallCosmetic ball;
   final GameMode mode;
+  final PlatformStyle platform;
   final Animation<double> drift;
   final bool reducedMotion;
 
@@ -312,6 +316,7 @@ class MenuBallStage extends CustomPainter {
     final w = size.width, h = size.height;
     final radius = math.min(w * .17, h * .19);
     final center = Offset(w * .5, h * .47 + math.sin(phase) * 3);
+    final tint = Color(platform.color);
     final baseY = h * .47 + radius * 1.75;
     final rx = radius * 2.2, ry = radius * .55;
 
@@ -389,10 +394,26 @@ class MenuBallStage extends CustomPainter {
         );
       }
     }
+    // The equipped rail lights the stage below it.
+    final pool = Rect.fromCenter(
+      center: Offset(center.dx, baseY),
+      width: radius * 5.2,
+      height: radius * .9,
+    );
+    canvas.drawOval(
+      pool,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            tint.withAlpha(platform.energized ? 75 : 45),
+            tint.withAlpha(0),
+          ],
+        ).createShader(pool),
+    );
     final shadow = Rect.fromCenter(
       center: Offset(center.dx, baseY),
-      width: radius * (2.5 - math.sin(phase) * .04),
-      height: radius * .48,
+      width: radius * (4.8 - math.sin(phase) * .08),
+      height: radius * .42,
     );
     canvas.save();
     canvas.translate(shadow.center.dx, shadow.center.dy);
@@ -418,6 +439,7 @@ class MenuBallStage extends CustomPainter {
           colors: [BallWorld.of(ball).accent.withAlpha(30), Colors.transparent],
         ).createShader(Rect.fromCircle(center: center, radius: radius * 2.5)),
     );
+    paintRail(canvas, center + Offset(0, radius * 1.15), radius, phase);
     paintCosmetic(
       canvas,
       center,
@@ -427,6 +449,80 @@ class MenuBallStage extends CustomPainter {
       rotation: math.sin(phase) * .035,
       reducedMotion: reducedMotion,
     );
+  }
+
+  /// The equipped rail, held level under the ball like a display plinth.
+  /// Drawn in game units so every style keeps its in-game detail.
+  void paintRail(Canvas canvas, Offset mid, double r, double phase) {
+    final tint = Color(platform.color);
+    const half = 2.35 * 18;
+    final scale = r / 18;
+    const a = Offset(-half, 0), b = Offset(half, 0);
+    canvas.save();
+    canvas.translate(mid.dx, mid.dy);
+    canvas.scale(scale);
+    canvas.drawLine(
+      a,
+      b,
+      Paint()
+        ..color = tint.withAlpha(platform.energized ? 90 : 50)
+        ..strokeWidth = 15
+        ..strokeCap = StrokeCap.round
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
+    );
+    canvas.drawLine(
+      a + const Offset(0, 5),
+      b + const Offset(0, 5),
+      Paint()
+        ..color = Colors.black.withAlpha(80)
+        ..strokeWidth = 7
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+    );
+    canvas.drawLine(
+      a,
+      b,
+      Paint()
+        ..color = const Color(0xFF2C3A37)
+        ..strokeWidth = 7
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.drawLine(
+      a - const Offset(0, 1),
+      b - const Offset(0, 1),
+      Paint()
+        ..color = tint
+        ..strokeWidth = 4
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.drawLine(
+      a - const Offset(0, 2.5),
+      b - const Offset(0, 2.5),
+      Paint()
+        ..color = const Color(0xFFFFFFE8)
+        ..strokeWidth = 1.2,
+    );
+    paintPlatformDetail(
+      canvas,
+      a,
+      b,
+      platform,
+      time: phase / (math.pi * 2) * 24,
+      reducedMotion: reducedMotion,
+    );
+    // A soft sheen where the ball rests on the rail.
+    final sheen = Rect.fromCenter(
+      center: const Offset(0, -1.5),
+      width: 30,
+      height: 4,
+    );
+    canvas.drawOval(
+      sheen,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [Colors.white.withAlpha(150), Colors.white.withAlpha(0)],
+        ).createShader(sheen),
+    );
+    canvas.restore();
   }
 
   void paintMergeStage(
@@ -609,6 +705,7 @@ class MenuBallStage extends CustomPainter {
   bool shouldRepaint(MenuBallStage old) =>
       old.mode != mode ||
       old.ball != ball ||
+      old.platform != platform ||
       old.drift != drift ||
       old.reducedMotion != reducedMotion;
 }

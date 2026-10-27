@@ -59,19 +59,27 @@ enum BossPhase {
 /// A timed survival encounter. The boss stays in screen space as the board
 /// climbs; thrown pools attach to the scrolling floor only after landing.
 class InfiniteBoss {
-  InfiniteBoss({this.top = 0, this.kind = BossKind.skyWarden, int seed = 0})
-    : training = false,
-      _random = math.Random(seed);
+  InfiniteBoss({
+    this.top = 0,
+    this.kind = BossKind.skyWarden,
+    int seed = 0,
+    this.lap = 0,
+  }) : training = false,
+       _random = math.Random(seed);
 
   /// The tutorial's practice boss: a smaller Sky Warden with one short round
   /// each of slow three-shot volleys and single lasers, and no pools.
   InfiniteBoss.training({this.top = 0})
     : kind = BossKind.skyWarden,
       training = true,
+      lap = 0,
       _random = math.Random(0);
 
   static const duration = 28.0;
   static const trainingDuration = 16.0;
+
+  /// Play time between Overdrive bosses, once all six have been met.
+  static const overdriveGapSeconds = 150.0;
   static const laserWarning = 1.1;
   static const laserLife = 1.3;
   static const throwFlight = .9;
@@ -83,9 +91,23 @@ class InfiniteBoss {
 
   final BossKind kind;
   final bool training;
+
+  /// 0 for a run's first meeting with this boss; each Overdrive lap after
+  /// all six bosses adds one, up to a speed cap.
+  final int lap;
   final math.Random _random;
-  String get displayName => training ? 'PRACTICE WARDEN' : kind.name;
+  String get displayName => training
+      ? 'PRACTICE WARDEN'
+      : lap == 0
+      ? kind.name
+      : '${kind.name} ${const ['II', 'III', 'IV', 'V'][math.min(lap, 4) - 1]}${lap > 4 ? '+' : ''}';
+
+  /// How fast the fight plays: 12% faster per Overdrive lap, capped at 36%.
+  double get pace => 1 + .12 * math.min(lap, 3);
   double get lifetime => training ? trainingDuration : duration;
+
+  /// Real seconds left in the fight, at this boss's pace.
+  double get secondsLeft => (lifetime - age) / pace;
   double age = 0, top;
   final shots = <LateEnemyShot>[];
   final toxicWalls = <ToxicWall>[];
@@ -480,12 +502,13 @@ class InfiniteBoss {
     // Phase 1: four rings, 1.5 seconds (about 160 units) apart.
     while (_bulletWave < 4 && age >= 2.6 + _bulletWave * 1.5) {
       final wave = _bulletWave++;
+      // Several wide openings, so one is always within reach of the ball.
       ring(
         2.6 + wave * 1.5,
-        wave < 2 ? 3 : 2,
-        .36,
+        wave < 2 ? 5 : 4,
+        .48,
         105,
-        wave.isEven ? .22 : -.22,
+        wave.isEven ? .16 : -.16,
       );
     }
     // Phase 2: two dashed side lasers. First they cross the whole board in
@@ -529,7 +552,7 @@ class InfiniteBoss {
     }
     while (_poolWave >= 1 && _poolWave < 3 && age >= 19.6 + (_poolWave - 1) * 3) {
       final wave = _poolWave++;
-      ring(19.6 + (wave - 1) * 3, 3, .38, 85, wave.isEven ? .18 : -.18);
+      ring(19.6 + (wave - 1) * 3, 5, .48, 85, wave.isEven ? .14 : -.14);
     }
   }
 

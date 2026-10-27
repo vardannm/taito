@@ -709,7 +709,7 @@ class BoardPainter extends CustomPainter {
           BossPhase.dashedRails => 'DASHED RAILS',
           BossPhase.novaLance => 'NOVA LANCE',
           _ => boss.phase.name.toUpperCase(),
-        }} · ${(boss.lifetime - boss.age).ceil()}s',
+        }} · ${boss.secondsLeft.ceil()}s',
         Offset(180, labelY + 16),
         9,
         bossInk,
