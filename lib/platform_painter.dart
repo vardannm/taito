@@ -132,8 +132,10 @@ class PlatformPreview extends CustomPainter {
   final AnimationController? animation;
   @override
   void paint(Canvas canvas, Size size) {
-    final a = Offset(3, size.height * .6),
-        b = Offset(size.width - 3, size.height * .4);
+    // Inset from the card edges and below the badge, so the rail sits framed.
+    final inset = size.width * .12;
+    final a = Offset(inset, size.height * .66),
+        b = Offset(size.width - inset, size.height * .5);
     canvas.drawLine(
       a,
       b,
@@ -147,7 +149,8 @@ class PlatformPreview extends CustomPainter {
       b,
       Paint()
         ..color = Color(style.color)
-        ..strokeWidth = 5,
+        ..strokeWidth = 5
+        ..strokeCap = StrokeCap.round,
     );
     paintPlatformDetail(
       canvas,
