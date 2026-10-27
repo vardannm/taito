@@ -104,7 +104,7 @@ void main() {
                 .painter!
             as BallWorldPreview;
     expect(preview.ball, BallCosmetic.circuit);
-    expect(find.text('Circuit Garden'), findsOneWidget);
+    expect(find.text('Circuit Garden'), findsNothing);
     await tester.tap(buy);
     await tester.pump();
     expect(profile.selectedBall, BallCosmetic.circuit);

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:convert';
 import 'dart:async';
 import 'ball_cosmetics.dart';
@@ -68,13 +69,93 @@ class PlayerProfile {
 
   /// Most bosses outlasted in one Infinite run.
   int infiniteBestBosses = 0;
-  bool infiniteFastStart = true;
+
+  /// Hidden opening pace. It follows the score a player reaches again and
+  /// again, not one lucky run, moves one small step per run, and eases off
+  /// after a streak of early falls. Nothing about it is shown to the player.
+  final recentInfiniteScores = <int>[];
+  double? _infiniteStartSpeed;
+  int _infiniteEarlyFalls = 0;
+  int? _legacyBestScore;
+
+  /// Players who upgrade keep the opening their best score earned until ten
+  /// new runs describe them; a fresh install starts with no such credit.
+  int get _legacyBest => _legacyBestScore ?? infiniteBestScore;
+
+  int get infiniteSkillScore {
+    final sorted = [...recentInfiniteScores]..sort((a, b) => b.compareTo(a));
+    final repeated = sorted.length >= InfiniteTuning.paceRepeatRuns
+        ? sorted[InfiniteTuning.paceRepeatRuns - 1]
+        : 0;
+    return recentInfiniteScores.length >= InfiniteTuning.paceRecentRuns
+        ? repeated
+        : math.max(repeated, _legacyBest);
+  }
+
+  double get infiniteStartSpeed =>
+      _infiniteStartSpeed ??
+      InfiniteTuning.startingSpeedMultiplier(infiniteSkillScore);
+
+  void recordInfinitePace(int score) {
+    final skillBefore = infiniteSkillScore;
+    var speed = infiniteStartSpeed;
+    recentInfiniteScores.add(score);
+    while (recentInfiniteScores.length > InfiniteTuning.paceRecentRuns) {
+      recentInfiniteScores.removeAt(0);
+    }
+    final early =
+        speed > 1 && score < skillBefore * InfiniteTuning.paceEarlyFallShare;
+    _infiniteEarlyFalls = early ? _infiniteEarlyFalls + 1 : 0;
+    if (_infiniteEarlyFalls >= InfiniteTuning.paceEarlyFallRuns) {
+      _infiniteEarlyFalls = 0;
+      speed -= InfiniteTuning.fastStartSpeedStep;
+    } else {
+      final target = InfiniteTuning.startingSpeedMultiplier(infiniteSkillScore);
+      speed += (target - speed).clamp(
+        -InfiniteTuning.fastStartSpeedStep,
+        InfiniteTuning.fastStartSpeedStep,
+      );
+    }
+    _infiniteStartSpeed = speed.clamp(
+      1.0,
+      InfiniteTuning.maxStartingSpeedMultiplier,
+    );
+  }
+
+  Map<String, Object?> get infinitePacing => {
+    'recent': recentInfiniteScores,
+    'speed': _infiniteStartSpeed,
+    'falls': _infiniteEarlyFalls,
+    'legacy': _legacyBest,
+  };
+
+  void restoreInfinitePacing(Object? raw) {
+    if (raw is! Map) return;
+    final recent = raw['recent'];
+    recentInfiniteScores
+      ..clear()
+      ..addAll(
+        recent is List
+            ? recent
+                  .whereType<int>()
+                  .map((v) => v.clamp(0, 1 << 30))
+                  .take(InfiniteTuning.paceRecentRuns)
+            : const <int>[],
+      );
+    final speed = raw['speed'];
+    _infiniteStartSpeed = speed is num
+        ? speed.toDouble().clamp(1.0, InfiniteTuning.maxStartingSpeedMultiplier)
+        : null;
+    final falls = raw['falls'];
+    _infiniteEarlyFalls = falls is int ? falls.clamp(0, 9) : 0;
+    final legacy = raw['legacy'];
+    _legacyBestScore = legacy is int ? legacy.clamp(0, 1 << 30) : 0;
+  }
 
   void applyInfiniteStart(BalanceGame game, {bool tutorial = false}) {
-    final bestScore = infiniteFastStart && !tutorial ? infiniteBestScore : 0;
-    game.infiniteStartingPace = InfiniteTuning.startingPace(bestScore);
-    game.infiniteStartingSpeedMultiplier =
-        InfiniteTuning.startingSpeedMultiplier(bestScore);
+    final speed = tutorial ? 1.0 : infiniteStartSpeed;
+    game.infiniteStartingPace = speed;
+    game.infiniteStartingSpeedMultiplier = speed;
   }
 
   int wallet = 0;
@@ -592,6 +673,7 @@ class PlayerProfile {
       _pendingRuns = 0;
       infiniteRuns++;
       final improved = game.score > infiniteBestScore;
+      recordInfinitePace(game.score);
       if (improved) infiniteBestScore = game.score;
       if (game.metres > infiniteBest) infiniteBest = game.metres;
       if (game.bossesCleared > infiniteBestBosses) {
@@ -702,8 +784,6 @@ class PlayerProfile {
       mergeRuns = await storage.getInt('gilt.merge.runs') ?? 0;
       infiniteBest = await storage.getInt('gilt.ascent.best') ?? 0;
       infiniteRuns = await storage.getInt('gilt.ascent.runs') ?? 0;
-      infiniteFastStart =
-          await storage.getBool('gilt.ascent.fastStart') ?? true;
       sound = await storage.getBool('gilt.sound') ?? true;
       // Preserve an existing player's mute preference when migrating.
       music = await storage.getBool('gilt.music') ?? sound;
@@ -711,6 +791,13 @@ class PlayerProfile {
       _loadRecords(await storage.getString('gilt.mastery.v1'));
       final legacyMaze = await storage.getString('gilt.maze.v1');
       _loadEconomy(await storage.getString(_economyKey));
+      final pacing = await storage.getString('gilt.ascent.pacing.v1');
+      try {
+        restoreInfinitePacing(pacing == null ? null : jsonDecode(pacing));
+      } catch (_) {
+        /* A damaged pacing save only resets the hidden opening pace. */
+      }
+      if (pacing == null) _legacyBestScore = infiniteBestScore;
       final savedTutorial = await storage.getString('gilt.tutorial.v2');
       if (savedTutorial != null) {
         try {
@@ -749,7 +836,10 @@ class PlayerProfile {
         infiniteBest > _pendingBest ? infiniteBest : _pendingBest,
       );
       await storage.setInt('gilt.ascent.runs', infiniteRuns + _pendingRuns);
-      await storage.setBool('gilt.ascent.fastStart', infiniteFastStart);
+      await storage.setString(
+        'gilt.ascent.pacing.v1',
+        jsonEncode(infinitePacing),
+      );
       await storage.setBool('gilt.sound', sound);
       await storage.setBool('gilt.music', music);
       await storage.setBool('gilt.haptics', haptics);

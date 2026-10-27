@@ -36,11 +36,13 @@ class _BallShopState extends State<BallShop>
     final velocity = details.primaryVelocity ?? 0;
     if (swipeDistance.abs() < 56 && velocity.abs() < 500) return;
     final direction = swipeDistance.abs() >= 56 ? swipeDistance : velocity;
-    if (direction < 0 && category == 0) {
+    // The content follows the finger: swiping left brings the next tab in,
+    // and swiping right on the first tab closes the shop like going back.
+    if (direction > 0 && category == 0) {
       Navigator.of(context).maybePop();
     } else {
       setState(
-        () => category = (category + (direction > 0 ? 1 : -1)).clamp(0, 2),
+        () => category = (category + (direction < 0 ? 1 : -1)).clamp(0, 2),
       );
     }
   }
@@ -145,7 +147,6 @@ class _BallShopState extends State<BallShop>
         : purchaseOnly
         ? 'PREMIUM'
         : 'DISCOVER',
-    worldName: worldBall == null ? null : BallWorld.of(worldBall).name,
     artHeight: worldBall == null ? 136 : 188,
     artwork: CustomPaint(
       key: worldBall == null

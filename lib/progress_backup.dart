@@ -42,7 +42,7 @@ class ProgressBackup {
     'sound': p.sound,
     'music': p.music,
     'haptics': p.haptics,
-    'fastStart': p.infiniteFastStart,
+    'pacing': p.infinitePacing,
     'bestBosses': p.infiniteBestBosses,
     'achievements': p.claimedAchievements.map((a) => a.name).toList(),
     'tutorial': p.tutorialSeen,
@@ -122,7 +122,8 @@ class ProgressBackup {
     // Older backups predate the music switch; music followed sound then.
     p.music = d['music'] != null ? flag('music') : p.sound;
     p.haloJoystick = d['haloJoystick'] != null ? flag('haloJoystick') : false;
-    if (d['fastStart'] != null) p.infiniteFastStart = flag('fastStart');
+    // Older backups predate hidden pacing; their best score seeds it.
+    if (d['pacing'] != null) p.restoreInfinitePacing(d['pacing']);
     // Older backups predate boss records; they restore as none outlasted.
     if (d['bestBosses'] != null)
       p.infiniteBestBosses = integer(d['bestBosses'], 99);
@@ -250,7 +251,7 @@ class ProgressBackup {
       ..classicLevel = source.classicLevel
       ..sound = source.sound
       ..music = source.music
-      ..infiniteFastStart = source.infiniteFastStart
+      ..restoreInfinitePacing(source.infinitePacing)
       ..haptics = source.haptics
       ..tutorialSeen = source.tutorialSeen
       ..tutorial = TutorialProgress.fromJson(source.tutorial.toJson())

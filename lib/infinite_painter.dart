@@ -158,160 +158,159 @@ void paintInfiniteAtmosphere(
   // BoardPainter already paints the combo-colored field. Avoid a second
   // full-screen gradient pass on every frame.
   if (reducedMotion) return;
-  final darkness = comboDarkness(power);
-  final time = game.clock, fade = subdued ? .35 : 1.0;
-  // Silk ribbons of light. Each one twists as it flows, so its fine strands
-  // cross and fan out like turning fabric; more ribbons join as combo grows.
-  final hue = Color.lerp(
-    comboEnergyColor(power),
-    BallWorld.of(game.cosmetic).accent,
-    .4,
-  )!;
-  final silk = boardFieldColors(game)[1].computeLuminance() > .3
-      ? Color.lerp(hue, const Color(0xFF243052), .55)!
-      : Color.lerp(hue, Colors.white, .3)!;
-  final glow = Color.lerp(silk, Colors.white, .5)!;
-  Offset silkAt(int ribbon, double u, double strand) {
-    final y =
-        110 +
-        ribbon * 165 +
-        math.sin(u * 5.2 + time * .5 + ribbon * 1.7) * 34 +
-        math.sin(u * 2.1 - time * .3 + ribbon) * 22;
-    final twist = math.cos(u * 6.5 + time * .8 + ribbon * 2.3);
-    return Offset(
-      (u * 380 - 20) * horizontalSpread,
-      y + strand * (9 + 7 * power) * twist,
-    );
-  }
-
-  final glints = Path();
-  final span = Rect.fromLTRB(0, 0, 340 * horizontalSpread, 1);
-  for (var ribbon = 0; ribbon < (1 + power * 2.2).floor(); ribbon++) {
-    final body = Path(), strands = Path(), edges = Path();
-    const samples = 28;
-    final upper = [
-      for (var i = 0; i <= samples; i++) silkAt(ribbon, i / samples, 1),
-    ];
-    final lower = [
-      for (var i = samples; i >= 0; i--) silkAt(ribbon, i / samples, -1),
-    ];
-    body.addPolygon([...upper, ...lower], true);
-    edges
-      ..addPolygon(upper, false)
-      ..addPolygon(lower, false);
-    for (final strand in [-.5, 0.0, .5]) {
-      strands.addPolygon([
-        for (var i = 0; i <= samples; i++) silkAt(ribbon, i / samples, strand),
-      ], false);
-    }
-    for (var j = 0; j < 3; j++) {
-      final u = (time * .09 + j / 3 + ribbon * .21) % 1;
-      glints.addOval(
-        Rect.fromCircle(
-          center: silkAt(ribbon, u, j.isEven ? 1 : -1),
-          radius: 1.4 + power,
-        ),
-      );
-    }
-    // Fade the ends into the board so no ribbon is cut off at the rails.
-    Shader along(double alpha) => LinearGradient(
-      colors: [
-        silk.withValues(alpha: 0),
-        silk.withValues(alpha: alpha * fade),
-        hue.withValues(alpha: alpha * .8 * fade),
-        silk.withValues(alpha: 0),
-      ],
-      stops: const [0, .3, .7, 1],
-    ).createShader(span);
-    c.drawPath(body, Paint()..shader = along(.1 + .06 * power));
-    c.drawPath(
-      strands,
-      Paint()
-        ..shader = along(.28 + .14 * power)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = .6,
-    );
-    c.drawPath(
-      edges,
-      Paint()
-        ..shader = along(.55 + .2 * power)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.1,
-    );
-  }
-  c.drawPath(
-    glints,
-    Paint()..color = glow.withValues(alpha: (.55 + .35 * power) * fade),
-  );
-  // The pale streaks hand their frame budget over to the embers as the board
-  // darkens, so the dark tiers cost no more to draw than the bright ones.
-  final streaks = Path();
-  for (var i = 0; i < (12 * power * (1 - darkness)).ceil(); i++) {
-    final x = (28.0 + (i * 83 % 304)) * horizontalSpread,
-        y = 16 + (i * 137 + time * (25 + 75 * power)) % 520;
-    streaks
-      ..moveTo(x, y)
-      ..lineTo(x, y - 3 - 18 * power);
-  }
-  c.drawPath(
-    streaks,
-    Paint()
-      ..color = Colors.white.withValues(
-        alpha: (.18 + .18 * power) * (subdued ? .3 : 1),
-      )
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1 + power,
-  );
-  if (darkness > 0)
-    paintComboEmbers(
-      c,
-      game.clock,
-      darkness * (.25 + .75 * power) * (subdued ? .25 : 1),
-      power: power,
-      horizontalSpread: horizontalSpread,
-    );
+  final fade = subdued ? .35 : 1.0;
+  paintComboMotif(c, game, power, game.clock, fade, horizontalSpread);
 }
 
-/// Embers that rise through the dark tiers. Positions come from the clock and
-/// the index alone: no particle state to own, reset or leak between runs, and
-/// every ember lands in one of four batched paths to keep the draw count flat.
-void paintComboEmbers(
+/// The calm combo effect each ball brings from its own world.
+enum ComboMotif {
+  motes,
+  bubbles,
+  rain,
+  embers,
+  snow,
+  twinkle,
+  petals,
+  orbit,
+  pulses,
+  drift,
+}
+
+ComboMotif comboMotif(BallCosmetic ball) => switch (ball) {
+  BallCosmetic.coral || BallCosmetic.pearl => ComboMotif.bubbles,
+  BallCosmetic.neon => ComboMotif.rain,
+  BallCosmetic.nova || BallCosmetic.phoenix => ComboMotif.embers,
+  BallCosmetic.aurora || BallCosmetic.comet => ComboMotif.snow,
+  BallCosmetic.nebula ||
+  BallCosmetic.quasar ||
+  BallCosmetic.singularity ||
+  BallCosmetic.plasma => ComboMotif.twinkle,
+  BallCosmetic.malachite ||
+  BallCosmetic.genesis ||
+  BallCosmetic.obsidian => ComboMotif.petals,
+  BallCosmetic.chronosphere => ComboMotif.orbit,
+  BallCosmetic.circuit || BallCosmetic.reactor => ComboMotif.pulses,
+  BallCosmetic.eclipse => ComboMotif.drift,
+  _ => ComboMotif.motes,
+};
+
+/// A few slow, dim particles in the ball's own style. Every shape lands in
+/// one of two batched paths, so the cost stays at two draws per frame.
+void paintComboMotif(
   Canvas c,
-  double clock,
-  double darkness, {
-  double power = 1,
-  double horizontalSpread = 1,
-}) {
-  final violet = comboEnergyColor(power);
-  const spark = Color(0xFFFFE6B8);
-  final count = (InfiniteTuning.maxParticles * darkness).round();
-  final glow = Path(), cores = Path(), sparks = Path(), trails = Path();
-  for (var i = 0; i < count; i++) {
-    final speed = 34 + (i % 5) * 13.0;
-    final life = (clock * speed + i * 137) % 600;
-    final y = 570 - life;
-    if (y < -10) continue;
-    // Fade in off the bottom edge and out again near the top of the field.
-    final fade =
-        (life / 90).clamp(0.0, 1.0) * ((600 - life) / 200).clamp(0.0, 1.0);
-    if (fade <= .02) continue;
-    final sway = math.sin(clock * 1.7 + i * .8) * (5 + i % 4);
-    final p = Offset(((i * 97) % 320 + 22.0 + sway) * horizontalSpread, y);
-    final twinkle = .75 + .25 * math.sin(clock * 4 + i * 1.3);
-    final radius = (1.3 + (i % 3) * .55) * twinkle * fade;
-    glow.addOval(Rect.fromCircle(center: p, radius: radius * 3.4));
-    (i % 4 == 0 ? sparks : cores).addOval(
-      Rect.fromCircle(center: p, radius: radius),
-    );
-    trails.addRect(
-      Rect.fromLTWH(p.dx - radius * .45, p.dy, radius * .9, radius * 4.5),
-    );
+  BalanceGame game,
+  double power,
+  double t,
+  double fade,
+  double horizontalSpread,
+) {
+  final motif = comboMotif(game.cosmetic);
+  var tint = Color.lerp(
+    BallWorld.of(game.cosmetic).accent,
+    comboEnergyColor(power),
+    .25,
+  )!;
+  if (boardFieldColors(game)[1].computeLuminance() > .3) {
+    tint = Color.lerp(tint, const Color(0xFF243052), .45)!;
   }
-  final alpha = .55 * darkness;
-  c.drawPath(glow, Paint()..color = violet.withValues(alpha: alpha * .28));
-  c.drawPath(trails, Paint()..color = violet.withValues(alpha: alpha * .22));
-  c.drawPath(cores, Paint()..color = violet.withValues(alpha: alpha));
-  c.drawPath(sparks, Paint()..color = spark.withValues(alpha: alpha));
+  // The dark tiers add a few more of the same shapes, never a second effect.
+  final count = 4 + (8 * power + 6 * comboDarkness(power)).round();
+  final shapes = Path(), halos = Path();
+  var stroke = false;
+  double column(int i) => ((i * 97) % 300 + 20.0) * horizontalSpread;
+  Offset rising(int i, double speed, double sway) => Offset(
+    column(i) + math.sin(t * .6 + i) * sway,
+    560 - (t * speed * (1 + i % 3 * .3) + i * 137) % 600,
+  );
+  Offset falling(int i, double speed, double sway) => Offset(
+    column(i) + math.sin(t * .5 + i * 1.3) * sway,
+    (t * speed * (1 + i % 3 * .25) + i * 137) % 600 - 30,
+  );
+  void dot(Offset p, double r, double halo) {
+    shapes.addOval(Rect.fromCircle(center: p, radius: r));
+    if (halo > 0) halos.addOval(Rect.fromCircle(center: p, radius: halo));
+  }
+
+  for (var i = 0; i < count; i++) {
+    switch (motif) {
+      case ComboMotif.motes:
+        dot(rising(i, 9, 8), 1.6, 5);
+      case ComboMotif.embers:
+        dot(rising(i, 16, 6), 1.4, 4);
+      case ComboMotif.bubbles:
+        stroke = true;
+        final p = rising(i, 14, 6), r = 2.5 + i % 3 * 1.5;
+        shapes.addOval(Rect.fromCircle(center: p, radius: r));
+        halos.addOval(
+          Rect.fromCircle(center: p - Offset(r, r) * .4, radius: .8),
+        );
+      case ComboMotif.snow:
+        dot(falling(i, 10, 10), 1.5, 4);
+      case ComboMotif.rain:
+        stroke = true;
+        final p = Offset(
+          column(i),
+          (t * 90 * (1 + i % 3 * .15) + i * 137) % 620 - 40,
+        );
+        shapes
+          ..moveTo(p.dx, p.dy)
+          ..lineTo(p.dx - 3, p.dy + 14);
+      case ComboMotif.twinkle:
+        final p = Offset(column(i), ((i * i * 53 + i * 29) % 470) + 35.0);
+        final glow = (math.sin(t * .9 + i * 2.1) + 1) / 2;
+        if (glow < .3) continue;
+        final r = 2 + 3 * glow, w = r * .25;
+        shapes.addPolygon([
+          p + Offset(0, -r),
+          p + Offset(w, -w),
+          p + Offset(r, 0),
+          p + Offset(w, w),
+          p + Offset(0, r),
+          p + Offset(-w, w),
+          p + Offset(-r, 0),
+          p + Offset(-w, -w),
+        ], true);
+        halos.addOval(Rect.fromCircle(center: p, radius: 4 * glow));
+      case ComboMotif.petals:
+        final p = falling(i, 12, 14);
+        final a = t * .8 + i;
+        final d = Offset(math.cos(a), math.sin(a)) * 5;
+        final n = Offset(-d.dy, d.dx) * .45;
+        shapes.addPolygon([p - d, p + n, p + d, p - n], true);
+      case ComboMotif.orbit:
+        // Sparks tick around the clock face, easing into each second.
+        final step = t.floor() + Curves.easeOut.transform(t % 1);
+        final a = (step + i * 60 / count) * math.pi / 30 - math.pi / 2;
+        final o = Offset(170 * horizontalSpread, 132);
+        dot(o + Offset(math.cos(a), math.sin(a)) * 104, 1.8, 5);
+      case ComboMotif.pulses:
+        final y = (i * 61 % 460) + 40.0;
+        final x =
+            ((t * 30 * (1 + i % 3 * .2) + i * 137) % 400 - 30) *
+            horizontalSpread;
+        shapes.addRect(Rect.fromLTWH(x, y - .6, 10, 1.2));
+        halos.addRect(Rect.fromLTWH(x - 4, y - 1.5, 18, 3));
+      case ComboMotif.drift:
+        dot(
+          Offset(
+            ((t * 12 * (1 + i % 3 * .3) + i * 137) % 380 - 20) *
+                horizontalSpread,
+            (i * 173 % 440) + 60 + math.sin(t * .5 + i) * 6,
+          ),
+          1.2,
+          3.5,
+        );
+    }
+  }
+  final alpha = (.3 + .25 * power) * fade;
+  c.drawPath(halos, Paint()..color = tint.withValues(alpha: alpha * .35));
+  c.drawPath(
+    shapes,
+    Paint()
+      ..color = tint.withValues(alpha: alpha)
+      ..style = stroke ? PaintingStyle.stroke : PaintingStyle.fill
+      ..strokeWidth = .9,
+  );
 }
 
 void paintInfiniteItems(Canvas c, BalanceGame game, bool reducedMotion) {

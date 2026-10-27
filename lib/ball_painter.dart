@@ -97,10 +97,25 @@ void paintCosmetic(
     canvas.clipPath(shape);
     final phase = reducedMotion ? .5 : time * .65;
     if (ball == BallCosmetic.eclipse) {
+      // A moon phase: the night side runs off the rim, so only a lit
+      // crescent remains, softened by a penumbra and faint plum earthshine.
+      final shadow = center + Offset(radius * .36, -radius * .06);
+      final r = radius * .9;
       canvas.drawCircle(
-        center + Offset(radius * .22, 0),
-        radius * .76,
-        Paint()..color = const Color(0xFF242B45),
+        shadow,
+        r * 1.06,
+        Paint()..color = const Color(0xFF3B3354).withAlpha(90),
+      );
+      canvas.drawCircle(
+        shadow,
+        r,
+        Paint()
+          ..shader = const RadialGradient(
+            center: Alignment(-.6, -.3),
+            radius: 1.1,
+            colors: [Color(0xFF5B4B73), Color(0xFF3A3354), Color(0xFF241F38)],
+            stops: [0, .45, 1],
+          ).createShader(Rect.fromCircle(center: shadow, radius: r)),
       );
     } else if (ball == BallCosmetic.nebula) {
       for (var i = 0; i < 7; i++) {

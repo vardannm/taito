@@ -723,21 +723,6 @@ class _GameScreenState extends State<GameScreen>
             haloJoystick: profile.haloJoystick,
             recordForControl: (number, mode) =>
                 profile.levelRecord(number, mode),
-            onControlChanged: (choice) {
-              final mode = profile.temporaryLevelAccess
-                  ? choice
-                  : choice.supportedMode;
-              setState(() {
-                if (mode == ControlMode.oneFinger &&
-                    !profile.oneFingerPadAvailable) {
-                  profile.haloJoystick = true;
-                }
-                profile.controlMode = mode;
-                game.haloJoystick = profile.haloJoystick;
-                game.setControlMode(profile.controlMode);
-              });
-              unawaited(profile.save());
-            },
             records: {
               for (var i = 1; i <= ClassicLevels.count; i++)
                 i: profile.levelRecord(i, controlForMode(GameMode.classic)),
@@ -1505,34 +1490,11 @@ class _GameScreenState extends State<GameScreen>
                   Icons.touch_app,
                   () => start(GameMode.practice),
                 ),
-                const SizedBox(height: 12),
-                const MenuSection('MAKE IT YOURS'),
-                const SizedBox(height: 12),
-                choice(
-                  'GEAR SHOP',
-                  'Balls, worlds, platforms and upgrades',
-                  Icons.palette_outlined,
-                  showBallShop,
-                ),
-                choice(
-                  profile.achievementsReady > 0
-                      ? 'ACHIEVEMENTS (${profile.achievementsReady} ready)'
-                      : 'ACHIEVEMENTS',
-                  'Milestones worth celebrating',
-                  Icons.workspace_premium_outlined,
-                  showAchievements,
-                ),
                 choice(
                   'Goals, friends & backup',
                   'Your progress, connected',
                   Icons.emoji_events_outlined,
                   showClub,
-                ),
-                choice(
-                  'HOW TO PLAY',
-                  'Learn the art of balance',
-                  Icons.help_outline,
-                  showGuide,
                 ),
               ],
             ),
@@ -3374,144 +3336,6 @@ class _GameScreenState extends State<GameScreen>
         ),
       );
 
-  Future<void> showGuide() => showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: menuBackground,
-    showDragHandle: true,
-    isScrollControlled: true,
-    // Leave a visible strip above the sheet so tapping outside also closes it.
-    constraints: BoxConstraints(
-      maxHeight: MediaQuery.sizeOf(context).height * .9,
-    ),
-    builder: (context) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 28),
-            child: MenuHeading(
-              'A game of balance.',
-              eyebrow: 'HOW TO PLAY',
-              trailing: MenuIconButton(
-                key: const ValueKey('guide-close'),
-                icon: Icons.close_rounded,
-                tooltip: 'Close how to play',
-                onPressed: () => Navigator.pop(context),
-              ),
-            ),
-          ),
-          Flexible(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(28, 2, 28, 26),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  guideRow(
-                    '01',
-                    'One finger. Full control.',
-                    'Drag in the thumb pad below the board: left or right tilts the platform, up or down raises or lowers it with your finger. Holding still keeps its height. Release and grab anywhere to continue without a jump. The same controls work in Levels, Infinite and Merge.',
-                  ),
-                  guideRow(
-                    '02',
-                    'Prefer two fingers?',
-                    'Choose One-finger or Two-finger in Options. With two fingers, drag up or down anywhere on the left or right half of the board. Each side moves its end of the platform, so keep your thumbs low and clear of the ball. Move both together to lift, or one to tilt and roll. Release to hold the platform.',
-                  ),
-                  guideRow(
-                    '03',
-                    'Levels: follow the light.',
-                    'Lift and tilt into the glowing numbered holes in order, 1–10. Dark holes are traps. Each target returns the platform to the bottom; clear all ten with three balls. Consecutive targets build a multiplier and faster climbs earn bonus points. Choose your board with Choose Level.',
-                  ),
-                  guideRow(
-                    '04',
-                    'Infinite: keep climbing.',
-                    'Start with ${profile.startingHearts} hearts and steer as the board climbs. A hit costs one heart and resets your combo. You keep your position and controls, with ${InfiniteTuning.recoverySeconds} seconds of protection. Keep moving to escape the rising red floor. Pace grows from x1 to x${InfiniteTuning.maxPace} as you climb; gold crystals build your combo up to x${InfiniteTuning.maxCombo}. Missing a crystal keeps the combo; losing a heart resets it.',
-                  ),
-                  const Text(
-                    'Desktop: W / S = left end. ↑ / ↓ = right end. Esc = pause.',
-                    style: TextStyle(fontSize: 12, height: 1.5),
-                  ),
-                  guideRow(
-                    '05',
-                    'Collect the power-ups.',
-                    'Blue shields protect you for ${profile.shieldDuration.toInt()} seconds. Red-and-blue magnets pull in nearby coins, crystals, shields and hearts for ${profile.magnetDuration.toInt()} seconds; the magnet icon and countdown show time left. Another pickup refreshes its timer. Hearts restore a life up to your upgraded limit. Pausing freezes pickup timers.',
-                  ),
-                  guideRow(
-                    '06',
-                    'Read the warnings.',
-                    'Infinite adds forming holes, moving holes and lasers as you climb. Temporary platform cuts unlock at 1,000,000 points. Leave red warnings before they activate. During laser mazes, steer through the openings in the descending walls. Spiders fire aimed webs and later enemies attack in turns. In Levels, entering a spider territory starts a chase; contact ends the run. Each target resets the spiders.',
-                  ),
-                  guideRow(
-                    '07',
-                    'Merge: grow your number.',
-                    'Swipe to Number Merge before starting. Collect numbers equal to or smaller than your head and dodge larger numbers. Matching values merge and grow your chain. Build enough value to pass each numbered gate. Use the same tilt and lift controls to line up your next catch.',
-                  ),
-                  guideRow(
-                    '08',
-                    'Three ways to master it.',
-                    'Earn a star for finishing, one for a finish without misses, and one for beating the active-time target in the HUD. Classic also has one gold star to collect on each board: it adds a permanent star immediately, even if the run ends later. Each bonus star can only be earned once across all controls. Pauses and ball resets do not count toward active time.',
-                  ),
-                  guideRow(
-                    '09',
-                    'Make your coins count.',
-                    'Infinite coins save to your wallet. Shop offers balls with their own backgrounds, platforms, and permanent Infinite upgrades for hearts, shields and magnets. Stronger gear increases Infinite points; some balls add a built-in magnet. A gold dot on Shop means you can afford stronger gear or an upgrade. Equipment keeps the same movement and collision size.',
-                  ),
-                  guideRow(
-                    '10',
-                    'Choose your next run.',
-                    'Swipe between Infinite, Levels and Number Merge, tap Play, then touch your controls to begin. Arcade opens Daily, Practice and How to Play. Daily changes at midnight UTC; retry the same board to improve your record. Replay Tutorial in Options walks you through the controls, pickups and shop again.',
-                  ),
-                  primary('TRY PRACTICE', () {
-                    Navigator.pop(context);
-                    start(GameMode.practice);
-                  }),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      replayTutorial();
-                    },
-                    child: const Text('Replay Tutorial'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-
-  Widget guideRow(String number, String title, String body) => Padding(
-    padding: const EdgeInsets.only(bottom: 20),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(number, style: label(menuGold)),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                body,
-                style: TextStyle(fontSize: 13, height: 1.5, color: menuMuted),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-
   Future<void> showClub() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -3636,29 +3460,6 @@ class _GameScreenState extends State<GameScreen>
                     unawaited(profile.save());
                   },
                 ),
-                if (profile.infiniteBestScore >
-                    InfiniteTuning.fastStartUnlockScore) ...[
-                  const SizedBox(height: 26),
-                  const MenuSection('Infinite'),
-                  const SizedBox(height: 12),
-                  MenuToggle(
-                    key: const ValueKey('infinite-fast-start'),
-                    title: 'Faster start',
-                    icon: Icons.speed_rounded,
-                    subtitle:
-                        'Start up to ${InfiniteTuning.startingSpeedMultiplier(profile.infiniteBestScore).toStringAsFixed(2)}× faster with a higher pace. Turn off for a relaxed opening. Applies to your next run.',
-                    value: profile.infiniteFastStart,
-                    onChanged: (value) {
-                      update(() => profile.infiniteFastStart = value);
-                      setState(() {
-                        if (game.infinite && game.waitingForInput) {
-                          prepareInfinite(retry: readyRetry);
-                        }
-                      });
-                      unawaited(profile.save());
-                    },
-                  ),
-                ],
                 const SizedBox(height: 26),
                 const MenuSection('Feel & sound'),
                 const SizedBox(height: 12),
@@ -3702,29 +3503,13 @@ class _GameScreenState extends State<GameScreen>
                     icon: Icons.piano_rounded,
                     onTap: () => showMusicCredits(context),
                   ),
-                const SizedBox(height: 16),
-                MenuPanel(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const MenuSection('Your records'),
-                      const SizedBox(height: 10),
-                      Text(
-                        '${profile.totalStars} Classic stars  •  ${profile.runs} runs',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Infinite best ${profile.infiniteBest}m',
-                        style: const TextStyle(color: menuMint),
-                      ),
-                      if (!profile.available)
-                        const Text(
-                          'Local storage is unavailable. Records will last for this session.',
-                        ),
-                    ],
+                if (!profile.available) ...[
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Local storage is unavailable. Records will last for this session.',
+                    style: TextStyle(color: menuMuted),
                   ),
-                ),
+                ],
                 const SizedBox(height: 18),
                 MenuAction(
                   title: 'Goals, friends & backup',

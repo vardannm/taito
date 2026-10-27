@@ -128,16 +128,17 @@ void main() {
     },
   );
 
-  testWidgets('large level picker offers Halo instead of the original pad', (
+  testWidgets('level picker has no control chooser and keeps Settings', (
     tester,
   ) async {
     final profile = await launchControls(tester, const Size(1114, 720));
+    profile
+      ..haloJoystick = true
+      ..controlMode = ControlMode.oneFinger;
     await openClassicLevels(tester);
-    expect(find.text('One-finger'), findsNothing);
-    expect(find.text('Halo Joystick'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('level-control-oneFinger')));
-    await tester.pump();
-    expect(profile.haloJoystick, isTrue);
+    for (final mode in ControlMode.values) {
+      expect(find.byKey(ValueKey('level-control-${mode.name}')), findsNothing);
+    }
     await tester.tap(find.byKey(const ValueKey('level-1')));
     await tester.pump();
     final game = tester.widget<PivotBoard>(find.byType(PivotBoard)).game;

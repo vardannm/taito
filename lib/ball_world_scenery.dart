@@ -401,7 +401,7 @@ class _Scenery {
     );
     wash(
       Rect.fromCircle(center: sun, radius: 230),
-      color(0xFFDCD6FF).withAlpha(55),
+      color(0xFFDCD6FF).withAlpha(22),
     );
     stars(color(0xFFF8E6D2), 44);
     const glints = [
@@ -437,40 +437,11 @@ class _Scenery {
     for (final p in figure) {
       c.drawCircle(p, 1.4, Paint()..color = color(0xFFFFF1E2).withAlpha(190));
     }
-    // Long celestial rays from the aether sun.
-    final rays = Path();
-    for (var i = 0; i < 18; i++) {
-      final a = i * math.pi / 9 + .09;
-      final spread = i.isEven ? .035 : .018;
-      rays
-        ..moveTo(sun.dx, sun.dy)
-        ..lineTo(
-          sun.dx + math.cos(a - spread) * 420,
-          sun.dy + math.sin(a - spread) * 420,
-        )
-        ..lineTo(
-          sun.dx + math.cos(a + spread) * 420,
-          sun.dy + math.sin(a + spread) * 420,
-        )
-        ..close();
-    }
-    c.drawPath(
-      rays,
-      Paint()
-        ..shader = RadialGradient(
-          colors: [
-            Colors.white.withAlpha(34),
-            color(0xFFE6DCFF).withAlpha(16),
-            Colors.white.withAlpha(0),
-          ],
-          stops: const [0, .45, 1],
-        ).createShader(Rect.fromCircle(center: sun, radius: 420)),
-    );
     // Rose-gold orbital rings: their back halves pass behind the sun.
     const rings = [
-      (330.0, 96.0, 1.5, 120),
-      (250.0, 70.0, .8, 95),
-      (410.0, 128.0, 3.0, 45),
+      (330.0, 96.0, 1.2, 60),
+      (250.0, 70.0, .7, 45),
+      (410.0, 128.0, 2.0, 22),
     ];
     void orbit(bool front) {
       c.save();
@@ -494,8 +465,7 @@ class _Scenery {
         if ((math.sin(a) > 0) != front) continue;
         final (w, h, _, _) = rings[i % 2];
         final p = Offset(math.cos(a) * w / 2, math.sin(a) * h / 2);
-        c.drawCircle(p, 6, Paint()..color = accent.withAlpha(40));
-        c.drawCircle(p, 2.6, Paint()..color = color(0xFFFFE8D6));
+        c.drawCircle(p, 2.2, Paint()..color = color(0xFFFFE8D6).withAlpha(120));
       }
       c.restore();
     }
@@ -507,8 +477,8 @@ class _Scenery {
       Paint()
         ..shader = RadialGradient(
           colors: [
-            Colors.white.withAlpha(95),
-            color(0xFFE9E1FF).withAlpha(45),
+            Colors.white.withAlpha(30),
+            color(0xFFE9E1FF).withAlpha(14),
             color(0xFFC9B8F0).withAlpha(0),
           ],
           stops: const [0, .4, 1],
@@ -520,7 +490,11 @@ class _Scenery {
       Paint()
         ..shader = RadialGradient(
           center: const Alignment(-.35, -.4),
-          colors: [color(0xFFF6F2FF), color(0xFFD9D4F2), color(0xFFA9B9DA)],
+          colors: [
+            color(0xFFF6F2FF).withAlpha(110),
+            color(0xFFD9D4F2).withAlpha(90),
+            color(0xFFA9B9DA).withAlpha(70),
+          ],
         ).createShader(Rect.fromCircle(center: sun, radius: 17)),
     );
     orbit(true);
@@ -715,74 +689,36 @@ class _Scenery {
   }
 
   void chronoCitadel() {
-    const o = Offset(170, 150);
+    // One faint clock face high above a quiet board; nothing else competes
+    // with the playfield.
+    const o = Offset(170, 132);
     final gold = accent;
     wash(
-      Rect.fromCircle(center: o, radius: 250),
-      color(0xFF7CE6D6).withAlpha(42),
+      Rect.fromCircle(center: o, radius: 210),
+      color(0xFF7CE6D6).withAlpha(20),
     );
-    stars(color(0xFFEADAA6), 26);
-    // Gears turn behind the dial, half hidden past the board edges.
-    clockGear(const Offset(-8, 318), 76, 20, .2);
-    clockGear(const Offset(336, 254), 54, 15, .5);
-    clockGear(const Offset(292, 330), 31, 9, 0);
-    clockGear(const Offset(58, 40), 40, 12, .9);
-    // The astronomical dial: sapphire glass, bezel, ticks and a zodiac band.
+    stars(color(0xFFEADAA6), 14);
     c.drawCircle(
       o,
-      130,
+      104,
       Paint()
-        ..shader = RadialGradient(
-          colors: [
-            color(0xFF8AF3E6).withAlpha(55),
-            color(0xFF1F7C80).withAlpha(30),
-            color(0xFF113D49).withAlpha(0),
-          ],
-          stops: const [0, .72, 1],
-        ).createShader(Rect.fromCircle(center: o, radius: 130)),
-    );
-    final rings = Path();
-    for (final r in [122.0, 98.0, 84.0, 40.0]) {
-      rings.addOval(Rect.fromCircle(center: o, radius: r));
-    }
-    c.drawPath(
-      rings,
-      Paint()
-        ..color = gold.withAlpha(75)
+        ..color = gold.withAlpha(40)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = .9,
+        ..strokeWidth = 1.6,
     );
     c.drawCircle(
       o,
-      128,
+      80,
       Paint()
-        ..color = gold.withAlpha(95)
+        ..color = gold.withAlpha(22)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.6,
+        ..strokeWidth = .8,
     );
-    final ticks = Path(), markers = Path();
-    for (var i = 0; i < 60; i++) {
-      final a = i * math.pi / 30 - math.pi / 2;
-      final d = Offset(math.cos(a), math.sin(a));
-      final p = o + d * 122;
-      final q = o + d * (i % 5 == 0 ? 114 : 118);
-      ticks
-        ..moveTo(p.dx, p.dy)
-        ..lineTo(q.dx, q.dy);
-      if (i % 5 == 0) {
-        final n = Offset(-d.dy, d.dx) * (i % 15 == 0 ? 4.2 : 2.8);
-        markers.addPolygon([
-          o + d * 112,
-          o + d * 106 + n,
-          o + d * 99,
-          o + d * 106 - n,
-        ], true);
-      }
-    }
+    final ticks = Path();
     for (var i = 0; i < 12; i++) {
-      final a = i * math.pi / 6 + math.pi / 12;
+      final a = i * math.pi / 6 - math.pi / 2;
       final d = Offset(math.cos(a), math.sin(a));
-      final p = o + d * 84, q = o + d * 98;
+      final p = o + d * 98, q = o + d * (i % 3 == 0 ? 86 : 91);
       ticks
         ..moveTo(p.dx, p.dy)
         ..lineTo(q.dx, q.dy);
@@ -790,107 +726,32 @@ class _Scenery {
     c.drawPath(
       ticks,
       Paint()
-        ..color = gold.withAlpha(105)
+        ..color = gold.withAlpha(50)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1,
+        ..strokeWidth = 1.2,
     );
-    c.drawPath(markers, Paint()..color = gold.withAlpha(150));
-    final signs = Path();
-    for (var i = 0; i < 12; i++) {
-      final a = i * math.pi / 6;
-      signs.addOval(
-        Rect.fromCircle(
-          center: o + Offset(math.cos(a), math.sin(a)) * 91,
-          radius: i % 3 == 0 ? 2.4 : 1.5,
-        ),
-      );
-    }
-    c.drawPath(signs, Paint()..color = color(0xFF9AF0E2).withAlpha(150));
-    // Guilloché rosette, engraved like a watch dial.
-    final rosette = Path();
-    for (var k = 0; k < 6; k++) {
-      for (var i = 0; i <= 180; i++) {
-        final a = i * math.pi / 90;
-        final r = 60 + 16 * math.sin(a * 9 + k * math.pi / 9);
-        final p = o + Offset(math.cos(a), math.sin(a)) * r;
-        if (i == 0) {
-          rosette.moveTo(p.dx, p.dy);
-        } else {
-          rosette.lineTo(p.dx, p.dy);
-        }
-      }
-    }
-    c.drawPath(
-      rosette,
-      Paint()
-        ..color = gold.withAlpha(34)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = .6,
-    );
-    // Hands at ten past ten, with spade tips and a counterweighted seconds.
     void hand(double turns, double length, double width) {
       final a = turns * math.pi * 2 - math.pi / 2;
-      final d = Offset(math.cos(a), math.sin(a)), n = Offset(-d.dy, d.dx);
-      polygon([
-        o - d * 12,
-        o + n * width / 2,
-        o + d * length * .72 + n * width * .3,
-        o + d * length * .8 + n * width,
-        o + d * length,
-        o + d * length * .8 - n * width,
-        o + d * length * .72 - n * width * .3,
-        o - n * width / 2,
-      ], gold.withAlpha(150));
+      final d = Offset(math.cos(a), math.sin(a));
+      line(o, o + d * length, gold.withAlpha(55), width);
     }
 
-    hand((10 + 9 / 60) / 12, 58, 5.5);
-    hand(9 / 60, 90, 4);
-    const second = 38 / 60 * math.pi * 2 - math.pi / 2;
-    final sd = Offset(math.cos(second), math.sin(second));
-    final teal = color(0xFF9AF0E2).withAlpha(160);
-    line(o - sd * 22, o + sd * 108, teal, .9);
-    c.drawCircle(o - sd * 18, 3, Paint()..color = teal);
-    c.drawCircle(o, 6, Paint()..color = gold.withAlpha(200));
-    c.drawCircle(o, 2.4, Paint()..color = color(0xFF4FD6C8));
-    // A sapphire moon riding the bezel.
-    final moon = o + Offset(math.cos(2.45), math.sin(2.45)) * 128;
-    c.drawCircle(moon, 9, Paint()..color = color(0xFF4FD6C8).withAlpha(45));
-    c.drawCircle(
-      moon,
-      4.5,
-      Paint()
-        ..shader = RadialGradient(
-          center: const Alignment(-.4, -.4),
-          colors: [color(0xFFD8FFF8), color(0xFF3FBFB4), color(0xFF145A63)],
-        ).createShader(Rect.fromCircle(center: moon, radius: 4.5)),
-    );
-    // Drifting gold chronons.
-    for (var i = 0; i < 9; i++) {
-      final p = Offset(
-        18 + (i * 113 % 304).toDouble(),
-        268 + (i * 71 % 150).toDouble(),
-      );
-      sparkle(p, i % 3 == 0 ? 3.5 : 2.2, gold.withAlpha(140));
-    }
-    // The citadel: pale far spires, then the gilded crystal towers.
+    hand((10 + 9 / 60) / 12, 46, 2.4);
+    hand(9 / 60, 70, 1.6);
+    c.drawCircle(o, 3, Paint()..color = gold.withAlpha(70));
+    // A low line of faint spires, then a scrim that sets the board apart.
     for (final (x, h, w) in [
-      (22.0, 112.0, 13.0),
-      (98.0, 92.0, 11.0),
-      (244.0, 104.0, 12.0),
-      (318.0, 130.0, 14.0),
+      (40.0, 70.0, 11.0),
+      (128.0, 56.0, 10.0),
+      (214.0, 64.0, 10.0),
+      (300.0, 80.0, 12.0),
     ]) {
-      crystalTower(x, 512, w, h * .8, .6);
+      crystalTower(x, 540, w, h, .75);
     }
-    for (final (x, h, w, clock) in [
-      (54.0, 84.0, 18.0, false),
-      (126.0, 118.0, 16.0, false),
-      (170.0, 168.0, 22.0, true),
-      (216.0, 108.0, 16.0, false),
-      (290.0, 92.0, 19.0, false),
-    ]) {
-      crystalTower(x, 540, w, h * .78, .3, clock: clock);
-    }
-    ridge(560, 34, color(0xFF0E3240), seed: 3);
+    c.drawRect(
+      const Rect.fromLTWH(0, 0, 340, 540),
+      Paint()..color = top.withAlpha(70),
+    );
   }
 
   void paint(BallCosmetic ball) {

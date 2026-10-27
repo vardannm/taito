@@ -22,7 +22,6 @@ class LevelPicker extends StatefulWidget {
     this.onSkipTutorial,
     this.allLevelsUnlocked = false,
     this.controlMode,
-    this.onControlChanged,
     this.recordForControl,
     this.haloJoystick = false,
   });
@@ -30,7 +29,6 @@ class LevelPicker extends StatefulWidget {
   final bool allLevelsUnlocked;
   final bool haloJoystick;
   final ControlMode? controlMode;
-  final ValueChanged<ControlMode>? onControlChanged;
   final LevelRecord Function(int, ControlMode)? recordForControl;
   final VoidCallback? onSkipTutorial;
   final int selected, totalStars;
@@ -91,8 +89,9 @@ class _LevelPickerState extends State<LevelPicker> {
   }
 
   bool skipped = false;
-  late ControlMode? _preferredControl = widget.controlMode;
-  late bool _haloJoystick = widget.haloJoystick;
+  // Controls are chosen in Settings; the roadmap only shows their records.
+  ControlMode? get _preferredControl => widget.controlMode;
+  bool get _haloJoystick => widget.haloJoystick;
   bool get wideControls =>
       !allowsOneFingerPad(MediaQuery.sizeOf(context).shortestSide);
   ControlMode? get control =>
@@ -119,306 +118,297 @@ class _LevelPickerState extends State<LevelPicker> {
   ValueChanged<int> get onSelected => widget.onSelected;
   @override
   Widget build(BuildContext context) => MenuSurface(
-    child: Stack(
+    child: Column(
       children: [
-        LayoutBuilder(
-          builder: (context, bounds) {
-            final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
-            final rowHeight = 166 + 65 * (textScale - 1).clamp(0.0, 2.0);
-            if (!_placedAtProgress && !(widget.tutorial && !skipped)) {
-              _placedAtProgress = true;
-              WidgetsBinding.instance.addPostFrameCallback(
-                (_) => _showProgress(rowHeight),
-              );
-            }
-            Widget heading(String title, String subtitle) => SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 20, 18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    MenuQuietButton(
-                      icon: Icons.arrow_back_rounded,
-                      tooltip: 'Back',
-                      onPressed: () => Navigator.maybePop(context),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 25,
-                        fontWeight: FontWeight.w800,
-                        color: menuText,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    if (subtitle.isNotEmpty)
-                      Text(
-                        subtitle,
-                        style: TextStyle(fontSize: 12, color: menuMuted),
-                      ),
-                  ],
-                ),
-              ),
-            );
-            Widget road(int first, int count) => SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-              sliver: SliverFixedExtentList(
-                itemExtent: rowHeight,
-                delegate: SliverChildBuilderDelegate((context, index) {
-                  final number = first + index;
-                  final open = unlocked(number);
-                  final active = number == selected && open;
-                  final required = ClassicLevels.requiredStars(number);
-                  final record =
-                      control != null && widget.recordForControl != null
-                      ? widget.recordForControl!(number, control!)
-                      : records[number] ?? const LevelRecord();
-                  return SizedBox(
-                    key: number == 1 ? _firstRowKey : null,
-                    height: rowHeight,
-                    child: CustomPaint(
-                      painter: LevelRoadPainter(number, open: open),
-                      child: Align(
-                        alignment: Alignment(
-                          math.sin((number - 1) * math.pi / 2) * .78,
-                          0,
+        // Kept outside the scroll so the way back stays in reach on every row.
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: MenuQuietButton(
+              icon: Icons.arrow_back_rounded,
+              tooltip: 'Back',
+              onPressed: () => Navigator.maybePop(context),
+            ),
+          ),
+        ),
+        Expanded(
+          child: Stack(
+            children: [
+              LayoutBuilder(
+                builder: (context, bounds) {
+                  final textScale =
+                      MediaQuery.textScalerOf(context).scale(14) / 14;
+                  final rowHeight = 166 + 65 * (textScale - 1).clamp(0.0, 2.0);
+                  if (!_placedAtProgress && !(widget.tutorial && !skipped)) {
+                    _placedAtProgress = true;
+                    WidgetsBinding.instance.addPostFrameCallback(
+                      (_) => _showProgress(rowHeight),
+                    );
+                  }
+                  Widget heading(String title, String subtitle) =>
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 4, 20, 18),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style: const TextStyle(
+                                  fontSize: 25,
+                                  fontWeight: FontWeight.w800,
+                                  color: menuText,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              if (subtitle.isNotEmpty)
+                                Text(
+                                  subtitle,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: menuMuted,
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
-                        child: SizedBox(
-                          width: math.min(180, bounds.maxWidth - 70),
-                          child: Semantics(
-                            button: true,
-                            enabled: open,
-                            label:
-                                'Level $number, $classicLevelCoinPrize coin completion prize${number >= 31 ? ", spider territory" : ""}${open ? "" : ", locked, needs $required stars; you have $totalStars"}',
-                            child: Material(
-                              key: number == 1 ? firstLevelKey : null,
-                              color: Colors.transparent,
-                              child: InkWell(
-                                key: ValueKey('level-$number'),
-                                borderRadius: BorderRadius.circular(28),
-                                onTap:
-                                    open &&
-                                        (!widget.tutorial ||
-                                            skipped ||
-                                            number == 1)
-                                    ? () => onSelected(number)
-                                    : null,
-                                child: Padding(
-                                  padding: const EdgeInsets.all(8),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Container(
-                                        width: number % 10 == 0 ? 72 : 64,
-                                        height: number % 10 == 0 ? 72 : 64,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: active
-                                              ? menuGold
-                                              : open
-                                              ? menuRaised
-                                              : menuBackground,
-                                          border: Border.all(
-                                            color: active
-                                                ? menuGold
-                                                : open
-                                                ? menuMint
-                                                : menuLine,
-                                            width: active ? 4 : 2,
-                                          ),
-                                          boxShadow: active
-                                              ? [
-                                                  BoxShadow(
-                                                    color: menuGold.withAlpha(
-                                                      45,
-                                                    ),
-                                                    blurRadius: 22,
-                                                  ),
-                                                ]
-                                              : [],
-                                        ),
-                                        // Large system text must shrink to fit
-                                        // the fixed circle, not spill out of it.
-                                        padding: const EdgeInsets.all(6),
-                                        child: FittedBox(
-                                          fit: BoxFit.scaleDown,
-                                          child: open
-                                              ? Text(
-                                                  '$number'.padLeft(2, '0'),
-                                                  style: TextStyle(
-                                                    fontSize: 23,
-                                                    fontWeight: FontWeight.w800,
-                                                    fontFamily: 'sans-serif',
-                                                    color: active
-                                                        ? menuBackground
-                                                        : menuText,
-                                                  ),
-                                                )
-                                              : Column(
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment.center,
-                                                  children: [
-                                                    const Icon(
-                                                      Icons
-                                                          .lock_outline_rounded,
-                                                      size: 18,
-                                                      color: menuMuted,
-                                                    ),
-                                                    Text(
-                                                      '$number',
-                                                      style: const TextStyle(
-                                                        fontSize: 12,
-                                                        color: menuMuted,
-                                                      ),
-                                                    ),
-                                                  ],
+                      );
+                  Widget road(int first, int count) => SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                    sliver: SliverFixedExtentList(
+                      itemExtent: rowHeight,
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        final number = first + index;
+                        final open = unlocked(number);
+                        final active = number == selected && open;
+                        final required = ClassicLevels.requiredStars(number);
+                        final record =
+                            control != null && widget.recordForControl != null
+                            ? widget.recordForControl!(number, control!)
+                            : records[number] ?? const LevelRecord();
+                        return SizedBox(
+                          key: number == 1 ? _firstRowKey : null,
+                          height: rowHeight,
+                          child: CustomPaint(
+                            painter: LevelRoadPainter(number, open: open),
+                            child: Align(
+                              alignment: Alignment(
+                                math.sin((number - 1) * math.pi / 2) * .78,
+                                0,
+                              ),
+                              child: SizedBox(
+                                width: math.min(180, bounds.maxWidth - 70),
+                                child: Semantics(
+                                  button: true,
+                                  enabled: open,
+                                  label:
+                                      'Level $number, $classicLevelCoinPrize coin completion prize${number >= 31 ? ", spider territory" : ""}${open ? "" : ", locked, needs $required stars; you have $totalStars"}',
+                                  child: Material(
+                                    key: number == 1 ? firstLevelKey : null,
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      key: ValueKey('level-$number'),
+                                      borderRadius: BorderRadius.circular(28),
+                                      onTap:
+                                          open &&
+                                              (!widget.tutorial ||
+                                                  skipped ||
+                                                  number == 1)
+                                          ? () => onSelected(number)
+                                          : null,
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(8),
+                                        child: Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Container(
+                                              width: number % 10 == 0 ? 72 : 64,
+                                              height: number % 10 == 0
+                                                  ? 72
+                                                  : 64,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: active
+                                                    ? menuGold
+                                                    : open
+                                                    ? menuRaised
+                                                    : menuBackground,
+                                                border: Border.all(
+                                                  color: active
+                                                      ? menuGold
+                                                      : open
+                                                      ? menuMint
+                                                      : menuLine,
+                                                  width: active ? 4 : 2,
                                                 ),
+                                                boxShadow: active
+                                                    ? [
+                                                        BoxShadow(
+                                                          color: menuGold
+                                                              .withAlpha(45),
+                                                          blurRadius: 22,
+                                                        ),
+                                                      ]
+                                                    : [],
+                                              ),
+                                              // Large system text must shrink to fit
+                                              // the fixed circle, not spill out of it.
+                                              padding: const EdgeInsets.all(6),
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                child: open
+                                                    ? Text(
+                                                        '$number'.padLeft(
+                                                          2,
+                                                          '0',
+                                                        ),
+                                                        style: TextStyle(
+                                                          fontSize: 23,
+                                                          fontWeight:
+                                                              FontWeight.w800,
+                                                          fontFamily:
+                                                              'sans-serif',
+                                                          color: active
+                                                              ? menuBackground
+                                                              : menuText,
+                                                        ),
+                                                      )
+                                                    : Column(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          const Icon(
+                                                            Icons
+                                                                .lock_outline_rounded,
+                                                            size: 18,
+                                                            color: menuMuted,
+                                                          ),
+                                                          Text(
+                                                            '$number',
+                                                            style:
+                                                                const TextStyle(
+                                                                  fontSize: 12,
+                                                                  color:
+                                                                      menuMuted,
+                                                                ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 7),
+                                            Flexible(
+                                              child: Text(
+                                                '+$classicLevelCoinPrize COINS',
+                                                textAlign: TextAlign.center,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  backgroundColor:
+                                                      menuBackground,
+                                                  fontSize: 11,
+                                                  height: 1.2,
+                                                  color: menuGold,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            if (open)
+                                              ColoredBox(
+                                                color: menuBackground,
+                                                child: StarRow(
+                                                  record.starMask,
+                                                  count: 4,
+                                                  size: 15,
+                                                  dark: true,
+                                                ),
+                                              ),
+                                            const SizedBox(height: 3),
+                                            FittedBox(
+                                              fit: BoxFit.scaleDown,
+                                              child: Text(
+                                                !open
+                                                    ? '$totalStars / $required STARS'
+                                                    : record.stars > 0 ||
+                                                          record.attempts > 0
+                                                    ? '${record.stars}/4 STARS'
+                                                    : number % 10 == 0
+                                                    ? 'FINALE'
+                                                    : 'UNPLAYED',
+                                                style: const TextStyle(
+                                                  backgroundColor:
+                                                      menuBackground,
+                                                  fontSize: 9,
+                                                  color: menuMuted,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ),
+                                            if (open && record.bestTime != null)
+                                              Text(
+                                                formatRunTime(record.bestTime!),
+                                                style: const TextStyle(
+                                                  backgroundColor:
+                                                      menuBackground,
+                                                  fontSize: 9,
+                                                  color: menuMuted,
+                                                ),
+                                              ),
+                                          ],
                                         ),
                                       ),
-                                      const SizedBox(height: 7),
-                                      Flexible(
-                                        child: Text(
-                                          '+$classicLevelCoinPrize COINS',
-                                          textAlign: TextAlign.center,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            backgroundColor: menuBackground,
-                                            fontSize: 11,
-                                            height: 1.2,
-                                            color: menuGold,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      if (open)
-                                        ColoredBox(
-                                          color: menuBackground,
-                                          child: StarRow(
-                                            record.starMask,
-                                            count: 4,
-                                            size: 15,
-                                            dark: true,
-                                          ),
-                                        ),
-                                      const SizedBox(height: 3),
-                                      FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        child: Text(
-                                          !open
-                                              ? '$totalStars / $required STARS'
-                                              : record.stars > 0 ||
-                                                    record.attempts > 0
-                                              ? '${record.stars}/4 STARS'
-                                              : number % 10 == 0
-                                              ? 'FINALE'
-                                              : 'UNPLAYED',
-                                          style: const TextStyle(
-                                            backgroundColor: menuBackground,
-                                            fontSize: 9,
-                                            color: menuMuted,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                      if (open && record.bestTime != null)
-                                        Text(
-                                          formatRunTime(record.bestTime!),
-                                          style: const TextStyle(
-                                            backgroundColor: menuBackground,
-                                            fontSize: 9,
-                                            color: menuMuted,
-                                          ),
-                                        ),
-                                    ],
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      ),
+                        );
+                      }, childCount: count),
                     ),
                   );
-                }, childCount: count),
-              ),
-            );
-            return CustomScrollView(
-              key: _scrollKey,
-              controller: _scroll,
-              slivers: [
-                heading(
-                  'Choose your challenge.',
-                  widget.tutorial && !skipped
-                      ? ''
-                      : widget.allLevelsUnlocked
-                      ? 'Development access. $controlLabel records.'
-                      : '$totalStars Classic stars · 2 more stars unlock each level. Stars are shared across controls and are not spent. $controlLabel records.',
-                ),
-                if (control != null && (!widget.tutorial || skipped))
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (final mode
-                              in widget.allLevelsUnlocked
-                                  // Developer builds keep the test modes.
-                                  ? ControlMode.values
-                                  : selectableControlModes)
-                            ChoiceChip(
-                              key: ValueKey('level-control-${mode.name}'),
-                              label: Text(
-                                controlName(mode),
-                                style: TextStyle(
-                                  color: control == mode
-                                      ? menuBackground
-                                      : menuText,
-                                ),
-                              ),
-                              selected: control == mode,
-                              onSelected: (_) {
-                                setState(() {
-                                  _preferredControl = mode;
-                                  if (wideControls &&
-                                      mode == ControlMode.oneFinger) {
-                                    _haloJoystick = true;
-                                  }
-                                });
-                                widget.onControlChanged?.call(mode);
-                              },
-                            ),
-                        ],
+                  return CustomScrollView(
+                    key: _scrollKey,
+                    controller: _scroll,
+                    slivers: [
+                      heading(
+                        'Choose your challenge.',
+                        widget.tutorial && !skipped
+                            ? ''
+                            : widget.allLevelsUnlocked
+                            ? 'Development access. $controlLabel records.'
+                            : '$totalStars Classic stars · 2 more stars unlock each level. Stars are shared across controls and are not spent. $controlLabel records.',
                       ),
-                    ),
-                  ),
-                road(1, visibleCount),
-              ],
-            );
-          },
-        ),
-        if (widget.tutorial && !skipped)
-          TutorialSpotlight(
-            title: 'Start Level 1',
-            icon: Icons.flag_rounded,
-            lesson: TutorialStep.level1.lesson,
-            lessons: TutorialStep.lessons,
-            message:
-                'Levels are handmade boards. Reach the glowing holes in order, 1 to 10, and avoid the dark ones. Tap Level 1.',
-            blockOutside: true,
-            onSkip: () {
-              widget.onSkipTutorial?.call();
-              setState(() => skipped = true);
-            },
-            targets: (layer) {
-              final rect = tutorialTarget(firstLevelKey, layer);
-              return [if (rect != null) rect];
-            },
+                      road(1, visibleCount),
+                    ],
+                  );
+                },
+              ),
+              if (widget.tutorial && !skipped)
+                TutorialSpotlight(
+                  title: 'Start Level 1',
+                  icon: Icons.flag_rounded,
+                  lesson: TutorialStep.level1.lesson,
+                  lessons: TutorialStep.lessons,
+                  message:
+                      'Levels are handmade boards. Reach the glowing holes in order, 1 to 10, and avoid the dark ones. Tap Level 1.',
+                  blockOutside: true,
+                  onSkip: () {
+                    widget.onSkipTutorial?.call();
+                    setState(() => skipped = true);
+                  },
+                  targets: (layer) {
+                    final rect = tutorialTarget(firstLevelKey, layer);
+                    return [if (rect != null) rect];
+                  },
+                ),
+            ],
           ),
+        ),
       ],
     ),
   );

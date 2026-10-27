@@ -13,7 +13,7 @@ void main() {
     const Size(320, 568),
     const Size(430, 932),
   ]) {
-    testWidgets('home, guide and gameplay fit $size', (tester) async {
+    testWidgets('home, modes and gameplay fit $size', (tester) async {
       tester.view.physicalSize = size;
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -33,17 +33,10 @@ void main() {
       await tester.tap(find.byTooltip('Modes'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
-      await tester.ensureVisible(find.text('HOW TO PLAY'));
-      await tester.tap(find.text('HOW TO PLAY'));
+      expect(find.text('HOW TO PLAY'), findsNothing);
+      await tester.ensureVisible(find.text('PRACTICE'));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      expect(find.text('A game of balance.'), findsOneWidget);
-      expect(find.text('One finger. Full control.'), findsOneWidget);
-      expect(find.text('Merge: grow your number.'), findsOneWidget);
-      expect(find.textContaining('unlock cabinet styles'), findsNothing);
-      await tester.ensureVisible(find.text('TRY PRACTICE'));
-      await tester.pump();
-      await tester.tap(find.text('TRY PRACTICE'));
+      await tester.tap(find.text('PRACTICE'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.textContaining('PRACTICE · '), findsOneWidget);
@@ -52,7 +45,7 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     });
   }
-  testWidgets('guide closes and side arrows switch modes', (tester) async {
+  testWidgets('side arrows switch modes', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -78,18 +71,6 @@ void main() {
     await tapArrow('mode-previous');
     expect(title(), 'Infinite');
 
-    await tester.tap(find.byTooltip('Modes'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
-    await tester.ensureVisible(find.text('HOW TO PLAY'));
-    await tester.tap(find.text('HOW TO PLAY'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
-    expect(find.text('A game of balance.'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('guide-close')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
-    expect(find.text('A game of balance.'), findsNothing);
     expect(find.textContaining('PRACTICE · '), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());

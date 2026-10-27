@@ -79,6 +79,12 @@ abstract final class InfiniteTuning {
   static const fastStartSpeedStep = .05, maxStartingSpeedMultiplier = 2.5;
   static const fastStartEaseSeconds = 2.5;
 
+  /// Hidden pacing: the opening follows the score reached in at least
+  /// [paceRepeatRuns] of the last [paceRecentRuns] runs, and steps down after
+  /// [paceEarlyFallRuns] runs in a row below [paceEarlyFallShare] of it.
+  static const paceRecentRuns = 10, paceRepeatRuns = 3, paceEarlyFallRuns = 3;
+  static const paceEarlyFallShare = .25;
+
   /// Add 5% of the original opening speed per 30,000 points above 300,000.
   /// Fractional progress keeps personal-best improvements smooth.
   static double startingSpeedMultiplier(int bestScore) =>

@@ -85,7 +85,7 @@ void main() {
   });
 
   testWidgets(
-    'shop swipes tabs, keeps vertical scrolling, and exits left from Balls',
+    'shop swipes tabs, keeps vertical scrolling, and exits right from Balls',
     (tester) async {
       final game = await launch(tester, ControlMode.oneFinger);
       await tester.tap(find.byKey(const ValueKey('board-shop')));
@@ -112,22 +112,22 @@ void main() {
         greaterThan(0),
       );
       for (var tab = 1; tab <= 2; tab++) {
-        await swipe(110);
-        expect(selected(), tab);
-      }
-      await swipe(110);
-      expect(selected(), 2);
-      for (var tab = 1; tab >= 0; tab--) {
         await swipe(-110);
         expect(selected(), tab);
       }
+      await swipe(-110);
+      expect(selected(), 2);
+      for (var tab = 1; tab >= 0; tab--) {
+        await swipe(110);
+        expect(selected(), tab);
+      }
       final smallDrag = await tester.startGesture(const Offset(160, 280));
-      await smallDrag.moveBy(const Offset(-15, 0));
+      await smallDrag.moveBy(const Offset(15, 0));
       await tester.pump(const Duration(milliseconds: 300));
       await smallDrag.up();
       await tester.pump();
       expect(selected(), 0);
-      await swipe(-110);
+      await swipe(110);
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.byKey(const ValueKey('shop-swipe-area')), findsNothing);
       expect(find.byKey(const ValueKey('board-shop')), findsOneWidget);

@@ -158,13 +158,11 @@ class ShopGalleryCard extends StatelessWidget {
     required this.action,
     required this.status,
     required this.detail,
-    this.worldName,
     this.selected = false,
     this.artHeight = 188,
     this.footer,
   });
   final String name, description, status, detail;
-  final String? worldName;
   final Widget artwork, action;
 
   /// Shown under the price row, such as a way to get more coins.
@@ -198,21 +196,6 @@ class ShopGalleryCard extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   RepaintBoundary(child: artwork),
-                  if (worldName != null)
-                    const DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          stops: [0, .5, 1],
-                          colors: [
-                            Colors.transparent,
-                            Colors.transparent,
-                            Color(0xAA07171E),
-                          ],
-                        ),
-                      ),
-                    ),
                   Positioned(
                     left: 16,
                     top: 14,
@@ -236,20 +219,6 @@ class ShopGalleryCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (worldName != null)
-                    Positioned(
-                      left: 18,
-                      right: 18,
-                      bottom: 16,
-                      child: Text(
-                        worldName!,
-                        style: const TextStyle(
-                          color: menuText,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
                 ],
               ),
             ),
