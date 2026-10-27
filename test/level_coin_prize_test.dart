@@ -91,7 +91,7 @@ void main() {
       final game = BalanceGame()..start(levelNumber: 10);
       await tester.pumpWidget(
         MaterialApp(
-          home: FinaleBriefing(game: game, onPlay: () {}),
+          home: FinaleBriefing(game: game, onPlay: () {}, onBack: () {}),
         ),
       );
       expect(find.text('Level 10'), findsOneWidget);

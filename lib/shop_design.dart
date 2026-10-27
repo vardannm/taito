@@ -13,8 +13,9 @@ class ShopRevealRoute extends PageRouteBuilder<void> {
     required Rect origin,
     required WidgetBuilder builder,
     required bool reducedMotion,
+    String name = '/collection',
   }) : super(
-         settings: const RouteSettings(name: '/collection'),
+         settings: RouteSettings(name: name),
          opaque: false,
          barrierDismissible: false,
          barrierColor: Colors.black.withAlpha(45),

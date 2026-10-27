@@ -316,9 +316,14 @@ class CabinetPicker extends StatelessWidget {
 }
 
 class FinaleBriefing extends StatelessWidget {
-  const FinaleBriefing({super.key, required this.game, required this.onPlay});
+  const FinaleBriefing({
+    super.key,
+    required this.game,
+    required this.onPlay,
+    required this.onBack,
+  });
   final BalanceGame game;
-  final VoidCallback onPlay;
+  final VoidCallback onPlay, onBack;
   @override
   Widget build(BuildContext context) => ColoredBox(
     color: menuBackground.withAlpha(245),
@@ -337,7 +342,9 @@ class FinaleBriefing extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'FINALE',
+                ClassicLevels.definition(game.level).finaleTitle.isEmpty
+                    ? 'NEW HAZARD'
+                    : 'FINALE',
                 style: const TextStyle(
                   color: brass,
                   fontSize: 11,
@@ -372,7 +379,14 @@ class FinaleBriefing extends StatelessWidget {
                   foregroundColor: menuBackground,
                 ),
                 onPressed: onPlay,
-                child: const Text('START FINALE'),
+                child: const Text('START LEVEL'),
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                style: TextButton.styleFrom(foregroundColor: cream),
+                onPressed: onBack,
+                icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                label: const Text('BACK TO LEVELS'),
               ),
             ],
           ),

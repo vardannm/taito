@@ -692,14 +692,22 @@ class _GameScreenState extends State<GameScreen>
     setState(() => tutorialSheetOpen = true);
     if (tutorialActive && tutorialStep == TutorialStep.levels)
       advanceTutorial(TutorialStep.level1);
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: menuBackground,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (context) => SizedBox(
-        height: MediaQuery.sizeOf(context).height * .84,
-        child: SafeArea(
+    final originBox =
+        tutorialLevelsKey.currentContext?.findRenderObject() as RenderBox?;
+    final viewport = MediaQuery.sizeOf(context);
+    final origin = originBox != null && originBox.hasSize
+        ? originBox.localToGlobal(Offset.zero) & originBox.size
+        : Rect.fromCenter(
+            center: Offset(viewport.width / 2, viewport.height - 48),
+            width: 48,
+            height: 48,
+          );
+    await Navigator.of(context).push<void>(
+      ShopRevealRoute(
+        name: '/levels',
+        origin: origin,
+        reducedMotion: MediaQuery.disableAnimationsOf(context),
+        builder: (context) => SafeArea(
           child: LevelPicker(
             tutorial:
                 tutorialActive &&
@@ -3098,7 +3106,15 @@ class _GameScreenState extends State<GameScreen>
           onHome: home,
         )
       : briefing
-      ? FinaleBriefing(game: game, onPlay: pause)
+      ? FinaleBriefing(
+          game: game,
+          onPlay: pause,
+          onBack: () async {
+            setState(() => briefing = false);
+            await home();
+            if (mounted) unawaited(selectLevel());
+          },
+        )
       : PopScope(
           canPop: !adBusy,
           child: Container(

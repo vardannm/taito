@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'menu_design.dart';
+import 'premium_menu.dart';
 import 'onboarding.dart';
 import 'tutorial_spotlight.dart';
 import 'package:flutter/material.dart';
@@ -132,10 +133,16 @@ class _LevelPickerState extends State<LevelPicker> {
             }
             Widget heading(String title, String subtitle) => SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
+                padding: const EdgeInsets.fromLTRB(12, 8, 20, 18),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    MenuQuietButton(
+                      icon: Icons.arrow_back_rounded,
+                      tooltip: 'Back',
+                      onPressed: () => Navigator.maybePop(context),
+                    ),
+                    const SizedBox(height: 8),
                     Text(
                       title,
                       style: const TextStyle(
