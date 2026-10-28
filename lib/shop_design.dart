@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -154,27 +155,26 @@ class ShopGalleryCard extends StatelessWidget {
   const ShopGalleryCard({
     super.key,
     required this.name,
-    this.description,
     required this.artwork,
     required this.action,
     required this.status,
-    required this.detail,
+    this.boost,
     this.selected = false,
-    this.artHeight = 188,
+    this.artHeight = 250,
     this.footer,
     this.badge,
   });
-  final String name, status, detail;
+  final String name, status;
+  final Widget artwork, action;
 
-  /// Optional line under the name; the shop shows names alone.
-  final String? description;
+  /// The Infinite points multiplier, such as '+1.3×'; null for base gear.
+  final String? boost;
+
+  /// Shown under the artwork, such as a way to get more coins.
+  final Widget? footer;
 
   /// Pinned to the artwork's top right, such as a ball's magnet.
   final Widget? badge;
-  final Widget artwork, action;
-
-  /// Shown under the price row, such as a way to get more coins.
-  final Widget? footer;
   final bool selected;
   final double artHeight;
 
@@ -204,18 +204,29 @@ class ShopGalleryCard extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   RepaintBoundary(child: artwork),
+                  // A soft shade under the name and price keeps them readable
+                  // on every world, light or dark.
+                  const Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: 130,
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Color(0x00081416), Color(0xB3081416)],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                   Positioned(
                     left: 16,
                     top: 14,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: menuBackground.withAlpha(220),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
+                    child: ShopGlassPill(
                       child: Text(
                         status,
                         style: TextStyle(
@@ -229,57 +240,119 @@ class ShopGalleryCard extends StatelessWidget {
                   ),
                   if (badge != null)
                     Positioned(right: 16, top: 14, child: badge!),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      color: menuText,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: -.5,
-                    ),
-                  ),
-                  if (description != null) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      description!,
-                      style: const TextStyle(
-                        color: menuMuted,
-                        fontSize: 12,
-                        height: 1.5,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          detail,
-                          style: const TextStyle(
-                            color: menuMint,
-                            fontSize: 11,
-                            height: 1.4,
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    bottom: 16,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: -.4,
+                                  shadows: [
+                                    Shadow(
+                                      color: Color(0x99000000),
+                                      blurRadius: 10,
+                                      offset: Offset(0, 1),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              action,
+                            ],
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Flexible(child: action),
-                    ],
+                        if (boost != null) ...[
+                          const SizedBox(width: 12),
+                          ShopBoostChip(boost: boost!),
+                        ],
+                      ],
+                    ),
                   ),
-                  if (footer != null) ...[const SizedBox(height: 6), footer!],
                 ],
               ),
             ),
+            if (footer != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 10, 18, 12),
+                child: footer!,
+              ),
           ],
         ),
+      ),
+    ),
+  );
+}
+
+/// A small frosted label that reads on any artwork behind it.
+class ShopGlassPill extends StatelessWidget {
+  const ShopGlassPill({super.key, required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+    borderRadius: BorderRadius.circular(20),
+    child: BackdropFilter(
+      filter: ui.ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: menuBackground.withAlpha(170),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withAlpha(30)),
+        ),
+        child: child,
+      ),
+    ),
+  );
+}
+
+/// The Infinite points multiplier: the endless mark and how much it adds.
+class ShopBoostChip extends StatelessWidget {
+  const ShopBoostChip({super.key, required this.boost});
+  final String boost;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label: '$boost Infinite points',
+    excludeSemantics: true,
+    child: ShopGlassPill(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            '∞',
+            style: TextStyle(
+              color: menuGold,
+              fontSize: 20,
+              fontWeight: FontWeight.w400,
+              height: 1,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            boost,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              height: 1,
+            ),
+          ),
+        ],
       ),
     ),
   );
@@ -303,12 +376,7 @@ class ShopMagnetBadge extends StatelessWidget {
           child: CustomPaint(painter: _MagnetIconPainter()),
         ),
         const SizedBox(height: 4),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: menuBackground.withAlpha(220),
-            borderRadius: BorderRadius.circular(20),
-          ),
+        ShopGlassPill(
           child: Text(
             'RADIUS ${radius.round()}',
             style: const TextStyle(

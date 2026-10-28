@@ -147,7 +147,7 @@ class _BallShopState extends State<BallShop>
         : purchaseOnly
         ? 'PREMIUM'
         : 'DISCOVER',
-    artHeight: worldBall == null ? 136 : 188,
+    artHeight: worldBall == null ? 220 : 250,
     artwork: CustomPaint(
       key: worldBall == null
           ? null
@@ -156,6 +156,7 @@ class _BallShopState extends State<BallShop>
           ? ShopPlatformStage(painter, animation: preview)
           : BallWorldPreview(
               worldBall,
+              ballHeight: .4,
               animation: MediaQuery.disableAnimationsOf(context)
                   ? null
                   : preview,
@@ -169,11 +170,7 @@ class _BallShopState extends State<BallShop>
             needed: cost - widget.profile.wallet,
             onClosed: () => setState(() {}),
           ),
-    detail: purchaseOnly
-        ? 'Premium · +${formatBoost(bonus)}× Infinite points'
-        : bonus == 0
-        ? 'Base equipment'
-        : '+${formatBoost(bonus)}× Infinite points',
+    boost: bonus == 0 ? null : '+${formatBoost(bonus)}×',
     action: example && guiding
         // The lesson's one live button: equipping the starter moves it on.
         ? KeyedSubtree(

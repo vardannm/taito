@@ -70,12 +70,13 @@ class MergeRun {
   }
   final math.Random random;
   static const platformLeft = 20.0, platformRight = 340.0;
-  static const ballRadius = 12.0, segmentSpacing = 26.0;
-  static const fallingRadius = 15.0;
+  static const ballRadius = 9.0, segmentSpacing = 20.0;
+  static const fallingRadius = 11.0;
   static const gateInterval = MergeDifficulty.gateInterval;
   static const platformWidth = platformRight - platformLeft;
-  static const maxSegments =
-      1 + (platformWidth - 2 * ballRadius) ~/ segmentSpacing;
+  // Twelve evenly spaced segments, then the tail compresses; fixed so smaller
+  // balls change the look, not when a snake counts as full.
+  static const maxSegments = 12;
   final segments = <int>[2];
   final orbs = <NumberOrb>[];
   final gates = <MergeGate>[];
@@ -92,7 +93,7 @@ class MergeRun {
   // Long snakes compress instead of ending the run or trapping the head.
   double get spacing => segments.length <= maxSegments
       ? segmentSpacing
-      : 260 / (segments.length - 1);
+      : (maxSegments - 1) * segmentSpacing / (segments.length - 1);
   double get length => 2 * ballRadius + (segments.length - 1) * spacing;
   bool get ended => rejectedValue != null || failedGate != null;
   bool canMerge(int value) => segments.contains(value);
@@ -149,7 +150,7 @@ class MergeRun {
       : math.min(
           spacing * .46,
           (ballRadius - (head.bitLength - segments[index].bitLength) * .7)
-              .clamp(7.5, 11.3),
+              .clamp(6.0, 8.5),
         );
 
   void _follow(double dt, double fromX, double toX) {

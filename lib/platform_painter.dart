@@ -132,10 +132,11 @@ class PlatformPreview extends CustomPainter {
   final AnimationController? animation;
   @override
   void paint(Canvas canvas, Size size) {
-    // Inset from the card edges and below the badge, so the rail sits framed.
+    // Inset from the card edges, below the badge and above the name and
+    // price along the bottom, so the rail sits framed.
     final inset = size.width * .12;
-    final a = Offset(inset, size.height * .66),
-        b = Offset(size.width - inset, size.height * .5);
+    final a = Offset(inset, size.height * .44),
+        b = Offset(size.width - inset, size.height * .3);
     canvas.drawLine(
       a,
       b,

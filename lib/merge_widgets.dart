@@ -145,7 +145,7 @@ void paintNumberOrb(
       text: formatMergeNumber(value),
       style: TextStyle(
         fontFamily: 'sans-serif',
-        fontSize: radius * .85,
+        fontSize: radius * .95,
         fontWeight: FontWeight.w900,
         color: opacity < 1 ? const Color(0xD9163D3B) : Colors.white,
       ),
