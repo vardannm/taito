@@ -2,7 +2,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'ball_cosmetics.dart';
+import 'ball_painter.dart';
 import 'menu_design.dart';
+import 'platform_painter.dart';
+import 'platforms.dart';
 
 /// The intro is storyboarded in milliseconds, so every phase below is written
 /// in the same units and the timeline reads top to bottom.
@@ -15,11 +19,10 @@ const _expandMs = 1860;
 const _plate = Color(0xFF163D3B);
 const _gold = Color(0xFFD9AE65);
 const _hole = Color(0xFF0E2929);
-const _board = Color(0xFFF2ECDD);
-const _boardEdge = Color(0xFFE3E0D2);
-const _ballLight = Color(0xFFF9FAF8);
-const _ballMid = Color(0xFFC3CCC1);
-const _ballDark = Color(0xFF4B6864);
+
+/// The icon's board drawn as the game's rail, scaled so its dark body is
+/// [_railHalfThick] each side of the centre line.
+const _railScale = _railHalfThick * 2 / 7;
 
 /// The stage is laid out in the icon's own 1024 unit square and scaled to
 /// whatever box it is given, so these are the icon's measurements.
@@ -29,6 +32,9 @@ const _plateStroke = 8.0;
 const _boardCenter = Offset(580, 420);
 const _boardHalf = 265.0;
 const _boardHalfThick = 8.25;
+
+/// The intro's rail is 50% thicker than the icon's board so it reads clearly.
+const _railHalfThick = _boardHalfThick * 1.5;
 
 /// The icon's own board angle, then the angle it rolls the ball off at.
 const _tiltRest = -0.2009;
@@ -59,14 +65,24 @@ double _phase(
 Offset _ballOnBoard(double tilt, double along) {
   final dir = Offset(math.cos(tilt), math.sin(tilt));
   final up = Offset(math.sin(tilt), -math.cos(tilt));
-  return _boardCenter + dir * along + up * (_boardHalfThick + _ballRadius);
+  return _boardCenter + dir * along + up * (_railHalfThick + _ballRadius);
 }
 
 /// Holds the intro over the running app until it finishes. The game builds and
 /// loads underneath, so the animation costs no start-up time.
 class GiltIntroGate extends StatefulWidget {
-  const GiltIntroGate({super.key, required this.child});
+  const GiltIntroGate({
+    super.key,
+    required this.child,
+    this.ball = BallCosmetic.steel,
+    this.platform = PlatformStyle.classic,
+  });
   final Widget child;
+
+  /// The player's equipped gear, so the intro rolls their own ball on their
+  /// own rail before handing over to the menu that shows the same pair.
+  final BallCosmetic ball;
+  final PlatformStyle platform;
   @override
   State<GiltIntroGate> createState() => _GiltIntroGateState();
 }
@@ -81,6 +97,8 @@ class _GiltIntroGateState extends State<GiltIntroGate> {
       if (playing)
         Positioned.fill(
           child: GiltIntro(
+            ball: widget.ball,
+            platform: widget.platform,
             onFinished: () {
               if (mounted) setState(() => playing = false);
             },
@@ -94,8 +112,15 @@ class _GiltIntroGateState extends State<GiltIntroGate> {
 /// tips, the ball rolls off into the hole, and the hole opens out over the
 /// screen to hand the game over. A tap skips to the hole.
 class GiltIntro extends StatefulWidget {
-  const GiltIntro({super.key, required this.onFinished});
+  const GiltIntro({
+    super.key,
+    required this.onFinished,
+    this.ball = BallCosmetic.steel,
+    this.platform = PlatformStyle.classic,
+  });
   final VoidCallback onFinished;
+  final BallCosmetic ball;
+  final PlatformStyle platform;
   @override
   State<GiltIntro> createState() => _GiltIntroState();
 }
@@ -160,6 +185,9 @@ class _GiltIntroState extends State<GiltIntro>
                     Curves.easeIn.transform(((v - .72) / .28).clamp(0.0, 1.0)));
             return CustomPaint(
               painter: _IntroPainter(
+                cosmetic: widget.ball,
+                platform: widget.platform,
+                reducedMotion: true,
                 plate: 1,
                 board: 1,
                 ring: 1,
@@ -187,10 +215,8 @@ class _GiltIntroState extends State<GiltIntro>
               _tiltRest +
               (_tiltRoll - _tiltRest) * turn +
               .035 * math.sin(hit * math.pi * 4) * damp;
-          final resting = _ballOnBoard(
-            tilt,
-            _landAt + (_leaveAt - _landAt) * roll,
-          );
+          final along = _landAt + (_leaveAt - _landAt) * roll;
+          final resting = _ballOnBoard(tilt, along);
           final ball = drop > 0
               ? Offset.lerp(
                   _ballOnBoard(_tiltRoll, _leaveAt),
@@ -202,6 +228,11 @@ class _GiltIntroState extends State<GiltIntro>
 
           return CustomPaint(
             painter: _IntroPainter(
+              cosmetic: widget.ball,
+              platform: widget.platform,
+              time: v * _introMs / 1000,
+              // The ball turns as it rolls, so its pattern travels with it.
+              spin: (along - _landAt) / _ballRadius,
               plate: plate,
               board: board,
               ring: ring,
@@ -220,6 +251,11 @@ class _GiltIntroState extends State<GiltIntro>
 
 class _IntroPainter extends CustomPainter {
   _IntroPainter({
+    required this.cosmetic,
+    required this.platform,
+    this.time = 0,
+    this.spin = 0,
+    this.reducedMotion = false,
     required this.plate,
     required this.board,
     required this.ring,
@@ -234,6 +270,13 @@ class _IntroPainter extends CustomPainter {
   /// stage, how far the hole has opened, and the overall fade.
   final double plate, board, ring, tilt, ballIn, grow, fade;
   final Offset ball;
+  final BallCosmetic cosmetic;
+  final PlatformStyle platform;
+
+  /// Seconds into the intro, for animated gear, and how far the ball has
+  /// turned while rolling.
+  final double time, spin;
+  final bool reducedMotion;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -333,26 +376,46 @@ class _IntroPainter extends CustomPainter {
     );
   }
 
+  /// The equipped rail, drawn like the game's: dark body, tinted face, a
+  /// highlight line and the style's own detail.
   void _paintBoard(Canvas canvas) {
     if (board <= 0) return;
     canvas.save();
     canvas.translate(_boardCenter.dx, _boardCenter.dy);
     canvas.rotate(tilt);
-    final length = _boardHalf * board;
-    final bar = Rect.fromLTRB(
-      -length,
-      -_boardHalfThick,
-      length,
-      _boardHalfThick,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(bar, const Radius.circular(_boardHalfThick)),
+    canvas.scale(_railScale);
+    final half = (_boardHalf - _railHalfThick) * board / _railScale;
+    final a = Offset(-half, 0), b = Offset(half, 0);
+    canvas.drawLine(
+      a,
+      b,
       Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [_board, _board, _boardEdge],
-        ).createShader(bar),
+        ..color = const Color(0xFF2C3A37)
+        ..strokeWidth = 7
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.drawLine(
+      a - const Offset(0, 1),
+      b - const Offset(0, 1),
+      Paint()
+        ..color = Color(platform.color)
+        ..strokeWidth = 4
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.drawLine(
+      a - const Offset(0, 2.5),
+      b - const Offset(0, 2.5),
+      Paint()
+        ..color = const Color(0xFFFFFFE8)
+        ..strokeWidth = 1.2,
+    );
+    paintPlatformDetail(
+      canvas,
+      a,
+      b,
+      platform,
+      time: time,
+      reducedMotion: reducedMotion,
     );
     canvas.restore();
   }
@@ -366,7 +429,7 @@ class _IntroPainter extends CustomPainter {
       canvas.rotate(tilt);
       canvas.drawOval(
         Rect.fromCenter(
-          center: Offset(_landAt, -_boardHalfThick),
+          center: Offset(_landAt, -_railHalfThick),
           width: 150 - 60 * ballIn,
           height: 18,
         ),
@@ -376,20 +439,23 @@ class _IntroPainter extends CustomPainter {
       );
       canvas.restore();
     }
-    canvas.drawCircle(
+    paintCosmetic(
+      canvas,
       ball,
       _ballRadius,
-      Paint()
-        ..shader = const RadialGradient(
-          center: Alignment(-.38, -.45),
-          radius: .95,
-          colors: [_ballLight, _ballMid, _ballDark],
-        ).createShader(Rect.fromCircle(center: ball, radius: _ballRadius)),
+      cosmetic,
+      time: time,
+      rotation: spin,
+      reducedMotion: reducedMotion,
     );
   }
 
   @override
   bool shouldRepaint(_IntroPainter old) =>
+      old.cosmetic != cosmetic ||
+      old.platform != platform ||
+      old.time != time ||
+      old.spin != spin ||
       old.plate != plate ||
       old.board != board ||
       old.ring != ring ||

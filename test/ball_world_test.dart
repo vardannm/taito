@@ -40,6 +40,18 @@ void main() {
     expect(charged.length, BallCosmetic.values.length);
   });
 
+  test('pale worlds sink into a rich hue, not grey, at the top combos', () {
+    for (final ball in [BallCosmetic.prism, BallCosmetic.malachite]) {
+      final game = BalanceGame()
+        ..cosmetic = ball
+        ..start(gameMode: GameMode.infinite);
+      game.survival.visualCombo = 1;
+      final field = HSVColor.fromColor(boardFieldColors(game)[1]);
+      expect(field.saturation, greaterThan(.45), reason: '$ball');
+      expect(field.value, lessThan(.5), reason: '$ball');
+    }
+  });
+
   test('HUD foreground stays legible for every world, mode and combo fade', () {
     final game = BalanceGame();
     for (final mode in GameMode.values) {

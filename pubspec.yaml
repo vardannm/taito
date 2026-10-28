@@ -20,8 +20,17 @@ dev_dependencies:
     sdk: flutter
 flutter:
   uses-material-design: true
+  # Montserrat, cut down to the letters of the ROLLRISE wordmark (SIL OFL).
+  fonts:
+    - family: RollriseTitle
+      fonts:
+        - asset: assets/fonts/Montserrat-ExtraLight-Title.ttf
+          weight: 200
+        - asset: assets/fonts/Montserrat-ExtraBold-Title.ttf
+          weight: 800
   assets:
     - assets/privacy/policy.json
+    - assets/fonts/Montserrat-OFL.txt
     # Music is off; every soundtrack stays archived on disk, outside the bundle.
     - assets/audio/complete.wav
     - assets/audio/enemy_bombThrow.wav

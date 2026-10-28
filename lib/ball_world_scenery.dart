@@ -79,17 +79,49 @@ class _Scenery {
     }
   }
 
-  void dune(double y, Color tint, double phase) {
+  Path crest(double y, double phase) => Path()
+    ..moveTo(-10, y)
+    ..cubicTo(95, y - 65 + phase, 230, y + 65, 350, y - 20);
+
+  void dune(double y, Color tint, double phase) =>
+      c.drawPath(dunePath(y, phase), Paint()..color = tint);
+
+  Path dunePath(double y, double phase) => crest(y, phase)
+    ..lineTo(350, 550)
+    ..lineTo(-10, 550)
+    ..close();
+
+  /// A dune whose fill drifts sideways through [colors], lit along its crest.
+  void sheenDune(double y, double phase, List<Color> colors, Color rim) {
     c.drawPath(
-      Path()
-        ..moveTo(-10, y)
-        ..cubicTo(95, y - 65 + phase, 230, y + 65, 350, y - 20)
-        ..lineTo(350, 550)
-        ..lineTo(-10, 550)
-        ..close(),
-      Paint()..color = tint,
+      dunePath(y, phase),
+      Paint()
+        ..shader = LinearGradient(
+          colors: colors,
+        ).createShader(Rect.fromLTWH(0, y - 60, 340, 120)),
+    );
+    c.drawPath(
+      crest(y, phase),
+      Paint()
+        ..color = rim
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.1,
     );
   }
+
+  /// Stable pseudo-random value in [0, 1) for hand-placed scatter.
+  double hash(int n) {
+    final v = math.sin(n * 12.9898 + 78.233) * 43758.5453;
+    return v - v.floorToDouble();
+  }
+
+  /// Flat-shaded triangles in a single draw call; three colors per triangle.
+  /// Opaque colors only: renderers disagree on translucent vertex colors.
+  void triangles(List<Offset> points, List<Color> colors) => c.drawVertices(
+    ui.Vertices(VertexMode.triangles, points, colors: colors),
+    BlendMode.dst,
+    Paint(),
+  );
 
   void crystal(double x, double y, double h, Color tint, [double width = 32]) {
     final tip = Offset(x + width * .12, y - h);
@@ -187,19 +219,18 @@ class _Scenery {
     c.restore();
   }
 
+  /// Batched: towers, roof lines and windows are one path each.
   void skyline(double base, Color tint, int seed, {bool windows = false}) {
-    final lights = Path();
+    final towers = Path(), roofs = Path(), lights = Path();
     for (var i = 0; i < 12; i++) {
       final x = i * 31.0 - 15, h = 35.0 + (i * 47 + seed * 31) % 80;
-      c.drawRect(Rect.fromLTWH(x, base - h, 25, h + 80), Paint()..color = tint);
+      towers.addRect(Rect.fromLTWH(x, base - h, 25, h + 80));
       if (i % 3 == 0)
-        line(Offset(x + 12, base - h), Offset(x + 12, base - h - 15), tint, 2);
+        towers.addRect(Rect.fromLTWH(x + 11, base - h - 15, 2, 15));
       if (windows) {
-        line(
-          Offset(x + 1, base - h),
-          Offset(x + 24, base - h),
-          accent.withAlpha(170),
-        );
+        roofs
+          ..moveTo(x + 1, base - h)
+          ..lineTo(x + 24, base - h);
         for (var row = 0; row < 5; row++) {
           if (row * 14 > h - 10) break;
           lights.addRect(Rect.fromLTWH(x + 5, base - h + 8 + row * 14, 3, 5));
@@ -210,6 +241,14 @@ class _Scenery {
         }
       }
     }
+    c.drawPath(towers, Paint()..color = tint);
+    if (!windows) return;
+    c.drawPath(
+      roofs,
+      Paint()
+        ..color = accent.withAlpha(170)
+        ..style = PaintingStyle.stroke,
+    );
     c.drawPath(lights, Paint()..color = accent.withAlpha(130));
   }
 
@@ -754,6 +793,715 @@ class _Scenery {
     );
   }
 
+  /// A board-level chip package with pins and a pin-one mark.
+  void chip(Rect body) {
+    final pins = Path();
+    for (var y = body.top + 6; y < body.bottom - 3; y += 7) {
+      pins
+        ..moveTo(body.left - 5, y)
+        ..lineTo(body.left, y)
+        ..moveTo(body.right, y)
+        ..lineTo(body.right + 5, y);
+    }
+    c.drawPath(
+      pins,
+      Paint()
+        ..color = accent.withAlpha(70)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
+    final package = RRect.fromRectAndRadius(body, const Radius.circular(3));
+    c.drawRRect(package, Paint()..color = color(0xFF0B3134));
+    c.drawRRect(
+      package,
+      Paint()
+        ..color = accent.withAlpha(60)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .8,
+    );
+    c.drawRRect(
+      RRect.fromRectAndRadius(body.deflate(7), const Radius.circular(2)),
+      Paint()
+        ..color = accent.withAlpha(28)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .7,
+    );
+    c.drawCircle(
+      body.topLeft + const Offset(5, 5),
+      1.4,
+      Paint()..color = accent.withAlpha(90),
+    );
+  }
+
+  /// A jade leaf whose veins are routed like traces, ending in gold pads.
+  void circuitLeaf(Offset base, double length, double angle, Color tint) {
+    c.save();
+    c.translate(base.dx, base.dy);
+    c.rotate(angle);
+    final w = length * .34;
+    c.drawPath(
+      Path()
+        ..moveTo(0, 0)
+        ..cubicTo(-w * 1.1, -length * .25, -w * .9, -length * .8, 0, -length)
+        ..cubicTo(w * .9, -length * .8, w * 1.1, -length * .25, 0, 0)
+        ..close(),
+      Paint()..color = tint,
+    );
+    final veins = Path()
+      ..moveTo(0, 0)
+      ..lineTo(0, -length * .88);
+    final pads = <Offset>[];
+    for (var i = 0; i < 3; i++) {
+      final y = -length * (.22 + i * .2), reach = w * (.55 - i * .1);
+      for (final side in [-1.0, 1.0]) {
+        final end = Offset(side * reach, y - reach - 5);
+        veins
+          ..moveTo(0, y)
+          ..lineTo(side * reach, y - reach)
+          ..lineTo(end.dx, end.dy);
+        pads.add(end);
+      }
+    }
+    c.drawPath(
+      veins,
+      Paint()
+        ..color = accent.withAlpha(85)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .9,
+    );
+    c.drawPoints(
+      ui.PointMode.points,
+      pads,
+      Paint()
+        ..color = color(0xFFE6D59B).withAlpha(150)
+        ..strokeWidth = 2.6
+        ..strokeCap = StrokeCap.round,
+    );
+    c.restore();
+  }
+
+  void circuitGarden() {
+    wash(const Rect.fromLTWH(-120, -110, 470, 300), accent.withAlpha(26));
+    wash(
+      const Rect.fromLTWH(-80, 370, 500, 300),
+      color(0xFF3FA98F).withAlpha(30),
+    );
+    // A faint via lattice in both margins gives the board its texture.
+    c.drawPoints(
+      ui.PointMode.points,
+      [
+        for (var y = 9.0; y < 540; y += 18)
+          for (final x in [6.0, 20.0, 34.0, 306.0, 320.0, 334.0])
+            if (hash((x * 7 + y).toInt()) > .3) Offset(x, y),
+      ],
+      Paint()
+        ..color = accent.withAlpha(30)
+        ..strokeWidth = 1.6
+        ..strokeCap = StrokeCap.round,
+    );
+    // Bus traces run down each margin with 45-degree jogs; the two sides
+    // use different routes so they never read as a mirror image.
+    final traces = Path(), rings = <Offset>[];
+    void bus(double edge, double dir, List<(double, double, double)> jogs) {
+      for (var k = 0; k < 3; k++) {
+        var x = edge + dir * (10 + k * 7);
+        traces.moveTo(x, -10);
+        for (final (y, depth, length) in jogs) {
+          final d = dir * depth, ky = y + k * 3;
+          traces
+            ..lineTo(x, ky)
+            ..lineTo(x + d, ky + depth)
+            ..lineTo(x + d, ky + depth + length)
+            ..lineTo(x, ky + depth * 2 + length);
+          if (k == 2) {
+            // The innermost trace taps off toward the field and ends in a via.
+            final tap = Offset(x + d, ky + depth + length * .5);
+            final end = tap + Offset(dir * 16, 16);
+            traces
+              ..moveTo(tap.dx, tap.dy)
+              ..lineTo(end.dx, end.dy)
+              ..moveTo(x, ky + depth * 2 + length);
+            rings.add(end);
+          }
+        }
+        traces.lineTo(x, 560);
+      }
+    }
+
+    bus(0, 1, [(70, 14, 60), (250, 10, 40), (400, 16, 30)]);
+    bus(340, -1, [(130, 12, 70), (310, 16, 36)]);
+    // A header bus along the top edge.
+    final header = Path();
+    for (var k = 0; k < 2; k++) {
+      final y = 18.0 + k * 7;
+      header
+        ..moveTo(-10, y)
+        ..lineTo(84 - k * 7, y)
+        ..lineTo(98 - k * 7, y + 14)
+        ..lineTo(126, y + 14)
+        ..moveTo(350, y + 4)
+        ..lineTo(262 + k * 7, y + 4)
+        ..lineTo(250 + k * 7, y + 16)
+        ..lineTo(222, y + 16);
+      rings
+        ..add(Offset(129, y + 14))
+        ..add(Offset(219, y + 16));
+    }
+    traces.addPath(header, Offset.zero);
+    c.drawPath(
+      traces,
+      Paint()
+        ..color = accent.withAlpha(60)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2
+        ..strokeJoin = StrokeJoin.round,
+    );
+    final via = Path();
+    for (final p in rings) {
+      via.addOval(Rect.fromCircle(center: p, radius: 2.6));
+    }
+    c.drawPath(
+      via,
+      Paint()
+        ..color = accent.withAlpha(110)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+    chip(const Rect.fromLTWH(-16, 168, 42, 52));
+    chip(const Rect.fromLTWH(312, 222, 40, 44));
+    // Small parts seated beside the traces.
+    final parts = Path(), leads = <Offset>[];
+    for (final (x, y, vertical) in [
+      (48.0, 96.0, true),
+      (40.0, 330.0, true),
+      (300.0, 120.0, true),
+      (291.0, 410.0, true),
+      (164.0, 38.0, false),
+    ]) {
+      final body = Rect.fromCenter(
+        center: Offset(x, y),
+        width: vertical ? 5 : 10,
+        height: vertical ? 10 : 5,
+      );
+      parts.addRRect(RRect.fromRectAndRadius(body, const Radius.circular(1)));
+      leads.addAll(
+        vertical
+            ? [body.topCenter, body.bottomCenter]
+            : [body.centerLeft, body.centerRight],
+      );
+    }
+    c.drawPath(parts, Paint()..color = color(0xFF0B3134));
+    c.drawPath(
+      parts,
+      Paint()
+        ..color = accent.withAlpha(70)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .7,
+    );
+    c.drawPoints(
+      ui.PointMode.points,
+      leads,
+      Paint()
+        ..color = color(0xFFE6D59B).withAlpha(120)
+        ..strokeWidth = 2.2
+        ..strokeCap = StrokeCap.round,
+    );
+    // Jade foliage grows from the bottom corners over a dark bed.
+    dune(512, color(0xFF0C3436).withAlpha(200), 22);
+    circuitLeaf(const Offset(18, 556), 118, .32, color(0xFF1E5E54));
+    circuitLeaf(const Offset(2, 548), 84, -.12, color(0xFF2A7464));
+    circuitLeaf(const Offset(56, 560), 58, .78, color(0xFF22685A));
+    circuitLeaf(const Offset(330, 556), 104, -.36, color(0xFF1E5E54));
+    circuitLeaf(const Offset(300, 562), 64, -.82, color(0xFF2A7464));
+    dune(546, color(0xFF0A2B30), -14);
+  }
+
+  void obsidianCavern() {
+    polygon([
+      const Offset(0, 0),
+      const Offset(340, 0),
+      const Offset(340, 36),
+      const Offset(305, 15),
+      const Offset(283, 55),
+      const Offset(236, 9),
+      const Offset(197, 26),
+      const Offset(167, 4),
+      const Offset(115, 41),
+      const Offset(78, 13),
+      const Offset(40, 67),
+      const Offset(0, 30),
+    ], color(0xFF342541));
+    wash(const Rect.fromLTWH(-130, 260, 240, 360), accent.withAlpha(42));
+    wash(
+      const Rect.fromLTWH(250, 120, 220, 300),
+      color(0xFF5867C8).withAlpha(26),
+    );
+    // Faceted volcanic glass walls with their own profile on each side.
+    // Facets turned toward the light get a glassy violet edge.
+    final points = <Offset>[], colors = <Color>[], glints = Path();
+    void wall(double edge, double dir, List<double> profile) {
+      final step = 580 / (profile.length - 1);
+      for (var i = 0; i < profile.length - 1; i++) {
+        final y0 = i * step - 20, y1 = y0 + step;
+        final a = Offset(edge + dir * profile[i], y0);
+        final b = Offset(edge + dir * profile[i + 1], y1);
+        final lit = profile[i + 1] < profile[i];
+        final face = lit ? color(0xFF2E2552) : color(0xFF1B1733);
+        final back = Color.lerp(face, color(0xFF141228), .45)!;
+        points.addAll([Offset(edge, y0), a, b, Offset(edge, y0), b]);
+        points.add(Offset(edge, y1));
+        colors.addAll([back, face, face, back, face, back]);
+        if (lit) {
+          glints
+            ..moveTo(a.dx, a.dy)
+            ..lineTo(b.dx, b.dy);
+        }
+      }
+    }
+
+    wall(0, 1, [22, 34, 14, 26, 40, 18, 30, 12, 24, 36, 20, 28, 16]);
+    wall(340, -1, [16, 28, 38, 20, 12, 30, 22, 36, 26, 14, 32, 18, 26]);
+    triangles(points, colors);
+    c.drawPath(
+      glints,
+      Paint()
+        ..color = accent.withAlpha(80)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .9,
+    );
+    ridge(555, 48, color(0xFF211C3D));
+    // One leaning crystal cluster per corner, each with its own shape.
+    for (final (x, y, h, w, lean, tint) in [
+      (20.0, 556.0, 128.0, 21.0, .16, color(0xFF8E72D6)),
+      (-2.0, 552.0, 82.0, 16.0, -.1, color(0xFF5E5DB4)),
+      (52.0, 560.0, 56.0, 13.0, .42, color(0xFFB39BEA)),
+      (322.0, 556.0, 98.0, 19.0, -.22, color(0xFF5E5DB4)),
+      (342.0, 558.0, 62.0, 14.0, .05, color(0xFF9479DA)),
+    ]) {
+      c.save();
+      c.translate(x, y);
+      c.rotate(lean);
+      crystal(0, 0, h, tint, w);
+      c.restore();
+    }
+  }
+
+  void pearlBead(Offset p, double r) => c.drawCircle(
+    p,
+    r,
+    Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(-.35, -.45),
+        colors: [
+          Colors.white,
+          color(0xFFF7E8EC),
+          color(0xFFDCC4D3),
+          color(0xFFB8CAD6),
+        ],
+        stops: const [0, .3, .75, 1],
+      ).createShader(Rect.fromCircle(center: p, radius: r)),
+  );
+
+  /// A pearl strand hanging between [a] and [b] through [sag].
+  void strand(Offset a, Offset sag, Offset b, int count, double size) {
+    Offset at(double t) =>
+        a * ((1 - t) * (1 - t)) + sag * (2 * t * (1 - t)) + b * (t * t);
+    c.drawPath(
+      Path()
+        ..moveTo(a.dx, a.dy)
+        ..quadraticBezierTo(sag.dx, sag.dy, b.dx, b.dy),
+      Paint()
+        ..color = color(0xFFC9A3B3).withAlpha(110)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .6,
+    );
+    for (var i = 0; i <= count; i++) {
+      final t = i / count;
+      pearlBead(at(t), size * (.7 + .45 * math.sin(math.pi * t)));
+    }
+  }
+
+  void pearlTides() {
+    wash(
+      const Rect.fromLTWH(-170, -150, 400, 340),
+      color(0xFFF4C2D2).withAlpha(95),
+    );
+    wash(
+      const Rect.fromLTWH(170, 110, 340, 340),
+      color(0xFFB9E6DE).withAlpha(70),
+    );
+    wash(
+      const Rect.fromLTWH(-150, 300, 340, 300),
+      color(0xFFD6C8EF).withAlpha(80),
+    );
+    strand(
+      const Offset(-8, 18),
+      const Offset(66, 130),
+      const Offset(168, -8),
+      17,
+      3.4,
+    );
+    strand(
+      const Offset(-8, 52),
+      const Offset(34, 120),
+      const Offset(92, -8),
+      9,
+      2.6,
+    );
+    strand(
+      const Offset(262, -8),
+      const Offset(318, 92),
+      const Offset(350, 30),
+      9,
+      3,
+    );
+    for (final (p, s) in [
+      (const Offset(118, 70), 4.0),
+      (const Offset(300, 92), 3.0),
+      (const Offset(54, 312), 2.5),
+    ]) {
+      sparkle(p, s, Colors.white.withAlpha(200));
+    }
+    sheenDune(442, 22, [
+      color(0xFFC6E3DF),
+      color(0xFFE9D3E1),
+      color(0xFFC8DCEB),
+    ], Colors.white.withAlpha(150));
+    sheenDune(484, -14, [
+      color(0xFFEBD6DF),
+      color(0xFFB8D7D9),
+      color(0xFFDCCDEB),
+    ], Colors.white.withAlpha(170));
+    sheenDune(522, 30, [
+      color(0xFFF4E6DA),
+      color(0xFFEAD4DC),
+      color(0xFFF2E4D6),
+    ], Colors.white.withAlpha(190));
+    // A scallop shell with its pearl at left, two loose pearls at right.
+    const hinge = Offset(42, 540);
+    final fan = Path()..moveTo(hinge.dx, hinge.dy);
+    final ribs = Path();
+    for (var i = 0; i <= 8; i++) {
+      final a = math.pi * (1.1 + .8 * i / 8);
+      final p = hinge + Offset(math.cos(a), math.sin(a)) * 44;
+      if (i > 0) {
+        final m = math.pi * (1.1 + .8 * (i - .5) / 8);
+        final q = hinge + Offset(math.cos(m), math.sin(m)) * 49;
+        fan.quadraticBezierTo(q.dx, q.dy, p.dx, p.dy);
+      } else {
+        fan.lineTo(p.dx, p.dy);
+      }
+      ribs
+        ..moveTo(hinge.dx, hinge.dy)
+        ..lineTo(p.dx, p.dy);
+    }
+    fan.close();
+    c.drawPath(
+      fan,
+      Paint()
+        ..shader = RadialGradient(
+          center: const Alignment(0, 1),
+          radius: 1,
+          colors: [color(0xFFE7C3CC), color(0xFFFBEEE7)],
+        ).createShader(Rect.fromCircle(center: hinge, radius: 48)),
+    );
+    c.drawPath(
+      ribs,
+      Paint()
+        ..color = color(0xFFD3A9B4).withAlpha(150)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .9,
+    );
+    for (final (p, r) in [
+      (const Offset(84, 530), 7.5),
+      (const Offset(294, 524), 6.0),
+      (const Offset(311, 532), 4.2),
+    ]) {
+      c.drawCircle(
+        p + Offset(r * .3, r * .45),
+        r,
+        Paint()..color = color(0xFF9C8A9E).withAlpha(45),
+      );
+      pearlBead(p, r);
+    }
+    sparkle(const Offset(80, 525), 3, Colors.white.withAlpha(230));
+  }
+
+  /// Low-poly alloy facets: absent behind play, crisper toward the margins
+  /// and floor. Facets share a handful of batched paths.
+  void titaniumFacets() {
+    const cols = 7, rows = 11;
+    final grid = [
+      for (var r = 0; r <= rows; r++)
+        [
+          for (var q = 0; q <= cols; q++)
+            Offset(
+              q * 340 / cols +
+                  (q == 0 || q == cols ? 0 : (hash(r * 17 + q) - .5) * 30),
+              r * 540 / rows +
+                  (r == 0 || r == rows ? 0 : (hash(r * 31 + q * 7) - .5) * 28),
+            ),
+        ],
+    ];
+    double smooth(double from, double to, double v) {
+      final t = ((v - from) / (to - from)).clamp(0.0, 1.0);
+      return t * t * (3 - 2 * t);
+    }
+
+    final facets = <int, Path>{}, edges = Path();
+    final light = color(0xFFEFF5F8), dark = color(0xFF4F7390);
+    var n = 0;
+    for (var r = 0; r < rows; r++) {
+      for (var q = 0; q < cols; q++) {
+        final a = grid[r][q], b = grid[r][q + 1];
+        final d = grid[r + 1][q], e = grid[r + 1][q + 1];
+        final split = (r + q).isEven;
+        for (final tri
+            in split
+                ? [
+                    [a, b, e],
+                    [a, e, d],
+                  ]
+                : [
+                    [a, b, d],
+                    [b, e, d],
+                  ]) {
+          n++;
+          final center = (tri[0] + tri[1] + tri[2]) / 3;
+          final side = (center.dx - 170).abs() / 170;
+          final strength = math.max(
+            smooth(.45, .95, side),
+            math.max(
+              smooth(.72, 1, center.dy / 540),
+              smooth(.84, 1, 1 - center.dy / 540) * .5,
+            ),
+          );
+          // Behind the playfield the facets vanish entirely.
+          if (strength < .08) continue;
+          // Light falls from the upper left: facets facing it brighten.
+          final normal =
+              (tri[1] - tri[0]).dx * (tri[2] - tri[0]).dy -
+              (tri[1] - tri[0]).dy * (tri[2] - tri[0]).dx;
+          final tone = ((hash(n) * .55 + (normal > 0 ? .45 : 0)) * 4).round();
+          final alpha = ((.06 + .3 * strength) * 20).round();
+          // Quantized tone and opacity keep the batch to a few paths.
+          final tint = Color.lerp(
+            dark,
+            light,
+            tone / 4,
+          )!.withValues(alpha: alpha / 20);
+          facets.putIfAbsent(tint.toARGB32(), Path.new).addPolygon(tri, true);
+          if (strength > .6) {
+            edges
+              ..moveTo(tri[0].dx, tri[0].dy)
+              ..lineTo(tri[1].dx, tri[1].dy);
+          }
+        }
+      }
+    }
+    for (final MapEntry(:key, :value) in facets.entries) {
+      c.drawPath(value, Paint()..color = Color(key));
+    }
+    c.drawPath(
+      edges,
+      Paint()
+        ..color = Colors.white.withAlpha(55)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .7,
+    );
+    wash(const Rect.fromLTWH(-120, -140, 420, 320), Colors.white.withAlpha(60));
+  }
+
+  /// A tilted spiral galaxy: soft halo, two dusty arms and a bright core.
+  void spiralGalaxy(Offset o, double r, double tilt) {
+    final arm = color(0xFFD6A9F2), core = color(0xFFFFE8F3);
+    c.save();
+    c.translate(o.dx, o.dy);
+    c.rotate(tilt);
+    c.scale(1, .4);
+    final disk = Rect.fromCircle(center: Offset.zero, radius: r);
+    c.drawCircle(
+      Offset.zero,
+      r,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [arm.withAlpha(80), arm.withAlpha(22), arm.withAlpha(0)],
+          stops: const [0, .45, 1],
+        ).createShader(disk),
+    );
+    final arms = Path(), dust = Path();
+    for (final start in [0.0, math.pi]) {
+      for (var i = 0; i <= 40; i++) {
+        final theta = i / 40 * math.pi * 2.2;
+        final radius = r * (.1 + .85 * i / 40);
+        final p = Offset(
+          math.cos(theta + start) * radius,
+          math.sin(theta + start) * radius,
+        );
+        if (i == 0) {
+          arms.moveTo(p.dx, p.dy);
+        } else {
+          arms.lineTo(p.dx, p.dy);
+        }
+        if (i % 3 == 0 && i > 4) {
+          dust.addOval(
+            Rect.fromCircle(
+              center: p + Offset(hash(i) - .5, hash(i + 9) - .5) * 14,
+              radius: 1 + hash(i + 4) * 1.4,
+            ),
+          );
+        }
+      }
+    }
+    c.drawPath(
+      arms,
+      Paint()
+        ..color = arm.withAlpha(30)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 16,
+    );
+    c.drawPath(
+      arms,
+      Paint()
+        ..color = arm.withAlpha(75)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.6,
+    );
+    c.drawPath(dust, Paint()..color = core.withAlpha(120));
+    c.drawCircle(
+      Offset.zero,
+      r * .26,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [core.withAlpha(170), core.withAlpha(50), core.withAlpha(0)],
+          stops: const [0, .35, 1],
+        ).createShader(Rect.fromCircle(center: Offset.zero, radius: r * .26)),
+    );
+    c.restore();
+  }
+
+  void opalFire() {
+    // Milky stone with play-of-color gathered at the margins.
+    wash(
+      const Rect.fromLTWH(-160, -140, 370, 320),
+      color(0xFFFFC2AE).withAlpha(85),
+    );
+    wash(
+      const Rect.fromLTWH(170, -120, 340, 340),
+      color(0xFF92EBD3).withAlpha(95),
+    );
+    wash(
+      const Rect.fromLTWH(-160, 290, 340, 330),
+      color(0xFF94C6F6).withAlpha(85),
+    );
+    wash(
+      const Rect.fromLTWH(180, 320, 330, 330),
+      color(0xFFC3A2F4).withAlpha(85),
+    );
+    // Opal fire: a few diagonal flashes of small spectral facets at the
+    // margins. Hue drifts along each flash and fades out at its ends, so the
+    // middle of the stone stays milky and calm.
+    const spectrum = [
+      Color(0xFF52D6B8),
+      Color(0xFF62B4F2),
+      Color(0xFF9E86EE),
+      Color(0xFFEE88B6),
+      Color(0xFFF0B864),
+      Color(0xFF86DA7A),
+    ];
+    const flashes = [
+      (Offset(14, 150), 74.0, 0),
+      (Offset(328, 248), 80.0, 2),
+      (Offset(18, 382), 56.0, 4),
+      (Offset(276, 20), 66.0, 1),
+    ];
+    const cell = 9.0, along = Offset(.82, -.57), across = Offset(.57, .82);
+    final facets = <int, Path>{}, glints = Path();
+    for (final (k, (o, length, shift)) in flashes.indexed) {
+      for (var i = -length ~/ cell; i <= length ~/ cell; i++) {
+        for (var j = -3; j <= 3; j++) {
+          final n = k * 997 + i * 31 + j;
+          final u = i / (length / cell), v = j / 3.5;
+          final strength = (1 - u * u) * (1 - v * v);
+          if (strength < .12 || hash(n) < .18) continue;
+          final p =
+              o +
+              along * (i * cell + (hash(n + 1) - .5) * 5) +
+              across * (j * cell * .9 + (hash(n + 2) - .5) * 5);
+          final size = cell * (.55 + hash(n + 3) * .35);
+          final spin = hash(n + 4) * math.pi;
+          final tri = [
+            for (final turn in [0.0, 2.1, 4.2])
+              p + Offset(math.cos(spin + turn), math.sin(spin + turn)) * size,
+          ];
+          final hue =
+              spectrum[(shift + (u + 1) * 2.2 + hash(n + 5) * .8).floor() % 6];
+          final level = strength > .6 ? 3 : (strength > .3 ? 2 : 1);
+          facets
+              .putIfAbsent(
+                hue.withValues(alpha: .13 * level).toARGB32(),
+                Path.new,
+              )
+              .addPolygon(tri, true);
+          if (level == 3 && hash(n + 6) > .75) glints.addPolygon(tri, true);
+        }
+      }
+    }
+    for (final MapEntry(:key, :value) in facets.entries) {
+      c.drawPath(value, Paint()..color = Color(key));
+    }
+    c.drawPath(glints, Paint()..color = Colors.white.withAlpha(70));
+    // Cut strata at the floor: angular bands, unlike Pearl's soft tides.
+    void stratum(double y, int seed, List<Color> colors, Color rim) {
+      final edge = <Offset>[
+        for (var i = 0; i <= 9; i++)
+          Offset(i * 40.0 - 10, y - i * 2.5 + (hash(seed * 13 + i) - .5) * 16),
+      ];
+      c.drawPath(
+        Path()..addPolygon([
+          ...edge,
+          const Offset(350, 560),
+          const Offset(-10, 560),
+        ], true),
+        Paint()
+          ..shader = LinearGradient(
+            colors: colors,
+          ).createShader(Rect.fromLTWH(0, y - 40, 340, 80)),
+      );
+      c.drawPath(
+        Path()..addPolygon(edge, false),
+        Paint()
+          ..color = rim
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1,
+      );
+    }
+
+    stratum(474, 1, [
+      color(0xFFA7E6D8).withAlpha(140),
+      color(0xFFB9C8F3).withAlpha(140),
+      color(0xFFF2C3D6).withAlpha(140),
+    ], Colors.white.withAlpha(170));
+    stratum(504, 2, [
+      color(0xFFC8B4F1).withAlpha(170),
+      color(0xFF9FDCE6).withAlpha(170),
+      color(0xFFF4D5AE).withAlpha(170),
+    ], Colors.white.withAlpha(180));
+    stratum(532, 3, [
+      color(0xFF8FC7D2),
+      color(0xFFA7B7E2),
+      color(0xFF94D2C0),
+    ], Colors.white.withAlpha(150));
+    for (final (p, s) in [
+      (const Offset(26, 140), 4.0),
+      (const Offset(318, 244), 3.5),
+      (const Offset(272, 24), 3.0),
+      (const Offset(150, 500), 3.0),
+    ]) {
+      sparkle(p, s, Colors.white.withAlpha(210));
+    }
+  }
+
   void paint(BallCosmetic ball) {
     switch (ball) {
       case BallCosmetic.steel:
@@ -805,53 +1553,8 @@ class _Scenery {
         reef(12, 551, color(0xFFF69A88), 1.0);
         reef(325, 563, color(0xFFD87595), 1.3);
         reef(53, 560, color(0xFFF1BE8F), .55);
-        for (var i = 0; i < 8; i++) {
-          final p = Offset(i.isEven ? 34 : 310, 95 + i * 40.0);
-          c.drawCircle(
-            p,
-            2 + i % 3.0,
-            Paint()
-              ..color = Colors.white.withAlpha(85)
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = .8,
-          );
-        }
       case BallCosmetic.circuit:
-        for (var i = 0; i < 9; i++) {
-          final y = i * 65.0;
-          for (final right in [false, true]) {
-            c.save();
-            if (right) {
-              c.translate(340, 0);
-              c.scale(-1, 1);
-            }
-            polygon([
-              Offset(-10, y),
-              Offset(38, y - 18),
-              Offset(75, y + 4),
-              Offset(75, y + 38),
-              Offset(32, y + 57),
-              Offset(-10, y + 32),
-            ], color(0xFF24635B).withAlpha(140));
-            c.drawPath(
-              Path()
-                ..moveTo(0, y + 20)
-                ..lineTo(25, y + 20)
-                ..lineTo(44, y + 36)
-                ..lineTo(66, y + 36),
-              Paint()
-                ..color = accent.withAlpha(120)
-                ..style = PaintingStyle.stroke
-                ..strokeWidth = 1.4,
-            );
-            c.drawRect(
-              Rect.fromLTWH(60, y + 33, 5, 5),
-              Paint()..color = accent.withAlpha(170),
-            );
-            c.restore();
-          }
-        }
-        wash(const Rect.fromLTWH(-120, -100, 470, 300), accent.withAlpha(24));
+        circuitGarden();
       case BallCosmetic.neon:
         wash(
           const Rect.fromLTWH(50, 310, 320, 200),
@@ -869,29 +1572,7 @@ class _Scenery {
           line(Offset(0, y), Offset(340, y), accent.withAlpha(70));
         stars(color(0xFF9AABEC), 15);
       case BallCosmetic.obsidian:
-        polygon([
-          const Offset(0, 0),
-          const Offset(340, 0),
-          const Offset(340, 36),
-          const Offset(305, 15),
-          const Offset(283, 55),
-          const Offset(236, 9),
-          const Offset(197, 26),
-          const Offset(167, 4),
-          const Offset(115, 41),
-          const Offset(78, 13),
-          const Offset(40, 67),
-          const Offset(0, 30),
-        ], color(0xFF342541));
-        wash(const Rect.fromLTWH(-130, 210, 220, 350), accent.withAlpha(40));
-        for (var i = 0; i < 6; i++)
-          crystal(
-            i.isEven ? 5 : 337,
-            190 + i * 70.0,
-            80 + i % 3 * 24.0,
-            i.isEven ? color(0xFF997BDC) : color(0xFF565FAC),
-          );
-        ridge(555, 48, color(0xFF211C3D));
+        obsidianCavern();
       case BallCosmetic.prism:
         for (var i = 0; i < 5; i++) {
           final y = i * 135.0 - 30;
@@ -914,21 +1595,71 @@ class _Scenery {
         crystal(325, 550, 80, color(0xFFCA839A), 50);
       case BallCosmetic.reactor:
         for (final x in [-18.0, 312.0]) {
+          // Shaded toward the screen edge, with a soft glow around the
+          // conduit, lit brace edges and clamps between the braces.
+          final column = Rect.fromLTWH(x, 0, 46, 540);
+          final inner = x < 0 ? column.right : column.left;
           c.drawRect(
-            Rect.fromLTWH(x, 0, 46, 540),
-            Paint()..color = color(0xFF223B53),
+            column,
+            Paint()
+              ..shader = LinearGradient(
+                colors: [color(0xFF1A2F45), color(0xFF26425A)],
+                begin: x < 0 ? Alignment.centerLeft : Alignment.centerRight,
+                end: x < 0 ? Alignment.centerRight : Alignment.centerLeft,
+              ).createShader(column),
           );
           c.drawRect(
-            Rect.fromLTWH(x + 17, 0, 5, 540),
-            Paint()..color = accent.withAlpha(140),
+            Rect.fromLTWH(x + 12.5, 0, 14, 540),
+            Paint()..color = accent.withAlpha(24),
           );
-          for (var i = 0; i < 8; i++)
-            polygon([
-              Offset(x, i * 78.0),
-              Offset(x + 46, i * 78.0 + 24),
-              Offset(x + 46, i * 78.0 + 40),
-              Offset(x, i * 78.0 + 16),
-            ], color(0xFF3E5368));
+          c.drawRect(
+            Rect.fromLTWH(x + 17.5, 0, 4, 540),
+            Paint()..color = accent.withAlpha(120),
+          );
+          c.drawRect(
+            Rect.fromLTWH(x + 19, 0, 1, 540),
+            Paint()..color = Colors.white.withAlpha(60),
+          );
+          final braces = Path(), edges = Path(), clamps = Path();
+          for (var i = 0; i < 8; i++) {
+            final y = i * 78.0;
+            braces.addPolygon([
+              Offset(x, y),
+              Offset(x + 46, y + 24),
+              Offset(x + 46, y + 40),
+              Offset(x, y + 16),
+            ], true);
+            edges
+              ..moveTo(x, y)
+              ..lineTo(x + 46, y + 24);
+            clamps.addRRect(
+              RRect.fromRectAndRadius(
+                Rect.fromCenter(
+                  center: Offset(x + 19.5, y + 59),
+                  width: 13,
+                  height: 6,
+                ),
+                const Radius.circular(2),
+              ),
+            );
+          }
+          c.drawPath(braces, Paint()..color = color(0xFF3A5066));
+          c.drawPath(
+            edges,
+            Paint()
+              ..color = color(0xFF7D98AE).withAlpha(110)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = .8,
+          );
+          c.drawPath(clamps, Paint()..color = color(0xFF2E4A62));
+          for (var i = 0; i < 8; i++) {
+            c.drawCircle(
+              Offset(x + 19.5, i * 78.0 + 59),
+              1.1,
+              Paint()..color = accent.withAlpha(170),
+            );
+          }
+          line(Offset(inner, 0), Offset(inner, 540), accent.withAlpha(40));
         }
         polygon([
           const Offset(24, 0),
@@ -959,8 +1690,8 @@ class _Scenery {
           const Rect.fromLTWH(220, 40, 300, 490),
           color(0xFF506FE5).withAlpha(85),
         );
-        aurora(color(0xFFDA80BA), color(0xFF7165CA));
         stars(color(0xFFFFD4E6), 52);
+        spiralGalaxy(const Offset(232, 104), 104, -.38);
         ridge(553, 65, color(0xFF262341), seed: 5);
       case BallCosmetic.nova:
         wash(
@@ -995,32 +1726,7 @@ class _Scenery {
         dune(489, color(0xFF8A6379), -10);
         dune(536, color(0xFF392F50), 30);
       case BallCosmetic.pearl:
-        for (var i = 0; i < 4; i++)
-          dune(
-            425 + i * 36.0,
-            [
-              color(0xFFA4CDCD),
-              color(0xFF92B9C8),
-              color(0xFFC7AFC5),
-              color(0xFFEED9C3),
-            ][i],
-            i * 17.0,
-          );
-        for (final x in [20.0, 320.0]) {
-          final shell = Path()
-            ..moveTo(x, 535)
-            ..quadraticBezierTo(x - 60, 480, x, 461)
-            ..quadraticBezierTo(x + 60, 480, x, 535)
-            ..close();
-          c.drawPath(shell, Paint()..color = color(0xFFF8E4D8));
-          for (var i = -2; i <= 2; i++)
-            line(
-              Offset(x, 532),
-              Offset(x + i * 12.0, 478 + i.abs() * 5),
-              color(0xFFD0A5AC),
-              1.2,
-            );
-        }
+        pearlTides();
       case BallCosmetic.malachite:
         dune(390, color(0xFF438878), 40);
         dune(465, color(0xFF2A6A62), -10);
@@ -1052,39 +1758,9 @@ class _Scenery {
         }
         dune(542, color(0xFF164B4A), 0);
       case BallCosmetic.titanium:
-        for (final x in [-8.0, 309.0]) {
-          c.drawRect(
-            Rect.fromLTWH(x, 0, 39, 540),
-            Paint()..color = color(0xFF7893A5),
-          );
-          for (var i = 0; i < 5; i++) {
-            final y = i * 120.0;
-            polygon([
-              Offset(x, y),
-              Offset(x + 39, y + 70),
-              Offset(x + 39, y + 100),
-              Offset(x, y + 30),
-            ], color(0xFF38576F));
-            line(
-              Offset(x + 5, y + 6),
-              Offset(x + 34, y + 65),
-              color(0xFFC4D9DD),
-              2,
-            );
-          }
-        }
-        ridge(542, 60, color(0xFF587689), seed: 2);
+        titaniumFacets();
       case BallCosmetic.opal:
-        dune(465, color(0xFFC5BFD9), 25);
-        dune(510, color(0xFF96C2C9), 0);
-        for (var i = 0; i < 7; i++)
-          crystal(
-            i.isEven ? 12 + i * 5.0 : 327 - i * 3.0,
-            450 + i * 25.0,
-            90 + i % 3 * 38.0,
-            [color(0xFF73BEBB), color(0xFFAB95CF), color(0xFFCCAE8F)][i % 3],
-            23 + i % 2 * 10.0,
-          );
+        opalFire();
       case BallCosmetic.plasma:
         aurora(color(0xFFAF69FF), color(0xFFEE8DBB));
         for (final x in [23.0, 320.0]) {

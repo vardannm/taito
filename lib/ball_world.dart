@@ -11,10 +11,15 @@ class BallWorld {
     this.description,
     this.top,
     this.bottom,
-    this.accent,
-  );
+    this.accent, {
+    this.deep,
+  });
   final String name, description;
   final Color top, bottom, accent;
+
+  /// What the dark combo tiers sink toward. Pale worlds name a rich hue here;
+  /// darkening their pale sky toward navy reads as muddy grey.
+  final Color? deep;
   List<Color> get field => [top, Color.lerp(top, bottom, .5)!, bottom];
   Color get surround => Color.lerp(accent, const Color(0xFFF7F3EB), .88)!;
   bool get dark => top.computeLuminance() < .18;
@@ -62,6 +67,7 @@ class BallWorld {
       Color(0xFFF6E8D2),
       Color(0xFFD0C5D7),
       Color(0xFFBC976C),
+      deep: Color(0xFF24145A),
     ),
     BallCosmetic.reactor => const BallWorld(
       'Reactor Station',
@@ -79,7 +85,7 @@ class BallWorld {
     ),
     BallCosmetic.nebula => const BallWorld(
       'Nebula Drift',
-      'Violet clouds and distant constellations',
+      'Violet clouds around a distant spiral galaxy',
       Color(0xFF201D40),
       Color(0xFF443457),
       Color(0xFFCFA7EA),
@@ -100,7 +106,7 @@ class BallWorld {
     ),
     BallCosmetic.pearl => const BallWorld(
       'Pearl Tides',
-      'Nacre shells and soft rose ocean ripples',
+      'Pearl strands and a nacre shell on rose tides',
       Color(0xFFF4EEE2),
       Color(0xFFB6D4D5),
       Color(0xFFBC929F),
@@ -111,17 +117,18 @@ class BallWorld {
       Color(0xFFB6DCCE),
       Color(0xFF549A89),
       Color(0xFF256B59),
+      deep: Color(0xFF005A42),
     ),
     BallCosmetic.titanium => const BallWorld(
       'Titanium Foundry',
-      'Cold alloy panels and industrial bracing',
+      'Machined alloy facets in cool blue light',
       Color(0xFFD9E4E6),
       Color(0xFF93B1C0),
       Color(0xFF426781),
     ),
     BallCosmetic.opal => const BallWorld(
       'Opal Sanctuary',
-      'Iridescent shards in a mint crystal landscape',
+      'Milky stone alive with flecks of spectral fire',
       Color(0xFFF2EDE1),
       Color(0xFFC4DADA),
       Color(0xFF8A98B5),

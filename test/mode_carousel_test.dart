@@ -157,7 +157,8 @@ void main() {
       isTrue,
     ); // Normal application opening always starts here.
     await selectWorld(tester, 1);
-    expect(find.text('Classic • Level 18'), findsOneWidget);
+    expect(find.text('Level 18'), findsOneWidget);
+    expect(find.text('PLAY LEVEL 18'), findsOneWidget);
     await startWorld(tester);
     expect(game.level, 18);
     expect(game.waitingForInput, isFalse);

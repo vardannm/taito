@@ -1,4 +1,6 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
+import 'dart:ui' show PointMode;
 import 'package:flutter/material.dart';
 import 'game.dart';
 import 'ball_world.dart';
@@ -67,7 +69,7 @@ List<Color> boardFieldColors(BalanceGame game) {
     )!;
     tint = Color.lerp(
       tint,
-      Color.lerp(world.top, const Color(0xFF090D1D), .75),
+      world.deep ?? Color.lerp(world.top, const Color(0xFF090D1D), .75),
       comboDarkness(power) * .8,
     )!;
   }
@@ -215,6 +217,11 @@ void paintComboMotif(
   }
   // The dark tiers add a few more of the same shapes, never a second effect.
   final count = 4 + (8 * power + 6 * comboDarkness(power)).round();
+  final alpha = (.3 + .25 * power) * fade;
+  if (motif == ComboMotif.rain) {
+    paintRain(c, count, t, tint.withValues(alpha: alpha), horizontalSpread);
+    return;
+  }
   final shapes = Path(), halos = Path();
   var stroke = false;
   double column(int i) => ((i * 97) % 300 + 20.0) * horizontalSpread;
@@ -247,14 +254,8 @@ void paintComboMotif(
       case ComboMotif.snow:
         dot(falling(i, 10, 10), 1.5, 4);
       case ComboMotif.rain:
-        stroke = true;
-        final p = Offset(
-          column(i),
-          (t * 90 * (1 + i % 3 * .15) + i * 137) % 620 - 40,
-        );
-        shapes
-          ..moveTo(p.dx, p.dy)
-          ..lineTo(p.dx - 3, p.dy + 14);
+        // Handled by paintRain above.
+        break;
       case ComboMotif.twinkle:
         final p = Offset(column(i), ((i * i * 53 + i * 29) % 470) + 35.0);
         final glow = (math.sin(t * .9 + i * 2.1) + 1) / 2;
@@ -302,13 +303,45 @@ void paintComboMotif(
         );
     }
   }
-  final alpha = (.3 + .25 * power) * fade;
   c.drawPath(halos, Paint()..color = tint.withValues(alpha: alpha * .35));
   c.drawPath(
     shapes,
     Paint()
       ..color = tint.withValues(alpha: alpha)
       ..style = stroke ? PaintingStyle.stroke : PaintingStyle.fill
+      ..strokeWidth = .9,
+  );
+}
+
+/// Reused across frames so Neon's rain allocates nothing while it falls.
+final _rainBuffer = Float32List(maxRainDrops * 4);
+const maxRainDrops = 10;
+
+/// Neon's rain is the one motif that moves fast, so it is also the leanest:
+/// at most [maxRainDrops] streaks, written into a pooled buffer and drawn as
+/// plain line segments in one call. No path is built or stroked per frame.
+void paintRain(
+  Canvas c,
+  int count,
+  double t,
+  Color tint,
+  double horizontalSpread,
+) {
+  final drops = math.min(maxRainDrops, (count * .6).ceil());
+  for (var i = 0; i < drops; i++) {
+    final x = ((i * 97) % 300 + 20.0) * horizontalSpread;
+    final y = (t * 60 * (1 + i % 3 * .15) + i * 151) % 620 - 40;
+    _rainBuffer
+      ..[i * 4] = x
+      ..[i * 4 + 1] = y
+      ..[i * 4 + 2] = x - 2
+      ..[i * 4 + 3] = y + 10;
+  }
+  c.drawRawPoints(
+    PointMode.lines,
+    Float32List.sublistView(_rainBuffer, 0, drops * 4),
+    Paint()
+      ..color = tint
       ..strokeWidth = .9,
   );
 }

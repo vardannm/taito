@@ -20,7 +20,8 @@ import 'infinite_progress.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart' show kReleaseMode;
+import 'package:flutter/foundation.dart'
+    show LicenseEntryWithLineBreaks, LicenseRegistry, kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -55,6 +56,11 @@ import 'infinite_boss.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks([
+      'Montserrat',
+    ], await rootBundle.loadString('assets/fonts/Montserrat-OFL.txt'));
+  });
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   // Full screen: hides the status bar (time, battery) and Android's nav bar;
   // a swipe from the edge shows them briefly. SafeAreas still avoid the notch.
@@ -114,7 +120,11 @@ class ArcadeApp extends StatelessWidget {
     theme: arcadeMenuTheme(),
     // Wrapping the navigator keeps the intro above anything the menu opens.
     builder: intro
-        ? (context, child) => GiltIntroGate(child: child ?? const SizedBox())
+        ? (context, child) => GiltIntroGate(
+            ball: profile.selectedBall,
+            platform: profile.selectedPlatform,
+            child: child ?? const SizedBox(),
+          )
         : null,
     home: GameScreen(
       profile: profile,
@@ -170,6 +180,7 @@ class _GameScreenState extends State<GameScreen>
   TutorialRun? tutorialRun;
   bool tutorialSheetOpen = false;
   final shopOriginKey = GlobalKey();
+  final achievementsOriginKey = GlobalKey();
   final tutorialLevelsKey = GlobalKey();
   final tutorialDailyKey = GlobalKey();
   final tutorialPlayKey = GlobalKey();
@@ -782,7 +793,7 @@ class _GameScreenState extends State<GameScreen>
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'BEST ${profile.mergeBest}  ·  HIGHEST ${formatMergeNumber(profile.mergeHighest)}',
+                        'BEST ${formatCompactScore(profile.mergeBest)}  ·  HIGHEST ${formatMergeNumber(profile.mergeHighest)}',
                         style: label(menuGold),
                       ),
                     ],
@@ -830,16 +841,36 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
+  /// Where a full-screen menu page grows from: [key]'s button, or a small
+  /// square at [fallback] when that button is not on screen.
+  Rect pageOrigin(GlobalKey key, Offset fallback) {
+    final box = key.currentContext?.findRenderObject() as RenderBox?;
+    return box != null && box.hasSize
+        ? box.localToGlobal(Offset.zero) & box.size
+        : Rect.fromCenter(center: fallback, width: 48, height: 48);
+  }
+
+  /// Opens a menu page like the shop: it grows from [origin], keeps a back
+  /// button on top and closes with a right swipe.
+  Future<void> openPage(String name, Rect origin, WidgetBuilder builder) =>
+      Navigator.of(context).push<void>(
+        ShopRevealRoute(
+          name: name,
+          origin: origin,
+          reducedMotion: MediaQuery.disableAnimationsOf(context),
+          builder: (context) => SwipeBackPage(child: builder(context)),
+        ),
+      );
+
   Future<void> showAchievements() async {
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: menuBackground,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (_) => FractionallySizedBox(
-        heightFactor: .85,
-        child: AchievementSheet(profile: profile),
+    final viewport = MediaQuery.sizeOf(context);
+    await openPage(
+      '/achievements',
+      pageOrigin(
+        achievementsOriginKey,
+        Offset(viewport.width - 48, viewport.height - 48),
       ),
+      (_) => AchievementSheet(profile: profile),
     );
     if (mounted) setState(() {});
   }
@@ -974,6 +1005,31 @@ class _GameScreenState extends State<GameScreen>
     }
     return level;
   }
+
+  /// The next Classic level and the stars already earned on it.
+  Widget classicLevelSummary(int level) => FittedBox(
+    fit: BoxFit.scaleDown,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Level $level',
+          style: const TextStyle(
+            color: menuText,
+            fontSize: 19,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 2),
+        StarRow(
+          profile.levelRecord(level, controlForMode(GameMode.classic)).starMask,
+          count: 4,
+          size: 18,
+          dark: true,
+        ),
+      ],
+    ),
+  );
 
   int worldLevel(int index) => switch (arcadeModes[index]) {
     GameMode.classic =>
@@ -1436,15 +1492,10 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  Future<void> showModes() => showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: menuBackground,
-    showDragHandle: true,
-    isScrollControlled: true,
-    constraints: BoxConstraints(
-      maxHeight: MediaQuery.sizeOf(context).height * .9,
-    ),
-    builder: (sheetContext) {
+  Future<void> showModes() => openPage(
+    '/arcade',
+    pageOrigin(tutorialDailyKey, const Offset(40, 40)),
+    (sheetContext) {
       Widget choice(
         String title,
         String subtitle,
@@ -1503,6 +1554,10 @@ class _GameScreenState extends State<GameScreen>
       );
     },
   );
+
+  String get hudScore => game.mode == GameMode.classic
+      ? '${game.completed}/10'
+      : formatCompactScore(game.score);
 
   Widget wideBoardChrome() => Align(
     alignment: Alignment.topCenter,
@@ -1570,15 +1625,13 @@ class _GameScreenState extends State<GameScreen>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  game.mode == GameMode.classic
-                                      ? '${game.completed}/10'
-                                      : '${game.score}',
+                                  hudScore,
                                   key: game.infinite
                                       ? const ValueKey('infinite-score')
                                       : null,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: menuText,
-                                    fontSize: 32,
+                                    fontSize: scoreFontSize(32, hudScore),
                                     height: 1.1,
                                     fontWeight: FontWeight.w800,
                                     fontFamily: 'monospace',
@@ -1774,7 +1827,8 @@ class _GameScreenState extends State<GameScreen>
     return Align(
       alignment: Alignment.topCenter,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        // Clear of notches that report little or no inset in immersive mode.
+        padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
         child: AnimatedBuilder(
           animation: Listenable.merge([hud, backdrop]),
           builder: (context, _) {
@@ -1845,15 +1899,13 @@ class _GameScreenState extends State<GameScreen>
                               FittedBox(
                                 fit: BoxFit.scaleDown,
                                 child: Text(
-                                  game.mode == GameMode.classic
-                                      ? '${game.completed}/10'
-                                      : '${game.score}',
+                                  hudScore,
                                   key: game.infinite
                                       ? const ValueKey('infinite-score')
                                       : null,
                                   style: TextStyle(
                                     color: color,
-                                    fontSize: 30,
+                                    fontSize: scoreFontSize(30, hudScore),
                                     height: 1.15,
                                     fontWeight: FontWeight.w800,
                                     fontFamily: 'monospace',
@@ -1972,7 +2024,7 @@ class _GameScreenState extends State<GameScreen>
 
   String worldSubtitle(int index) => switch (index) {
     0 => 'NO FINISH LINE. FIND YOUR FLOW.',
-    1 => 'Classic • Level ${worldLevel(index)}',
+    1 => 'HANDMADE BOARDS. EARN EVERY STAR.',
     _ => 'SMALL NUMBERS. BIG POSSIBILITIES.',
   };
 
@@ -2148,6 +2200,51 @@ class _GameScreenState extends State<GameScreen>
               ),
             ),
           ),
+        // Classic's next level, or Infinite's endless mark, sits under the
+        // floating rail on the stage pool that MenuBallStage lights, so it
+        // swipes with its world.
+        if (chromeOpacity > 0 &&
+            (arcadeModes[index] == GameMode.classic ||
+                arcadeModes[index] == GameMode.infinite))
+          Opacity(
+            opacity: chromeOpacity * visibility,
+            child: LayoutBuilder(
+              builder: (context, bounds) {
+                final radius = math.min(
+                  bounds.maxWidth * .17,
+                  bounds.maxHeight * .19,
+                );
+                return Stack(
+                  children: [
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      top: bounds.maxHeight * .47 + radius * 1.75,
+                      height: arcadeModes[index] == GameMode.classic
+                          ? (compactMenu ? 36 : 46)
+                          : (compactMenu ? 52 : 72),
+                      child: arcadeModes[index] == GameMode.classic
+                          ? classicLevelSummary(worldLevel(index))
+                          : const FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                '∞',
+                                key: ValueKey('menu-infinite-mark'),
+                                semanticsLabel: 'Endless',
+                                style: TextStyle(
+                                  color: menuText,
+                                  fontSize: 72,
+                                  fontWeight: FontWeight.w300,
+                                  height: 1,
+                                ),
+                              ),
+                            ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
       ],
     );
   }
@@ -2255,25 +2352,32 @@ class _GameScreenState extends State<GameScreen>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    'ROLLRISE',
-                    style: TextStyle(
-                      fontFamily: 'sans-serif',
-                      color: menuText,
-                      fontSize: 30,
-                      letterSpacing: 4,
-                      fontWeight: FontWeight.w300,
-                      height: 1.15,
+                  // Bold ROLL, thin gold RISE: the Montserrat wordmark.
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: 'ROLL',
+                          style: TextStyle(
+                            color: menuText,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        TextSpan(
+                          text: 'RISE',
+                          style: TextStyle(
+                            color: menuGold,
+                            fontWeight: FontWeight.w200,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'THE ART OF BALANCE',
+                    semanticsLabel: 'ROLLRISE',
                     style: TextStyle(
-                      color: menuMuted,
-                      fontSize: 8,
-                      letterSpacing: 2,
-                      fontWeight: FontWeight.w500,
+                      fontFamily: 'RollriseTitle',
+                      fontSize: 30,
+                      letterSpacing: 3,
+                      height: 1.15,
                     ),
                   ),
                 ],
@@ -2373,54 +2477,27 @@ class _GameScreenState extends State<GameScreen>
               ),
               SizedBox(
                 height: 48,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: classic
-                          ? MenuEarnedStars(stars: profile.totalStars)
-                          : MenuBestScore(score: savedWorldScore(index)),
-                    ),
-                    if (classic) ...[
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Center(
+                child: classic
+                    ? Center(
+                        child: FractionallySizedBox(
+                          widthFactor: 1,
                           child: Tooltip(
                             key: tutorialLevelsKey,
                             message: 'Level ${worldLevel(index)}',
-                            child: SizedBox(
-                              height: 40,
-                              child: FilledButton.icon(
-                                key: const ValueKey('choose-level'),
-                                onPressed: carouselMoving ? null : selectLevel,
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: menuGold,
-                                  foregroundColor: menuBackground,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                  ),
-                                  minimumSize: const Size(0, 40),
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                  textStyle: const TextStyle(
-                                    fontFamily: 'sans-serif',
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                icon: const Icon(Icons.route_rounded, size: 20),
-                                label: const FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Text('Choose Level'),
-                                ),
-                              ),
+                            child: MenuActionButton(
+                              key: const ValueKey('choose-level'),
+                              label: 'All levels',
+                              icon: Icons.route_rounded,
+                              tooltip: 'All levels',
+                              // Shorter than the row, so it clears the subtitle.
+                              height: 42,
+                              tint: BallWorld.of(profile.selectedBall).accent,
+                              onPressed: carouselMoving ? null : selectLevel,
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ],
-                ),
+                      )
+                    : MenuBestScore(score: savedWorldScore(index)),
               ),
               const SizedBox(height: 8),
               Row(
@@ -2436,6 +2513,7 @@ class _GameScreenState extends State<GameScreen>
                         icon: Icons.storefront_outlined,
                         tooltip: 'Gear shop',
                         upgradeAvailable: profile.shopUpgradeAvailable,
+                        tint: BallWorld.of(profile.selectedBall).accent,
                         onPressed: carouselMoving ? null : showBallShop,
                       ),
                     ),
@@ -2443,12 +2521,14 @@ class _GameScreenState extends State<GameScreen>
                   const SizedBox(width: 12),
                   Expanded(
                     child: MenuActionButton(
+                      key: achievementsOriginKey,
                       label: 'Achievements',
                       icon: Icons.emoji_events_outlined,
                       tooltip: 'Achievements',
                       upgradeAvailable: profile.achievementsReady > 0,
                       hintLabel: 'Achievement rewards ready',
                       hintKey: 'achievement-ready-hint',
+                      tint: BallWorld.of(profile.selectedBall).accent,
                       onPressed: carouselMoving ? null : showAchievements,
                     ),
                   ),
@@ -2459,6 +2539,9 @@ class _GameScreenState extends State<GameScreen>
                 key: tutorialPlayKey,
                 child: PremiumPlayButton(
                   height: compactMenu ? 56 : 64,
+                  label: arcadeModes[index] == GameMode.classic
+                      ? 'PLAY LEVEL ${worldLevel(index)}'
+                      : 'PLAY',
                   key: game.waitingForInput
                       ? const ValueKey('menu-play')
                       : null,
@@ -3137,9 +3220,12 @@ class _GameScreenState extends State<GameScreen>
                         const SizedBox(height: 8),
                         if (game.mode != GameMode.classic)
                           Text(
-                            '${game.score}',
-                            style: const TextStyle(
-                              fontSize: 42,
+                            formatCompactScore(game.score),
+                            style: TextStyle(
+                              fontSize: scoreFontSize(
+                                42,
+                                formatCompactScore(game.score),
+                              ),
                               fontFamily: 'monospace',
                               color: cream,
                             ),

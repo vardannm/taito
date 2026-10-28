@@ -442,7 +442,7 @@ Debug and release launches both use the normal saved wallet with no automatic te
 
 ### Number Merge difficulty configuration
 
-Edit `lib/merge_difficulty.dart`, just like `lib/infinite_difficulty.dart`, then hot restart and begin a fresh Merge run. The 22 October harder defaults start at 42 units/second, add 8 per doubling, cap at 112, and space waves 96 units apart.
+Edit `lib/merge_difficulty.dart`, just like `lib/infinite_difficulty.dart`, then hot restart and begin a fresh Merge run. The current defaults start at 35.7 units/second, add 6.8 per doubling, cap at 95.2, and space waves 128 units apart.
 
 - `startSpeed`, `speedPerDoubling`, `maxSpeed`: falling-ball speed and its growth.
 - `waveSpacing`: distance between waves; higher values give more time to react.

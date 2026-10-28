@@ -208,7 +208,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('ACHIEVEMENTS'), findsNothing);
     expect(find.text('GEAR SHOP'), findsNothing);
-    await tester.tapAt(const Offset(10, 10));
+    await tester.tap(find.byTooltip('Back'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byTooltip('Achievements').first);
@@ -236,6 +236,35 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
+
+  testWidgets('achievements and the arcade open full screen and swipe closed', (
+    tester,
+  ) async {
+    final p = PlayerProfile()..tutorialSeen = true;
+    await tester.pumpWidget(ArcadeApp(profile: p));
+    await tester.pump();
+    await tester.tap(find.text('Achievements'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byType(AchievementSheet), findsOneWidget);
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.byTooltip('Back'), findsOneWidget);
+    await tester.dragFrom(const Offset(120, 420), const Offset(160, 0));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byType(AchievementSheet), findsNothing);
+    await tester.tap(find.byTooltip('Modes'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('Your arcade'), findsOneWidget);
+    expect(find.byType(BottomSheet), findsNothing);
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('Your arcade'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
 
   test('outlasting bosses counts toward the boss achievements', () {
     final game = BalanceGame(seed: 5)..start(gameMode: GameMode.infinite);

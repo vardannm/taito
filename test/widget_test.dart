@@ -157,15 +157,15 @@ void main() {
     expect(rect.top, closeTo(0, .001));
     expect(
       tester.getTopLeft(find.byKey(const ValueKey('board-hud'))).dy,
-      closeTo(56, .001),
+      closeTo(66, .001),
     );
     expect(
       tester.getTopLeft(find.byKey(const ValueKey('board-pause'))).dy,
-      closeTo(56, .001),
+      closeTo(66, .001),
     );
     expect(
       tester.getTopLeft(find.byKey(const ValueKey('board-hearts'))).dy,
-      closeTo(66, .001),
+      closeTo(76, .001),
     );
     expect(rect.height, greaterThan(700));
     expect(tester.takeException(), isNull);

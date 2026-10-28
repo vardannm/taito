@@ -3,6 +3,7 @@ import 'arena_canvas.dart';
 import 'package:flutter/material.dart';
 import 'menu_design.dart';
 import 'merge.dart';
+import 'premium_menu.dart' show formatCompactScore;
 
 Color numberColor(int value) {
   const colors = [
@@ -199,7 +200,7 @@ class MergeResult extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              '${newBest ? 'NEW BEST' : 'SCORE'} ${run.score}  ·  HIGHEST ${formatMergeNumber(run.highest)}',
+              '${newBest ? 'NEW BEST' : 'SCORE'} ${formatCompactScore(run.score)}  ·  HIGHEST ${formatMergeNumber(run.highest)}',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: menuGold,

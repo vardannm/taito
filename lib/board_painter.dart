@@ -541,6 +541,38 @@ class BoardPainter extends CustomPainter {
             ..style = PaintingStyle.stroke
             ..strokeWidth = active ? 2.5 : 1.5,
         );
+      final motion = hole.motion;
+      if (motion != null) {
+        // Moving holes share the moving-hole hazard's red ring and arrows, so
+        // a sliding trap never reads as a still one. Target holes keep their
+        // own ring and only show the arrows.
+        final cue = Paint()
+          ..color = const Color(0xFFE34336)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..strokeCap = StrokeCap.round;
+        if (hole.target == 0) canvas.drawCircle(p, rim + 1, cue);
+        final tip = rim + 9;
+        if (motion.path == HazardMotion.circle ||
+            motion.path == HazardMotion.oval) {
+          final angle = math.atan2(hole.y - hole.homeY, hole.x - hole.homeX);
+          final direction = Offset(-math.sin(angle), math.cos(angle));
+          final normal = Offset(-direction.dy, direction.dx);
+          final head = p + direction * (tip + 3);
+          canvas.drawLine(head, head - direction * 6 + normal * 4, cue);
+          canvas.drawLine(head, head - direction * 6 - normal * 4, cue);
+        } else {
+          final axis = motion.path == HazardMotion.vertical
+              ? const Offset(0, 1)
+              : const Offset(1, 0);
+          final side = Offset(-axis.dy, axis.dx);
+          for (final d in [-1.0, 1.0]) {
+            final head = p + axis * (d * tip);
+            canvas.drawLine(head, head - axis * (d * 5) + side * 5, cue);
+            canvas.drawLine(head, head - axis * (d * 5) - side * 5, cue);
+          }
+        }
+      }
       if (hole.target > 0)
         text(
           canvas,

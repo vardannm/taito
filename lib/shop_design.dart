@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'infinite_coin_chip.dart';
 import 'menu_design.dart';
+import 'pickup_painter.dart';
 
 /// A full-screen destination whose opening rectangle comes from the real
 /// Shop control. The page keeps its final layout while its reveal is clipped.
@@ -153,7 +154,7 @@ class ShopGalleryCard extends StatelessWidget {
   const ShopGalleryCard({
     super.key,
     required this.name,
-    required this.description,
+    this.description,
     required this.artwork,
     required this.action,
     required this.status,
@@ -161,8 +162,15 @@ class ShopGalleryCard extends StatelessWidget {
     this.selected = false,
     this.artHeight = 188,
     this.footer,
+    this.badge,
   });
-  final String name, description, status, detail;
+  final String name, status, detail;
+
+  /// Optional line under the name; the shop shows names alone.
+  final String? description;
+
+  /// Pinned to the artwork's top right, such as a ball's magnet.
+  final Widget? badge;
   final Widget artwork, action;
 
   /// Shown under the price row, such as a way to get more coins.
@@ -219,6 +227,8 @@ class ShopGalleryCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (badge != null)
+                    Positioned(right: 16, top: 14, child: badge!),
                 ],
               ),
             ),
@@ -236,15 +246,17 @@ class ShopGalleryCard extends StatelessWidget {
                       letterSpacing: -.5,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    description,
-                    style: const TextStyle(
-                      color: menuMuted,
-                      fontSize: 12,
-                      height: 1.5,
+                  if (description != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      description!,
+                      style: const TextStyle(
+                        color: menuMuted,
+                        fontSize: 12,
+                        height: 1.5,
+                      ),
                     ),
-                  ),
+                  ],
                   const SizedBox(height: 16),
                   Row(
                     children: [
@@ -271,6 +283,64 @@ class ShopGalleryCard extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// A ball's built-in Infinite magnet: the in-game magnet pickup, with its
+/// pull radius under it.
+class ShopMagnetBadge extends StatelessWidget {
+  const ShopMagnetBadge({super.key, required this.radius});
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label: 'Magnet, radius ${radius.round()}',
+    excludeSemantics: true,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox.square(
+          dimension: 30,
+          child: CustomPaint(painter: _MagnetIconPainter()),
+        ),
+        const SizedBox(height: 4),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: menuBackground.withAlpha(220),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            'RADIUS ${radius.round()}',
+            style: const TextStyle(
+              color: menuText,
+              fontSize: 9,
+              letterSpacing: 1,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _MagnetIconPainter extends CustomPainter {
+  const _MagnetIconPainter();
+  @override
+  void paint(Canvas canvas, Size size) {
+    // The pickup is drawn about 27 across; scale it to the badge.
+    final scale = size.shortestSide / 27;
+    canvas.scale(scale);
+    paintPickup(
+      canvas,
+      Offset(size.width / 2 / scale, size.height / 2 / scale),
+      PickupFace.magnet,
+      0,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_MagnetIconPainter old) => false;
 }
 
 class ShopPlatformStage extends CustomPainter {

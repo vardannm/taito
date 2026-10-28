@@ -1,7 +1,8 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
   <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
     <item name="android:windowSplashScreenBackground">#0D171A</item>
     <item name="android:windowSplashScreenAnimatedIcon">@drawable/gilt_icon</item>
     <item name="android:windowBackground">#0D171A</item>
+    <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="p">shortEdges</item>
   </style>
 </resources>

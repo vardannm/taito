@@ -126,7 +126,6 @@ class _BallShopState extends State<BallShop>
   Widget galleryItem({
     required String id,
     required String name,
-    required String description,
     required int cost,
     required double bonus,
     required bool owned,
@@ -136,9 +135,10 @@ class _BallShopState extends State<BallShop>
     bool purchaseOnly = false,
     bool example = false,
     BallCosmetic? worldBall,
+    Widget? badge,
   }) => ShopGalleryCard(
     name: name,
-    description: description,
+    badge: badge,
     selected: selected,
     status: selected
         ? 'EQUIPPED'
@@ -357,8 +357,9 @@ class _BallShopState extends State<BallShop>
                               id: 'buy-${b.name}',
                               worldBall: b,
                               name: b.label,
-                              description:
-                                  '${b.description}\n${b.magnetLabel} · Infinite',
+                              badge: b.magnetRadius > 0
+                                  ? ShopMagnetBadge(radius: b.magnetRadius)
+                                  : null,
                               cost: b.cost,
                               bonus: b.scoreBonus,
                               purchaseOnly: b.purchaseOnly,
@@ -373,7 +374,6 @@ class _BallShopState extends State<BallShop>
                             galleryItem(
                               id: 'buy-platform-${rail.name}',
                               name: rail.label,
-                              description: rail.description,
                               cost: rail.cost,
                               bonus: rail.scoreBonus,
                               purchaseOnly: rail.purchaseOnly,

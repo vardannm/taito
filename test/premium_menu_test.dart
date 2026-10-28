@@ -17,6 +17,25 @@ void main() {
         InMemorySharedPreferencesAsync.empty(),
   );
 
+  test('big scores use shorthand and smaller fonts', () {
+    for (final entry in {
+      0: '0',
+      9600: '9,600',
+      10000: '10K',
+      28640: '28.6K',
+      148620: '148.6K',
+      999960: '1M',
+      1234567: '1.2M',
+      987654321: '987.7M',
+      2500000000: '2.5B',
+    }.entries) {
+      expect(formatCompactScore(entry.key), entry.value);
+    }
+    expect(scoreFontSize(32, '9,600'), lessThan(32));
+    expect(scoreFontSize(32, '148.6K'), lessThan(scoreFontSize(32, '28.6K')));
+    expect(scoreFontSize(32, '320'), 32);
+  });
+
   for (final control in ControlMode.values) {
     for (var mode = 0; mode < 3; mode++) {
       testWidgets('Play launches prepared world $mode with $control', (
@@ -58,7 +77,7 @@ void main() {
     }
   }
 
-  testWidgets('menu shows saved scores and total earned Classic stars', (
+  testWidgets('menu shows saved scores and the next Classic level', (
     tester,
   ) async {
     final profile = PlayerProfile()
@@ -80,16 +99,15 @@ void main() {
     String displayedScore() => tester
         .widget<Text>(find.byKey(const ValueKey('menu-best-score')))
         .data!;
-    expect(displayedScore(), '148,620');
+    expect(displayedScore(), '148.6K');
     await selectWorld(tester, 1);
     expect(find.byKey(const ValueKey('menu-best-score')), findsNothing);
-    expect(
-      tester.widget<Text>(find.byKey(const ValueKey('menu-earned-stars'))).data,
-      '5',
-    );
+    // Classic shows the next level and its stars instead of the total.
+    expect(find.byKey(const ValueKey('menu-earned-stars')), findsNothing);
+    expect(find.textContaining('PLAY LEVEL '), findsOneWidget);
     expect(find.byKey(const ValueKey('choose-level')), findsOneWidget);
     await selectWorld(tester, 2);
-    expect(displayedScore(), '28,640');
+    expect(displayedScore(), '28.6K');
     await startWorld(tester);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
@@ -99,7 +117,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 650));
     await tester.pump();
-    expect(displayedScore(), '28,640');
+    expect(displayedScore(), '28.6K');
     expect(find.byKey(const ValueKey('menu-play')), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());

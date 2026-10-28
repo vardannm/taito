@@ -70,15 +70,7 @@ class _AchievementSheetState extends State<AchievementSheet> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              MenuHeading(
-                'Achievements',
-                eyebrow: 'YOUR MILESTONES',
-                trailing: MenuIconButton(
-                  icon: Icons.close,
-                  tooltip: 'Close achievements',
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ),
+              const MenuHeading('Achievements', eyebrow: 'YOUR MILESTONES'),
               Text(
                 '$earned of ${Achievement.values.length} earned',
                 style: const TextStyle(fontWeight: FontWeight.w700),
