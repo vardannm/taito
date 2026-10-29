@@ -1,3 +1,4 @@
+import 'support/shop_actions.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -146,6 +147,7 @@ void main() {
       expect(find.text('Coming soon'), findsNothing);
       expect(find.text('25,000'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('buy-aether')));
+      await completeShopPurchase(tester);
       await tester.pump();
       expect(p.ownedBalls.contains(BallCosmetic.aether), isTrue);
       expect(p.selectedBall, BallCosmetic.aether);

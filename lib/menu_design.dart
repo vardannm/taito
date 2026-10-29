@@ -496,18 +496,20 @@ class MenuTabs extends StatelessWidget {
     required this.selected,
     required this.onChanged,
     this.minimal = false,
+    this.singleRow = false,
     this.icons,
   });
   final List<String> labels;
   final int selected;
   final ValueChanged<int> onChanged;
   final bool minimal;
+  final bool singleRow;
   final List<IconData>? icons;
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, bounds) {
       final scale = MediaQuery.textScalerOf(context).scale(11) / 11;
-      final columns = scale > 1.3 ? 2 : labels.length;
+      final columns = !singleRow && scale > 1.3 ? 2 : labels.length;
       return Wrap(
         spacing: 6,
         runSpacing: 6,
@@ -562,23 +564,35 @@ class MenuTabs extends StatelessWidget {
                                 const SizedBox(height: 4),
                               ],
                               Flexible(
-                                child: Text(
-                                  labels[i],
-                                  textAlign: TextAlign.center,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: minimal
-                                        ? (i == selected ? menuGold : menuMuted)
-                                        : i == selected
-                                        ? menuBackground
-                                        : menuText,
-                                    fontSize: 11,
-                                    height: 1.2,
-                                    fontWeight: minimal
-                                        ? FontWeight.w600
-                                        : FontWeight.w800,
-                                  ),
+                                child: Builder(
+                                  builder: (context) {
+                                    final text = Text(
+                                      labels[i],
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: minimal
+                                            ? (i == selected
+                                                  ? menuGold
+                                                  : menuMuted)
+                                            : i == selected
+                                            ? menuBackground
+                                            : menuText,
+                                        fontSize: 11,
+                                        height: 1.2,
+                                        fontWeight: minimal
+                                            ? FontWeight.w600
+                                            : FontWeight.w800,
+                                      ),
+                                    );
+                                    return singleRow
+                                        ? FittedBox(
+                                            fit: BoxFit.scaleDown,
+                                            child: text,
+                                          )
+                                        : text;
+                                  },
                                 ),
                               ),
                             ],

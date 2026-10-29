@@ -1,3 +1,4 @@
+import 'support/shop_actions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/ball_cosmetics.dart';
@@ -99,8 +100,13 @@ void main() {
     await tester.tap(find.text('Platforms'));
     await tester.pump();
     final buy = find.byKey(const ValueKey('buy-platform-copper'));
-    await tester.scrollUntilVisible(buy.hitTestable(), 150);
+    await tester.scrollUntilVisible(
+      buy.hitTestable(),
+      150,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(buy);
+    await completeShopPurchase(tester);
     await tester.pump();
     expect(profile.selectedPlatform, PlatformStyle.copper);
     expect(profile.wallet, 0);

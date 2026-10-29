@@ -1,3 +1,4 @@
+import 'support/shop_actions.dart';
 import 'package:balance_arcade/ball_cosmetics.dart';
 import 'package:balance_arcade/ball_shop.dart';
 import 'package:balance_arcade/main.dart';
@@ -128,6 +129,7 @@ void main() {
           .first,
     );
     await tester.tap(buy);
+    await completeShopPurchase(tester);
     await tester.pump();
     expect(p.wallet, 0);
     await tester.tap(find.byTooltip('Done shopping'));

@@ -1,3 +1,4 @@
+import 'support/shop_actions.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -106,8 +107,13 @@ void main() {
       await tester.tap(find.text('Upgrades'));
       await tester.pump();
       final buy = find.byKey(const ValueKey('upgrade-magnet'));
-      await tester.scrollUntilVisible(buy, 150);
+      await tester.scrollUntilVisible(
+        buy.hitTestable(),
+        150,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.tap(buy);
+      await completeShopPurchase(tester);
       await tester.pump();
       expect(p.magnetDuration, 11);
       expect(p.wallet, 0);

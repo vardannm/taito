@@ -1,3 +1,4 @@
+import 'support/shop_actions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/game.dart';
@@ -305,8 +306,10 @@ void main() {
       await tester.scrollUntilVisible(
         find.byKey(const ValueKey('buy-platform-copper')).hitTestable(),
         140,
+        scrollable: find.byType(Scrollable).first,
       );
       await tester.tap(find.byKey(const ValueKey('buy-platform-copper')));
+      await completeShopPurchase(tester);
       await tester.pump();
       expect(p.selectedPlatform, PlatformStyle.copper);
       expect(p.wallet, 120);

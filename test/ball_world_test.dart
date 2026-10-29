@@ -1,3 +1,4 @@
+import 'support/shop_actions.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -116,8 +117,9 @@ void main() {
                 .painter!
             as BallWorldPreview;
     expect(preview.ball, BallCosmetic.circuit);
-    expect(find.text('Circuit Garden'), findsNothing);
+    expect(find.text('Circuit Garden'), findsOneWidget);
     await tester.tap(buy);
+    await completeShopPurchase(tester);
     await tester.pump();
     expect(profile.selectedBall, BallCosmetic.circuit);
     expect(profile.wallet, 200 - BallCosmetic.circuit.cost);

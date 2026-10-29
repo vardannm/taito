@@ -105,7 +105,9 @@ void main() {
       expect(
         tester
             .state<ScrollableState>(
-              find.descendant(of: ballList, matching: find.byType(Scrollable)),
+              find
+                  .descendant(of: ballList, matching: find.byType(Scrollable))
+                  .first,
             )
             .position
             .pixels,

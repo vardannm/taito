@@ -39,7 +39,7 @@ Milestone Classic boards introduce or combine mechanics; learned hazards also re
 
 **Daily** uses a fixed board generated from the UTC date with an explicit integer random generator, consistent across web and native platforms. The date is pinned for an ongoing run and its retry, even across midnight; opening Daily again selects the current day. Records are local and separate from Classic, with 32 days of history retained for all control modes. No online leaderboard or account service is connected.
 
-**Shop → Cabinet Styles** offers Original brass plus Jade garden (3 Classic stars), Porcelain club (12), and Ember forge (30). Each style changes the cabinet finish, ball and platform colors with identical physics and hitboxes. Stars earned with either control count toward each board's four unlock stars; Daily stars do not unlock Classic cosmetics. The equipped style persists. Existing global records and preferences are retained.
+**Settings → Cabinet Styles** offers Original brass plus Jade garden (3 Classic stars), Porcelain club (12), and Ember forge (30). Each style changes the cabinet finish, ball and platform colors with identical physics and hitboxes. Stars earned with either control count toward each board's four unlock stars; Daily stars do not unlock Classic cosmetics. The equipped style persists. Existing global records and preferences are retained.
 
 **Tilt Only** is the temporary fourth control option in Settings. Drag the bottom slider sideways to set the angle; release to keep it. The lift control is hidden for this trial, so there is no manual lifting.
 
@@ -47,7 +47,7 @@ Classic levels temporarily always use **Tilt Only**, including previews, retries
 
 **Board Tilt** is a fifth test option. Drag sideways anywhere on the board to set the angle, with no lift or fixed bottom control. A small guide appears at the contact only while held. Release keeps the angle; re-grab anywhere without a jump. Use the mode arrows/dots or swipe the header to change games before starting.
 
-**Ball worlds:** All 19 balls include a distinct scene, from Coral Lagoon and Neon City to Polar Lights and Event Horizon. Equipping a ball changes the playfield and surrounding colors in every mode, including frozen carousel previews. Infinite combo energy changes the palette while preserving the scenery; losing the combo restores the equipped world. Shop cards preview the actual world before purchase. Cabinet styles still control the frame and trim. World artwork and palettes live in `lib/ball_world.dart`; they do not affect movement, collision, prices, or bonuses.
+**Ball worlds:** All 23 balls include a distinct scene, from Coral Lagoon and Neon City to Polar Lights and Event Horizon. Equipping a ball changes the playfield and surrounding colors in every mode, including frozen carousel previews. Infinite combo energy changes the palette while preserving the scenery; losing the combo restores the equipped world. Shop cards preview the actual world before purchase. Cabinet styles still control the frame and trim. World artwork and palettes live in `lib/ball_world.dart`; they do not affect movement, collision, prices, or bonuses.
 
 ## What is implemented
 
@@ -86,7 +86,7 @@ Shield pickup, refresh and expiration preserve active touch ownership, drag posi
 
 Coins appear more often than crystals; shields and hearts are much rarer. Offscreen pickups are pruned and the extra collectible list is capped at 12. Each 360m cycle has a rush and recovery; encounter time grows gradually after 600m to its full share at 2,400m. Special hazards unlock at 450m (forming holes), 900m (moving holes), 1,500m (lasers), and 2,250m (platform gaps). Warnings begin farther apart, reaching the same minimum spacing late in a run. Complex sweeping/zigzag variants gradually become common from 2,400m to 4,200m. Spider encounters begin later and closer spacing develops with distance. Only one special hazard runs at once, with harmless warnings before activation. Once a forming hole opens, its world coordinates are fixed and it remains until it scrolls off-screen. Camera movement from manual lifting is included in both rendering and collision. Moving-hole types retain their intended movement. Off-screen pruning happens after swept collisions, so a fast camera lift cannot skip a hole. A winding clear route and hole separation remain. After three seconds without steering the red floor rises; deliberate steering stops its active rise.
 
-**GEAR SHOP** in the Modes menu spends Infinite and Laser Endless coins. It contains **11 balls and 6 platforms**, each with a permanent point bonus displayed before purchase. The active gear multiplier is `1 + ball bonus + platform bonus`, up to x5. Gear multiplies Normal Infinite distance and combo points; other modes retain their scoring rules. Physics, collision size and platform handling stay the same. Existing owned balls automatically receive their new bonus; no repurchase is needed. Coins and gear ownership save locally without an account. The Number Merge mode retains its numbered ball for readability. Cabinet styles remain in Settings.
+**GEAR SHOP** offers 23 balls with their worlds, 16 platforms and three permanent Infinite upgrades. Search by equipment or world, filter by affordability/ownership/premium tier, and sort by price or points bonus. Artwork opens a detailed preview; purchasing shows the cost, resulting balance and loadout benefits, then waits for a successful device save before spending coins or granting the item. Success, insufficient coins, pending saves and retryable failures have explicit feedback. Wallet links open real daily prizes and achievement rewards. Paid coin packs are unavailable until store billing is connected. The active gear multiplier is `1 + ball bonus + platform bonus`, up to x12.5; physics, collision size and handling stay shared. Coins and ownership remain local. Cabinet styles remain in Settings. See [the shop implementation notes](docs/shop-ui.md) for research, architecture and validation.
 
 Tune lives, durations, starting speed, pace levels, the 60,000-point density threshold, collectible spacing, coin spacing and visual intensity in `lib/infinite_progress.dart`. Survival integration is in `lib/infinite_gameplay.dart`; visuals are in `lib/infinite_painter.dart`. Economy saves use ordered snapshots to prevent an older coin save from undoing a purchase. This is device-local progress, with no account sync.
 
@@ -302,7 +302,7 @@ remain archived outside the asset bundle. Attribution is available in Settings >
 Music credits. Source, CC BY 4.0 license and the original recording checksum are in
 `assets/audio/CREDITS.md`; music and effect switches remain independent.
 
-The main Shop contains Balls (23), Platforms (16), and Cabinet Styles. New gear
+The main Shop contains Balls (23), Platforms (16), and permanent Infinite Upgrades. Cabinet Styles remain in Settings. New gear
 includes pearl, malachite, titanium, opal, plasma, comet, quasar and singularity
 balls, plus carbon, pearl, aurora, plasma, celestial and sovereign platforms.
 Premium gear uses bounded orbit sparks, light channels and short trails; physics
@@ -321,9 +321,9 @@ Phoenix, Chronosphere and Genesis, with four matching platforms after Sovereign.
 Each has distinct procedural artwork; every ball also includes its own world.
 Ball bonuses rise from +4x to +6.5x with permanent magnet radii of 78, 90, 105 and
 120; platform bonuses rise from +3.5x to +5x, for a maximum combined x12.5.
-These eight items show Coming soon until store billing is connected. Coins,
-unlimited-coin mode and daily gifts cannot unlock them. Existing owned store
-entitlements can equip and persist, ready for later billing integration.
+These eight premium items can be purchased with gameplay coins. Daily gifts
+exclude premium gear. Ownership and the equipped selection persist locally;
+real-money coin purchases require a future store billing integration.
 `tool/render_premium_gear.dart` renders the actual artwork and shop screenshots
 to `artifacts/premium-gear-gallery.png`, `artifacts/premium-gear-shop.png` and
 `artifacts/premium-platform-shop.png`.

@@ -20,6 +20,7 @@ import 'daily_prizes.dart';
 import 'achievements.dart';
 import 'survival_upgrades.dart';
 import 'infinite_progress.dart';
+import 'shop_catalog.dart';
 
 class PlayerProfile {
   PlayerProfile({
@@ -170,6 +171,7 @@ class PlayerProfile {
       .toInt();
 
   bool buySurvivalUpgrade(SurvivalUpgrade upgrade) {
+    if (_shopTransactionPending) return false;
     final level = upgradeLevel(upgrade);
     if (level >= upgrade.maxLevel || !canAfford(upgrade.costAt(level)))
       return false;
@@ -359,6 +361,7 @@ class PlayerProfile {
   }
 
   bool selectBall(BallCosmetic ball) {
+    if (_shopTransactionPending) return false;
     if (!ownedBalls.contains(ball)) {
       if (!canAfford(ball.cost)) return false;
       if (!unlimitedCoins) wallet -= ball.cost;
@@ -370,6 +373,7 @@ class PlayerProfile {
   }
 
   bool selectPlatform(PlatformStyle platform) {
+    if (_shopTransactionPending) return false;
     if (!ownedPlatforms.contains(platform)) {
       if (!canAfford(platform.cost)) return false;
       if (!unlimitedCoins) wallet -= platform.cost;
@@ -380,33 +384,111 @@ class PlayerProfile {
     return true;
   }
 
+  Map<String, Object?> _economyData() => {
+    'wallet': wallet,
+    'survivalUpgrades': survivalUpgrades.map(
+      (upgrade, level) => MapEntry(upgrade.name, level),
+    ),
+    'dailyPrizes': dailyPrizes.toJson(),
+    'claimedAchievements': _claimedAchievements.map((a) => a.name).toList(),
+    'owned': ownedBalls.map((b) => b.name).toList(),
+    'selected': selectedBall.name,
+    'bestScore': infiniteBestScore > _pendingBestScore
+        ? infiniteBestScore
+        : _pendingBestScore,
+    'bestBosses': infiniteBestBosses,
+    'platforms': ownedPlatforms.map((p) => p.name).toList(),
+    'platform': selectedPlatform.name,
+  };
+
   Future<void> saveEconomy() {
     if (_loadFailed) return _economyWrites;
-    // Snapshot and serialize wallet transactions; an older save cannot undo a purchase.
-    final data = jsonEncode({
-      'wallet': wallet,
-      'survivalUpgrades': survivalUpgrades.map(
-        (upgrade, level) => MapEntry(upgrade.name, level),
-      ),
-      'dailyPrizes': dailyPrizes.toJson(),
-      'claimedAchievements': _claimedAchievements.map((a) => a.name).toList(),
-      'owned': ownedBalls.map((b) => b.name).toList(),
-      'selected': selectedBall.name,
-      'bestScore': infiniteBestScore > _pendingBestScore
-          ? infiniteBestScore
-          : _pendingBestScore,
-      'bestBosses': infiniteBestBosses,
-      'platforms': ownedPlatforms.map((p) => p.name).toList(),
-      'platform': selectedPlatform.name,
-    });
+    // Read when this write runs: a queued save must include a shop transaction
+    // committed ahead of it, as well as any rewards earned in the meantime.
     _economyWrites = _economyWrites.then((_) async {
       try {
-        await storage.setString(_economyKey, data);
+        await storage.setString(_economyKey, jsonEncode(_economyData()));
       } catch (_) {
         available = false;
       }
     });
     return _economyWrites;
+  }
+
+  bool _shopTransactionPending = false;
+
+  /// Acknowledges a shop action only after storage accepts it. Failed writes
+  /// never spend coins, grant gear, equip an item, or advance an upgrade.
+  /// The quote is revalidated inside the wallet write queue.
+  Future<ShopTransactionResult> purchaseShopProduct(
+    ShopProduct product, {
+    required int quotedPrice,
+    required int quotedLevel,
+  }) async {
+    if (_shopTransactionPending) return ShopTransactionResult.busy;
+    if (_loadFailed) return ShopTransactionResult.storageUnavailable;
+    _shopTransactionPending = true;
+    var result = ShopTransactionResult.changed;
+    _economyWrites = _economyWrites.then((_) async {
+      final ball = product.ball, platform = product.platform;
+      final upgrade = product.upgrade;
+      final owned = ball != null
+          ? ownedBalls.contains(ball)
+          : platform != null && ownedPlatforms.contains(platform);
+      final level = upgrade == null ? 0 : upgradeLevel(upgrade);
+      if (upgrade != null &&
+          (level != quotedLevel || level >= upgrade.maxLevel))
+        return;
+      final cost = owned ? 0 : product.price(level);
+      if (cost != quotedPrice) return;
+      if (!canAfford(cost)) {
+        result = ShopTransactionResult.insufficientCoins;
+        return;
+      }
+      final draft = _economyData();
+      draft['wallet'] = wallet - (unlimitedCoins ? 0 : cost);
+      if (ball != null) {
+        draft['owned'] = {...ownedBalls, ball}.map((b) => b.name).toList();
+        draft['selected'] = ball.name;
+      } else if (platform != null) {
+        draft['platforms'] = {
+          ...ownedPlatforms,
+          platform,
+        }.map((p) => p.name).toList();
+        draft['platform'] = platform.name;
+      } else {
+        draft['survivalUpgrades'] = {
+          for (final entry in survivalUpgrades.entries)
+            entry.key.name: entry.value,
+          upgrade!.name: level + 1,
+        };
+      }
+      try {
+        await storage.setString(_economyKey, jsonEncode(draft));
+      } catch (_) {
+        available = false;
+        result = ShopTransactionResult.storageUnavailable;
+        return;
+      }
+      if (!unlimitedCoins) wallet -= cost;
+      available = true;
+      if (ball != null) {
+        ownedBalls.add(ball);
+        selectedBall = ball;
+      } else if (platform != null) {
+        ownedPlatforms.add(platform);
+        selectedPlatform = platform;
+      } else {
+        survivalUpgrades[upgrade!] = level + 1;
+      }
+      result = ShopTransactionResult.success;
+    });
+    try {
+      await _economyWrites;
+      return result;
+    } finally {
+      _shopTransactionPending = false;
+    }
   }
 
   void _loadEconomy(String? raw) {

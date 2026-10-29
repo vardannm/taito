@@ -1,3 +1,4 @@
+import 'support/shop_actions.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -398,15 +399,18 @@ void main() {
       await tester.scrollUntilVisible(
         find.byKey(const ValueKey('buy-coral')).hitTestable(),
         140,
+        scrollable: find.byType(Scrollable).first,
       );
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('buy-coral')));
+      await completeShopPurchase(tester);
       await tester.pump();
       expect(p.wallet, 5);
       expect(p.selectedBall, BallCosmetic.coral);
       await tester.scrollUntilVisible(
         find.byKey(const ValueKey('buy-neon')).hitTestable(),
         160,
+        scrollable: find.byType(Scrollable).first,
       );
       await tester.pump();
       expect(
