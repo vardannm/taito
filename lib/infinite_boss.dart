@@ -505,8 +505,8 @@ class InfiniteBoss {
       // Several wide openings, so one is always within reach of the ball.
       ring(
         2.6 + wave * 1.5,
-        wave < 2 ? 5 : 4,
-        .48,
+        wave < 2 ? 6 : 5,
+        .78,
         105,
         wave.isEven ? .16 : -.16,
       );
