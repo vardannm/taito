@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/ball_cosmetics.dart';
 import 'package:balance_arcade/ball_shop.dart';
-import 'package:balance_arcade/shop_design.dart';
 import 'package:balance_arcade/platforms.dart';
 import 'package:balance_arcade/profile.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -86,20 +85,14 @@ void main() {
         home: Scaffold(body: BallShop(profile: profile)),
       ),
     );
-    // The wallet shows the endless mark; gear cards show it beside boosts.
-    expect(
-      find
-          .text('\u221e')
-          .evaluate()
-          .where(
-            (e) => e.findAncestorWidgetOfExactType<ShopBoostChip>() == null,
-          ),
-      hasLength(1),
-    );
-    await tester.tap(find.text('Platforms'));
+    expect(find.text('\u221e'), findsOneWidget);
+    final next = find.byKey(const ValueKey('next-platform'));
+    await tester.ensureVisible(next);
+    await tester.tap(next);
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     final buy = find.byKey(const ValueKey('buy-platform-copper'));
-    await tester.scrollUntilVisible(buy.hitTestable(), 150);
+    await tester.ensureVisible(buy);
     await tester.tap(buy);
     await tester.pump();
     expect(profile.selectedPlatform, PlatformStyle.copper);

@@ -1,4 +1,7 @@
 import '../test/support/mode_navigation.dart';
+import '../test/support/shop_navigation.dart';
+import 'package:balance_arcade/ball_cosmetics.dart';
+import 'package:balance_arcade/platforms.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -115,23 +118,10 @@ void main() {
         ),
       );
       await tester.pump();
-      await tester.scrollUntilVisible(
-        find.byKey(const ValueKey('buy-plasma')).hitTestable(),
-        250,
-      );
+      await revealShopBall(tester, BallCosmetic.plasma);
       await tester.pump(const Duration(milliseconds: 500));
       await capture('premium-balls-${width.toInt()}');
-      // Return to the category tabs without changing any saved equipment.
-      await tester.scrollUntilVisible(
-        find.text('Platforms').hitTestable(),
-        -300,
-      );
-      await tester.tap(find.text('Platforms'));
-      await tester.pump();
-      await tester.scrollUntilVisible(
-        find.byKey(const ValueKey('buy-platform-celestial')).hitTestable(),
-        250,
-      );
+      await revealShopPlatform(tester, PlatformStyle.celestial);
       await tester.pump(const Duration(milliseconds: 500));
       await capture('premium-platforms-${width.toInt()}');
       await tester.pumpWidget(const SizedBox());

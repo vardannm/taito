@@ -1,12 +1,17 @@
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/shop_design.dart';
-import 'package:balance_arcade/menu_design.dart';
+import 'package:balance_arcade/ball_cosmetics.dart';
+import 'package:balance_arcade/platforms.dart';
+import 'package:balance_arcade/profile.dart';
+import 'package:balance_arcade/ball_shop.dart';
+import 'package:balance_arcade/survival_upgrades.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 import 'start_flow_test.dart' show launch;
+import 'support/shop_navigation.dart';
 
 void main() {
   setUp(
@@ -36,6 +41,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     expect(tester.getRect(surface), const Rect.fromLTWH(0, 0, 320, 568));
     expect(find.byType(BottomSheet), findsNothing);
+    expect(find.text('Gear Shop'), findsOneWidget);
+    expect(find.text('MAKE IT YOURS'), findsNothing);
     expect(game.runSerial, serial);
     expect(game.waitingForInput, isTrue);
     await tester.tap(find.byTooltip('Done shopping'));
@@ -85,49 +92,44 @@ void main() {
   });
 
   testWidgets(
-    'shop swipes tabs, keeps vertical scrolling, and exits right from Balls',
+    'shop swipes gear independently, scrolls vertically, and keeps the run waiting',
     (tester) async {
       final game = await launch(tester, ControlMode.oneFinger);
       await tester.tap(find.byKey(const ValueKey('board-shop')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 550));
-      int selected() => tester.widget<MenuTabs>(find.byType(MenuTabs)).selected;
-      Future<void> swipe(double dx) async {
-        await tester.dragFrom(const Offset(160, 280), Offset(dx, 0));
-        await tester.pump();
-      }
-
-      expect(selected(), 0);
-      await tester.dragFrom(const Offset(160, 380), const Offset(0, -140));
+      final balls = find.byKey(const ValueKey('ball-pages'));
+      await tester.drag(balls, const Offset(-180, 0));
       await tester.pump();
-      expect(selected(), 0);
-      final ballList = find.byKey(const ValueKey('collection-0'));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byKey(const ValueKey('buy-coral')), findsOneWidget);
       expect(
-        tester
-            .state<ScrollableState>(
-              find.descendant(of: ballList, matching: find.byType(Scrollable)),
-            )
-            .position
-            .pixels,
-        greaterThan(0),
+        find.byKey(const ValueKey('buy-platform-classic')),
+        findsOneWidget,
       );
-      for (var tab = 1; tab <= 2; tab++) {
-        await swipe(-110);
-        expect(selected(), tab);
-      }
-      await swipe(-110);
-      expect(selected(), 2);
-      for (var tab = 1; tab >= 0; tab--) {
-        await swipe(110);
-        expect(selected(), tab);
-      }
-      final smallDrag = await tester.startGesture(const Offset(160, 280));
-      await smallDrag.moveBy(const Offset(15, 0));
-      await tester.pump(const Duration(milliseconds: 300));
-      await smallDrag.up();
+      // A rightward browse at the first ball must never close the shop.
+      await tester.drag(balls, const Offset(180, 0));
       await tester.pump();
-      expect(selected(), 0);
-      await swipe(110);
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.drag(balls, const Offset(180, 0));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byType(BallShop), findsOneWidget);
+      expect(find.byKey(const ValueKey('buy-steel')), findsOneWidget);
+      final rail = find.byKey(const ValueKey('platform-pages'));
+      await tester.ensureVisible(rail);
+      await tester.drag(rail, const Offset(-180, 0));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byKey(const ValueKey('buy-platform-copper')), findsOneWidget);
+      expect(find.byKey(const ValueKey('buy-steel')), findsOneWidget);
+      await tester.ensureVisible(find.byKey(const ValueKey('upgrade-hearts')));
+      expect(
+        find.byKey(const ValueKey('upgrade-hearts')).hitTestable(),
+        findsOneWidget,
+      );
+      await tester.tap(find.byTooltip('Done shopping'));
+      await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.byKey(const ValueKey('shop-swipe-area')), findsNothing);
       expect(find.byKey(const ValueKey('board-shop')), findsOneWidget);
@@ -137,4 +139,74 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
+
+  testWidgets('reopening the shop starts at the equipped loadout', (
+    tester,
+  ) async {
+    final p = PlayerProfile(unlimitedCoins: true)..tutorialSeen = true;
+    p.selectBall(BallCosmetic.quasar);
+    p.selectPlatform(PlatformStyle.celestial);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: BallShop(profile: p)),
+      ),
+    );
+    expect(find.byKey(const ValueKey('buy-quasar')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('buy-platform-celestial')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('browsing leaves coins and equipped gear unchanged', (
+    tester,
+  ) async {
+    final p = PlayerProfile()
+      ..tutorialSeen = true
+      ..wallet = 1000;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: BallShop(profile: p)),
+      ),
+    );
+    await revealShopBall(tester, BallCosmetic.neon);
+    await revealShopPlatform(tester, PlatformStyle.ion);
+    expect(p.wallet, 1000);
+    expect(p.selectedBall, BallCosmetic.steel);
+    expect(p.selectedPlatform, PlatformStyle.classic);
+    expect(p.ownedBalls, isNot(contains(BallCosmetic.neon)));
+    expect(p.ownedPlatforms, isNot(contains(PlatformStyle.ion)));
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('maxed upgrades disable purchases and hide coin shortfalls', (
+    tester,
+  ) async {
+    final p = PlayerProfile()..tutorialSeen = true;
+    for (final upgrade in SurvivalUpgrade.values) {
+      p.survivalUpgrades[upgrade] = upgrade.maxLevel;
+    }
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: BallShop(profile: p)),
+      ),
+    );
+    for (final upgrade in SurvivalUpgrade.values) {
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.byKey(ValueKey('upgrade-${upgrade.name}')),
+            )
+            .onPressed,
+        isNull,
+      );
+    }
+    expect(find.byKey(const ValueKey('get-coins-upgrades')), findsNothing);
+    expect(find.text('Max'), findsNWidgets(3));
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
 }

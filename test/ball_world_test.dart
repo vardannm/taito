@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/ball_cosmetics.dart';
 import 'package:balance_arcade/ball_world.dart';
-import 'package:balance_arcade/ball_shop.dart';
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/infinite_painter.dart';
 import 'package:balance_arcade/main.dart';
@@ -12,6 +11,7 @@ import 'package:balance_arcade/profile.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'support/mode_navigation.dart';
+import 'support/shop_navigation.dart';
 
 double contrast(Color a, Color b) {
   final x = a.computeLuminance(), y = b.computeLuminance();
@@ -97,16 +97,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     final buy = find.byKey(const ValueKey('buy-circuit'));
-    await tester.scrollUntilVisible(
-      buy.hitTestable(),
-      180,
-      scrollable: find
-          .descendant(
-            of: find.byType(BallShop),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    );
+    await revealShopBall(tester, BallCosmetic.circuit);
     await tester.pump();
     final preview =
         tester
@@ -116,21 +107,11 @@ void main() {
                 .painter!
             as BallWorldPreview;
     expect(preview.ball, BallCosmetic.circuit);
-    expect(find.text('Circuit Garden'), findsNothing);
+    expect(find.text('Circuit Garden · World included'), findsOneWidget);
     await tester.tap(buy);
     await tester.pump();
     expect(profile.selectedBall, BallCosmetic.circuit);
     expect(profile.wallet, 200 - BallCosmetic.circuit.cost);
-    await tester.scrollUntilVisible(
-      find.byTooltip('Done shopping').hitTestable(),
-      -220,
-      scrollable: find
-          .descendant(
-            of: find.byType(BallShop),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    );
     await tester.tap(find.byTooltip('Done shopping'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
@@ -173,16 +154,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('board-shop')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('buy-coral')).hitTestable(),
-      180,
-      scrollable: find
-          .descendant(
-            of: find.byType(BallShop),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    );
+    await revealShopBall(tester, BallCosmetic.coral);
     await tester.pump();
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());

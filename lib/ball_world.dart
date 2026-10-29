@@ -225,14 +225,19 @@ void paintBallWorld(
 
 /// Shop artwork shows the actual ball against its own world before purchase.
 class BallWorldPreview extends CustomPainter {
-  BallWorldPreview(this.ball, {this.animation, this.ballHeight = .5})
-    : super(repaint: animation);
+  BallWorldPreview(
+    this.ball, {
+    this.animation,
+    this.ballHeight = .5,
+    this.ballScale = .22,
+  }) : super(repaint: animation);
   final BallCosmetic ball;
   final Animation<double>? animation;
 
   /// Where the ball sits, as a fraction of the height; the shop lifts it
   /// clear of the name and price along the bottom.
   final double ballHeight;
+  final double ballScale;
   @override
   void paint(Canvas canvas, Size size) {
     final area = Offset.zero & size;
@@ -254,7 +259,7 @@ class BallWorldPreview extends CustomPainter {
     paintCosmetic(
       canvas,
       p,
-      math.min(size.width, size.height) * .22,
+      math.min(size.width, size.height) * ballScale,
       ball,
       time: (animation?.value ?? 0) * 12,
       reducedMotion: animation == null,
@@ -266,5 +271,6 @@ class BallWorldPreview extends CustomPainter {
   bool shouldRepaint(BallWorldPreview old) =>
       old.ball != ball ||
       old.animation != animation ||
-      old.ballHeight != ballHeight;
+      old.ballHeight != ballHeight ||
+      old.ballScale != ballScale;
 }

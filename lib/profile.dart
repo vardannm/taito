@@ -284,8 +284,8 @@ class PlayerProfile {
     if (!dailyPrizes.canClaim(date)) return null;
     final day = dailyPrizes.nextDay;
     final String reward;
-    if (day < 5) {
-      final coins = DailyPrizes.coins[day - 1];
+    if (!DailyPrizes.isGearDay(day)) {
+      final coins = DailyPrizes.coinReward(day);
       wallet += coins;
       reward = '$coins coins';
     } else {

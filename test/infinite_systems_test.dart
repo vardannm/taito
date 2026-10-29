@@ -7,6 +7,7 @@ import 'package:balance_arcade/infinite_progress.dart';
 import 'package:balance_arcade/profile.dart';
 import 'package:balance_arcade/ball_cosmetics.dart';
 import 'package:balance_arcade/ball_shop.dart';
+import 'support/shop_navigation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -395,19 +396,13 @@ void main() {
           home: Scaffold(body: BallShop(profile: p)),
         ),
       );
-      await tester.scrollUntilVisible(
-        find.byKey(const ValueKey('buy-coral')).hitTestable(),
-        140,
-      );
+      await revealShopBall(tester, BallCosmetic.coral);
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('buy-coral')));
       await tester.pump();
       expect(p.wallet, 5);
       expect(p.selectedBall, BallCosmetic.coral);
-      await tester.scrollUntilVisible(
-        find.byKey(const ValueKey('buy-neon')).hitTestable(),
-        160,
-      );
+      await revealShopBall(tester, BallCosmetic.neon);
       await tester.pump();
       expect(
         tester

@@ -24,6 +24,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import '../test/support/mode_navigation.dart' show startWorld;
+import '../test/support/shop_navigation.dart' show revealShopBall;
 
 const playStore = String.fromEnvironment('STORE_PLATFORM') == 'android';
 const outputRoot = String.fromEnvironment(
@@ -222,18 +223,9 @@ void main() {
           await tester.tap(find.byKey(const ValueKey('board-shop')));
           await tester.pump();
           await tester.pump(const Duration(milliseconds: 600));
-          final collection = find.descendant(
-            of: find.byKey(const ValueKey('collection-0')),
-            matching: find.byType(Scrollable),
-          );
+          await revealShopBall(tester, BallCosmetic.nebula);
           final featuredBall = find.byKey(
             const ValueKey('world-preview-nebula'),
-          );
-          await tester.scrollUntilVisible(
-            featuredBall,
-            450,
-            scrollable: collection,
-            maxScrolls: 50,
           );
           await Scrollable.ensureVisible(
             tester.element(featuredBall),

@@ -6,6 +6,7 @@ import 'package:balance_arcade/coin_store.dart';
 import 'package:balance_arcade/profile.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
+import 'support/shop_navigation.dart';
 
 // The shop's artwork animates forever, so pump a fixed span instead.
 Future<void> settle(WidgetTester tester) async {
@@ -72,7 +73,7 @@ void main() {
     final p = await openShop(tester, wallet: 50);
     // Coral costs 60: the first card the player cannot afford.
     final link = find.byKey(const ValueKey('get-coins-buy-coral'));
-    await tester.scrollUntilVisible(link, 200);
+    await revealShopBall(tester, BallCosmetic.coral);
     expect(find.text('Need 10 more · Get coins'), findsOneWidget);
     // Owned gear never offers coins.
     expect(find.byKey(const ValueKey('get-coins-buy-steel')), findsNothing);

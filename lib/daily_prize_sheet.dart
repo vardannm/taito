@@ -50,6 +50,7 @@ class _DailyPrizeSheetState extends State<DailyPrizeSheet> {
     final now = DateTime.now();
     final ready = p.dailyPrizes.canClaim(now);
     final day = p.dailyPrizes.displayedDay(now);
+    final firstDay = p.dailyPrizes.firstDisplayedDay(now);
     return MenuSurface(
       child: SafeArea(
         child: SingleChildScrollView(
@@ -69,16 +70,20 @@ class _DailyPrizeSheetState extends State<DailyPrizeSheet> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'A gift each day. Reach Day 5 to choose a ball or platform. Missed days keep your progress.',
+                'A gift each day. Gear every 5 days. Missed days keep your progress.',
               ),
               const SizedBox(height: 16),
-              for (var i = 1; i <= 5; i++)
+              for (
+                var i = firstDay;
+                i < firstDay + DailyPrizes.rewardInterval;
+                i++
+              )
                 Card(
                   color: i == day ? const Color(0xFF2C4140) : menuPanel,
                   child: ListTile(
                     leading: i < day || (i == day && !ready)
                         ? const Icon(Icons.check_circle_rounded)
-                        : i == 5
+                        : DailyPrizes.isGearDay(i)
                         ? const Icon(Icons.redeem_rounded)
                         : const CoinIcon(size: 22),
                     title: Text(
@@ -86,9 +91,9 @@ class _DailyPrizeSheetState extends State<DailyPrizeSheet> {
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                     subtitle: Text(
-                      i == 5
+                      DailyPrizes.isGearDay(i)
                           ? 'Choose a ball or platform'
-                          : '${DailyPrizes.coins[i - 1]} coins',
+                          : '${DailyPrizes.coinReward(i)} coins',
                     ),
                     trailing: i == day
                         ? Text(ready ? 'TODAY' : 'CLAIMED')
@@ -102,7 +107,7 @@ class _DailyPrizeSheetState extends State<DailyPrizeSheet> {
                   'Device storage could not save your prize. It is available for this session.',
                 ),
               if (ready &&
-                  day == 5 &&
+                  DailyPrizes.isGearDay(day) &&
                   (p.prizeBall != null || p.prizePlatform != null)) ...[
                 if (p.prizeBall != null)
                   FilledButton.icon(
@@ -145,12 +150,12 @@ class _DailyPrizeSheetState extends State<DailyPrizeSheet> {
                   onPressed: ready && !busy ? () => claim() : null,
                   child: Text(
                     ready
-                        ? 'CLAIM ${day == 5 ? 100 : DailyPrizes.coins[day - 1]} COINS'
+                        ? 'CLAIM ${DailyPrizes.coinReward(day)} COINS'
                         : 'CLAIMED TODAY',
                   ),
                 ),
               if (ready &&
-                  day == 5 &&
+                  DailyPrizes.isGearDay(day) &&
                   p.prizeBall == null &&
                   p.prizePlatform == null)
                 const Text('You own all gear! Enjoy 100 coins instead.'),
