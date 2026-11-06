@@ -187,6 +187,11 @@ class BalanceGame {
   double magnetDuration = InfiniteTuning.magnetSeconds;
   BallCosmetic cosmetic = BallCosmetic.steel;
   PlatformStyle platformStyle = PlatformStyle.classic;
+  // Capture replay appearance may change while recorded equipment physics stay fixed.
+  BallCosmetic? visualBallOverride;
+  PlatformStyle? visualPlatformOverride;
+  BallCosmetic get renderCosmetic => visualBallOverride ?? cosmetic;
+  PlatformStyle get renderPlatformStyle => visualPlatformOverride ?? platformStyle;
   double get equipmentMultiplier =>
       1 + cosmetic.scoreBonus + platformStyle.scoreBonus;
   ControlMode controlMode = ControlMode.twoFinger;
@@ -442,6 +447,8 @@ class BalanceGame {
   int bossesCleared = 0;
   List<BossKind> _bossOrder = List.unmodifiable(BossKind.values);
   List<BossKind> get bossOrder => _bossOrder;
+  /// Explicit encounter choice for temporary capture scenarios only.
+  BossKind? firstBossOverride;
   List<int> _bossScoreThresholds = [
     for (final (low, high) in bossScoreWindows) (low + high) ~/ 2,
   ];
@@ -900,6 +907,14 @@ class BalanceGame {
     _bossOrder = List.unmodifiable(
       BossKind.values.toList()..shuffle(bossRandom),
     );
+    final first = firstBossOverride;
+    if (first != null) {
+      final order = _bossOrder.toList();
+      final index = order.indexOf(first);
+      order[index] = order.first;
+      order[0] = first;
+      _bossOrder = List.unmodifiable(order);
+    }
     _bossScoreThresholds = List.unmodifiable([
       // Score windows belong to encounter slots, independently of boss order.
       for (final (low, high) in bossScoreWindows)
@@ -959,8 +974,13 @@ class BalanceGame {
   final pivotTargets = <double?>[null, null];
   final _released = [false, false];
 
+  /// Optional command journal for the separate App Store capture build.
+  /// Runs before an accepted input changes state; normal games leave it null.
+  void Function(String command, int side, double delta)? onPivotInput;
+
   void grabPivot(int side) {
     if (!canControl) return;
+    onPivotInput?.call('grab', side, 0);
     beginInput();
     _released[side] = false;
     pivotTargets[side] = side == 0 ? left : right;
@@ -968,6 +988,7 @@ class BalanceGame {
 
   void dragPivot(int side, double delta) {
     if (!canControl || !delta.isFinite || pivotTargets[side] == null) return;
+    onPivotInput?.call('drag', side, delta);
     final other = side == 0 ? right : left;
     final minimum = infinite ? math.max(other - 180, minPivot) : minPivot;
     final maximum = infinite ? math.min(maxPivot, other + 180) : maxPivot;
@@ -983,6 +1004,7 @@ class BalanceGame {
   }
 
   void releasePivot(int side) {
+    onPivotInput?.call('release', side, 0);
     final position = side == 0 ? left : right;
     _released[side] =
         pivotTargets[side] != null &&
@@ -1524,7 +1546,7 @@ class BalanceGame {
             q.x < -12 ||
             q.x > 372 ||
             screenY(q.y) < visibleTop - 30 ||
-            screenY(q.y) > 622,
+            screenY(q.y) > math.max(622, visibleBottom + 30),
       );
       webShots.removeWhere(
         (shot) =>

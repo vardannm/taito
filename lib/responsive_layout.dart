@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 bool usesWideStage(Size size) => size.width >= 600;
 
 bool usesLandscapeMenu(Size size) =>
-    size.width >= 1000 && size.width > size.height * 1.15;
+    size.width >= 800 && size.width > size.height * 1.15;
 
 double wideMenuScale(Size size) =>
     !usesWideStage(size) || size.height < 560 && !usesLandscapeMenu(size)

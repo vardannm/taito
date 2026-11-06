@@ -345,7 +345,7 @@ extension InfiniteGameplay on BalanceGame {
 
   void _updatePorcupines(double dt) {
     if (boss != null) return;
-    if (mazeSection || section == InfiniteSection.breath) {
+    if (mazeSection) {
       quills.clear();
       for (final p in porcupines) {
         p.charge = null;
@@ -361,7 +361,7 @@ extension InfiniteGameplay on BalanceGame {
       final sy = screenY(p.y);
       // A committed warning may scroll below the attack-start zone before
       // completing. Keep it alive until the enemy actually leaves the board.
-      if (sy < visibleTop + 32 || sy > BalanceGame.height + 30) {
+      if (sy < visibleTop - 30 || sy > visibleBottom + 30) {
         p.charge = null;
         continue;
       }
@@ -375,7 +375,11 @@ extension InfiniteGameplay on BalanceGame {
       }
     }
     // Big encounters own the screen; no porcupine starts a burst during them.
-    if (bossPending || lateEnemy != null || snakes.isNotEmpty) return;
+    if (bossPending ||
+        lateEnemy != null ||
+        snakes.isNotEmpty ||
+        section == InfiniteSection.breath)
+      return;
     // Repeat bursts wait for a calm moment. Holes that form or wander are
     // board obstacles, not timed attacks, so they never hold one back.
     final calm =
@@ -383,8 +387,7 @@ extension InfiniteGameplay on BalanceGame {
         quills.isEmpty &&
         webShots.isEmpty &&
         !specialHazards.any(
-          (h) =>
-              h.kind == HazardKind.laser || h.kind == HazardKind.platformGap,
+          (h) => h.kind == HazardKind.laser || h.kind == HazardKind.platformGap,
         );
     for (final p in porcupines) {
       // A porcupine's first burst does not wait for calm: otherwise a busy
@@ -401,7 +404,7 @@ extension InfiniteGameplay on BalanceGame {
           sy > 430 ||
           sy + travelDuringWarning > BalanceGame.height - 20 ||
           distance < 85 ||
-          distance > 330)
+          (p.bursts > 0 && distance > 330))
         continue;
       p.charge = 0;
       break;
@@ -574,9 +577,13 @@ extension InfiniteGameplay on BalanceGame {
     final climbed = maxHeight / 10;
     if (!mazeSection) {
       if (!mazeSectionsEnabled || climbed < _nextMazeMetres) return;
-      // A maze clears ranged attacks. Wait for the current visitor to leave
-      // rather than cancelling its warning or deleting live projectiles.
-      if (lateEnemy != null || snakes.isNotEmpty || boss != null || bossPending)
+      // Finish committed attacks before replacing the course with a maze.
+      if (lateEnemy != null ||
+          snakes.isNotEmpty ||
+          boss != null ||
+          bossPending ||
+          quills.isNotEmpty ||
+          porcupines.any((p) => p.charge != null))
         return;
       _mazeEndMetres = climbed + InfiniteTuning.mazeSectionMetres;
       _mazeSectionTime = 0;

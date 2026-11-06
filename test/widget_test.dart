@@ -6,6 +6,7 @@ import 'package:balance_arcade/profile.dart';
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/board_painter.dart';
 import 'package:balance_arcade/one_finger_controls.dart';
+import 'package:balance_arcade/level_picker.dart';
 
 void main() {
   for (final size in [
@@ -34,12 +35,31 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.text('HOW TO PLAY'), findsNothing);
-      await tester.ensureVisible(find.text('PRACTICE'));
-      await tester.pump();
-      await tester.tap(find.text('PRACTICE'));
+      expect(find.text('PRACTICE'), findsNothing);
+      expect(find.text('DAILY'), findsOneWidget);
+      expect(find.text('Classic levels'), findsNothing);
+      Navigator.of(tester.element(find.text('Your arcade'))).pop();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
-      expect(find.textContaining('PRACTICE · '), findsOneWidget);
+      final dynamic state = tester.state(find.byType(GameScreen));
+      state.start(
+        GameMode.practice,
+      ); // Obsolete mode requests cannot launch it.
+      await tester.pump();
+      expect(
+        tester.widget<PivotBoard>(find.byType(PivotBoard)).game.mode,
+        GameMode.infinite,
+      );
+      await openClassicLevels(tester);
+      expect(find.byType(LevelPicker), findsOneWidget);
+      Navigator.of(tester.element(find.byType(LevelPicker))).pop();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.tap(find.byTooltip('Settings'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byKey(const ValueKey('replay-tutorial')), findsOneWidget);
+      expect(find.textContaining('PRACTICE · '), findsNothing);
       expect(find.byType(PivotBoard), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());

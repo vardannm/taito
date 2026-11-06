@@ -1,3 +1,4 @@
+import 'ui_audio.dart';
 import 'package:flutter/material.dart';
 import 'responsive_layout.dart';
 
@@ -287,6 +288,39 @@ class MenuPanel extends StatelessWidget {
   );
 }
 
+/// Consistent navigation chrome for full-screen menus and the gear shop.
+class MenuBackButton extends StatelessWidget {
+  const MenuBackButton({
+    super.key,
+    required this.onPressed,
+    this.tooltip = 'Back',
+    this.icon = Icons.arrow_back_rounded,
+  });
+
+  final VoidCallback? onPressed;
+  final String tooltip;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final tablet = usesWideStage(size);
+    final scale = wideMenuScale(size);
+    final extent = tablet ? (48 * scale).clamp(64.0, 72.0) : 48.0;
+    final arrowSize = tablet ? (28 * scale).clamp(32.0, 36.0) : 21.0;
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: uiAction(context, onPressed, cue: UiCue.back),
+      style: IconButton.styleFrom(
+        minimumSize: Size.square(extent),
+        maximumSize: Size.square(extent),
+        foregroundColor: menuText,
+      ),
+      icon: Icon(icon, size: arrowSize),
+    );
+  }
+}
+
 class MenuIconButton extends StatelessWidget {
   const MenuIconButton({
     super.key,
@@ -302,7 +336,7 @@ class MenuIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => IconButton(
     tooltip: tooltip,
-    onPressed: onPressed,
+    onPressed: uiAction(context, onPressed),
     style: IconButton.styleFrom(
       minimumSize: const Size(44, 44),
       maximumSize: const Size(44, 44),
@@ -392,7 +426,7 @@ class MenuAction extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: onTap,
+        onTap: uiAction(context, onTap),
         child: Padding(
           padding: const EdgeInsets.all(15),
           child: Row(
@@ -482,7 +516,7 @@ class MenuToggle extends StatelessWidget {
                   style: const TextStyle(fontSize: 11, color: menuMuted),
                 ),
           value: value,
-          onChanged: onChanged,
+          onChanged: uiChange(context, onChanged),
         ),
       ),
     ),
@@ -533,7 +567,11 @@ class MenuTabs extends StatelessWidget {
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
-                    onTap: () => onChanged(i),
+                    onTap: uiAction(
+                      context,
+                      () => onChanged(i),
+                      cue: UiCue.select,
+                    ),
                     child: Container(
                       decoration: minimal
                           ? BoxDecoration(

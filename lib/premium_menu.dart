@@ -1,3 +1,4 @@
+import 'ui_audio.dart';
 import 'dart:ui' as ui;
 import 'dart:math' as math;
 
@@ -486,7 +487,7 @@ class _PremiumPlayButtonState extends State<PremiumPlayButton> {
             borderRadius: BorderRadius.circular(20),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
-              onTap: widget.onPressed,
+              onTap: uiAction(context, widget.onPressed),
               onHighlightChanged: (value) => setState(() => pressed = value),
               splashColor: Colors.white.withAlpha(30),
               highlightColor: Colors.black.withAlpha(12),
@@ -549,7 +550,7 @@ class MenuQuietButton extends StatelessWidget {
     child: Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onPressed,
+        onTap: uiAction(context, onPressed),
         borderRadius: BorderRadius.circular(14),
         child: SizedBox(
           width: label == null ? 48 : 64,
@@ -738,14 +739,14 @@ class MenuActionButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           child: BackdropFilter(
             filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-            child: buildButton(glass),
+            child: buildButton(context, glass),
           ),
         ),
       ),
     );
   }
 
-  Widget buildButton(Color glass) => FilledButton.icon(
+  Widget buildButton(BuildContext context, Color glass) => FilledButton.icon(
     style: FilledButton.styleFrom(
       backgroundColor: glass.withAlpha(140),
       disabledBackgroundColor: glass.withAlpha(140),
@@ -762,7 +763,7 @@ class MenuActionButton extends StatelessWidget {
         fontWeight: FontWeight.w600,
       ),
     ),
-    onPressed: onPressed,
+    onPressed: uiAction(context, onPressed),
     icon: ShopHintIcon(
       icon,
       size: 26,
@@ -839,9 +840,7 @@ class _SwipeBackPageState extends State<SwipeBackPage> {
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: MenuQuietButton(
-                  icon: Icons.arrow_back_rounded,
-                  tooltip: 'Back',
+                child: MenuBackButton(
                   onPressed: () => Navigator.maybePop(context),
                 ),
               ),

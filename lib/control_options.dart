@@ -1,3 +1,4 @@
+import 'ui_audio.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'game.dart';
@@ -81,10 +82,10 @@ class _ControlOptionsState extends State<ControlOptions>
                 key: halo
                     ? const ValueKey('control-haloJoystick')
                     : ValueKey('control-${mode.name}'),
-                onTap: () {
+                onTap: uiAction(context, () {
                   widget.onHaloChanged?.call(halo);
                   widget.onChanged(mode);
-                },
+                }),
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Column(

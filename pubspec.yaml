@@ -31,8 +31,23 @@ flutter:
   assets:
     - assets/privacy/policy.json
     - assets/fonts/Montserrat-OFL.txt
-    # Music is off; every soundtrack stays archived on disk, outside the bundle.
+    # Equal-length Infinite arrangements; draft recordings are not bundled.
+    - assets/audio/theme_infinite_climb.wav
+    - assets/audio/theme_infinite_fast.wav
+    - assets/audio/theme_infinite_boss.wav
+    - assets/audio/theme_classic_1_40.wav
+    - assets/audio/theme_classic_41_80.wav
     - assets/audio/complete.wav
+    - assets/audio/coin.wav
+    - assets/audio/merge.wav
+    - assets/audio/star.wav
+    - assets/audio/ui_tap.wav
+    - assets/audio/ui_back.wav
+    - assets/audio/ui_toggle.wav
+    - assets/audio/ui_select.wav
+    - assets/audio/enemy_prismArrival.wav
+    - assets/audio/enemy_venomArrival.wav
+    - assets/audio/enemy_novaArrival.wav
     - assets/audio/enemy_bombThrow.wav
     - assets/audio/enemy_bounce.wav
     - assets/audio/enemy_bullet.wav

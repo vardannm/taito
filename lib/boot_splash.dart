@@ -1,3 +1,4 @@
+import 'ui_audio.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -172,7 +173,7 @@ class _GiltIntroState extends State<GiltIntro>
     container: true,
     child: GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: skip,
+      onTap: uiAction(context, skip),
       child: AnimatedBuilder(
         animation: controller,
         builder: (context, _) {

@@ -1,3 +1,4 @@
+import 'ui_audio.dart';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -103,7 +104,7 @@ class _PrivacyPolicyPageState extends State<PrivacyPolicyPage> {
                               style: const TextStyle(color: menuMint),
                             ),
                             TextButton.icon(
-                              onPressed: () async {
+                              onPressed: uiAction(context, () async {
                                 try {
                                   await Clipboard.setData(
                                     ClipboardData(
@@ -128,7 +129,7 @@ class _PrivacyPolicyPageState extends State<PrivacyPolicyPage> {
                                     );
                                   }
                                 }
-                              },
+                              }),
                               icon: const Icon(Icons.copy_outlined, size: 16),
                               label: const Text('Copy link'),
                             ),

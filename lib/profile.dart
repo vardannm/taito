@@ -13,6 +13,8 @@ import 'game.dart';
 import 'enemy_sounds.dart';
 import 'enemy_audio.dart';
 import 'music_output.dart';
+import 'adaptive_music_output.dart';
+import 'infinite_music.dart';
 import 'levels.dart';
 import 'rewards.dart';
 import 'onboarding.dart';
@@ -458,6 +460,31 @@ class PlayerProfile {
 
   int mergeBest = 0, mergeHighest = 2, mergeRuns = 0;
   bool sound = true, music = true, haptics = true;
+  double soundVolume = 1, musicVolume = 1;
+  double get effectiveSoundVolume => sound ? soundVolume : 0;
+  double get effectiveMusicVolume => music ? musicVolume : 0;
+
+  void setAudioLevel({required bool forMusic, required double value}) {
+    final level = value.clamp(0.0, 1.0);
+    if (forMusic) {
+      music = level > 0;
+      if (level > 0) musicVolume = level;
+    } else {
+      sound = level > 0;
+      if (level > 0) soundVolume = level;
+    }
+  }
+
+  void toggleAudioMute({required bool forMusic}) {
+    if (forMusic) {
+      music = !music;
+      if (music && musicVolume <= 0) musicVolume = 1;
+    } else {
+      sound = !sound;
+      if (sound && soundVolume <= 0) soundVolume = 1;
+    }
+  }
+
   bool available = true;
 
   /// A failed read leaves defaults in memory; writing them would erase the
@@ -787,6 +814,10 @@ class PlayerProfile {
       sound = await storage.getBool('gilt.sound') ?? true;
       // Preserve an existing player's mute preference when migrating.
       music = await storage.getBool('gilt.music') ?? sound;
+      final savedSound = await storage.getDouble('gilt.soundVolume') ?? 1;
+      final savedMusic = await storage.getDouble('gilt.musicVolume') ?? 1;
+      soundVolume = savedSound.isFinite ? savedSound.clamp(0.0, 1.0) : 1;
+      musicVolume = savedMusic.isFinite ? savedMusic.clamp(0.0, 1.0) : 1;
       haptics = await storage.getBool('gilt.haptics') ?? true;
       _loadRecords(await storage.getString('gilt.mastery.v1'));
       final legacyMaze = await storage.getString('gilt.maze.v1');
@@ -842,6 +873,8 @@ class PlayerProfile {
       );
       await storage.setBool('gilt.sound', sound);
       await storage.setBool('gilt.music', music);
+      await storage.setDouble('gilt.soundVolume', soundVolume);
+      await storage.setDouble('gilt.musicVolume', musicVolume);
       await storage.setBool('gilt.haptics', haptics);
       await storage.setBool(
         'gilt.oneFinger',
@@ -870,11 +903,44 @@ class PlayerProfile {
 }
 
 class GameFeedback {
-  GameFeedback({MusicOutput Function()? musicOutput})
-    : _musicFactory = musicOutput ?? AudioMusicOutput.new;
+  GameFeedback({
+    MusicOutput Function()? musicOutput,
+    Future<void> Function(String asset, double volume)? effectOutput,
+    Duration Function()? soundClock,
+  }) : _musicFactory = musicOutput ?? AdaptiveAudioMusicOutput.new,
+       _effectOutput = effectOutput {
+    final watch = Stopwatch()..start();
+    _soundClock = soundClock ?? () => watch.elapsed;
+  }
   final MusicOutput Function() _musicFactory;
+  final Future<void> Function(String asset, double volume)? _effectOutput;
+  late final Duration Function() _soundClock;
+  Duration? _lastPickupSound;
   // One low-latency player per effect, so a coin cannot cut off a target.
   final _players = <String, AudioPlayer>{};
+  final _effectLevels = <String, double>{};
+  double _soundGain = 1;
+  Future<void> setSoundVolume(double value) async {
+    if (_soundGain == value) return;
+    _soundGain = value;
+    _enemyAudio.volume = value;
+    if (value == 0) _enemyAudio.setEnabled(false);
+    for (final entry in _players.entries.toList()) {
+      if (_soundGain != value) return;
+      try {
+        if (value == 0) {
+          await entry.value.stop();
+        } else {
+          await entry.value.setVolume(
+            (_effectLevels[entry.key] ?? .55) * value,
+          );
+        }
+      } catch (_) {
+        /* Audio may be unavailable. */
+      }
+    }
+  }
+
   final _enemyAudio = EnemyAudio();
   void setEnemyEffectsEnabled(bool enabled) => _enemyAudio.setEnabled(enabled);
   Future<void> playEnemy(EnemyCue cue) => _enemyAudio.play(cue);
@@ -902,23 +968,40 @@ class GameFeedback {
         HapticFeedback.mediumImpact();
       }
     }
-    if (!profile.sound) return;
+    if (profile.effectiveSoundVolume <= 0) return;
+    final pickup = event == GameEvent.coin;
+    if (pickup) {
+      final now = _soundClock();
+      if (_lastPickupSound != null &&
+          now - _lastPickupSound! < const Duration(milliseconds: 500))
+        return;
+      // Reserve before loading: magnet collections must not queue or overlap.
+      _lastPickupSound = now;
+    }
     try {
-      await _shareAudioFocus();
-      final sound = switch (event) {
-        GameEvent.merge || GameEvent.coin || GameEvent.star => 'target',
-        _ => event.name,
+      final baseVolume = switch (event) {
+        GameEvent.coin => .025,
+        GameEvent.merge => .16,
+        GameEvent.miss => .28,
+        GameEvent.star => .22,
+        GameEvent.target => .25,
+        _ => .55,
       };
+      final volume = baseVolume * profile.effectiveSoundVolume;
+      if (_effectOutput != null) {
+        await _effectOutput('audio/${event.name}.wav', volume);
+        return;
+      }
+      await _shareAudioFocus();
+      final sound = event.name;
       final key = '$sound:${event == GameEvent.coin}';
+      _effectLevels[key] = baseVolume;
       var player = _players[key];
       if (player == null) {
         player = _players[key] = AudioPlayer();
         await player.setPlayerMode(PlayerMode.lowLatency);
       }
-      await player.play(
-        AssetSource('audio/$sound.wav'),
-        volume: event == GameEvent.coin ? .25 : .55,
-      );
+      await player.play(AssetSource('audio/$sound.wav'), volume: volume);
     } catch (_) {
       /* Audio restrictions must never interrupt a run. */
     }
@@ -930,9 +1013,23 @@ class GameFeedback {
   bool _musicPlaying = false;
   bool _disposed = false;
   double _musicRate = 1, _musicVolume = .32;
-  ({String? track, bool playing, double volume, double rate, int? session})?
+  ({
+    String? track,
+    bool playing,
+    double volume,
+    double rate,
+    int? session,
+    MusicMix mix,
+  })?
   _wantedMusic;
-  ({String? track, bool playing, double volume, double rate, int? session})?
+  ({
+    String? track,
+    bool playing,
+    double volume,
+    double rate,
+    int? session,
+    MusicMix mix,
+  })?
   _handledMusic;
   Future<void>? _musicUpdate;
 
@@ -945,6 +1042,7 @@ class GameFeedback {
     double volume = .32,
     double playbackRate = 1,
     int? playbackSession,
+    MusicMix mix = const MusicMix(1, 0, 0),
   }) async {
     if (_disposed ||
         (track == null && _track == null && _musicUpdate == null)) {
@@ -956,6 +1054,7 @@ class GameFeedback {
       volume: volume.clamp(0.0, 1.0),
       rate: playbackRate.clamp(.5, 2.0),
       session: playbackSession,
+      mix: mix,
     );
     _wantedMusic = request;
     // Coalesce ticker updates during asset loading. A later mute, pause or
@@ -991,7 +1090,14 @@ class GameFeedback {
   }
 
   Future<void> _applyMusic(
-    ({String? track, bool playing, double volume, double rate, int? session})
+    ({
+      String? track,
+      bool playing,
+      double volume,
+      double rate,
+      int? session,
+      MusicMix mix,
+    })
     request,
   ) async {
     final track = request.track;
@@ -1015,6 +1121,7 @@ class GameFeedback {
       return;
     }
     final music = _music ??= _musicFactory();
+    if (music is AdaptiveMusicOutput) await music.setMix(request.mix);
     if (newRecording) {
       await music.play(track, request.volume);
       _track = track;

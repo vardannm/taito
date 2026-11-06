@@ -43,7 +43,7 @@ abstract final class InfiniteTuning {
   static const webInterval = 3.5, maxWebShots = 2;
   static const quillCount = 12, maxPorcupines = 2;
   static const quillSpeed = 95.0, quillRadius = 3.0;
-  static const quillWarningSeconds = 1.1, quillLifeSeconds = 3.6;
+  static const quillWarningSeconds = 1.1;
   static const quillInterval = 4.8, porcupineSpacing = 2200.0;
   static const snakeSideSpeed = 65.0, snakeDownSpeed = 72.0;
   static const lateEnemyWarning = 1.2;

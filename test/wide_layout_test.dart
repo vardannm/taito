@@ -20,6 +20,7 @@ void main() {
   for (final size in [
     const Size(600, 900),
     const Size(1114, 720),
+    const Size(932, 678),
     const Size(820, 1180),
     const Size(1440, 900),
     const Size(1920, 1080),
@@ -85,6 +86,18 @@ void main() {
       expect(tester.takeException(), isNull);
       for (var mode = 0; mode < 3; mode++) {
         await selectWorld(tester, mode);
+        if (mode == 1 && size.height >= 720) {
+          final summary = find.byKey(
+            const ValueKey('menu-classic-level-summary'),
+          );
+          final label = find.descendant(
+            of: summary,
+            matching: find.text('Level 1'),
+          );
+          expect(tester.getRect(label).height, greaterThan(28));
+          final summaryRect = tester.getRect(summary);
+          expect(summaryRect.bottom, lessThanOrEqualTo(size.height));
+        }
         await armWorld(tester);
         final board = tester.widget<PivotBoard>(find.byType(PivotBoard));
         final game = board.game;
@@ -134,6 +147,53 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       await tester.pumpWidget(const SizedBox());
     });
+  }
+
+  for (final rightCutout in [false, true]) {
+    testWidgets(
+      'side cutout keeps chrome safe without shrinking gameplay: $rightCutout',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(466, 678);
+        final insets = FakeViewPadding(
+          left: rightCutout ? 0 : 84,
+          right: rightCutout ? 84 : 0,
+        );
+        tester.view.padding = insets;
+        tester.view.viewPadding = insets;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(
+          ArcadeApp(
+            profile: PlayerProfile()
+              ..tutorialSeen = true
+              ..sound = false
+              ..music = false
+              ..controlMode = ControlMode.oneFinger,
+          ),
+        );
+        await tester.pump(const Duration(milliseconds: 700));
+        final play = tester.getRect(find.byKey(const ValueKey('menu-play')));
+        expect(play.center.dx, closeTo(233, .01));
+        final endless = tester.getRect(
+          find.byKey(const ValueKey('menu-infinite-mark')),
+        );
+        final title = tester.getRect(
+          find.byKey(const ValueKey('selected-mode-title')),
+        );
+        expect(endless.bottom, lessThan(title.top));
+        final settings = tester.getRect(find.byTooltip('Settings'));
+        expect(settings.right, lessThanOrEqualTo(rightCutout ? 382 : 466));
+        await startWorld(tester);
+        final board = tester.getRect(find.byType(PivotBoard));
+        expect(board.left, closeTo(0, .01));
+        expect(board.width, closeTo(466, .01));
+        final pause = tester.getRect(find.byKey(const ValueKey('board-pause')));
+        expect(pause.right, lessThanOrEqualTo(rightCutout ? 382 : 466));
+        expect(pause.left, greaterThanOrEqualTo(rightCutout ? 0 : 84));
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
   }
 
   test('phone projection and menu scale retain existing dimensions', () {
@@ -243,7 +303,16 @@ void main() {
       await tester.pump(const Duration(milliseconds: 600));
       await tester.tap(find.byTooltip('Pause'));
       await tester.pump();
-      expect(find.text('Take a breath.'), findsOneWidget);
+      expect(find.text('Paused'), findsOneWidget);
+      expect(find.text('Your run is right where you left it.'), findsNothing);
+      expect(
+        tester.getRect(find.byKey(const ValueKey('pause-panel'))).width,
+        closeTo(size.width, .01),
+      );
+      expect(
+        tester.getRect(find.byKey(const ValueKey('pause-panel'))).height,
+        closeTo(size.height, .01),
+      );
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
     });

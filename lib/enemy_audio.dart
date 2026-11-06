@@ -15,6 +15,7 @@ class _EnemyVoice {
 class EnemyAudio {
   EnemyAudio({EnemySoundStart? start}) : _injectedStart = start;
   final EnemySoundStart? _injectedStart;
+  double volume = 1;
   final _pools = <EnemyCue, Future<AudioPool>>{};
   final _voices = <_EnemyVoice>{};
   bool _enabled = false, _disposed = false;
@@ -76,7 +77,7 @@ class EnemyAudio {
     final epoch = _epoch;
     final pool = await _pool(cue);
     if (!_enabled || _disposed || epoch != _epoch) return () async {};
-    return pool.start(volume: cue.volume);
+    return pool.start(volume: cue.volume * volume);
   }
 
   Future<void> play(EnemyCue cue) async {

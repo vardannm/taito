@@ -1,3 +1,4 @@
+import 'ui_audio.dart';
 import 'menu_design.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -86,11 +87,14 @@ class _ClubScreenState extends State<ClubScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: uiAction(context, () => Navigator.pop(context)),
             child: const Text('CANCEL'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            onPressed: uiAction(
+              context,
+              () => Navigator.pop(context, controller.text.trim()),
+            ),
             child: const Text('CONTINUE'),
           ),
         ],
@@ -188,11 +192,11 @@ class _ClubScreenState extends State<ClubScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context, false),
+              onPressed: uiAction(context, () => Navigator.pop(context, false)),
               child: const Text('CANCEL'),
             ),
             FilledButton(
-              onPressed: () => Navigator.pop(context, true),
+              onPressed: uiAction(context, () => Navigator.pop(context, true)),
               child: const Text('RESTORE'),
             ),
           ],
@@ -285,9 +289,12 @@ class _ClubScreenState extends State<ClubScreen> {
                       '${nextCabinet.requiredStars - profile.totalStars} more stars unlock ${nextCabinet.title}.',
                     ),
                   FilledButton(
-                    onPressed: busy
-                        ? null
-                        : () => play(goal.mode, goal.level, goal.date),
+                    onPressed: uiAction(
+                      context,
+                      busy
+                          ? null
+                          : () => play(goal.mode, goal.level, goal.date),
+                    ),
                     child: const Text('PLAY THIS GOAL'),
                   ),
                 ]),
@@ -297,10 +304,13 @@ class _ClubScreenState extends State<ClubScreen> {
                   ),
                   Text('Your controls: ${profile.controlMode.label}'),
                   FilledButton.tonal(
-                    onPressed: () => play(
-                      GameMode.daily,
-                      15,
-                      DailyChallenge.day(DateTime.now()),
+                    onPressed: uiAction(
+                      context,
+                      () => play(
+                        GameMode.daily,
+                        15,
+                        DailyChallenge.day(DateTime.now()),
+                      ),
                     ),
                     child: const Text('PLAY TODAY’S DAILY'),
                   ),
@@ -308,11 +318,11 @@ class _ClubScreenState extends State<ClubScreen> {
                     spacing: 8,
                     children: [
                       TextButton(
-                        onPressed: shareDaily,
+                        onPressed: uiAction(context, shareDaily),
                         child: const Text('COPY MY CHALLENGE'),
                       ),
                       TextButton(
-                        onPressed: importFriend,
+                        onPressed: uiAction(context, importFriend),
                         child: const Text('ADD FRIEND CODE'),
                       ),
                     ],
@@ -328,14 +338,14 @@ class _ClubScreenState extends State<ClubScreen> {
                       trailing: IconButton(
                         tooltip: 'Play this challenge',
                         icon: const Icon(Icons.play_arrow),
-                        onPressed: () {
+                        onPressed: uiAction(context, () {
                           profile.controlMode = friend.control.supportedMode;
                           play(
                             GameMode.daily,
                             15,
                             DateTime.parse('${friend.date}T00:00:00Z'),
                           );
-                        },
+                        }),
                       ),
                     ),
                 ]),
@@ -347,16 +357,19 @@ class _ClubScreenState extends State<ClubScreen> {
                     spacing: 8,
                     children: [
                       TextButton(
-                        onPressed: busy
-                            ? null
-                            : () => copy(
-                                ProgressBackup.encode(profile),
-                                'Progress copied. Save the full text outside the game.',
-                              ),
+                        onPressed: uiAction(
+                          context,
+                          busy
+                              ? null
+                              : () => copy(
+                                  ProgressBackup.encode(profile),
+                                  'Progress copied. Save the full text outside the game.',
+                                ),
+                        ),
                         child: const Text('COPY BACKUP'),
                       ),
                       TextButton(
-                        onPressed: busy ? null : restore,
+                        onPressed: uiAction(context, busy ? null : restore),
                         child: const Text('RESTORE BACKUP'),
                       ),
                     ],
@@ -375,13 +388,16 @@ class _ClubScreenState extends State<ClubScreen> {
                       spacing: 8,
                       children: [
                         TextButton(
-                          onPressed: () => setState(() {
-                            if (recorder.active) {
-                              recorder.stop();
-                            } else {
-                              recorder.start();
-                            }
-                          }),
+                          onPressed: uiAction(
+                            context,
+                            () => setState(() {
+                              if (recorder.active) {
+                                recorder.stop();
+                              } else {
+                                recorder.start();
+                              }
+                            }),
+                          ),
                           child: Text(
                             recorder.active
                                 ? 'STOP SESSION'
@@ -389,12 +405,15 @@ class _ClubScreenState extends State<ClubScreen> {
                           ),
                         ),
                         TextButton(
-                          onPressed: recorder.events.isEmpty
-                              ? null
-                              : () => copy(
-                                  recorder.export(),
-                                  'Playtest report copied.',
-                                ),
+                          onPressed: uiAction(
+                            context,
+                            recorder.events.isEmpty
+                                ? null
+                                : () => copy(
+                                    recorder.export(),
+                                    'Playtest report copied.',
+                                  ),
+                          ),
                           child: const Text('COPY REPORT'),
                         ),
                       ],

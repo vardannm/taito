@@ -168,12 +168,13 @@ class _BallShopState extends State<BallShop>
     if (mounted) setState(() {});
   }
 
-  Widget ballShowcase() {
+  Widget ballShowcase({double? previewHeight}) {
     final p = widget.profile, ball = ballShopOrder[ballIndex];
     final owned = p.ownedBalls.contains(ball);
     return ShopShowcase(
       key: const ValueKey('ball-showcase'),
       title: 'BALLS',
+      previewHeight: previewHeight,
       index: ballIndex,
       count: ballShopOrder.length,
       name: ball.label,
@@ -262,69 +263,99 @@ class _BallShopState extends State<BallShop>
             ShopHeader(profile: widget.profile, onWalletChanged: refresh),
             Expanded(
               child: LayoutBuilder(
-                builder: (context, bounds) => SingleChildScrollView(
-                  key: const ValueKey('shop-scroll'),
-                  padding: EdgeInsets.fromLTRB(
-                    bounds.maxWidth < 360 ? 16 : 24,
-                    4,
-                    bounds.maxWidth < 360 ? 16 : 24,
-                    24,
-                  ),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 1000),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (!widget.profile.available)
-                            const Padding(
-                              padding: EdgeInsets.only(bottom: 12),
-                              child: Text(
-                                'Device storage is unavailable; progress may not save.',
-                                style: TextStyle(color: menuGold, fontSize: 11),
-                              ),
-                            ),
-                          if (bounds.maxWidth >= 760)
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(child: ballShowcase()),
-                                const SizedBox(width: 32),
-                                Expanded(
-                                  child: Column(
-                                    children: [
-                                      platformShowcase(),
-                                      const SizedBox(height: 20),
-                                      upgrades(),
-                                    ],
+                builder: (context, bounds) {
+                  // A portrait tablet needs a vertical composition; using only
+                  // width puts the entire shop in the top half of an iPad.
+                  final portraitTablet =
+                      bounds.maxWidth >= 600 &&
+                      bounds.maxHeight > bounds.maxWidth;
+                  final sideBySide = bounds.maxWidth >= 760 && !portraitTablet;
+                  return SingleChildScrollView(
+                    key: const ValueKey('shop-scroll'),
+                    padding: EdgeInsets.fromLTRB(
+                      bounds.maxWidth < 360 ? 16 : 24,
+                      4,
+                      bounds.maxWidth < 360 ? 16 : 24,
+                      24,
+                    ),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: portraitTablet ? 700 : 1000,
+                          minHeight: portraitTablet ? bounds.maxHeight - 28 : 0,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            if (!widget.profile.available)
+                              const Padding(
+                                padding: EdgeInsets.only(bottom: 12),
+                                child: Text(
+                                  'Device storage is unavailable; progress may not save.',
+                                  style: TextStyle(
+                                    color: menuGold,
+                                    fontSize: 11,
                                   ),
                                 ),
-                              ],
-                            )
-                          else ...[
-                            ballShowcase(),
-                            const SizedBox(height: 20),
-                            platformShowcase(),
-                            const SizedBox(height: 20),
-                            upgrades(),
-                          ],
-                          const SizedBox(height: 16),
-                          Text(
-                            'YOUR LOADOUT  /  ×${formatBoost(widget.profile.equipmentMultiplier)} INFINITE POINTS',
-                            key: const ValueKey('gear-total'),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: menuMuted,
-                              fontSize: 10,
-                              letterSpacing: 1,
-                              height: 1.5,
+                              ),
+                            if (sideBySide)
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(child: ballShowcase()),
+                                  const SizedBox(width: 32),
+                                  Expanded(
+                                    child: Column(
+                                      children: [
+                                        platformShowcase(),
+                                        const SizedBox(height: 20),
+                                        upgrades(),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              )
+                            else ...[
+                              Padding(
+                                padding: EdgeInsets.only(
+                                  bottom: portraitTablet ? 28 : 20,
+                                ),
+                                child: ballShowcase(
+                                  previewHeight: portraitTablet
+                                      ? (bounds.maxHeight * .32).clamp(
+                                          260.0,
+                                          420.0,
+                                        )
+                                      : null,
+                                ),
+                              ),
+                              Padding(
+                                padding: EdgeInsets.only(
+                                  bottom: portraitTablet ? 28 : 20,
+                                ),
+                                child: platformShowcase(),
+                              ),
+                              upgrades(),
+                            ],
+                            const SizedBox(height: 16),
+                            Text(
+                              'YOUR LOADOUT  /  ×${formatBoost(widget.profile.equipmentMultiplier)} INFINITE POINTS',
+                              key: const ValueKey('gear-total'),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: menuMuted,
+                                fontSize: 10,
+                                letterSpacing: 1,
+                                height: 1.5,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ),
           ],

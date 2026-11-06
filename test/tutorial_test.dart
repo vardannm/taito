@@ -363,7 +363,7 @@ void main() {
       await tester.tap(find.byTooltip('Done shopping'));
       await frames(tester);
       expect(p.tutorial.step, TutorialStep.levels);
-      expect(find.text('Handmade levels'), findsOneWidget);
+      expect(find.text('Classic levels'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('choose-level')));
       await frames(tester);
       expect(p.tutorial.step, TutorialStep.level1);

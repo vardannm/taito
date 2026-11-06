@@ -1,3 +1,4 @@
+import 'ui_audio.dart';
 import 'menu_design.dart';
 import 'package:flutter/material.dart';
 import 'achievements.dart';
@@ -141,7 +142,10 @@ class _AchievementSheetState extends State<AchievementSheet> {
                           const SizedBox(height: 8),
                           FilledButton(
                             key: ValueKey('claim-${a.name}'),
-                            onPressed: busy ? null : () => claim(a),
+                            onPressed: uiAction(
+                              context,
+                              busy ? null : () => claim(a),
+                            ),
                             child: Text('CLAIM ${a.coins} COINS'),
                           ),
                         ],

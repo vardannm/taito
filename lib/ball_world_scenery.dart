@@ -1877,54 +1877,183 @@ class _Scenery {
       case BallCosmetic.chronosphere:
         chronoCitadel();
       case BallCosmetic.genesis:
+        // Genesis is a quiet celestial sanctuary, with a vault and nacre terraces.
+        // Recorded once in the scene cache, with no blur or animated geometry.
         wash(
-          const Rect.fromLTWH(-100, -80, 410, 330),
-          color(0xFFF5B1EC).withAlpha(55),
+          const Rect.fromLTWH(-175, -150, 360, 420),
+          color(0xFFD1C5F0).withAlpha(27),
         );
         wash(
-          const Rect.fromLTWH(80, 80, 390, 360),
-          color(0xFF9DFFF1).withAlpha(24),
+          const Rect.fromLTWH(210, 250, 300, 390),
+          color(0xFFE9C9B1).withAlpha(17),
         );
-        stars(color(0xFFFFE1F4), 39);
-        const ribbons = [
-          Color(0xFFF9C5EA),
-          Color(0xFFBAF5EC),
-          Color(0xFFD3C3FF),
-        ];
+        // A distant orbital vault gives Genesis a recognizable setting.
+        // Large, open ellipses cannot be confused with the small target holes.
+        wash(
+          const Rect.fromLTWH(-35, -100, 430, 300),
+          color(0xFFDBC7E6).withAlpha(34),
+        );
         for (var i = 0; i < 3; i++) {
+          final arch = Path()
+            ..moveTo(-55, 176 + i * 19.0)
+            ..cubicTo(
+              28,
+              43 + i * 10.0,
+              195,
+              -16 + i * 7.0,
+              390,
+              67 + i * 25.0,
+            );
           c.drawPath(
-            Path()
-              ..moveTo(-30, 90 + i * 33.0)
-              ..cubicTo(
-                75,
-                -15 + i * 20,
-                195,
-                280 + i * 22,
-                375,
-                86 + i * 22.0,
-              ),
+            arch,
             Paint()
-              ..color = ribbons[i].withAlpha(40)
+              ..shader = LinearGradient(
+                colors: [
+                  color(0xFFABBCD5).withAlpha(15 + i * 4),
+                  color(0xFFE3CCE3).withAlpha(43 - i * 7),
+                  color(0xFFEBD3AA).withAlpha(21),
+                ],
+              ).createShader(const Rect.fromLTWH(0, 0, 340, 200))
               ..style = PaintingStyle.stroke
-              ..strokeWidth = 15 - i * 3.0,
+              ..strokeWidth = i == 0 ? 12 : 4,
+          );
+          c.drawPath(
+            arch,
+            Paint()
+              ..color = accent.withAlpha(47 - i * 11)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = .7,
           );
         }
-        for (var i = 0; i < 8; i++) {
-          final x = i * 48.0 - 15, h = 35.0 + i * 27 % 60;
-          polygon([
-            Offset(x - 14, 550),
-            Offset(x - 7, 550 - h),
-            Offset(x, 534 - h),
-            Offset(x + 15, 550 - h * .3),
-            Offset(x + 20, 550),
-          ], ribbons[i % 3].withAlpha(100));
+        // Tiny constellation inlays sit beside the vault, away from the route.
+        for (final point in [
+          const Offset(42, 64),
+          const Offset(285, 46),
+          const Offset(306, 177),
+        ]) {
           line(
-            Offset(x, 534 - h),
-            Offset(x + 4, 550),
-            accent.withAlpha(110),
-            .8,
+            point - const Offset(3, 0),
+            point + const Offset(3, 0),
+            accent.withAlpha(78),
+            .6,
+          );
+          line(
+            point - const Offset(0, 3),
+            point + const Offset(0, 3),
+            accent.withAlpha(78),
+            .6,
           );
         }
+        final leftVeil = Path()
+          ..moveTo(-28, -20)
+          ..cubicTo(45, 35, 57, 115, 23, 215)
+          ..cubicTo(-3, 300, 23, 422, -22, 560)
+          ..lineTo(-40, 560)
+          ..close();
+        c.drawPath(
+          leftVeil,
+          Paint()
+            ..shader = const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0x19E6D8EF), Color(0x0AADC9D6), Color(0x00C9C0E2)],
+            ).createShader(const Rect.fromLTWH(-30, 0, 100, 540)),
+        );
+        final rightVeil = Path()
+          ..moveTo(365, -20)
+          ..cubicTo(302, 90, 337, 185, 318, 285)
+          ..cubicTo(293, 405, 326, 462, 363, 560)
+          ..close();
+        c.drawPath(
+          rightVeil,
+          Paint()
+            ..shader = const LinearGradient(
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+              colors: [Color(0x00D8C9EC), Color(0x10C5C9E8), Color(0x18E4CDB1)],
+            ).createShader(const Rect.fromLTWH(290, 0, 80, 540)),
+        );
+        // Polished, layered sanctuary terraces frame the lower edges. Their
+        // subdued surfaces give depth without introducing bright foreground props.
+        for (var layer = 0; layer < 3; layer++) {
+          final y = 432 + layer * 37.0;
+          final crest = Path()
+            ..moveTo(-25, y)
+            ..cubicTo(40, y - 29, 81, y + 12, 140, y + 23)
+            ..cubicTo(224, y + 37, 286, y - 41, 365, y - 17);
+          final terrace = Path.from(crest)
+            ..lineTo(365, 560)
+            ..lineTo(-25, 560)
+            ..close();
+          c.drawPath(
+            terrace,
+            Paint()
+              ..shader = LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color.lerp(color(0xFF4F485E), top, layer * .14)!,
+                  color(0xFF292A3D),
+                  color(0xFF363348),
+                ],
+              ).createShader(Rect.fromLTWH(0, y - 30, 340, 105)),
+          );
+          c.drawPath(
+            crest,
+            Paint()
+              ..shader = LinearGradient(
+                colors: [
+                  accent.withAlpha(55),
+                  accent.withAlpha(8),
+                  color(0xFFBADCD9).withAlpha(34),
+                ],
+              ).createShader(Rect.fromLTWH(0, y - 20, 340, 80))
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = .85,
+          );
+          // A fine second bevel reads as nacre rather than flat cartoon hills.
+          c.save();
+          c.translate(0, 4);
+          c.drawPath(
+            crest,
+            Paint()
+              ..color = color(0xFFD2C3E5).withAlpha(15)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = .6,
+          );
+          c.restore();
+        }
+        final edgeLight = Paint()
+          ..color = accent.withAlpha(30)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = .65;
+        c.drawPath(
+          Path()
+            ..moveTo(-2, 40)
+            ..cubicTo(35, 97, 31, 161, 13, 220),
+          edgeLight,
+        );
+        c.drawPath(
+          Path()
+            ..moveTo(339, 310)
+            ..cubicTo(316, 386, 331, 459, 351, 498),
+          edgeLight,
+        );
+        // Very sparse pearl dust at the edges only; no stars in the play lane.
+        final dust = Path();
+        for (var i = 0; i < 10; i++) {
+          final x = i.isEven
+              ? 7 + hash(i + 920) * 24
+              : 311 + hash(i + 930) * 22;
+          final y = 28 + hash(i + 940) * 465;
+          dust.addOval(
+            Rect.fromCircle(
+              center: Offset(x, y),
+              radius: .4 + hash(i + 950) * .35,
+            ),
+          );
+        }
+        c.drawPath(dust, Paint()..color = accent.withAlpha(55));
     }
   }
 }

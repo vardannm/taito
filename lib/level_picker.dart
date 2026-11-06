@@ -1,6 +1,6 @@
+import 'ui_audio.dart';
 import 'dart:math' as math;
 import 'menu_design.dart';
-import 'premium_menu.dart';
 import 'onboarding.dart';
 import 'tutorial_spotlight.dart';
 import 'package:flutter/material.dart';
@@ -103,12 +103,6 @@ class _LevelPickerState extends State<LevelPicker> {
   int get selected => widget.selected;
   int get totalStars => widget.totalStars;
   Map<int, LevelRecord> get records => widget.records;
-  String controlName(ControlMode mode) =>
-      mode == ControlMode.oneFinger && (wideControls || _haloJoystick)
-      ? 'Halo Joystick'
-      : mode.label;
-  String get controlLabel =>
-      control == null ? widget.controlLabel : controlName(control!);
   bool unlocked(int number) =>
       widget.allLevelsUnlocked || ClassicLevels.isUnlocked(number, totalStars);
   int get visibleCount => widget.allLevelsUnlocked
@@ -141,9 +135,7 @@ class _LevelPickerState extends State<LevelPicker> {
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: MenuQuietButton(
-                icon: Icons.arrow_back_rounded,
-                tooltip: 'Back',
+              child: MenuBackButton(
                 onPressed: () => Navigator.maybePop(context),
               ),
             ),
@@ -227,13 +219,15 @@ class _LevelPickerState extends State<LevelPicker> {
                                       child: InkWell(
                                         key: ValueKey('level-$number'),
                                         borderRadius: BorderRadius.circular(28),
-                                        onTap:
-                                            open &&
-                                                (!widget.tutorial ||
-                                                    skipped ||
-                                                    number == 1)
-                                            ? () => onSelected(number)
-                                            : null,
+                                        onTap: uiAction(
+                                          context,
+                                          open &&
+                                                  (!widget.tutorial ||
+                                                      skipped ||
+                                                      number == 1)
+                                              ? () => onSelected(number)
+                                              : null,
+                                        ),
                                         child: Padding(
                                           padding: const EdgeInsets.all(8),
                                           child: Column(
@@ -403,11 +397,10 @@ class _LevelPickerState extends State<LevelPicker> {
                       slivers: [
                         heading(
                           'Choose your challenge.',
-                          widget.tutorial && !skipped
+                          (widget.tutorial && !skipped) ||
+                                  widget.allLevelsUnlocked
                               ? ''
-                              : widget.allLevelsUnlocked
-                              ? 'Development access. $controlLabel records.'
-                              : '$totalStars Classic stars · 2 more stars unlock each level. Stars are shared across controls and are not spent. $controlLabel records.',
+                              : '$totalStars Classic stars · 2 more stars unlock each level. Stars are shared across controls and are not spent.',
                         ),
                         road(1, visibleCount),
                       ],
@@ -421,7 +414,7 @@ class _LevelPickerState extends State<LevelPicker> {
                     lesson: TutorialStep.level1.lesson,
                     lessons: TutorialStep.lessons,
                     message:
-                        'Levels are handmade boards. Reach the glowing holes in order, 1 to 10, and avoid the dark ones. Tap Level 1.',
+                        'Reach the glowing holes in order, 1 to 10, and avoid the dark ones. Tap Level 1.',
                     blockOutside: true,
                     onSkip: () {
                       widget.onSkipTutorial?.call();

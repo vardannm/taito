@@ -1,3 +1,4 @@
+import 'ui_audio.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -146,10 +147,10 @@ class _FirstPlayTutorialState extends State<FirstPlayTutorial>
                               ),
                             ),
                             TextButton(
-                              onPressed: () {
+                              onPressed: uiAction(context, () {
                                 widget.onExit?.call(false);
                                 widget.onDone();
-                              },
+                              }),
                               child: const Text('SKIP'),
                             ),
                           ],
@@ -212,32 +213,40 @@ class _FirstPlayTutorialState extends State<FirstPlayTutorial>
                           spacing: 8,
                           children: [
                             TextButton(
-                              onPressed: () =>
-                                  setState(() => reset(game.controlMode)),
+                              onPressed: uiAction(
+                                context,
+                                () => setState(() => reset(game.controlMode)),
+                              ),
                               child: const Text('RESET'),
                             ),
                             if (lesson > 0)
                               TextButton(
-                                onPressed: () => setState(() {
-                                  lesson--;
-                                  reset(game.controlMode);
-                                }),
+                                onPressed: uiAction(
+                                  context,
+                                  () => setState(() {
+                                    lesson--;
+                                    reset(game.controlMode);
+                                  }),
+                                ),
                                 child: const Text('BACK'),
                               ),
                             FilledButton(
-                              onPressed: passed
-                                  ? () {
-                                      if (lesson == 2) {
-                                        widget.onExit?.call(true);
-                                        widget.onDone();
-                                      } else {
-                                        setState(() {
-                                          lesson++;
-                                          reset(game.controlMode);
-                                        });
+                              onPressed: uiAction(
+                                context,
+                                passed
+                                    ? () {
+                                        if (lesson == 2) {
+                                          widget.onExit?.call(true);
+                                          widget.onDone();
+                                        } else {
+                                          setState(() {
+                                            lesson++;
+                                            reset(game.controlMode);
+                                          });
+                                        }
                                       }
-                                    }
-                                  : null,
+                                    : null,
+                              ),
                               child: Text(lesson == 2 ? "LET'S PLAY" : 'NEXT'),
                             ),
                           ],

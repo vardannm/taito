@@ -1,10 +1,11 @@
+import 'ui_audio.dart';
 import 'playtest_recorder.dart';
 import 'rewarded_revive_ads.dart';
 import 'ad_consent.dart';
 import 'app_analytics.dart';
 import 'privacy_policy.dart';
-import 'music_credits.dart';
 import 'infinite_music.dart';
+import 'level_music.dart';
 export 'pivot_board.dart';
 import 'pivot_board.dart';
 import 'club.dart';
@@ -53,6 +54,7 @@ import 'boot_splash.dart';
 import 'responsive_layout.dart';
 import 'infinite_coin_chip.dart';
 import 'infinite_boss.dart';
+import 'device_orientation.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -61,7 +63,7 @@ Future<void> main() async {
       'Montserrat',
     ], await rootBundle.loadString('assets/fonts/Montserrat-OFL.txt'));
   });
-  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  final isIOSPhone = await initializeDeviceOrientation();
   // Full screen: hides the status bar (time, battery) and Android's nav bar;
   // a swipe from the edge shows them briefly. SafeAreas still avoid the notch.
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
@@ -73,8 +75,7 @@ Future<void> main() async {
       systemNavigationBarIconBrightness: Brightness.light,
     ),
   );
-  // TEMPORARY store-screenshot build: every level open and at least 300,000
-  // coins. Remove both before release.
+  // Store capture setup: open every level and keep at least 300,000 coins.
   final profile = PlayerProfile(temporaryLevelAccess: true);
   await profile.load();
   if (profile.wallet < 300000) {
@@ -85,6 +86,7 @@ Future<void> main() async {
   final adConsent = AdConsent();
   runApp(
     ArcadeApp(
+      isIOSPhone: isIOSPhone,
       profile: profile,
       analytics: analytics,
       reviveAds: GoogleRewardedReviveAds(
@@ -104,11 +106,13 @@ class ArcadeApp extends StatelessWidget {
     this.reviveAds,
     this.adConsent,
     this.intro = false,
+    this.isIOSPhone = false,
   });
   final PlayerProfile profile;
   final AppAnalytics? analytics;
   final RewardedReviveAds? reviveAds;
   final AdConsent? adConsent;
+  final bool isIOSPhone;
 
   /// The boot animation belongs to the real launch only; tests pump this app
   /// straight into the menu rather than waiting an intro out.
@@ -119,13 +123,20 @@ class ArcadeApp extends StatelessWidget {
     title: 'Rollrise: Ball Balance',
     theme: arcadeMenuTheme(),
     // Wrapping the navigator keeps the intro above anything the menu opens.
-    builder: intro
-        ? (context, child) => GiltIntroGate(
-            ball: profile.selectedBall,
-            platform: profile.selectedPlatform,
-            child: child ?? const SizedBox(),
-          )
-        : null,
+    builder: (context, child) => UiAudioScope(
+      enabled: () => profile.effectiveSoundVolume > 0,
+      volume: () => profile.effectiveSoundVolume,
+      child: PhoneOrientationFrame(
+        isIOSPhone: isIOSPhone,
+        child: intro
+            ? GiltIntroGate(
+                ball: profile.selectedBall,
+                platform: profile.selectedPlatform,
+                child: child ?? const SizedBox(),
+              )
+            : child ?? const SizedBox(),
+      ),
+    ),
     home: GameScreen(
       profile: profile,
       analytics: analytics,
@@ -252,9 +263,6 @@ class _GameScreenState extends State<GameScreen>
 
   bool readyRetry = false;
 
-  /// TEMPORARY store-screenshot tool: hides the pause menu over the frozen
-  /// run until the next tap. Remove before release.
-  bool screenshotMode = false;
   final carouselKey = GlobalKey<ModeCarouselState>();
   final boardKey = GlobalKey();
   final analogKey = GlobalKey();
@@ -277,6 +285,7 @@ class _GameScreenState extends State<GameScreen>
     game,
     fillWidth: expansion,
     bottomInset: (boardKey.currentWidget as PivotBoard?)?.bottomInset,
+    fitHeight: (boardKey.currentWidget as PivotBoard?)?.fitHeight ?? false,
   );
   int selectedMode = 0;
   bool carouselMoving = false;
@@ -635,6 +644,8 @@ class _GameScreenState extends State<GameScreen>
 
   void start(GameMode mode, {DateTime? challengeDate}) => setState(() {
     if (adBusy) return;
+    // Practice remains an internal lesson simulation, never a player mode.
+    if (mode == GameMode.practice) return;
     if (game.finished) recordFinalResult();
     reviveDeclined = false;
     reviveError = null;
@@ -804,10 +815,10 @@ class _GameScreenState extends State<GameScreen>
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: () {
+                  onPressed: uiAction(context, () {
                     Navigator.pop(context);
                     start(GameMode.merge2048);
-                  },
+                  }),
                   child: const Text('PLAY MERGE'),
                 ),
               ),
@@ -876,13 +887,34 @@ class _GameScreenState extends State<GameScreen>
   }
 
   Future<void> showDailyPrizes() async {
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: menuBackground,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (_) => DailyPrizeSheet(profile: profile),
-    );
+    final size = MediaQuery.sizeOf(context);
+    if (usesWideStage(size)) {
+      await showDialog<void>(
+        context: context,
+        builder: (_) => Dialog(
+          backgroundColor: menuBackground,
+          clipBehavior: Clip.antiAlias,
+          insetPadding: const EdgeInsets.all(32),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
+          child: SizedBox(
+            key: const ValueKey('daily-prizes-dialog'),
+            width: 680,
+            height: math.min(960, size.height * .88),
+            child: DailyPrizeSheet(profile: profile),
+          ),
+        ),
+      );
+    } else {
+      await showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: menuBackground,
+        showDragHandle: true,
+        isScrollControlled: true,
+        builder: (_) => DailyPrizeSheet(profile: profile),
+      );
+    }
     if (mounted) setState(() {});
   }
 
@@ -927,31 +959,34 @@ class _GameScreenState extends State<GameScreen>
       });
   }
 
-  /// Infinite runs to a loop; every other screen is quiet. Pausing
+  /// Classic/Daily use level loops; Infinite blends adaptive arrangements. Pausing
   /// holds the track rather than restarting it.
   void syncMusic() {
+    unawaited(feedback.setSoundVolume(profile.effectiveSoundVolume));
     feedback.setEnemyEffectsEnabled(
-      profile.sound &&
+      profile.effectiveSoundVolume > 0 &&
           game.started &&
           game.phase == GamePhase.playing &&
           !game.paused &&
           !game.waitingForInput &&
           !returning,
     );
+    final track = game.infinite
+        ? InfiniteMusic.asset
+        : LevelMusic.trackFor(game.mode, game.level);
     final wants =
-        InfiniteMusic.bundled &&
-        game.infinite &&
-        profile.music &&
-        game.started &&
-        !game.finished;
+        profile.effectiveMusicVolume > 0 && game.started && !game.finished;
     unawaited(
       feedback.updateMusic(
-        track: wants ? InfiniteMusic.asset : null,
+        track: wants ? track : null,
+        volume: (game.infinite ? .32 : .23) * profile.effectiveMusicVolume,
         playing: !game.paused && !game.waitingForInput && !returning,
         playbackSession: game.runSerial,
-        playbackRate: game.infinite
-            ? InfiniteMusic.rateFor(seconds: game.elapsed, pace: game.pace)
-            : 1,
+        mix: InfiniteMusic.mixFor(
+          seconds: game.elapsed,
+          pace: game.pace,
+          boss: game.boss != null || game.bossWarningSeconds != null,
+        ),
       ),
     );
   }
@@ -1008,6 +1043,7 @@ class _GameScreenState extends State<GameScreen>
 
   /// The next Classic level and the stars already earned on it.
   Widget classicLevelSummary(int level) => FittedBox(
+    key: const ValueKey('menu-classic-level-summary'),
     fit: BoxFit.scaleDown,
     child: Column(
       mainAxisSize: MainAxisSize.min,
@@ -1043,7 +1079,6 @@ class _GameScreenState extends State<GameScreen>
     if (adBusy) return;
     cancelResumeCountdown();
     if (game.finished) recordFinalResult();
-    screenshotMode = false;
     reviveDeclined = false;
     reviveError = null;
     coinDoubleError = null;
@@ -1201,10 +1236,6 @@ class _GameScreenState extends State<GameScreen>
   /// returns to the menu (recording any finished result) instead of exiting.
   void handleBack() {
     if (adBusy || returning) return;
-    if (screenshotMode) {
-      setState(() => screenshotMode = false);
-      return;
-    }
     if (game.started &&
         !game.finished &&
         !game.paused &&
@@ -1250,18 +1281,18 @@ class _GameScreenState extends State<GameScreen>
                 )
               : tutorialOnLevels
               ? (
-                  'Handmade levels',
+                  'Classic levels',
                   Icons.route_rounded,
-                  'Classic is a road of handmade boards with stars to earn. Tap Choose Level.',
+                  'Complete Classic levels and earn stars. Tap Choose Level.',
                 )
               : step == TutorialStep.dailyChallenge
               ? (
                   'Daily Challenge',
                   Icons.today_rounded,
-                  'Daily Challenge: a new board each day. Earn stars and beat your best. It lives in Modes with Practice and How to Play. Tap Modes to finish.',
+                  'Daily Challenge: a new board each day. Earn stars and beat your best. Find it in Modes. Tap Modes to finish.',
                 )
               : (
-                  'Back to practice',
+                  'Back to the tutorial',
                   Icons.play_arrow_rounded,
                   'Your Infinite lessons pick up where you left off. Tap Play.',
                 )
@@ -1524,22 +1555,10 @@ class _GameScreenState extends State<GameScreen>
                   subtitle: 'A new challenge. Your next personal best.',
                 ),
                 choice(
-                  'Classic levels',
-                  'Master every board and collect stars',
-                  Icons.grid_view_rounded,
-                  selectLevel,
-                ),
-                choice(
                   'DAILY',
                   'A fresh board, every day',
                   Icons.today_outlined,
                   showDaily,
-                ),
-                choice(
-                  'PRACTICE',
-                  'Find your balance at your own pace',
-                  Icons.touch_app,
-                  () => start(GameMode.practice),
                 ),
                 choice(
                   'Goals, friends & backup',
@@ -1700,8 +1719,9 @@ class _GameScreenState extends State<GameScreen>
                 IconButton.filledTonal(
                   key: const ValueKey('board-pause'),
                   tooltip: game.paused ? 'Resume' : 'Pause',
-                  onPressed: pause,
+                  onPressed: uiAction(context, pause),
                   style: IconButton.styleFrom(
+                    fixedSize: const Size.square(64),
                     backgroundColor: menuRaised,
                     foregroundColor: menuText,
                   ),
@@ -1709,7 +1729,7 @@ class _GameScreenState extends State<GameScreen>
                     game.paused
                         ? Icons.play_arrow_rounded
                         : Icons.pause_rounded,
-                    size: 24,
+                    size: 32,
                   ),
                 ),
               ],
@@ -1743,11 +1763,22 @@ class _GameScreenState extends State<GameScreen>
       if (!playArmed) return const SizedBox();
       return Center(
         child: IgnorePointer(
-          child: MenuPanel(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 360),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            decoration: BoxDecoration(
+              color: const Color(0xB3121419),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0x26FFFFFF)),
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.touch_app_rounded, color: menuGold, size: 32),
+                const Icon(
+                  Icons.touch_app_rounded,
+                  color: Color(0xFFA9CBEF),
+                  size: 32,
+                ),
                 const SizedBox(height: 12),
                 Text(
                   startInstruction,
@@ -1755,7 +1786,7 @@ class _GameScreenState extends State<GameScreen>
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 18,
-                    color: menuText,
+                    color: Color(0xFFF4F5F7),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1763,7 +1794,7 @@ class _GameScreenState extends State<GameScreen>
                 const Text(
                   'Your run starts when you move.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, color: menuMuted),
+                  style: TextStyle(fontSize: 13, color: Color(0xFFBFC3CB)),
                 ),
               ],
             ),
@@ -1789,7 +1820,10 @@ class _GameScreenState extends State<GameScreen>
                 children: [
                   FilledButton.icon(
                     key: const ValueKey('choose-level'),
-                    onPressed: carouselMoving ? null : selectLevel,
+                    onPressed: uiAction(
+                      context,
+                      carouselMoving ? null : selectLevel,
+                    ),
                     icon: const Icon(Icons.grid_view_rounded, size: 18),
                     label: const Text('Choose Level'),
                   ),
@@ -1985,7 +2019,7 @@ class _GameScreenState extends State<GameScreen>
                         child: IconButton.filledTonal(
                           key: const ValueKey('board-pause'),
                           tooltip: game.paused ? 'Resume' : 'Pause',
-                          onPressed: pause,
+                          onPressed: uiAction(context, pause),
                           style: IconButton.styleFrom(
                             backgroundColor: color.withAlpha(24),
                             foregroundColor: color,
@@ -2024,7 +2058,7 @@ class _GameScreenState extends State<GameScreen>
 
   String worldSubtitle(int index) => switch (index) {
     0 => 'NO FINISH LINE. FIND YOUR FLOW.',
-    1 => 'HANDMADE BOARDS. EARN EVERY STAR.',
+    1 => 'REACH EVERY TARGET. EARN EVERY STAR.',
     _ => 'SMALL NUMBERS. BIG POSSIBILITIES.',
   };
 
@@ -2123,6 +2157,7 @@ class _GameScreenState extends State<GameScreen>
               game: game,
               frame: frame,
               fillWidth: expansion,
+              fitHeight: MediaQuery.viewPaddingOf(context).horizontal > 0,
               bottomInset:
                   controlStrip(game) +
                   bottomControlHeight(context) * expansion +
@@ -2132,11 +2167,12 @@ class _GameScreenState extends State<GameScreen>
                 // The board extends behind the status bar; its HUD stays below it.
                 padding: EdgeInsets.only(
                   top: MediaQuery.paddingOf(context).top * expansion,
+                  left: MediaQuery.paddingOf(context).left,
+                  right: MediaQuery.paddingOf(context).right,
                 ),
                 child: boardChrome(),
               ),
               dimUntilInput:
-                  game.infinite &&
                   game.waitingForInput &&
                   (tutorialBoard || playArmed) &&
                   !returning,
@@ -2214,17 +2250,44 @@ class _GameScreenState extends State<GameScreen>
                   bounds.maxWidth * .17,
                   bounds.maxHeight * .19,
                 );
+                final desiredSummaryTop =
+                    bounds.maxHeight * .47 + radius * 1.75;
+                final summaryHeight = compactMenu ? 36.0 : 46.0;
+                final screenSize = MediaQuery.sizeOf(context);
+                // Match the tablet menu's larger controls, while reserving
+                // enough room below the rail in short landscape windows.
+                final levelScale = usesWideStage(screenSize)
+                    ? math.min(
+                        wideMenuScale(screenSize) * 1.25,
+                        math.max(
+                          1.0,
+                          (bounds.maxHeight - desiredSummaryTop - 8) /
+                              summaryHeight,
+                        ),
+                      )
+                    : 1.0;
+                final labelHeight = arcadeModes[index] == GameMode.classic
+                    ? summaryHeight * levelScale
+                    : math.min(
+                        compactMenu ? 52.0 : 72.0,
+                        (bounds.maxHeight * .2).clamp(36.0, 72.0),
+                      );
+                final summaryTop = math.min(
+                  desiredSummaryTop,
+                  math.max(0.0, bounds.maxHeight - labelHeight - 8),
+                );
                 return Stack(
                   children: [
                     Positioned(
                       left: 16,
                       right: 16,
-                      top: bounds.maxHeight * .47 + radius * 1.75,
-                      height: arcadeModes[index] == GameMode.classic
-                          ? (compactMenu ? 36 : 46)
-                          : (compactMenu ? 52 : 72),
+                      top: summaryTop,
+                      height: labelHeight,
                       child: arcadeModes[index] == GameMode.classic
-                          ? classicLevelSummary(worldLevel(index))
+                          ? ScaledMenuChrome(
+                              scale: levelScale,
+                              child: classicLevelSummary(worldLevel(index)),
+                            )
                           : const FittedBox(
                               fit: BoxFit.scaleDown,
                               child: Text(
@@ -2408,9 +2471,12 @@ class _GameScreenState extends State<GameScreen>
           tooltip: step < 0 ? 'Previous mode' : 'Next mode',
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints.tightFor(width: 44, height: 44),
-          onPressed: enabled && !carouselMoving
-              ? () => carouselKey.currentState?.select(target)
-              : null,
+          onPressed: uiAction(
+            context,
+            enabled && !carouselMoving
+                ? () => carouselKey.currentState?.select(target)
+                : null,
+          ),
           icon: Icon(
             step < 0 ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
             color: menuGold,
@@ -2570,10 +2636,13 @@ class _GameScreenState extends State<GameScreen>
                                   color: Colors.transparent,
                                   child: InkWell(
                                     key: ValueKey('mode-$mode'),
-                                    onTap: carouselMoving
-                                        ? null
-                                        : () => carouselKey.currentState
-                                              ?.select(mode),
+                                    onTap: uiAction(
+                                      context,
+                                      carouselMoving
+                                          ? null
+                                          : () => carouselKey.currentState
+                                                ?.select(mode),
+                                    ),
                                     borderRadius: BorderRadius.circular(18),
                                     child: SizedBox(
                                       width: 48,
@@ -2724,6 +2793,9 @@ class _GameScreenState extends State<GameScreen>
                     ),
                   SafeArea(
                     key: const ValueKey('arcade-stage'),
+                    // Side cutouts constrain chrome, not the painted arena.
+                    left: false,
+                    right: false,
                     top: false,
                     bottom: false,
                     minimum: EdgeInsets.only(
@@ -2760,7 +2832,11 @@ class _GameScreenState extends State<GameScreen>
                                               animation: reveal,
                                               child: ScaledMenuChrome(
                                                 scale: menuScale,
-                                                child: selectionHeader(page),
+                                                child: SafeArea(
+                                                  top: false,
+                                                  bottom: false,
+                                                  child: selectionHeader(page),
+                                                ),
                                               ),
                                             ),
                                           ),
@@ -2841,31 +2917,31 @@ class _GameScreenState extends State<GameScreen>
                                 MediaQuery.paddingOf(context).bottom *
                                     expansion +
                                 menuFooterHeight * (1 - expansion),
-                            child: bottomInput(controlHeight),
+                            child: SafeArea(
+                              top: false,
+                              bottom: false,
+                              child: bottomInput(controlHeight),
+                            ),
                           ),
                       ],
                     ),
                   ),
                   if (!returning &&
                       resumeSeconds == 0 &&
-                      (game.paused || game.finished) &&
-                      !screenshotMode)
-                    SafeArea(
-                      key: const ValueKey('run-overlay'),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
+                      (game.paused || game.finished))
+                    if (game.paused && !briefing && !offeringRevive)
+                      Positioned.fill(
+                        key: const ValueKey('run-overlay'),
                         child: responsiveRunOverlay(context),
+                      )
+                    else
+                      SafeArea(
+                        key: const ValueKey('run-overlay'),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: responsiveRunOverlay(context),
+                        ),
                       ),
-                    ),
-                  // TEMPORARY: any tap leaves the frozen screenshot view.
-                  if (screenshotMode)
-                    Positioned.fill(
-                      child: GestureDetector(
-                        key: const ValueKey('screenshot-mode'),
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => setState(() => screenshotMode = false),
-                      ),
-                    ),
                   if (resumeSeconds > 0)
                     Positioned.fill(
                       child: Stack(
@@ -2939,7 +3015,7 @@ class _GameScreenState extends State<GameScreen>
         width: double.infinity,
         height: 54,
         child: FilledButton(
-          onPressed: action,
+          onPressed: uiAction(context, action),
           style: FilledButton.styleFrom(
             backgroundColor: menuGold,
             foregroundColor: menuBackground,
@@ -3003,7 +3079,7 @@ class _GameScreenState extends State<GameScreen>
           const SizedBox(height: 12),
           FilledButton.icon(
             key: const ValueKey('watch-coin-double-ad'),
-            onPressed: adBusy ? null : watchCoinDoubleAd,
+            onPressed: uiAction(context, adBusy ? null : watchCoinDoubleAd),
             icon: adBusy
                 ? const SizedBox(
                     width: 18,
@@ -3083,7 +3159,10 @@ class _GameScreenState extends State<GameScreen>
                     width: double.infinity,
                     child: FilledButton.icon(
                       key: const ValueKey('watch-revive-ad'),
-                      onPressed: adBusy ? null : watchReviveAd,
+                      onPressed: uiAction(
+                        context,
+                        adBusy ? null : watchReviveAd,
+                      ),
                       style: FilledButton.styleFrom(
                         backgroundColor: brass,
                         foregroundColor: ink,
@@ -3112,7 +3191,7 @@ class _GameScreenState extends State<GameScreen>
                   SizedBox(height: compact ? 4 : 10),
                   TextButton(
                     key: const ValueKey('decline-revive'),
-                    onPressed: adBusy ? null : declineRevive,
+                    onPressed: uiAction(context, adBusy ? null : declineRevive),
                     child: const Text(
                       'No thanks · End run',
                       style: TextStyle(color: cream),
@@ -3132,6 +3211,9 @@ class _GameScreenState extends State<GameScreen>
     final scale = wideMenuScale(MediaQuery.sizeOf(context));
     final overlay = boardOverlay();
     if (scale == 1) return overlay;
+    if (game.paused && !briefing) {
+      return ScaledMenuChrome(scale: scale, child: overlay);
+    }
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: 520 * scale),
@@ -3163,14 +3245,23 @@ class _GameScreenState extends State<GameScreen>
       : PopScope(
           canPop: !adBusy,
           child: Container(
+            key: game.paused ? const ValueKey('pause-panel') : null,
             decoration: BoxDecoration(
-              color: menuBackground.withAlpha(245),
-              borderRadius: BorderRadius.circular(28),
+              color: game.paused
+                  ? const Color(0xB3121419)
+                  : menuBackground.withAlpha(245),
+              borderRadius: game.paused
+                  ? BorderRadius.zero
+                  : BorderRadius.circular(28),
             ),
             child: Center(
               child: SingleChildScrollView(
                 child: Padding(
-                  padding: const EdgeInsets.all(25),
+                  padding:
+                      const EdgeInsets.all(25) +
+                      (game.paused
+                          ? MediaQuery.paddingOf(context)
+                          : EdgeInsets.zero),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -3181,12 +3272,12 @@ class _GameScreenState extends State<GameScreen>
                             ? Icons.workspace_premium_outlined
                             : Icons.refresh_rounded,
                         size: 48,
-                        color: menuGold,
+                        color: game.paused ? Colors.white : menuGold,
                       ),
                       const SizedBox(height: 14),
                       Text(
                         game.paused
-                            ? 'Take a breath.'
+                            ? 'Paused'
                             : game.won
                             ? (game.merging
                                   ? 'A brilliant chain.'
@@ -3201,8 +3292,8 @@ class _GameScreenState extends State<GameScreen>
                           letterSpacing: -1,
                         ),
                       ),
-                      const SizedBox(height: 12),
                       if (game.finished) ...[
+                        const SizedBox(height: 12),
                         Text(
                           game.mode == GameMode.classic
                               ? game.won
@@ -3270,7 +3361,10 @@ class _GameScreenState extends State<GameScreen>
                           ),
                         if (profile.achievementsReady > 0)
                           TextButton.icon(
-                            onPressed: adBusy ? null : showAchievements,
+                            onPressed: uiAction(
+                              context,
+                              adBusy ? null : showAchievements,
+                            ),
                             style: TextButton.styleFrom(foregroundColor: brass),
                             icon: const Icon(Icons.emoji_events_outlined),
                             label: Text(
@@ -3291,12 +3385,11 @@ class _GameScreenState extends State<GameScreen>
                                   ),
                             unlocks: const [],
                           ),
-                      ] else
-                        const Text(
-                          'Your run is right where you left it.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: menuMuted, fontSize: 12),
-                        ),
+                      ],
+                      if (game.paused) ...[
+                        const SizedBox(height: 20),
+                        pauseAudioControls(),
+                      ],
                       const SizedBox(height: 22),
                       SizedBox(
                         width: double.infinity,
@@ -3306,27 +3399,30 @@ class _GameScreenState extends State<GameScreen>
                             backgroundColor: menuGold,
                             foregroundColor: menuBackground,
                           ),
-                          onPressed: adBusy
-                              ? null
-                              : game.paused
-                              ? pause
-                              : () {
-                                  if (game.won &&
-                                      game.mode == GameMode.classic &&
-                                      game.level < ClassicLevels.count) {
-                                    if (!profile.selectClassicLevel(
-                                      game.level + 1,
-                                    )) {
-                                      unawaited(selectLevel());
-                                      return;
+                          onPressed: uiAction(
+                            context,
+                            adBusy
+                                ? null
+                                : game.paused
+                                ? pause
+                                : () {
+                                    if (game.won &&
+                                        game.mode == GameMode.classic &&
+                                        game.level < ClassicLevels.count) {
+                                      if (!profile.selectClassicLevel(
+                                        game.level + 1,
+                                      )) {
+                                        unawaited(selectLevel());
+                                        return;
+                                      }
+                                      unawaited(profile.save());
                                     }
-                                    unawaited(profile.save());
-                                  }
-                                  start(
-                                    game.mode,
-                                    challengeDate: game.dailyDate,
-                                  );
-                                },
+                                    start(
+                                      game.mode,
+                                      challengeDate: game.dailyDate,
+                                    );
+                                  },
+                          ),
                           child: Text(
                             game.paused
                                 ? 'RESUME RUN'
@@ -3375,16 +3471,9 @@ class _GameScreenState extends State<GameScreen>
                           Icons.restart_alt_rounded,
                           () => start(game.mode, challengeDate: game.dailyDate),
                         ),
-                      // TEMPORARY store-screenshot tool. Remove before release.
-                      if (game.paused || game.finished)
-                        pauseAction(
-                          'SCREENSHOT MODE',
-                          Icons.photo_camera_outlined,
-                          () => setState(() => screenshotMode = true),
-                        ),
                       if (tutorialActive)
                         TextButton(
-                          onPressed: skipTutorial,
+                          onPressed: uiAction(context, skipTutorial),
                           child: const Text('Skip Tutorial'),
                         ),
                       pauseAction('BACK TO MENU', Icons.home_outlined, home),
@@ -3396,6 +3485,92 @@ class _GameScreenState extends State<GameScreen>
           ),
         );
 
+  Widget pauseAudioControls() => Center(
+    child: Container(
+      constraints: const BoxConstraints(maxWidth: 460),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xF02C3038),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0x45FFFFFF)),
+      ),
+      child: Column(children: [pauseVolumeRow(true), pauseVolumeRow(false)]),
+    ),
+  );
+
+  Widget pauseVolumeRow(bool music) {
+    final name = music ? 'music' : 'sound';
+    final level = music
+        ? profile.effectiveMusicVolume
+        : profile.effectiveSoundVolume;
+    void change(double value, {bool save = false}) {
+      setState(
+        () => profile.setAudioLevel(forMusic: music, value: value / 100),
+      );
+      syncMusic();
+      if (save) unawaited(profile.save());
+    }
+
+    return Row(
+      children: [
+        IconButton(
+          key: ValueKey('pause-$name-mute'),
+          tooltip: '${level > 0 ? 'Mute' : 'Unmute'} $name',
+          color: level > 0 ? Colors.white : const Color(0xFF92969E),
+          onPressed: uiAction(context, () {
+            setState(() => profile.toggleAudioMute(forMusic: music));
+            syncMusic();
+            unawaited(profile.save());
+          }),
+          icon: Icon(
+            music
+                ? (level > 0
+                      ? Icons.music_note_rounded
+                      : Icons.music_off_rounded)
+                : (level > 0
+                      ? Icons.volume_up_rounded
+                      : Icons.volume_off_rounded),
+          ),
+        ),
+        SizedBox(
+          width: 49,
+          child: Text(
+            music ? 'Music' : 'Sound',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Slider(
+            key: ValueKey('pause-$name-slider'),
+            value: (level * 100).clamp(0.0, 100.0),
+            min: 0,
+            max: 100,
+            divisions: 100,
+            activeColor: menuGold,
+            inactiveColor: const Color(0x33FFFFFF),
+            label: '${(level * 100).round()}%',
+            semanticFormatterCallback: (value) =>
+                '${value.round()} percent $name volume',
+            onChanged: (value) => change(value),
+            onChangeEnd: (value) => change(value, save: true),
+          ),
+        ),
+        SizedBox(
+          width: 32,
+          child: Text(
+            '${(level * 100).round()}',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white, fontSize: 12),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget pauseAction(String text, IconData icon, VoidCallback onPressed) =>
       Padding(
         padding: const EdgeInsets.only(top: 12),
@@ -3404,8 +3579,14 @@ class _GameScreenState extends State<GameScreen>
           child: FilledButton.icon(
             style: FilledButton.styleFrom(
               minimumSize: const Size(0, 58),
-              backgroundColor: const Color(0xFF2C4448),
-              foregroundColor: menuText,
+              backgroundColor: game.paused
+                  ? (icon == Icons.restart_alt_rounded
+                        ? const Color(0xFFF0C787)
+                        : const Color(0xD9434751))
+                  : const Color(0xFF2C4448),
+              foregroundColor: game.paused && icon == Icons.restart_alt_rounded
+                  ? const Color(0xFF342515)
+                  : menuText,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -3415,7 +3596,7 @@ class _GameScreenState extends State<GameScreen>
                 fontWeight: FontWeight.w600,
               ),
             ),
-            onPressed: adBusy ? null : onPressed,
+            onPressed: uiAction(context, adBusy ? null : onPressed),
             icon: Icon(icon, size: 23),
             label: Text(text, textAlign: TextAlign.center),
           ),
@@ -3514,7 +3695,7 @@ class _GameScreenState extends State<GameScreen>
                     'Optional usage data to help improve Rollrise',
                   ),
                   value: analytics.collectionEnabled,
-                  onChanged: (enabled) async {
+                  onChanged: uiChange(context, (enabled) async {
                     final saved = await analytics.setCollectionEnabled(enabled);
                     if (!context.mounted) return;
                     update(() {});
@@ -3526,7 +3707,7 @@ class _GameScreenState extends State<GameScreen>
                           ),
                         ),
                       );
-                  },
+                  }),
                 ),
                 const SizedBox(height: 14),
                 const MenuSection('Choose your controls'),
@@ -3564,7 +3745,7 @@ class _GameScreenState extends State<GameScreen>
                   MenuToggle(
                     title: 'Music',
                     icon: Icons.music_note_rounded,
-                    subtitle: 'Background soundtrack',
+                    subtitle: 'Level and adaptive Infinite soundtracks',
                     value: profile.music,
                     onChanged: (v) {
                       update(() => profile.music = v);
@@ -3582,13 +3763,6 @@ class _GameScreenState extends State<GameScreen>
                     unawaited(profile.save());
                   },
                 ),
-                if (InfiniteMusic.bundled)
-                  MenuAction(
-                    title: 'Music credits',
-                    subtitle: 'The Complex · Kevin MacLeod',
-                    icon: Icons.piano_rounded,
-                    onTap: () => showMusicCredits(context),
-                  ),
                 if (!profile.available) ...[
                   const SizedBox(height: 16),
                   const Text(

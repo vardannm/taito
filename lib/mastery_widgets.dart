@@ -1,3 +1,4 @@
+import 'ui_audio.dart';
 import 'menu_design.dart';
 import 'package:flutter/material.dart';
 import 'board_painter.dart';
@@ -210,7 +211,10 @@ class DailyCard extends StatelessWidget {
                 style: TextStyle(fontSize: 11, color: menuMuted),
               ),
               const SizedBox(height: 18),
-              FilledButton(onPressed: onPlay, child: const Text('PLAY DAILY')),
+              FilledButton(
+                onPressed: uiAction(context, onPlay),
+                child: const Text('PLAY DAILY'),
+              ),
             ],
           ),
         ),
@@ -257,7 +261,10 @@ class CabinetPicker extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               key: ValueKey('cabinet-${style.name}'),
-              onTap: profile.isUnlocked(style) ? () => onSelected(style) : null,
+              onTap: uiAction(
+                context,
+                profile.isUnlocked(style) ? () => onSelected(style) : null,
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(14),
                 child: Row(
@@ -378,13 +385,13 @@ class FinaleBriefing extends StatelessWidget {
                   backgroundColor: menuGold,
                   foregroundColor: menuBackground,
                 ),
-                onPressed: onPlay,
+                onPressed: uiAction(context, onPlay),
                 child: const Text('START LEVEL'),
               ),
               const SizedBox(height: 8),
               TextButton.icon(
                 style: TextButton.styleFrom(foregroundColor: cream),
-                onPressed: onBack,
+                onPressed: uiAction(context, onBack),
                 icon: const Icon(Icons.arrow_back_rounded, size: 18),
                 label: const Text('BACK TO LEVELS'),
               ),

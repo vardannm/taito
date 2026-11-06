@@ -1,3 +1,4 @@
+import 'ui_audio.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
@@ -28,14 +29,10 @@ class ShopHeader extends StatelessWidget {
     padding: const EdgeInsets.fromLTRB(12, 10, 20, 14),
     child: Row(
       children: [
-        IconButton(
+        MenuBackButton(
           tooltip: 'Done shopping',
           onPressed: () => Navigator.of(context).maybePop(),
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 21),
-          style: IconButton.styleFrom(
-            foregroundColor: menuText,
-            minimumSize: const Size(48, 48),
-          ),
+          icon: Icons.arrow_back_ios_new_rounded,
         ),
         const SizedBox(width: 6),
         const Expanded(
@@ -91,6 +88,7 @@ class ShopShowcase extends StatelessWidget {
     required this.itemBuilder,
     required this.action,
     this.footer,
+    this.previewHeight,
     this.magnet,
     this.compact = false,
     this.premium = false,
@@ -105,6 +103,7 @@ class ShopShowcase extends StatelessWidget {
   final IndexedWidgetBuilder itemBuilder;
   final Widget action;
   final Widget? footer;
+  final double? previewHeight;
   final String? magnet;
 
   @override
@@ -153,7 +152,9 @@ class ShopShowcase extends StatelessWidget {
       SizedBox(height: compact ? 6 : 8),
       LayoutBuilder(
         builder: (context, bounds) => SizedBox(
-          height: compact ? 50 : (bounds.maxWidth > 420 ? 260 : 150),
+          height:
+              previewHeight ??
+              (compact ? 50 : (bounds.maxWidth > 420 ? 260 : 150)),
           child: Row(
             children: [
               _BrowseArrow(
@@ -353,7 +354,7 @@ class _BrowseArrow extends StatelessWidget {
   Widget build(BuildContext context) => IconButton(
     key: ValueKey('${previous ? 'previous' : 'next'}-$label'),
     tooltip: '${previous ? 'Previous' : 'Next'} $label',
-    onPressed: onPressed,
+    onPressed: uiAction(context, onPressed),
     style: IconButton.styleFrom(
       minimumSize: const Size(48, 48),
       maximumSize: const Size(48, 48),

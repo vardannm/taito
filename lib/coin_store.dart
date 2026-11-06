@@ -1,3 +1,4 @@
+import 'ui_audio.dart';
 import 'package:flutter/material.dart';
 
 import 'infinite_coin_chip.dart';
@@ -189,9 +190,12 @@ class _CoinStoreSheetState extends State<CoinStoreSheet> {
                 ),
                 TextButton(
                   key: const ValueKey('restore-purchases'),
-                  onPressed: () => comingSoon(
-                    'Restoring purchases arrives with coin packs. '
-                    'Nothing has been bought yet.',
+                  onPressed: uiAction(
+                    context,
+                    () => comingSoon(
+                      'Restoring purchases arrives with coin packs. '
+                      'Nothing has been bought yet.',
+                    ),
                   ),
                   child: const Text('Restore'),
                 ),
@@ -225,7 +229,7 @@ class _PackTile extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: onBuy,
+          onTap: uiAction(context, onBuy),
           borderRadius: BorderRadius.circular(20),
           child: Ink(
             decoration: BoxDecoration(
@@ -310,7 +314,7 @@ class _PackTile extends StatelessWidget {
                       const SizedBox(width: 10),
                       FilledButton(
                         key: ValueKey('coin-pack-${pack.id}'),
-                        onPressed: onBuy,
+                        onPressed: uiAction(context, onBuy),
                         style: FilledButton.styleFrom(
                           minimumSize: const Size(84, 44),
                           padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -421,10 +425,10 @@ class WalletButton extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(22),
-          onTap: () async {
+          onTap: uiAction(context, () async {
             await showCoinStore(context, profile);
             onClosed?.call();
-          },
+          }),
           child: content,
         ),
       ),
@@ -455,10 +459,10 @@ class GetCoinsLink extends StatelessWidget {
     return Align(
       alignment: Alignment.centerLeft,
       child: TextButton.icon(
-        onPressed: () async {
+        onPressed: uiAction(context, () async {
           await showCoinStore(context, profile, needed: needed);
           onClosed?.call();
-        },
+        }),
         style: TextButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 8),
           minimumSize: const Size(0, 36),

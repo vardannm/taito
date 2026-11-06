@@ -56,12 +56,12 @@ Color comboColor(double power, {bool background = false}) {
 
 /// Combo energy recolors the equipped world without replacing its identity.
 List<Color> boardFieldColors(BalanceGame game) {
-  final world = BallWorld.of(game.cosmetic);
+  final world = BallWorld.of(game.renderCosmetic);
   if (!game.infinite) return world.field;
   final power = (game.survival.visualCombo * InfiniteTuning.visualIntensity)
       .clamp(0.0, 1.0);
   var tint = comboColor(power);
-  if (game.cosmetic != BallCosmetic.steel) {
+  if (game.renderCosmetic != BallCosmetic.steel) {
     tint = Color.lerp(
       tint,
       Color.lerp(world.field[1], world.accent, .35),
@@ -114,7 +114,7 @@ class InfiniteBackdropPainter extends CustomPainter {
     this.game, {
     required this.reducedMotion,
     Listenable? repaint,
-  }) : world = BallWorld.of(game.cosmetic),
+  }) : world = BallWorld.of(game.renderCosmetic),
        super(repaint: repaint);
   final BalanceGame game;
   final BallWorld world;
@@ -187,9 +187,7 @@ ComboMotif comboMotif(BallCosmetic ball) => switch (ball) {
   BallCosmetic.quasar ||
   BallCosmetic.singularity ||
   BallCosmetic.plasma => ComboMotif.twinkle,
-  BallCosmetic.malachite ||
-  BallCosmetic.genesis ||
-  BallCosmetic.obsidian => ComboMotif.petals,
+  BallCosmetic.malachite || BallCosmetic.obsidian => ComboMotif.petals,
   BallCosmetic.chronosphere => ComboMotif.orbit,
   BallCosmetic.circuit || BallCosmetic.reactor => ComboMotif.pulses,
   BallCosmetic.eclipse => ComboMotif.drift,
@@ -206,9 +204,9 @@ void paintComboMotif(
   double fade,
   double horizontalSpread,
 ) {
-  final motif = comboMotif(game.cosmetic);
+  final motif = comboMotif(game.renderCosmetic);
   var tint = Color.lerp(
-    BallWorld.of(game.cosmetic).accent,
+    BallWorld.of(game.renderCosmetic).accent,
     comboEnergyColor(power),
     .25,
   )!;
@@ -216,8 +214,11 @@ void paintComboMotif(
     tint = Color.lerp(tint, const Color(0xFF243052), .45)!;
   }
   // The dark tiers add a few more of the same shapes, never a second effect.
-  final count = 4 + (8 * power + 6 * comboDarkness(power)).round();
-  final alpha = (.3 + .25 * power) * fade;
+  final genesis = game.renderCosmetic == BallCosmetic.genesis;
+  final count = genesis
+      ? 3 + (3 * power).round()
+      : 4 + (8 * power + 6 * comboDarkness(power)).round();
+  final alpha = (.3 + .25 * power) * fade * (genesis ? .45 : 1);
   if (motif == ComboMotif.rain) {
     paintRain(c, count, t, tint.withValues(alpha: alpha), horizontalSpread);
     return;

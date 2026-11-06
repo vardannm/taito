@@ -4,6 +4,7 @@ import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/hazards.dart';
 import 'package:balance_arcade/infinite_progress.dart';
 import 'package:balance_arcade/porcupines.dart';
+import 'package:balance_arcade/rewards.dart';
 import 'package:balance_arcade/spiders.dart';
 
 BalanceGame run() {
@@ -36,16 +37,18 @@ void main() {
     expect(p.burst().first.angle, closeTo(math.pi / 12, 1e-9));
   });
 
-  test('quills sweep fast crossings and clip collisions at expiry', () {
+  test('quills sweep fast crossings and remain live until consumed', () {
     final q = PorcupineQuill(x: 100, y: 200, angle: 0);
     q.step(.1);
     expect(q.contact(105, 140, 105, 260), isNotNull);
     expect(q.contact(105, 240, 105, 300), isNull);
     q.step(4);
-    expect(q.expired, isTrue);
+    expect(q.expired, isFalse);
     expect(q.contact(400, 200, 400, 200), isNotNull);
+    q.consumed = true;
     q.step(.01);
     expect(q.contact(q.x, q.y, q.x, q.y), isNull);
+    expect(q.expired, isTrue);
   });
 
   test('visible porcupine warns, pauses, fires once and cools down', () {
@@ -118,25 +121,84 @@ void main() {
     expect(g.webShots, isEmpty);
   });
 
-  test('breathing, maze and restarting clear attacks', () {
-    for (final maze in [false, true]) {
-      final g = run();
-      final p = BoardPorcupine(85, 260)..charge = .5;
-      g.porcupines.add(p);
-      g.quills.add(PorcupineQuill(x: 100, y: 200, angle: 0));
-      if (maze) {
-        g.mazeSectionsEnabled = true;
-        g.maxHeight = 8000;
-      } else {
-        g.maxHeight = 1800;
-      }
-      g.step(1 / 120);
-      expect(g.quills, isEmpty);
-      expect(p.charge, isNull);
-      g.start(gameMode: GameMode.classic, levelNumber: 31);
-      expect(g.porcupines, isEmpty);
-      expect(g.quills, isEmpty);
-    }
+  test('first warning starts even while the ball is far below', () {
+    final g = run();
+    final p = BoardPorcupine(85, 40);
+    g.porcupines.add(p);
+    g.step(1 / 120);
+    expect(p.charge, 0);
+    advance(g, InfiniteTuning.quillWarningSeconds + .02);
+    expect(p.bursts, 1);
+    expect(g.quills, isNotEmpty);
+  });
+
+  test('breathing lets committed attacks finish without starting new ones', () {
+    final g = run();
+    final p = BoardPorcupine(85, 260)..charge = .5;
+    final idle = BoardPorcupine(290, 200);
+    final q = PorcupineQuill(x: 100, y: 200, angle: 0);
+    g.porcupines.addAll([p, idle]);
+    g.quills.add(q);
+    g.maxHeight = 1800;
+    g.step(1 / 120);
+    expect(g.section, InfiniteSection.breath);
+    expect(g.quills, contains(q));
+    expect(p.charge, greaterThan(.5));
+    advance(g, .65);
+    expect(p.bursts, 1);
+    expect(g.quills.length, InfiniteTuning.quillCount + 1);
+    expect(idle.charge, isNull);
+    g.start(gameMode: GameMode.classic, levelNumber: 31);
+    expect(g.porcupines, isEmpty);
+    expect(g.quills, isEmpty);
+  });
+
+  test('a maze waits for a warning and its live quills to finish', () {
+    final g = run();
+    final p = BoardPorcupine(85, 260)..charge = .5;
+    g.porcupines.add(p);
+    g.mazeSectionsEnabled = true;
+    g.maxHeight = 8000;
+    g.step(1 / 120);
+    expect(g.mazeSection, isFalse);
+    expect(p.charge, greaterThan(.5));
+    advance(g, .65);
+    expect(p.bursts, 1);
+    expect(g.quills, isNotEmpty);
+    expect(g.mazeSection, isFalse);
+    g.porcupines.clear();
+    g.quills.clear();
+    g.step(1 / 120);
+    expect(g.mazeSection, isTrue);
+  });
+
+  test('upward quills stay live on screen beyond the old lifetime', () {
+    final g = run();
+    final q = PorcupineQuill(x: 85, y: 260, angle: -math.pi / 2);
+    g.quills.add(q);
+    advance(g, 4);
+    expect(g.screenY(q.y), inInclusiveRange(0, BalanceGame.height));
+    expect(g.quills, contains(q));
+    expect(q.expired, isFalse);
+    // The quill is removed after it fully leaves the visible board.
+    g.cameraOffset += 700;
+    g.left -= 700;
+    g.right -= 700;
+    g.step(1 / 120);
+    expect(g.quills, isEmpty);
+  });
+
+  test('quill cleanup respects the visible bottom of an expanded board', () {
+    final g = run()..visibleBottom = 900;
+    final q = PorcupineQuill(x: 85, y: 700, angle: 0);
+    g.quills.add(q);
+    g.step(1 / 120);
+    expect(g.quills, contains(q));
+    g.cameraOffset += 300;
+    g.left -= 300;
+    g.right -= 300;
+    g.step(1 / 120);
+    expect(g.quills, isEmpty);
   });
 
   test(

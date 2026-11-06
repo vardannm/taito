@@ -8,9 +8,23 @@ import 'package:balance_arcade/infinite_boss.dart';
 import 'package:balance_arcade/late_enemies.dart';
 import 'package:balance_arcade/porcupines.dart';
 import 'package:balance_arcade/spider_web.dart';
+import 'package:balance_arcade/spiders.dart';
 import 'infinite_boss_test.dart' show run;
 
 void main() {
+  test(
+    'spider and porcupine appearances are silent but attacks still sound',
+    () {
+      final game = run();
+      final sound = EnemySoundDirector();
+    game.spiders.add(BoardSpider(180, 160, 60));
+      final porcupine = BoardPorcupine(180, 160);
+      game.porcupines.add(porcupine);
+      expect(sound.capture(game), isEmpty);
+      game.quills.addAll(porcupine.burst());
+      expect(sound.capture(game), [EnemyCue.quills]);
+    },
+  );
   test(
     'every cue has a bounded, unclipped PCM asset with a matching duration',
     () {
@@ -133,15 +147,15 @@ void main() {
           EnemyCue.cometFire: 3,
         },
         BossKind.prismReaver => {
-          EnemyCue.colossusArrival: 1,
+          EnemyCue.prismArrival: 1,
           EnemyCue.laserCharge: 4,
           EnemyCue.laserFire: 4,
           EnemyCue.ricochet: 3,
         },
-        BossKind.venomCrown => {EnemyCue.seraphArrival: 1, EnemyCue.bullet: 17},
+        BossKind.venomCrown => {EnemyCue.venomArrival: 1, EnemyCue.bullet: 17},
         // Six rings, two pairs of rails (one cue per pair) and one lance.
         BossKind.novaPulsar => {
-          EnemyCue.wardenArrival: 1,
+          EnemyCue.novaArrival: 1,
           EnemyCue.laserCharge: 9,
           EnemyCue.laserFire: 9,
         },

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/ball_cosmetics.dart';
+import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/platforms.dart';
 import 'package:balance_arcade/profile.dart';
 import 'package:balance_arcade/progress_backup.dart';
@@ -10,6 +11,94 @@ import 'package:shared_preferences_platform_interface/in_memory_shared_preferenc
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 void main() {
+  for (final size in [
+    const Size(820, 1180),
+    const Size(1024, 1366),
+    const Size(1114, 720),
+    const Size(390, 844),
+  ]) {
+    testWidgets(
+      'daily prizes adapts presentation and keeps claims accessible $size',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final p = PlayerProfile()
+          ..tutorialSeen = true
+          ..sound = false
+          ..music = false;
+        await tester.pumpWidget(ArcadeApp(profile: p));
+        await tester.pump(const Duration(milliseconds: 700));
+        await tester.tap(find.byTooltip('Daily prizes'));
+        await tester.pumpAndSettle();
+        if (size.width >= 600) {
+          final panel = tester.getRect(
+            find.byKey(const ValueKey('daily-prizes-dialog')),
+          );
+          expect(panel.center.dx, closeTo(size.width / 2, 1));
+          expect(panel.center.dy, closeTo(size.height / 2, 1));
+          expect(panel.width, lessThanOrEqualTo(680));
+          expect(
+            tester.getSize(find.byTooltip('Close daily prizes')).width,
+            greaterThanOrEqualTo(64),
+          );
+          final claim = find.widgetWithText(FilledButton, 'CLAIM 10 COINS');
+          expect(claim.hitTestable(), findsOneWidget);
+          expect(tester.getSize(claim).height, greaterThanOrEqualTo(72));
+          await tester.tap(claim);
+          await tester.pumpAndSettle();
+          expect(p.wallet, 10);
+          expect(find.text('CLAIMED TODAY'), findsOneWidget);
+        } else {
+          expect(find.byType(BottomSheet), findsOneWidget);
+        }
+        await tester.tap(find.byTooltip('Close daily prizes'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 700));
+        expect(find.byType(DailyPrizeSheet), findsNothing);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
+  }
+
+  testWidgets(
+    'landscape tablet keeps both gear choices accessible with large text',
+    (tester) async {
+      tester.view.physicalSize = const Size(1114, 720);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = 1.8;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final p = PlayerProfile()
+        ..tutorialSeen = true
+        ..sound = false
+        ..music = false;
+      p.dailyPrizes.claimed = 4;
+      p.dailyPrizes.lastClaim = DateTime.now().toUtc().subtract(
+        const Duration(days: 1),
+      );
+      await tester.pumpWidget(ArcadeApp(profile: p));
+      await tester.pump(const Duration(milliseconds: 700));
+      await tester.tap(find.byTooltip('Daily prizes'));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('daily-claim-ball')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('daily-claim-platform')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(
+        find.byTooltip('Close daily prizes').hitTestable(),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
   for (final platform in [false, true]) {
     testWidgets(
       'day five claim choices stay separate with large text: $platform',

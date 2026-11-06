@@ -183,11 +183,11 @@ class BallWorld {
       Color(0xFFE9D28D),
     ),
     BallCosmetic.genesis => const BallWorld(
-      'Genesis Bloom',
-      'Opalescent ribbons and rose crystal gardens in deep space',
-      Color(0xFF382B57),
-      Color(0xFF665177),
-      Color(0xFFF9CDE9),
+      'Genesis Sanctuary',
+      'Pearl-lit celestial arches above layered opalescent terraces',
+      Color(0xFF191A2C),
+      Color(0xFF353047),
+      Color(0xFFEADCC5),
     ),
   };
 }

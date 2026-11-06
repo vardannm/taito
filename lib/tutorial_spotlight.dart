@@ -1,3 +1,4 @@
+import 'ui_audio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'menu_design.dart';
@@ -169,7 +170,7 @@ class _TutorialSpotlightState extends State<TutorialSpotlight>
                       right: 12,
                       child: TextButton(
                         key: const ValueKey('skip-tutorial'),
-                        onPressed: widget.onSkip,
+                        onPressed: uiAction(context, widget.onSkip),
                         style: TextButton.styleFrom(
                           foregroundColor: menuMuted,
                           backgroundColor: menuBackground.withAlpha(150),

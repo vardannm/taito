@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'game.dart';
 import 'infinite_painter.dart';
 import 'late_enemies.dart';
+import 'scorpion_painter.dart';
 
 // Visitors wear warning colors, like poisonous animals: dark bodies with
 // acid, venom and neon accents, so none of them reads as a friendly pickup.
@@ -237,7 +238,18 @@ void paintLateEnemy(Canvas canvas, BalanceGame game, bool reducedMotion) {
     LateEnemyKind.seedSpitter => const Color(0xFF4FCB16),
   };
   final contrast = ink == Colors.white ? Colors.black : Colors.white;
-  canvas.drawCircle(Offset.zero, 23, Paint()..color = contrast.withAlpha(135));
+  if (enemy.kind == LateEnemyKind.scorpion) {
+    canvas.drawOval(
+      const Rect.fromLTWH(-19, -5, 38, 28),
+      Paint()..color = Colors.black.withAlpha(65),
+    );
+  } else {
+    canvas.drawCircle(
+      Offset.zero,
+      23,
+      Paint()..color = contrast.withAlpha(135),
+    );
+  }
   if (enemy.warning) {
     canvas.drawArc(
       const Rect.fromLTWH(-27, -27, 54, 54),
@@ -415,58 +427,16 @@ void paintLateEnemy(Canvas canvas, BalanceGame game, bool reducedMotion) {
       }
       oval(const Rect.fromLTWH(-4, -13, 8, 32), const Color(0xFF9DFF2E));
     case LateEnemyKind.scorpion:
-      final feet = Path();
-      for (final side in [-1.0, 1.0]) {
-        for (var i = 0; i < 3; i++) {
-          final stride = math.sin(time * 8 + i * 2 + side * 1.6) * motion;
-          feet.moveTo(side * 6, -4 + i * 5.0);
-          feet.lineTo(side * 15, -8 + i * 8.0 + stride * 1.5);
-          feet.lineTo(side * (19 + stride), -5 + i * 8.0 + stride * 2);
-        }
-        canvas.save();
-        canvas.rotate(side * (.06 * sway + .12 * charge - .16 * recoil));
-        limb(
-          [Offset(side * 6, 5), Offset(side * 19, 13), Offset(side * 17, 24)],
-          3,
-          shell,
-        );
-        final claw = Path()
-          ..moveTo(side * 17, 16)
-          ..lineTo(side * 25, 24)
-          ..lineTo(side * 18, 22)
-          ..lineTo(side * 14, 28)
-          ..lineTo(side * 12, 19)
-          ..close();
-        outlined(claw, shell);
-        canvas.restore();
-      }
-      legs(feet, 1.5, shell);
-      canvas.save();
-      canvas.translate(0, -4);
-      canvas.rotate(.14 * sway + .2 * charge - .28 * recoil);
-      canvas.translate(0, 4);
-      final tail = Path()
-        ..moveTo(0, -4)
-        ..cubicTo(-20, -19, 10, -36, 14, -18);
-      canvas.drawPath(tail, _stroke(ink, 6));
-      canvas.drawPath(tail, _stroke(shell, 4));
-      outlined(
-        Path()
-          ..moveTo(10, -22)
-          ..lineTo(20, -15)
-          ..lineTo(10, -12)
-          ..close(),
-        accent,
+      paintScorpionSkin(
+        canvas,
+        lightInk: ink == Colors.white,
+        accent: accent,
+        time: time,
+        motion: motion,
+        sway: sway,
+        charge: charge,
+        recoil: recoil,
       );
-      canvas.restore();
-      oval(const Rect.fromLTWH(-8, -10, 16, 28), shell);
-      for (var i = 0; i < 3; i++) {
-        canvas.drawLine(
-          Offset(-5, -4 + i * 5.0),
-          Offset(5, -4 + i * 5.0),
-          _stroke(dark, 1),
-        );
-      }
     case LateEnemyKind.seedSpitter:
       for (final side in [-1.0, 1.0]) {
         canvas.save();
@@ -504,7 +474,8 @@ void paintLateEnemy(Canvas canvas, BalanceGame game, bool reducedMotion) {
         dark,
       );
   }
-  if (enemy.kind != LateEnemyKind.seedSpitter) {
+  if (enemy.kind != LateEnemyKind.seedSpitter &&
+      enemy.kind != LateEnemyKind.scorpion) {
     for (final side in [-1.0, 1.0]) {
       canvas.drawCircle(
         Offset(side * 3.5, 11),

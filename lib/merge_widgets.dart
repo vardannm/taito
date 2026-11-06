@@ -1,3 +1,4 @@
+import 'ui_audio.dart';
 import 'dart:math' as math;
 import 'arena_canvas.dart';
 import 'package:flutter/material.dart';
@@ -228,7 +229,7 @@ class MergeResult extends StatelessWidget {
                   backgroundColor: menuGold,
                   foregroundColor: menuBackground,
                 ),
-                onPressed: onRetry,
+                onPressed: uiAction(context, onRetry),
                 child: const Text('PLAY AGAIN'),
               ),
             ),
@@ -242,7 +243,7 @@ class MergeResult extends StatelessWidget {
               alignment: WrapAlignment.center,
               children: [
                 TextButton(
-                  onPressed: onHome,
+                  onPressed: uiAction(context, onHome),
                   child: const Text(
                     'BACK TO CLUB',
                     style: TextStyle(color: menuMuted),

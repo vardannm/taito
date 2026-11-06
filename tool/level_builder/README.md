@@ -31,7 +31,7 @@ tool is not compiled into the player app. No Firebase account is used here.
   Add/reorder waves to alternate lasers and moving holes; set warning/active times.
   Select circular, oval, horizontal or vertical movement and set its radii,
   period (seconds per cycle), and phase (radians). Positions are motion centers.
-  Laser orientation selects vertical beams (y 33–537) or horizontal beams
+  Laser orientation selects vertical beams (y 33–470 by default, clearing the launch platform) or horizontal beams
   (x 24–336). Enable **Preview hazard movement** to see the paths animate.
   Set a laser wave's **Beam** to *Dashed* for lit dashes with gaps the ball
   can slip through (gaps over 14); **Dash speed** slides them along the beam.

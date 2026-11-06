@@ -35,7 +35,7 @@ void paintWideBoardScenery(
     world,
     worldOffset,
     worldScale,
-    game.cosmetic,
+    game.renderCosmetic,
     colors[0],
     colors[1],
     colors[2],
@@ -58,7 +58,7 @@ void paintWideBoardScenery(
     paintBallWorld(
       scene,
       world,
-      game.cosmetic,
+      game.renderCosmetic,
       background: false,
       reducedMotion: true,
     );

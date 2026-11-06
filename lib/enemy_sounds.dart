@@ -11,6 +11,9 @@ enum EnemyCue {
   wardenArrival,
   colossusArrival,
   seraphArrival,
+  prismArrival,
+  venomArrival,
+  novaArrival,
   bullet,
   ricochet,
   bounce,
@@ -37,6 +40,9 @@ extension EnemyCueAudio on EnemyCue {
     EnemyCue.wardenArrival => .85,
     EnemyCue.colossusArrival => .95,
     EnemyCue.seraphArrival => 1.05,
+    EnemyCue.prismArrival ||
+    EnemyCue.venomArrival ||
+    EnemyCue.novaArrival => .9,
     EnemyCue.bullet => .14,
     EnemyCue.ricochet => .22,
     EnemyCue.bounce => .16,
@@ -56,8 +62,14 @@ extension EnemyCueAudio on EnemyCue {
   double get volume => switch (this) {
     EnemyCue.wardenArrival ||
     EnemyCue.colossusArrival ||
-    EnemyCue.seraphArrival => .5,
-    EnemyCue.laserFire || EnemyCue.mineFire => .4,
+    EnemyCue.seraphArrival ||
+    EnemyCue.prismArrival ||
+    EnemyCue.venomArrival ||
+    EnemyCue.novaArrival => .5,
+    EnemyCue.laserCharge => .13,
+    EnemyCue.laserFire => .18,
+    EnemyCue.web || EnemyCue.quills => .16,
+    EnemyCue.mineFire => .4,
     EnemyCue.insectArrival || EnemyCue.wingArrival || EnemyCue.snakeHiss => .27,
     _ => .3,
   };
@@ -137,9 +149,9 @@ class EnemySoundDirector {
         BossKind.skyWarden => EnemyCue.wardenArrival,
         BossKind.stormColossus => EnemyCue.colossusArrival,
         BossKind.eclipseSeraph => EnemyCue.seraphArrival,
-        BossKind.prismReaver => EnemyCue.colossusArrival,
-        BossKind.venomCrown => EnemyCue.seraphArrival,
-        BossKind.novaPulsar => EnemyCue.wardenArrival,
+        BossKind.prismReaver => EnemyCue.prismArrival,
+        BossKind.venomCrown => EnemyCue.venomArrival,
+        BossKind.novaPulsar => EnemyCue.novaArrival,
       });
       shots(boss.shots, boss.kind);
     }
@@ -160,20 +172,8 @@ class EnemySoundDirector {
         onBoard: visible(game.screenY(snake.y)),
       );
     }
-    for (final spider in game.spiders) {
-      arrival(
-        spider,
-        EnemyCue.insectArrival,
-        onBoard: visible(game.screenY(spider.y)),
-      );
-    }
-    for (final porcupine in game.porcupines) {
-      arrival(
-        porcupine,
-        EnemyCue.insectArrival,
-        onBoard: visible(game.screenY(porcupine.y)),
-      );
-    }
+    // Spider and porcupine appearances are deliberately silent. Their web
+    // releases and quill bursts still announce the actual dangerous action.
     for (final web in game.webShots) {
       present.add(web);
       final previous = _ages[web] ?? 0;

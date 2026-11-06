@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
+import 'infinite_music.dart';
 
 /// One audio context for every game sound. It mixes with other apps instead
 /// of taking focus (so effects never stop the music), and on iOS it uses the
@@ -23,6 +24,10 @@ abstract interface class MusicOutput {
   Future<void> pause();
   Future<void> stop();
   void dispose();
+}
+
+abstract interface class AdaptiveMusicOutput implements MusicOutput {
+  Future<void> setMix(MusicMix mix);
 }
 
 class AudioMusicOutput implements MusicOutput {
