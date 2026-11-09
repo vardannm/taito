@@ -147,7 +147,7 @@ class HoleMotion {
 
 enum GamePhase { playing, sinking, returning, over }
 
-enum GameEvent { target, miss, complete, coin, merge, star }
+enum GameEvent { target, miss, complete, coin, merge, star, life }
 
 // Preserve mode identifiers for saved data and analytics. The displayed name
 // of merge2048 is Number Merge.
@@ -297,13 +297,17 @@ class BalanceGame {
   double _classicSceneTime = 0;
   final _spawnOverlappingHazards = <SpecialHazard>{};
   final _spawnOverlappingSpiders = <BoardSpider>{};
-  int get earnedStarMask =>
-      (mode == GameMode.classic && finished && won && levelStarCollected
-          ? 8
-          : 0) |
-      (!finished || !won || practice || infinite || merging
-          ? 0
-          : 1 | (misses == 0 ? 2 : 0) | (elapsed <= targetTime ? 4 : 0));
+  int get earnedStarMask => finished ? winStarMask : 0;
+
+  /// The stars a winning run earns, readable from the moment the last ball
+  /// starts sinking (the active-time clock is already stopped), so the win
+  /// sound can match the result screen that appears afterwards.
+  int get winStarMask => !won || practice || infinite || merging
+      ? 0
+      : (mode == GameMode.classic && levelStarCollected ? 8 : 0) |
+            1 |
+            (misses == 0 ? 2 : 0) |
+            (elapsed <= targetTime ? 4 : 0);
   InfiniteSection get section => sectionAt(maxHeight / 10);
 
   final spiders = <BoardSpider>[];

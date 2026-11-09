@@ -41,6 +41,7 @@ import 'tutorial_spotlight.dart';
 import 'two_finger_feedback.dart';
 import 'rewards.dart';
 import 'mastery_widgets.dart';
+import 'level_fireworks.dart';
 import 'analog_controls.dart';
 import 'tilt_lift_controls.dart';
 import 'merge_widgets.dart';
@@ -191,6 +192,7 @@ class _GameScreenState extends State<GameScreen>
   double accumulator = 0;
   Timer? resumeTimer;
   int resumeSeconds = 0;
+  UiAudio? _resumeAudio;
   bool recorded = false, newBest = false, briefing = false;
   TutorialRun? tutorialRun;
   bool tutorialSheetOpen = false;
@@ -209,7 +211,7 @@ class _GameScreenState extends State<GameScreen>
   /// ordinary menu, where only Play opens the board.
   bool get tutorialBoard => tutorialActive && !entrance.isDismissed;
 
-  /// The Levels lessons point at Choose Level, which only Classic shows.
+  /// The Levels lessons point at All levels, which only Classic shows.
   bool get tutorialOnLevels =>
       tutorialActive &&
       const [
@@ -430,7 +432,14 @@ class _GameScreenState extends State<GameScreen>
         "target": game.completed,
         "misses": game.misses,
       });
-      unawaited(feedback.play(game.event!, profile));
+      unawaited(
+        feedback.play(
+          game.event!,
+          profile,
+          mode: game.mode,
+          stars: game.event == GameEvent.complete ? levelResultStars : null,
+        ),
+      );
 
       game.event = null;
     }
@@ -480,8 +489,7 @@ class _GameScreenState extends State<GameScreen>
       if (tutorialActive &&
           tutorialStep == TutorialStep.classicPlay &&
           game.mode == GameMode.classic &&
-          game.level == 1 &&
-          game.won) {
+          game.level == 1) {
         advanceTutorial(TutorialStep.dailyChallenge);
       }
       if (!game.practice) {
@@ -989,6 +997,8 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
+  bool get _usesResumeCountdown => game.infinite || game.merging;
+
   void pause() => setState(() {
     briefing = false;
     clearControls();
@@ -996,8 +1006,10 @@ class _GameScreenState extends State<GameScreen>
       cancelResumeCountdown();
       return;
     }
-    if (game.paused && (game.infinite || game.merging)) {
+    if (game.paused && _usesResumeCountdown) {
       resumeSeconds = 3;
+      _resumeAudio = UiAudio.of(context);
+      unawaited(_resumeAudio?.play(UiCue.countdown));
       resumeTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
         setState(() {
           resumeSeconds--;
@@ -1007,6 +1019,8 @@ class _GameScreenState extends State<GameScreen>
             game.setPaused(false);
             syncMusic();
             runTicker();
+          } else {
+            unawaited(_resumeAudio?.play(UiCue.countdown));
           }
         });
       });
@@ -1025,11 +1039,26 @@ class _GameScreenState extends State<GameScreen>
     resumeTimer?.cancel();
     resumeTimer = null;
     resumeSeconds = 0;
+    _resumeAudio?.silence();
+    _resumeAudio = null;
   }
 
   void prepareInfinite({bool retry = false}) {
     prepareWorld(0, retry: retry);
   }
+
+  /// Stars a classic level win shows, counting a bonus star collected on an
+  /// earlier run just as the result screen does. Null outside classic levels.
+  int? get levelResultStars => game.mode == GameMode.classic && game.won
+      ? LevelRecord.starCount(
+          game.winStarMask |
+              (profile.levelRecord(game.level, game.controlMode).starMask & 8),
+        )
+      : null;
+
+  /// Three or four stars on a classic level earn fireworks behind the result.
+  bool get celebrateLevel =>
+      game.finished && !game.paused && (levelResultStars ?? 0) >= 3;
 
   int get classicContinueLevel {
     var level = profile.classicLevel.clamp(1, ClassicLevels.count);
@@ -1288,7 +1317,7 @@ class _GameScreenState extends State<GameScreen>
               ? (
                   'Classic levels',
                   Icons.route_rounded,
-                  'Complete Classic levels and earn stars. Tap Choose Level.',
+                  'Complete Classic levels and earn stars. Tap All levels.',
                 )
               : step == TutorialStep.dailyChallenge
               ? (
@@ -3311,233 +3340,287 @@ class _GameScreenState extends State<GameScreen>
                   ? BorderRadius.zero
                   : BorderRadius.circular(28),
             ),
-            child: Center(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding:
-                      const EdgeInsets.all(25) +
-                      (game.paused
-                          ? MediaQuery.paddingOf(context)
-                          : EdgeInsets.zero),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        game.paused
-                            ? Icons.pause_circle_outline
-                            : game.won
-                            ? Icons.workspace_premium_outlined
-                            : Icons.refresh_rounded,
-                        size: 48,
-                        color: game.paused ? Colors.white : menuGold,
-                      ),
-                      const SizedBox(height: 14),
-                      Text(
-                        game.paused
-                            ? 'Paused'
-                            : game.won
-                            ? (game.merging
-                                  ? 'A brilliant chain.'
-                                  : 'Pure precision.')
-                            : 'So close.\nGo again.',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 30,
-                          color: cream,
-                          fontWeight: FontWeight.w800,
-                          height: 1.1,
-                          letterSpacing: -1,
-                        ),
-                      ),
-                      if (game.finished) ...[
-                        const SizedBox(height: 12),
-                        Text(
-                          game.mode == GameMode.classic
-                              ? game.won
-                                    ? 'LEVEL COMPLETE'
-                                    : 'TRY AGAIN'
-                              : newBest
-                              ? 'NEW PERSONAL BEST'
-                              : game.practice
-                              ? 'PRACTICE COMPLETE'
-                              : game.infinite
-                              ? 'INFINITE RUN COMPLETE'
-                              : 'RUN COMPLETE',
-                          style: label(brass),
-                        ),
-                        const SizedBox(height: 8),
-                        if (game.mode != GameMode.classic)
-                          Text(
-                            formatCompactScore(game.score),
-                            style: TextStyle(
-                              fontSize: scoreFontSize(
-                                42,
-                                formatCompactScore(game.score),
-                              ),
-                              fontFamily: 'monospace',
-                              color: cream,
-                            ),
-                          ),
-                        Text(
-                          !game.won || game.merging
-                              ? (game.infinite
-                                    ? '${game.metres}m · Best combo x${game.survival.bestCombo}\n${game.message}  ${game.coinsCollected * (profile.infiniteCoinsDoubled(game) ? 2 : 1)} coins saved.'
-                                    : game.message)
-                              : '${game.completed}/10 holes  •  ${game.bestStreak} best streak',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: menuMuted,
-                          ),
-                        ),
-                        if (game.mode == GameMode.classic && game.won)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 16),
-                            child: Text(
-                              '+$classicLevelCoinPrize coins · Level complete',
-                              key: const ValueKey('level-coin-prize'),
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: menuGold,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        if (offeringCoinDouble) coinDoubleOffer(),
-                        if (game.infinite && profile.infiniteCoinsDoubled(game))
-                          Padding(
-                            padding: const EdgeInsets.only(top: 16),
-                            child: Text(
-                              'Coins doubled! +${game.coinsCollected} bonus coins saved.',
-                              key: const ValueKey('coins-doubled'),
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: menuGold,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        if (profile.achievementsReady > 0)
-                          TextButton.icon(
-                            onPressed: uiAction(
-                              context,
-                              adBusy ? null : showAchievements,
-                            ),
-                            style: TextButton.styleFrom(foregroundColor: brass),
-                            icon: const Icon(Icons.emoji_events_outlined),
-                            label: Text(
-                              '${profile.achievementsReady} achievement rewards ready',
-                            ),
-                          ),
-                        if (!game.infinite && !game.practice && !game.merging)
-                          MasteryResult(
-                            game: game,
-                            record: game.daily
-                                ? profile.dailyRecord(
-                                    game.dailyKey,
-                                    game.controlMode,
-                                  )
-                                : profile.levelRecord(
-                                    game.level,
-                                    game.controlMode,
-                                  ),
-                            unlocks: const [],
-                          ),
-                      ],
-                      if (game.paused) ...[
-                        const SizedBox(height: 20),
-                        pauseAudioControls(),
-                      ],
-                      const SizedBox(height: 22),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 60,
-                        child: FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: menuGold,
-                            foregroundColor: menuBackground,
-                          ),
-                          onPressed: uiAction(
-                            context,
-                            adBusy
-                                ? null
-                                : game.paused
-                                ? pause
-                                : () {
-                                    if (game.won &&
-                                        game.mode == GameMode.classic &&
-                                        game.level < ClassicLevels.count) {
-                                      if (!profile.selectClassicLevel(
-                                        game.level + 1,
-                                      )) {
-                                        unawaited(selectLevel());
-                                        return;
-                                      }
-                                      unawaited(profile.save());
-                                    }
-                                    start(
-                                      game.mode,
-                                      challengeDate: game.dailyDate,
-                                    );
-                                  },
-                          ),
-                          child: Text(
+            child: Stack(
+              children: [
+                if (celebrateLevel)
+                  const Positioned.fill(child: LevelFireworks()),
+                Center(
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding:
+                          const EdgeInsets.all(25) +
+                          (game.paused
+                              ? MediaQuery.paddingOf(context)
+                              : EdgeInsets.zero),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
                             game.paused
-                                ? 'RESUME RUN'
-                                : game.won &&
-                                      game.mode == GameMode.classic &&
-                                      game.level < ClassicLevels.count
-                                ? profile.isClassicLevelUnlocked(game.level + 1)
-                                      ? 'NEXT LEVEL'
-                                      : 'EARN MORE STARS'
-                                : 'ONE MORE RUN',
+                                ? Icons.pause_circle_outline
+                                : game.won
+                                ? Icons.workspace_premium_outlined
+                                : Icons.refresh_rounded,
+                            size: 48,
+                            color: game.paused ? Colors.white : menuGold,
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            game.paused
+                                ? 'Paused'
+                                : game.won
+                                ? (game.merging
+                                      ? 'A brilliant chain.'
+                                      : 'Pure precision.')
+                                : 'So close.\nGo again.',
+                            textAlign: TextAlign.center,
                             style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
+                              fontSize: 30,
+                              color: cream,
+                              fontWeight: FontWeight.w800,
+                              height: 1.1,
+                              letterSpacing: -1,
                             ),
                           ),
-                        ),
-                      ),
-                      if (game.won &&
-                          game.mode == GameMode.classic &&
-                          game.level < ClassicLevels.count &&
-                          !profile.isClassicLevelUnlocked(game.level + 1))
-                        Padding(
-                          padding: const EdgeInsets.only(top: 10),
-                          child: Text(
-                            'Level ${game.level + 1} needs ${ClassicLevels.requiredStars(game.level + 1)} stars · You have ${profile.totalStars}',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: cream, fontSize: 12),
+                          if (game.finished) ...[
+                            const SizedBox(height: 12),
+                            Text(
+                              game.mode == GameMode.classic
+                                  ? game.won
+                                        ? 'LEVEL COMPLETE'
+                                        : 'TRY AGAIN'
+                                  : newBest
+                                  ? 'NEW PERSONAL BEST'
+                                  : game.practice
+                                  ? 'PRACTICE COMPLETE'
+                                  : game.infinite
+                                  ? 'INFINITE RUN COMPLETE'
+                                  : 'RUN COMPLETE',
+                              style: label(brass),
+                            ),
+                            if (tutorialActive &&
+                                tutorialStep == TutorialStep.dailyChallenge &&
+                                game.mode == GameMode.classic &&
+                                game.level == 1)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 12),
+                                child: TutorialCard(
+                                  title: 'Daily Challenge',
+                                  icon: Icons.today_rounded,
+                                  lesson: tutorialStep.lesson,
+                                  lessons: TutorialStep.lessons,
+                                  message:
+                                      'Try a new board each day. Go back to the menu and tap Modes to finish the tutorial.',
+                                ),
+                              ),
+                            const SizedBox(height: 8),
+                            if (game.mode != GameMode.classic)
+                              Text(
+                                formatCompactScore(game.score),
+                                style: TextStyle(
+                                  fontSize: scoreFontSize(
+                                    42,
+                                    formatCompactScore(game.score),
+                                  ),
+                                  fontFamily: 'monospace',
+                                  color: cream,
+                                ),
+                              ),
+                            Text(
+                              !game.won || game.merging
+                                  ? (game.infinite
+                                        ? '${game.metres}m · Best combo x${game.survival.bestCombo}\n${game.message}  ${game.coinsCollected * (profile.infiniteCoinsDoubled(game) ? 2 : 1)} coins saved.'
+                                        : game.message)
+                                  : '${game.completed}/10 holes  •  ${game.bestStreak} best streak',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: menuMuted,
+                              ),
+                            ),
+                            if (game.mode == GameMode.classic && game.won)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 16),
+                                child: Text(
+                                  '+$classicLevelCoinPrize coins · Level complete',
+                                  key: const ValueKey('level-coin-prize'),
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: menuGold,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            if (offeringCoinDouble) coinDoubleOffer(),
+                            if (game.infinite &&
+                                profile.infiniteCoinsDoubled(game))
+                              Padding(
+                                padding: const EdgeInsets.only(top: 16),
+                                child: Text(
+                                  'Coins doubled! +${game.coinsCollected} bonus coins saved.',
+                                  key: const ValueKey('coins-doubled'),
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: menuGold,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            if (profile.achievementsReady > 0)
+                              TextButton.icon(
+                                onPressed: uiAction(
+                                  context,
+                                  adBusy ? null : showAchievements,
+                                ),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: brass,
+                                ),
+                                icon: const Icon(Icons.emoji_events_outlined),
+                                label: Text(
+                                  '${profile.achievementsReady} achievement rewards ready',
+                                ),
+                              ),
+                            if (!game.infinite &&
+                                !game.practice &&
+                                !game.merging)
+                              MasteryResult(
+                                game: game,
+                                onStarRevealed: game.mode == GameMode.classic
+                                    ? (_) => unawaited(
+                                        feedback.playStarReveal(profile),
+                                      )
+                                    : null,
+                                record: game.daily
+                                    ? profile.dailyRecord(
+                                        game.dailyKey,
+                                        game.controlMode,
+                                      )
+                                    : profile.levelRecord(
+                                        game.level,
+                                        game.controlMode,
+                                      ),
+                                unlocks: const [],
+                              ),
+                          ],
+                          if (game.paused) ...[
+                            const SizedBox(height: 20),
+                            pauseAudioControls(),
+                          ],
+                          const SizedBox(height: 22),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 60,
+                            child: FilledButton(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: menuGold,
+                                foregroundColor: menuBackground,
+                              ),
+                              onPressed: uiAction(
+                                context,
+                                adBusy
+                                    ? null
+                                    : game.paused
+                                    ? pause
+                                    : () {
+                                        if (game.won &&
+                                            game.mode == GameMode.classic &&
+                                            game.level < ClassicLevels.count) {
+                                          if (!profile.selectClassicLevel(
+                                            game.level + 1,
+                                          )) {
+                                            unawaited(selectLevel());
+                                            return;
+                                          }
+                                          unawaited(profile.save());
+                                        }
+                                        start(
+                                          game.mode,
+                                          challengeDate: game.dailyDate,
+                                        );
+                                      },
+                                cue: game.paused && _usesResumeCountdown
+                                    ? null
+                                    : UiCue.tap,
+                              ),
+                              child: Text(
+                                game.paused
+                                    ? 'RESUME RUN'
+                                    : game.won &&
+                                          game.mode == GameMode.classic &&
+                                          game.level < ClassicLevels.count
+                                    ? profile.isClassicLevelUnlocked(
+                                            game.level + 1,
+                                          )
+                                          ? 'NEXT LEVEL'
+                                          : 'EARN MORE STARS'
+                                    : 'ONE MORE RUN',
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                      if (game.won && !game.practice)
-                        pauseAction(
-                          'RETRY THIS BOARD',
-                          Icons.refresh_rounded,
-                          () {
-                            // The win already moved progress to the next level.
-                            if (game.mode == GameMode.classic) {
-                              profile.selectClassicLevel(game.level);
-                            }
-                            start(game.mode, challengeDate: game.dailyDate);
-                          },
-                        ),
-                      // A paused run can be dropped for a fresh one in any mode.
-                      if (game.paused)
-                        pauseAction(
-                          'RESTART RUN',
-                          Icons.restart_alt_rounded,
-                          () => start(game.mode, challengeDate: game.dailyDate),
-                        ),
-                      if (tutorialActive)
-                        TextButton(
-                          onPressed: uiAction(context, skipTutorial),
-                          child: const Text('Skip Tutorial'),
-                        ),
-                      pauseAction('BACK TO MENU', Icons.home_outlined, home),
-                    ],
+                          if (game.won &&
+                              game.mode == GameMode.classic &&
+                              game.level < ClassicLevels.count &&
+                              !profile.isClassicLevelUnlocked(game.level + 1))
+                            Padding(
+                              padding: const EdgeInsets.only(top: 10),
+                              child: Text(
+                                'Level ${game.level + 1} needs ${ClassicLevels.requiredStars(game.level + 1)} stars · You have ${profile.totalStars}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: cream,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          if (game.finished &&
+                              game.won &&
+                              game.mode == GameMode.classic)
+                            pauseAction(
+                              'LEVELS',
+                              Icons.route_rounded,
+                              selectLevel,
+                            ),
+                          if (game.won && !game.practice)
+                            pauseAction(
+                              'RETRY THIS BOARD',
+                              Icons.refresh_rounded,
+                              () {
+                                // The win already moved progress to the next level.
+                                if (game.mode == GameMode.classic) {
+                                  profile.selectClassicLevel(game.level);
+                                }
+                                start(game.mode, challengeDate: game.dailyDate);
+                              },
+                            ),
+                          // A paused run can be dropped for a fresh one in any mode.
+                          if (game.paused)
+                            pauseAction(
+                              'RESTART RUN',
+                              Icons.restart_alt_rounded,
+                              () => start(
+                                game.mode,
+                                challengeDate: game.dailyDate,
+                              ),
+                            ),
+                          if (tutorialActive)
+                            TextButton(
+                              onPressed: uiAction(context, skipTutorial),
+                              child: const Text('Skip Tutorial'),
+                            ),
+                          pauseAction(
+                            'BACK TO MENU',
+                            Icons.home_outlined,
+                            home,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
           ),
         );
@@ -3625,6 +3708,38 @@ class _GameScreenState extends State<GameScreen>
           ),
         ),
       ],
+    );
+  }
+
+  /// The Options counterpart of [pauseVolumeRow], sharing the same levels.
+  Widget settingsVolume(
+    StateSetter update, {
+    required bool music,
+    required String title,
+    required String subtitle,
+  }) {
+    void change(double value, {bool save = false}) {
+      update(() => profile.setAudioLevel(forMusic: music, value: value));
+      syncMusic();
+      if (save) unawaited(profile.save());
+    }
+
+    return MenuVolumeSlider(
+      name: music ? 'music' : 'sound',
+      title: title,
+      subtitle: subtitle,
+      icon: music ? Icons.music_note_rounded : Icons.graphic_eq_rounded,
+      mutedIcon: music ? Icons.music_off_rounded : Icons.volume_off_rounded,
+      level: music
+          ? profile.effectiveMusicVolume
+          : profile.effectiveSoundVolume,
+      onChanged: change,
+      onChangeEnd: (value) => change(value, save: true),
+      onToggleMute: () {
+        update(() => profile.toggleAudioMute(forMusic: music));
+        syncMusic();
+        unawaited(profile.save());
+      },
     );
   }
 
@@ -3787,28 +3902,18 @@ class _GameScreenState extends State<GameScreen>
                 const SizedBox(height: 26),
                 const MenuSection('Feel & sound'),
                 const SizedBox(height: 12),
-                MenuToggle(
+                settingsVolume(
+                  update,
+                  music: false,
                   title: 'Sound Effects',
-                  icon: Icons.graphic_eq_rounded,
                   subtitle: 'Shots, lasers, rewards, and game cues',
-                  value: profile.sound,
-                  onChanged: (v) {
-                    update(() => profile.sound = v);
-                    syncMusic();
-                    unawaited(profile.save());
-                  },
                 ),
                 if (InfiniteMusic.bundled)
-                  MenuToggle(
+                  settingsVolume(
+                    update,
+                    music: true,
                     title: 'Music',
-                    icon: Icons.music_note_rounded,
                     subtitle: 'Level and adaptive Infinite soundtracks',
-                    value: profile.music,
-                    onChanged: (v) {
-                      update(() => profile.music = v);
-                      syncMusic();
-                      unawaited(profile.save());
-                    },
                   ),
                 MenuToggle(
                   title: 'Haptic feedback',

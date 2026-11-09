@@ -226,12 +226,14 @@ void main() {
       final g = run()..lives = 1;
       pickup(g, InfiniteItemKind.heart);
       expect(g.lives, 2);
+      expect(g.event, GameEvent.life);
       pickup(g, InfiniteItemKind.heart);
       expect(g.lives, 3);
       final score = g.score;
       pickup(g, InfiniteItemKind.heart);
       expect(g.lives, 3);
       expect(g.score, score + 50);
+      expect(g.event, GameEvent.coin);
     },
   );
   test(

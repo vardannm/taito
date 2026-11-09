@@ -523,6 +523,115 @@ class MenuToggle extends StatelessWidget {
   );
 }
 
+/// A 0-100 volume row matching the pause menu: the icon mutes and restores,
+/// the slider sets the level, and [onChangeEnd] fires once the drag ends so
+/// the caller can save.
+class MenuVolumeSlider extends StatelessWidget {
+  const MenuVolumeSlider({
+    super.key,
+    required this.name,
+    required this.title,
+    required this.icon,
+    required this.mutedIcon,
+    required this.level,
+    required this.onChanged,
+    required this.onChangeEnd,
+    required this.onToggleMute,
+    this.subtitle,
+  });
+  final String name, title;
+  final String? subtitle;
+  final IconData icon, mutedIcon;
+
+  /// Current level from 0 to 1.
+  final double level;
+
+  /// Levels from 0 to 1.
+  final ValueChanged<double> onChanged, onChangeEnd;
+  final VoidCallback onToggleMute;
+  @override
+  Widget build(BuildContext context) {
+    final percent = (level * 100).round().clamp(0, 100);
+    final on = percent > 0;
+    final showSubtitle =
+        subtitle != null &&
+        !(MediaQuery.sizeOf(context).height < 650 &&
+            MediaQuery.textScalerOf(context).scale(11) > 16.5);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: MenuPanel(
+        padding: const EdgeInsets.fromLTRB(4, 6, 14, 2),
+        child: Material(
+          color: Colors.transparent,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  IconButton(
+                    key: ValueKey('settings-$name-mute'),
+                    tooltip: '${on ? 'Mute' : 'Unmute'} $name',
+                    color: on ? menuGold : menuMuted,
+                    onPressed: uiAction(context, onToggleMute),
+                    icon: Icon(on ? icon : mutedIcon),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (showSubtitle)
+                          Text(
+                            subtitle!,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: menuMuted,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '$percent',
+                    key: ValueKey('settings-$name-value'),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: on ? menuGold : menuMuted,
+                    ),
+                  ),
+                ],
+              ),
+              Slider(
+                key: ValueKey('settings-$name-slider'),
+                value: percent.toDouble(),
+                min: 0,
+                max: 100,
+                divisions: 100,
+                activeColor: menuGold,
+                inactiveColor: const Color(0x33FFFFFF),
+                label: '$percent%',
+                semanticFormatterCallback: (value) =>
+                    '${value.round()} percent $name volume',
+                onChanged: (value) => onChanged(value / 100),
+                onChangeEnd: (value) => onChangeEnd(value / 100),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class MenuTabs extends StatelessWidget {
   const MenuTabs({
     super.key,

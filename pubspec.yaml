@@ -38,19 +38,26 @@ flutter:
     - assets/audio/theme_classic_1_40.wav
     - assets/audio/theme_classic_41_80.wav
     - assets/audio/complete.wav
+    - assets/audio/level_win.wav
+    - assets/audio/level_win_big.wav
+    - assets/audio/star_reveal.wav
     - assets/audio/coin.wav
     - assets/audio/merge.wav
     - assets/audio/star.wav
+    - assets/audio/life.wav
     - assets/audio/ui_tap.wav
     - assets/audio/ui_back.wav
     - assets/audio/ui_toggle.wav
     - assets/audio/ui_select.wav
+    - assets/audio/ui_countdown.wav
+    - assets/audio/ui_claim.wav
     - assets/audio/enemy_prismArrival.wav
     - assets/audio/enemy_venomArrival.wav
     - assets/audio/enemy_novaArrival.wav
     - assets/audio/enemy_bombThrow.wav
     - assets/audio/enemy_bounce.wav
     - assets/audio/enemy_bullet.wav
+    - assets/audio/enemy_seedSpit.wav
     - assets/audio/enemy_colossusArrival.wav
     - assets/audio/enemy_cometCharge.wav
     - assets/audio/enemy_cometFire.wav
@@ -70,5 +77,7 @@ flutter:
     - assets/audio/enemy_web.wav
     - assets/audio/enemy_wingArrival.wav
     - assets/audio/miss.wav
+    - assets/audio/infinite_heart_loss.wav
     - assets/audio/target.wav
+    - assets/audio/level_target.wav
 

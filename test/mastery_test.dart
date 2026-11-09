@@ -50,6 +50,15 @@ void main() {
     () => SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty(),
   );
+  test('the winning sink already knows the stars the result will show', () {
+    final g = BalanceGame()..start();
+    finish(g, misses: 1);
+    g.phase = GamePhase.sinking;
+    expect(g.earnedStarMask, 0);
+    expect(g.winStarMask, 5);
+    g.phase = GamePhase.over;
+    expect(g.earnedStarMask, g.winStarMask);
+  });
   test(
     'stars require completion, track independent goals, and merge across runs',
     () {

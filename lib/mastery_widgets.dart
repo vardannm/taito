@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'ui_audio.dart';
 import 'menu_design.dart';
 import 'package:flutter/material.dart';
@@ -42,26 +43,141 @@ class StarRow extends StatelessWidget {
   }
 }
 
+/// The earned stars pop in one at a time, each calling [onReveal] with its
+/// index as it lands so the caller can play a sound. Reduced motion shows them
+/// all at once, silently.
+class StarReveal extends StatefulWidget {
+  const StarReveal(
+    this.mask, {
+    super.key,
+    this.size = 34,
+    this.count = 3,
+    this.onReveal,
+  });
+  final int mask, count;
+  final double size;
+  final ValueChanged<int>? onReveal;
+
+  /// Pause before the first star, gap between stars, and one star's pop.
+  static const lead = .35, gap = .38, pop = .45;
+
+  @override
+  State<StarReveal> createState() => _StarRevealState();
+}
+
+class _StarRevealState extends State<StarReveal>
+    with SingleTickerProviderStateMixin {
+  late final int earned = LevelRecord.starCount(
+    widget.mask & ((1 << widget.count) - 1),
+  );
+  late final double total = earned == 0
+      ? 0
+      : StarReveal.lead + StarReveal.gap * (earned - 1) + StarReveal.pop;
+  late final _controller = AnimationController(
+    vsync: this,
+    duration: Duration(milliseconds: (total * 1000).round()),
+  )..addListener(_announce);
+  int _announced = 0;
+  bool _still = false;
+
+  double get _seconds => _controller.value * total;
+  double _start(int i) => StarReveal.lead + StarReveal.gap * i;
+
+  void _announce() {
+    while (_announced < earned && _seconds >= _start(_announced)) {
+      widget.onReveal?.call(_announced++);
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _still = MediaQuery.disableAnimationsOf(context) || earned == 0;
+    if (!_still && !_controller.isAnimating && _controller.value == 0) {
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label: '$earned of ${widget.count} stars',
+    child: AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < widget.count; i++)
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                Icon(
+                  Icons.star_outline_rounded,
+                  size: widget.size,
+                  color: cream.withAlpha(80),
+                ),
+                if (i < earned) _star(i),
+              ],
+            ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _star(int i) {
+    final t = _still
+        ? 1.0
+        : ((_seconds - _start(i)) / StarReveal.pop).clamp(0.0, 1.0);
+    return Opacity(
+      opacity: Curves.easeOut.transform(math.min(1, t * 2.5)),
+      child: Transform.rotate(
+        angle: (1 - Curves.easeOutBack.transform(t)) * -.6,
+        child: Transform.scale(
+          scale: Curves.elasticOut.transform(t),
+          child: Icon(Icons.star_rounded, size: widget.size, color: brass),
+        ),
+      ),
+    );
+  }
+}
+
 class MasteryResult extends StatelessWidget {
   const MasteryResult({
     super.key,
     required this.game,
     required this.record,
     required this.unlocks,
+    this.onStarRevealed,
   });
   final BalanceGame game;
   final LevelRecord record;
   final List<CabinetStyle> unlocks;
+
+  /// When set, the stars appear one by one and this hears each one land.
+  final ValueChanged<int>? onStarRevealed;
   @override
   Widget build(BuildContext context) => Column(
     children: [
       const SizedBox(height: 14),
-      StarRow(
-        game.earnedStarMask | (record.starMask & 8),
-        size: 34,
-        dark: true,
-        count: game.mode == GameMode.classic ? 4 : 3,
-      ),
+      if (onStarRevealed != null)
+        StarReveal(
+          game.earnedStarMask | (record.starMask & 8),
+          size: 34,
+          count: game.mode == GameMode.classic ? 4 : 3,
+          onReveal: onStarRevealed,
+        )
+      else
+        StarRow(
+          game.earnedStarMask | (record.starMask & 8),
+          size: 34,
+          dark: true,
+          count: game.mode == GameMode.classic ? 4 : 3,
+        ),
       const SizedBox(height: 8),
       for (final (bit, label) in [
         (1, 'Finish the board'),

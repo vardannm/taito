@@ -76,6 +76,28 @@ void main() {
     },
   );
 
+  test('seed spitter spits with its own cue; the three-way split stays a bullet', () {
+    final game = run();
+    final sound = EnemySoundDirector();
+    final visitor = LateEnemyEncounter(
+      kind: LateEnemyKind.seedSpitter,
+      origin: (x: 180, y: 130),
+      target: (x: 180, y: 430),
+    );
+    game.lateEnemy = visitor;
+    final heard = <EnemyCue>[];
+    for (var i = 0; i < 4 * 120; i++) {
+      visitor.step(1 / 120);
+      game.elapsed += 1 / 120;
+      heard.addAll(sound.capture(game));
+    }
+    expect(heard, [
+      EnemyCue.insectArrival,
+      EnemyCue.seedSpit,
+      EnemyCue.bullet,
+    ]);
+  });
+
   test('laser charge and fire happen once at their actual transitions', () {
     final game = run();
     final sound = EnemySoundDirector();

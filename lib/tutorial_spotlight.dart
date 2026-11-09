@@ -155,7 +155,7 @@ class _TutorialSpotlightState extends State<TutorialSpotlight>
                           child: child,
                         ),
                       ),
-                      child: _TutorialCard(
+                      child: TutorialCard(
                         key: ValueKey('${widget.title}|${widget.message}'),
                         title: widget.title,
                         message: widget.message,
@@ -163,6 +163,7 @@ class _TutorialSpotlightState extends State<TutorialSpotlight>
                         badge: widget.badge,
                         lesson: widget.lesson,
                         lessons: widget.lessons,
+                        reserveSkipSpace: true,
                       ),
                     ),
                     Positioned(
@@ -201,10 +202,9 @@ class _TutorialSpotlightState extends State<TutorialSpotlight>
   );
 }
 
-/// The lesson card: a lit icon, the lesson count and title, the instruction
-/// and a progress bar. It ignores touches, so play continues beneath it.
-class _TutorialCard extends StatelessWidget {
-  const _TutorialCard({
+/// The lesson title, instruction and progress indicator.
+class TutorialCard extends StatelessWidget {
+  const TutorialCard({
     super.key,
     required this.message,
     required this.icon,
@@ -212,12 +212,14 @@ class _TutorialCard extends StatelessWidget {
     this.badge,
     this.lesson,
     this.lessons,
+    this.reserveSkipSpace = false,
   });
   final String message;
   final String? title;
   final IconData icon;
   final Widget? badge;
   final int? lesson, lessons;
+  final bool reserveSkipSpace;
 
   @override
   Widget build(BuildContext context) {
@@ -295,8 +297,7 @@ class _TutorialCard extends StatelessWidget {
                   ],
                 ),
               ),
-              // Room for the Skip chip laid over this corner.
-              const SizedBox(width: 62),
+              if (reserveSkipSpace) const SizedBox(width: 62),
             ],
           ),
           const SizedBox(height: 10),
@@ -342,7 +343,10 @@ class _TutorialCard extends StatelessWidget {
 Rect? tutorialTarget(GlobalKey key, RenderBox layer) {
   final target = key.currentContext?.findRenderObject();
   if (target is! RenderBox || !target.hasSize || !target.attached) return null;
-  return layer.globalToLocal(target.localToGlobal(Offset.zero)) & target.size;
+  return MatrixUtils.transformRect(
+    target.getTransformTo(layer),
+    Offset.zero & target.size,
+  );
 }
 
 class _SpotlightPainter extends CustomPainter {

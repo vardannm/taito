@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'music_output.dart';
 
-enum UiCue { tap, back, toggle, select }
+enum UiCue { tap, back, toggle, select, countdown, claim }
 
 typedef UiSoundStart = Future<StopFunction> Function(UiCue cue);
 
@@ -23,16 +23,25 @@ class UiAudio {
   int _pending = 0;
   DateTime? _last;
 
+  static UiAudio? of(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<_UiAudio>()?.audio;
+
   Future<void> play(UiCue cue) async {
     if (_disposed) return;
     if (!enabled() || (volume?.call() ?? 1) <= 0) {
       silence();
       return;
     }
-    if (_pending + _active.length >= 2) return;
-    final now = DateTime.now();
-    if (_last != null && now.difference(_last!).inMilliseconds < 60) return;
-    _last = now;
+    if (cue == UiCue.countdown || cue == UiCue.claim) {
+      // Each beat, and a prize claim, replaces any stale UI sound, even just
+      // after a button tap.
+      silence();
+    } else {
+      if (_pending + _active.length >= 2) return;
+      final now = DateTime.now();
+      if (_last != null && now.difference(_last!).inMilliseconds < 60) return;
+      _last = now;
+    }
     final epoch = _epoch;
     _pending++;
     try {
@@ -52,7 +61,13 @@ class UiAudio {
         );
         if (_disposed || !enabled() || epoch != _epoch) return;
         stop = await pool.start(
-          volume: .18 * (volume?.call() ?? 1).clamp(0.0, 1.0),
+          volume:
+              (switch (cue) {
+                UiCue.countdown => .32,
+                UiCue.claim => .3,
+                _ => .18,
+              }) *
+              (volume?.call() ?? 1).clamp(0.0, 1.0),
         );
       }
       if (_disposed || !enabled() || epoch != _epoch) {
@@ -61,7 +76,8 @@ class UiAudio {
       }
       _active.add(stop);
       late final Timer timer;
-      timer = Timer(const Duration(milliseconds: 220), () {
+      // Taps are clipped short; the claim chime is allowed to ring out.
+      timer = Timer(Duration(milliseconds: cue == UiCue.claim ? 520 : 220), () {
         _timers.remove(timer);
         _active.remove(stop);
         unawaited(stop().catchError((Object _) {}));
@@ -152,10 +168,10 @@ class _UiAudio extends InheritedWidget {
 VoidCallback? uiAction(
   BuildContext context,
   VoidCallback? action, {
-  UiCue cue = UiCue.tap,
+  UiCue? cue = UiCue.tap,
 }) {
-  if (action == null) return null;
-  final audio = context.getInheritedWidgetOfExactType<_UiAudio>()?.audio;
+  if (action == null || cue == null) return action;
+  final audio = UiAudio.of(context);
   return () {
     action();
     if (audio != null) unawaited(audio.play(cue));
@@ -164,7 +180,7 @@ VoidCallback? uiAction(
 
 ValueChanged<T>? uiChange<T>(BuildContext context, ValueChanged<T>? action) {
   if (action == null) return null;
-  final audio = context.getInheritedWidgetOfExactType<_UiAudio>()?.audio;
+  final audio = UiAudio.of(context);
   return (value) {
     action(value);
     if (audio != null) unawaited(audio.play(UiCue.toggle));

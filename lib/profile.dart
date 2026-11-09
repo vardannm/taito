@@ -959,7 +959,15 @@ class GameFeedback {
     }
   }
 
-  Future<void> play(GameEvent event, PlayerProfile profile) async {
+  /// [mode] lets a mode replace a shared cue: Infinite has its own lost-heart
+  /// sound, and the classic levels their own target-hole sound and a win
+  /// sound chosen by the [stars] the level earned.
+  Future<void> play(
+    GameEvent event,
+    PlayerProfile profile, {
+    GameMode? mode,
+    int? stars,
+  }) async {
     if (profile.haptics) {
       if (event == GameEvent.miss) {
         HapticFeedback.heavyImpact();
@@ -977,33 +985,74 @@ class GameFeedback {
       // Reserve before loading: magnet collections must not queue or overlap.
       _lastPickupSound = now;
     }
+    final infiniteHeart = mode == GameMode.infinite && event == GameEvent.miss;
+    final levelTarget = mode == GameMode.classic && event == GameEvent.target;
+    final levelWin =
+        mode == GameMode.classic &&
+        event == GameEvent.complete &&
+        stars != null;
+    final bigWin = levelWin && stars >= 3;
     try {
       final baseVolume = switch (event) {
         GameEvent.coin => .025,
         GameEvent.merge => .16,
+        // The Infinite heart cue peaks about twice as loud as miss.wav.
+        GameEvent.miss when infiniteHeart => .14,
         GameEvent.miss => .28,
         GameEvent.star => .22,
+        GameEvent.life => .16,
+        // The level cue peaks about twice as loud as target.wav.
+        GameEvent.target when levelTarget => .12,
         GameEvent.target => .25,
+        // Both win cues peak near full scale, louder than complete.wav.
+        GameEvent.complete when bigWin => .36,
+        GameEvent.complete when levelWin => .4,
         _ => .55,
       };
-      final volume = baseVolume * profile.effectiveSoundVolume;
-      if (_effectOutput != null) {
-        await _effectOutput('audio/${event.name}.wav', volume);
-        return;
-      }
-      await _shareAudioFocus();
-      final sound = event.name;
-      final key = '$sound:${event == GameEvent.coin}';
-      _effectLevels[key] = baseVolume;
-      var player = _players[key];
-      if (player == null) {
-        player = _players[key] = AudioPlayer();
-        await player.setPlayerMode(PlayerMode.lowLatency);
-      }
-      await player.play(AssetSource('audio/$sound.wav'), volume: volume);
+      final sound = infiniteHeart
+          ? 'infinite_heart_loss'
+          : levelTarget
+          ? 'level_target'
+          : bigWin
+          ? 'level_win_big'
+          : levelWin
+          ? 'level_win'
+          : event.name;
+      await _playEffect(sound, baseVolume, profile);
     } catch (_) {
       /* Audio restrictions must never interrupt a run. */
     }
+  }
+
+  /// One pop per result star as it appears.
+  Future<void> playStarReveal(PlayerProfile profile) async {
+    if (profile.effectiveSoundVolume <= 0) return;
+    try {
+      await _playEffect('star_reveal', .2, profile);
+    } catch (_) {
+      /* Audio restrictions must never interrupt a result screen. */
+    }
+  }
+
+  Future<void> _playEffect(
+    String sound,
+    double baseVolume,
+    PlayerProfile profile,
+  ) async {
+    final volume = baseVolume * profile.effectiveSoundVolume;
+    if (_effectOutput != null) {
+      await _effectOutput('audio/$sound.wav', volume);
+      return;
+    }
+    await _shareAudioFocus();
+    final key = '$sound:${sound == GameEvent.coin.name}';
+    _effectLevels[key] = baseVolume;
+    var player = _players[key];
+    if (player == null) {
+      player = _players[key] = AudioPlayer();
+      await player.setPlayerMode(PlayerMode.lowLatency);
+    }
+    await player.play(AssetSource('audio/$sound.wav'), volume: volume);
   }
 
   MusicOutput? _music;

@@ -58,4 +58,71 @@ void main() {
     expect(EnemyCue.laserCharge.volume, greaterThan(gate.volume));
     expect(EnemyCue.laserFire.volume, greaterThan(gate.volume));
   });
+
+  test('Infinite mode loses a heart with its own cue', () async {
+    final heard = <(String, double)>[];
+    final feedback = GameFeedback(
+      effectOutput: (asset, volume) async => heard.add((asset, volume)),
+    );
+    final profile = PlayerProfile()..haptics = false;
+    await feedback.play(GameEvent.miss, profile, mode: GameMode.infinite);
+    await feedback.play(GameEvent.miss, profile);
+    await feedback.play(GameEvent.target, profile, mode: GameMode.infinite);
+    expect(heard, [
+      ('audio/infinite_heart_loss.wav', .14),
+      ('audio/miss.wav', .28),
+      ('audio/target.wav', .25),
+    ]);
+  });
+
+  test('gaining a heart plays its own cue at a calm level', () async {
+    final heard = <(String, double)>[];
+    final feedback = GameFeedback(
+      effectOutput: (asset, volume) async => heard.add((asset, volume)),
+    );
+    await feedback.play(GameEvent.life, PlayerProfile()..haptics = false);
+    expect(heard, [('audio/life.wav', .16)]);
+  });
+
+  test('classic levels sink a target with their own cue', () async {
+    final heard = <(String, double)>[];
+    final feedback = GameFeedback(
+      effectOutput: (asset, volume) async => heard.add((asset, volume)),
+    );
+    final profile = PlayerProfile()..haptics = false;
+    await feedback.play(GameEvent.target, profile, mode: GameMode.classic);
+    await feedback.play(GameEvent.target, profile, mode: GameMode.daily);
+    await feedback.play(GameEvent.miss, profile, mode: GameMode.classic);
+    expect(heard, [
+      ('audio/level_target.wav', .12),
+      ('audio/target.wav', .25),
+      ('audio/miss.wav', .28),
+    ]);
+  });
+
+  test('a won level picks its fanfare by stars and pops each star', () async {
+    final heard = <(String, double)>[];
+    final feedback = GameFeedback(
+      effectOutput: (asset, volume) async => heard.add((asset, volume)),
+    );
+    final profile = PlayerProfile()..haptics = false;
+    for (final stars in [1, 2, 3, 4]) {
+      await feedback.play(
+        GameEvent.complete,
+        profile,
+        mode: GameMode.classic,
+        stars: stars,
+      );
+    }
+    await feedback.play(GameEvent.complete, profile, mode: GameMode.daily);
+    await feedback.playStarReveal(profile);
+    expect(heard, [
+      ('audio/level_win.wav', .4),
+      ('audio/level_win.wav', .4),
+      ('audio/level_win_big.wav', .36),
+      ('audio/level_win_big.wav', .36),
+      ('audio/complete.wav', .55),
+      ('audio/star_reveal.wav', .2),
+    ]);
+  });
 }

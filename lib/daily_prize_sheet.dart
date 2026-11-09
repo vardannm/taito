@@ -115,7 +115,11 @@ class _DailyPrizeSheetState extends State<DailyPrizeSheet> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             ),
             icon: const Icon(Icons.sports_baseball_outlined),
-            onPressed: uiAction(context, busy ? null : () => claim()),
+            onPressed: uiAction(
+              context,
+              busy ? null : () => claim(),
+              cue: UiCue.claim,
+            ),
             label: Text(
               'CLAIM ${p.prizeBall!.label.toUpperCase()} BALL',
               textAlign: TextAlign.center,
@@ -134,6 +138,7 @@ class _DailyPrizeSheetState extends State<DailyPrizeSheet> {
             onPressed: uiAction(
               context,
               busy ? null : () => claim(platform: true),
+              cue: UiCue.claim,
             ),
             label: Text(
               'CLAIM ${p.prizePlatform!.label.toUpperCase()} PLATFORM',
@@ -152,7 +157,11 @@ class _DailyPrizeSheetState extends State<DailyPrizeSheet> {
                   ),
                 )
               : null,
-          onPressed: uiAction(context, ready && !busy ? () => claim() : null),
+          onPressed: uiAction(
+            context,
+            ready && !busy ? () => claim() : null,
+            cue: UiCue.claim,
+          ),
           child: Text(
             ready
                 ? 'CLAIM ${DailyPrizes.coinReward(day)} COINS'

@@ -628,6 +628,7 @@ extension InfiniteGameplay on BalanceGame {
   void _takeInfiniteItem(InfiniteItem item) {
     survival.items.remove(item);
     final bonus = InfiniteTuning.comboPoints * paceLevel * survival.scoreBoost;
+    var gainedLife = false;
     switch (item.kind) {
       case InfiniteItemKind.combo:
         final capped = survival.combo == InfiniteTuning.maxCombo;
@@ -651,6 +652,7 @@ extension InfiniteGameplay on BalanceGame {
       case InfiniteItemKind.heart:
         if (lives < infiniteMaxLives) {
           lives++;
+          gainedLife = true;
           survival.announce('HEART RESTORED');
         } else {
           survival.points += (bonus * survival.combo).round();
@@ -660,7 +662,7 @@ extension InfiniteGameplay on BalanceGame {
         }
     }
     score = survival.points.floor();
-    event = GameEvent.coin;
+    event = gainedLife ? GameEvent.life : GameEvent.coin;
   }
 
   void _resolveInfiniteContacts(

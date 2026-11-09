@@ -7,6 +7,7 @@ import 'package:shared_preferences_platform_interface/shared_preferences_async_p
 import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/profile.dart';
 import 'package:balance_arcade/onboarding.dart';
+import 'package:balance_arcade/level_picker.dart';
 import 'package:balance_arcade/levels.dart';
 import 'package:balance_arcade/progress_backup.dart';
 import 'package:balance_arcade/tutorial_spotlight.dart';
@@ -42,8 +43,12 @@ Offset twoFingerContact(WidgetTester tester, int side) {
       );
 }
 
-Future<void> launch(WidgetTester tester, PlayerProfile profile) async {
-  tester.view.physicalSize = const Size(320, 568);
+Future<void> launch(
+  WidgetTester tester,
+  PlayerProfile profile, {
+  Size size = const Size(320, 568),
+}) async {
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(ArcadeApp(profile: profile));
@@ -455,8 +460,35 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     });
   }
+
+  for (final size in [const Size(820, 1180), const Size(1180, 820)]) {
+    testWidgets('spotlight covers scaled menu controls at $size', (
+      tester,
+    ) async {
+      for (final (step, button) in [
+        (TutorialStep.shop, find.byKey(const ValueKey('board-shop'))),
+        (TutorialStep.levels, find.byKey(const ValueKey('choose-level'))),
+        (TutorialStep.dailyChallenge, menuButton('Modes')),
+      ]) {
+        await launch(tester, profileAt(step), size: size);
+        await frames(tester);
+        final spotlight = find.byType(TutorialSpotlight);
+        final layer = tester.renderObject<RenderBox>(spotlight);
+        final target = tester
+            .widget<TutorialSpotlight>(spotlight)
+            .targets(layer);
+        final buttonRect = tester
+            .getRect(button)
+            .shift(-tester.getTopLeft(spotlight));
+        expect(target.single, rectMoreOrLessEquals(buttonRect));
+        expect(button.hitTestable(at: const Alignment(.96, 0)), findsOneWidget);
+        await tester.pumpWidget(const SizedBox());
+      }
+    });
+  }
+
   testWidgets(
-    'shop actions, Level 1 completion, and delayed Daily introduction',
+    'shop actions lead to Level 1, then a win shows the Daily lesson immediately',
     (tester) async {
       final p = profileAt(TutorialStep.shop)..wallet = 1;
       await launch(tester, p);
@@ -494,7 +526,18 @@ void main() {
       await frames(tester, 2);
       expect(p.tutorial.step, TutorialStep.dailyChallenge);
       expect(p.tutorial.gameplayComplete, isTrue);
-      expect(find.textContaining('Daily Challenge:'), findsNothing);
+      expect(find.text('TUTORIAL · 11 OF 11'), findsOneWidget);
+      expect(find.text('Daily Challenge'), findsOneWidget);
+      final levels = find.text('LEVELS');
+      await tester.ensureVisible(levels);
+      await tester.tap(levels);
+      await frames(tester);
+      final picker = find.byType(LevelPicker);
+      expect(picker, findsOneWidget);
+      expect(tester.widget<LevelPicker>(picker).tutorial, isFalse);
+      expect(tester.widget<LevelPicker>(picker).selected, 2);
+      Navigator.of(tester.element(picker)).pop();
+      await frames(tester);
       await tester.ensureVisible(find.text('BACK TO MENU'));
       await tester.tap(find.text('BACK TO MENU'));
       await frames(tester, 35);
@@ -508,6 +551,32 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
+  testWidgets('a Level 1 loss lets the player finish the tutorial', (
+    tester,
+  ) async {
+    final p = profileAt(TutorialStep.classicPlay);
+    await launch(tester, p);
+    await tester.tapAt(twoFingerContact(tester, 0));
+    await frames(tester, 2);
+    final game = currentGame(tester);
+    game.lives = 0;
+    game.phase = GamePhase.over;
+    await frames(tester, 2);
+    expect(game.won, isFalse);
+    expect(p.tutorial.step, TutorialStep.dailyChallenge);
+    expect(find.text('LEVELS'), findsNothing);
+
+    await tester.ensureVisible(find.text('BACK TO MENU'));
+    await tester.tap(find.text('BACK TO MENU'));
+    await frames(tester, 35);
+    expect(find.text('Classic levels'), findsNothing);
+    expect(find.text('Daily Challenge'), findsOneWidget);
+    await tester.tap(menuButton('Modes'));
+    await frames(tester);
+    expect(p.tutorialSeen, isTrue);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
   testWidgets('free play has no overlays and resumes its saved timer', (
     tester,
   ) async {

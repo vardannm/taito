@@ -15,6 +15,7 @@ enum EnemyCue {
   venomArrival,
   novaArrival,
   bullet,
+  seedSpit,
   ricochet,
   bounce,
   petal,
@@ -49,6 +50,7 @@ extension EnemyCueAudio on EnemyCue {
     EnemyCue.venomArrival ||
     EnemyCue.novaArrival => .9,
     EnemyCue.bullet => .14,
+    EnemyCue.seedSpit => .4,
     EnemyCue.ricochet => .22,
     EnemyCue.bounce => .16,
     EnemyCue.petal => .28,
@@ -132,7 +134,7 @@ class EnemySoundDirector {
         if ((previous ?? double.negativeInfinity) < 0 && shot.age >= 0) {
           emit(switch (shot.kind) {
             LateShotKind.shard => seraph ? EnemyCue.cometFire : EnemyCue.bullet,
-            LateShotKind.seed => EnemyCue.bullet,
+            LateShotKind.seed => EnemyCue.seedSpit,
             LateShotKind.ricochet => EnemyCue.ricochet,
             LateShotKind.moth => seraph ? EnemyCue.crystal : EnemyCue.petal,
             LateShotKind.laser => EnemyCue.laserFire,
