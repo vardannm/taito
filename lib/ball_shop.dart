@@ -250,11 +250,11 @@ class _BallShopState extends State<BallShop>
 
   Widget collection() => MenuSurface(
     child: DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: RadialGradient(
           center: Alignment(0, -.7),
           radius: 1.2,
-          colors: [Color(0xFF20383C), menuBackground],
+          colors: [menuRaised, menuBackground],
         ),
       ),
       child: SafeArea(
@@ -289,7 +289,7 @@ class _BallShopState extends State<BallShop>
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             if (!widget.profile.available)
-                              const Padding(
+                              Padding(
                                 padding: EdgeInsets.only(bottom: 12),
                                 child: Text(
                                   'Device storage is unavailable; progress may not save.',
@@ -343,7 +343,7 @@ class _BallShopState extends State<BallShop>
                               'YOUR LOADOUT  /  ×${formatBoost(widget.profile.equipmentMultiplier)} INFINITE POINTS',
                               key: const ValueKey('gear-total'),
                               textAlign: TextAlign.center,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: menuMuted,
                                 fontSize: 10,
                                 letterSpacing: 1,

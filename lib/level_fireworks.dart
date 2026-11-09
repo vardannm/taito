@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'board_painter.dart' show cream;
-import 'menu_design.dart';
 
 /// A short, one-shot fireworks show behind a 3-4 star level result. It plays
 /// once and settles, so it never keeps a frame callback alive, and it stays
@@ -66,11 +65,11 @@ class FireworksPainter extends CustomPainter {
 
   static const _life = 1.15, _sparks = 26;
   static const _bursts = [
-    _Burst(.10, .26, .20, menuGold, 1),
+    _Burst(.10, .26, .20, Color(0xFFE9C47C), 1),
     _Burst(.42, .74, .16, Color(0xFFFF7A6B), 2),
     _Burst(.78, .50, .30, Color(0xFF7DE3B5), 3),
     _Burst(1.12, .20, .40, Color(0xFF8EC9FF), 4),
-    _Burst(1.42, .80, .36, menuGold, 5),
+    _Burst(1.42, .80, .36, Color(0xFFE9C47C), 5),
     _Burst(1.80, .46, .14, Color(0xFFFFB86B), 6),
   ];
 

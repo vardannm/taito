@@ -70,7 +70,7 @@ Future<void> main() async {
   // a swipe from the edge shows them briefly. SafeAreas still avoid the notch.
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
+    SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,
       systemNavigationBarColor: menuBackground,
@@ -80,6 +80,7 @@ Future<void> main() async {
   // Store capture setup: open every level and keep at least 300,000 coins.
   final profile = PlayerProfile(temporaryLevelAccess: true);
   await profile.load();
+  currentUiTheme = UiTheme.named(profile.uiTheme);
   if (profile.wallet < 300000) {
     profile.wallet = 300000;
     await profile.saveEconomy();
@@ -1077,7 +1078,7 @@ class _GameScreenState extends State<GameScreen>
       children: [
         Text(
           'Level $level',
-          style: const TextStyle(
+          style: TextStyle(
             color: menuText,
             fontSize: 19,
             fontWeight: FontWeight.w600,
@@ -1668,7 +1669,7 @@ class _GameScreenState extends State<GameScreen>
         child: AnimatedBuilder(
           animation: Listenable.merge([hud, backdrop]),
           builder: (context, _) {
-            const detail = TextStyle(
+            final detail = TextStyle(
               color: menuText,
               fontSize: 14,
               fontWeight: FontWeight.w700,
@@ -1766,7 +1767,7 @@ class _GameScreenState extends State<GameScreen>
                                     ),
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      const Icon(
+                                      Icon(
                                         Icons.star_rounded,
                                         color: menuGold,
                                         size: 16,
@@ -1922,7 +1923,7 @@ class _GameScreenState extends State<GameScreen>
                         'Level ${game.level}',
                         key: const ValueKey('board-level-name'),
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: menuText,
@@ -2371,14 +2372,14 @@ class _GameScreenState extends State<GameScreen>
                               scale: levelScale,
                               child: classicLevelSummary(worldLevel(index)),
                             )
-                          : const FittedBox(
+                          : FittedBox(
                               fit: BoxFit.scaleDown,
                               child: Text(
                                 '∞',
                                 key: ValueKey('menu-infinite-mark'),
                                 semanticsLabel: 'Endless',
                                 style: TextStyle(
-                                  color: menuText,
+                                  color: menuSceneryText,
                                   fontSize: 72,
                                   fontWeight: FontWeight.w300,
                                   height: 1,
@@ -2494,7 +2495,7 @@ class _GameScreenState extends State<GameScreen>
           badge: profile.dailyPrizes.canClaim(DateTime.now()),
           onPressed: carouselMoving ? null : showDailyPrizes,
         ),
-        const Expanded(
+        Expanded(
           child: Center(
             child: FittedBox(
               fit: BoxFit.scaleDown,
@@ -2508,7 +2509,7 @@ class _GameScreenState extends State<GameScreen>
                         TextSpan(
                           text: 'ROLL',
                           style: TextStyle(
-                            color: menuText,
+                            color: menuSceneryText,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
@@ -2598,8 +2599,8 @@ class _GameScreenState extends State<GameScreen>
                         child: Text(
                           worldTitle(index),
                           key: const ValueKey('selected-mode-title'),
-                          style: const TextStyle(
-                            color: menuText,
+                          style: TextStyle(
+                            color: menuSceneryText,
                             fontSize: 28,
                             fontWeight: FontWeight.w500,
                             letterSpacing: -.4,
@@ -2618,8 +2619,8 @@ class _GameScreenState extends State<GameScreen>
                   child: Text(
                     worldSubtitle(index),
                     key: const ValueKey('selected-mode-subtitle'),
-                    style: const TextStyle(
-                      color: menuMuted,
+                    style: TextStyle(
+                      color: menuSceneryMuted,
                       fontSize: 9,
                       letterSpacing: 1,
                       fontWeight: FontWeight.w500,
@@ -2747,7 +2748,7 @@ class _GameScreenState extends State<GameScreen>
                                           decoration: BoxDecoration(
                                             color: selectedMode == mode
                                                 ? menuGold
-                                                : menuMuted.withAlpha(80),
+                                                : menuSceneryMuted.withAlpha(80),
                                             borderRadius: BorderRadius.circular(
                                               4,
                                             ),
@@ -2825,7 +2826,7 @@ class _GameScreenState extends State<GameScreen>
           final controlHeight = bottomControlHeight(context);
           final stageBackground = Color.lerp(
             background,
-            menuBackground,
+            menuSceneryShade,
             chromeOpacity,
           )!;
           final stageBrightness = ThemeData.estimateBrightnessForColor(
@@ -3136,7 +3137,7 @@ class _GameScreenState extends State<GameScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
+          Text(
             'Double your coins',
             textAlign: TextAlign.center,
             style: TextStyle(
@@ -3151,7 +3152,7 @@ class _GameScreenState extends State<GameScreen>
             '${game.coinsCollected} to ${game.coinsCollected * 2} coins.\n'
             'Your collected coins are already saved.',
             textAlign: TextAlign.center,
-            style: const TextStyle(color: menuText, fontSize: 12, height: 1.5),
+            style: TextStyle(color: menuText, fontSize: 12, height: 1.5),
           ),
           if (coinDoubleError != null)
             Padding(
@@ -3159,7 +3160,7 @@ class _GameScreenState extends State<GameScreen>
               child: Text(
                 coinDoubleError!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: menuGold, fontSize: 12),
+                style: TextStyle(color: menuGold, fontSize: 12),
               ),
             ),
           const SizedBox(height: 12),
@@ -3432,10 +3433,7 @@ class _GameScreenState extends State<GameScreen>
                                         ? '${game.metres}m · Best combo x${game.survival.bestCombo}\n${game.message}  ${game.coinsCollected * (profile.infiniteCoinsDoubled(game) ? 2 : 1)} coins saved.'
                                         : game.message)
                                   : '${game.completed}/10 holes  •  ${game.bestStreak} best streak',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: menuMuted,
-                              ),
+                              style: TextStyle(fontSize: 12, color: menuMuted),
                             ),
                             if (game.mode == GameMode.classic && game.won)
                               Padding(
@@ -3444,7 +3442,7 @@ class _GameScreenState extends State<GameScreen>
                                   '+$classicLevelCoinPrize coins · Level complete',
                                   key: const ValueKey('level-coin-prize'),
                                   textAlign: TextAlign.center,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: menuGold,
                                     fontWeight: FontWeight.w700,
                                   ),
@@ -3459,7 +3457,7 @@ class _GameScreenState extends State<GameScreen>
                                   'Coins doubled! +${game.coinsCollected} bonus coins saved.',
                                   key: const ValueKey('coins-doubled'),
                                   textAlign: TextAlign.center,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: menuGold,
                                     fontWeight: FontWeight.w700,
                                   ),
@@ -3753,11 +3751,11 @@ class _GameScreenState extends State<GameScreen>
               minimumSize: const Size(0, 58),
               backgroundColor: game.paused
                   ? (icon == Icons.restart_alt_rounded
-                        ? const Color(0xFFF0C787)
+                        ? menuGold
                         : const Color(0xD9434751))
-                  : const Color(0xFF2C4448),
+                  : menuHighlight,
               foregroundColor: game.paused && icon == Icons.restart_alt_rounded
-                  ? const Color(0xFF342515)
+                  ? menuOnAccent
                   : menuText,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
@@ -3900,6 +3898,17 @@ class _GameScreenState extends State<GameScreen>
                   },
                 ),
                 const SizedBox(height: 26),
+                const MenuSection('Theme (trial)'),
+                const SizedBox(height: 12),
+                UiThemePicker(
+                  value: currentUiTheme,
+                  onChanged: (theme) {
+                    profile.uiTheme = theme.name;
+                    applyUiTheme(theme);
+                    unawaited(profile.save());
+                  },
+                ),
+                const SizedBox(height: 26),
                 const MenuSection('Feel & sound'),
                 const SizedBox(height: 12),
                 settingsVolume(
@@ -3927,7 +3936,7 @@ class _GameScreenState extends State<GameScreen>
                 ),
                 if (!profile.available) ...[
                   const SizedBox(height: 16),
-                  const Text(
+                  Text(
                     'Local storage is unavailable. Records will last for this session.',
                     style: TextStyle(color: menuMuted),
                   ),
@@ -3942,7 +3951,7 @@ class _GameScreenState extends State<GameScreen>
                   },
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Rollrise / No rush. Just precision.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 11, color: menuMuted),

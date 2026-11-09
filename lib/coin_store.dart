@@ -104,7 +104,7 @@ class _CoinStoreSheetState extends State<CoinStoreSheet> {
                         Text(
                           p.unlimitedCoins ? '∞' : formatMenuScore(p.wallet),
                           key: const ValueKey('coin-store-wallet'),
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: menuText,
                             fontSize: 24,
                             fontWeight: FontWeight.w800,
@@ -145,7 +145,7 @@ class _CoinStoreSheetState extends State<CoinStoreSheet> {
                           ),
                           child: Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.schedule_rounded,
                                 color: menuMint,
                                 size: 20,
@@ -154,7 +154,7 @@ class _CoinStoreSheetState extends State<CoinStoreSheet> {
                               Expanded(
                                 child: Text(
                                   notice!,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: menuText,
                                     fontSize: 12,
                                     height: 1.4,
@@ -181,7 +181,7 @@ class _CoinStoreSheetState extends State<CoinStoreSheet> {
             const SizedBox(height: 6),
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
                     'Coins never expire. Prices are in USD; the store shows '
                     'your local price at checkout.',
@@ -263,7 +263,7 @@ class _PackTile extends StatelessWidget {
                       ),
                       child: Text(
                         tag,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: menuBackground,
                           fontSize: 9,
                           letterSpacing: 1.2,
@@ -290,7 +290,7 @@ class _PackTile extends StatelessWidget {
                               alignment: Alignment.centerLeft,
                               child: Text(
                                 formatMenuScore(pack.coins),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: menuText,
                                   fontSize: 22,
                                   fontWeight: FontWeight.w800,
@@ -391,7 +391,7 @@ class WalletButton extends StatelessWidget {
           const SizedBox(width: 7),
           Text(
             amount,
-            style: const TextStyle(
+            style: TextStyle(
               color: menuGold,
               fontSize: 13,
               fontWeight: FontWeight.w800,
@@ -402,15 +402,11 @@ class WalletButton extends StatelessWidget {
             Container(
               width: 22,
               height: 22,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: menuGold,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.add_rounded,
-                size: 17,
-                color: menuBackground,
-              ),
+              child: Icon(Icons.add_rounded, size: 17, color: menuBackground),
             ),
           ],
         ],
@@ -453,7 +449,7 @@ class GetCoinsLink extends StatelessWidget {
     if (!coinStoreVisible) {
       return Text(
         '$label coins',
-        style: const TextStyle(color: menuMuted, fontSize: 11),
+        style: TextStyle(color: menuMuted, fontSize: 11),
       );
     }
     return Align(

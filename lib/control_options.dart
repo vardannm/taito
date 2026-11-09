@@ -67,7 +67,7 @@ class _ControlOptionsState extends State<ControlOptions>
         Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: Material(
-            color: selected(mode, halo) ? const Color(0xFF2C4140) : menuPanel,
+            color: selected(mode, halo) ? menuHighlight : menuPanel,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
               side: BorderSide(
@@ -128,11 +128,7 @@ class _ControlOptionsState extends State<ControlOptions>
                             ),
                           ),
                           if (selected(mode, halo))
-                            const Icon(
-                              Icons.check_circle,
-                              color: menuMint,
-                              size: 20,
-                            ),
+                            Icon(Icons.check_circle, color: menuMint, size: 20),
                         ],
                       ),
                       Row(
@@ -167,7 +163,7 @@ class _ControlOptionsState extends State<ControlOptions>
                                       ControlMode.boardTilt =>
                                         'Tilt anywhere on the board. The guide appears under your finger, then hides on release. No lift or bottom slider.',
                                     },
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 height: 1.4,
                                 color: menuMuted,

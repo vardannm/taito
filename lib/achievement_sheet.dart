@@ -91,9 +91,7 @@ class _AchievementSheetState extends State<AchievementSheet> {
                 const SizedBox(height: 12),
                 Card(
                   key: a == _firstReady ? _firstReadyKey : null,
-                  color: p.achievementEarned(a)
-                      ? const Color(0xFF2C4140)
-                      : menuPanel,
+                  color: p.achievementEarned(a) ? menuHighlight : menuPanel,
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(

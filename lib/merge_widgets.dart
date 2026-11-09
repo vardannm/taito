@@ -24,14 +24,15 @@ Color numberColor(int value) {
 }
 
 class MergeStatus extends StatelessWidget {
-  const MergeStatus({super.key, required this.run, this.color = menuText});
+  const MergeStatus({super.key, required this.run, this.color});
   final MergeRun run;
 
   /// Matches the HUD ink, which adapts to the board behind it.
-  final Color color;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
+    final color = this.color ?? menuText;
     final danger = !run.ended && run.head <= run.upcomingGateValue;
     final style = TextStyle(
       color: color,
@@ -193,7 +194,7 @@ class MergeResult extends StatelessWidget {
                   ? 'Gate not cleared.'
                   : 'Number too large.',
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: menuText,
                 fontSize: 24,
                 fontWeight: FontWeight.w900,
@@ -203,7 +204,7 @@ class MergeResult extends StatelessWidget {
             Text(
               '${newBest ? 'NEW BEST' : 'SCORE'} ${formatCompactScore(run.score)}  ·  HIGHEST ${formatMergeNumber(run.highest)}',
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: menuGold,
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
@@ -215,10 +216,7 @@ class MergeResult extends StatelessWidget {
                 '+$coinsEarned coins · 2,048 reached',
                 key: const ValueKey('merge-coin-prize'),
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: menuGold,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: TextStyle(color: menuGold, fontWeight: FontWeight.w700),
               ),
             ],
             const SizedBox(height: 12),
@@ -237,14 +235,14 @@ class MergeResult extends StatelessWidget {
             Text(
               run.notice,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: menuMuted, fontSize: 11),
+              style: TextStyle(color: menuMuted, fontSize: 11),
             ),
             Wrap(
               alignment: WrapAlignment.center,
               children: [
                 TextButton(
                   onPressed: uiAction(context, onHome),
-                  child: const Text(
+                  child: Text(
                     'BACK TO CLUB',
                     style: TextStyle(color: menuMuted),
                   ),

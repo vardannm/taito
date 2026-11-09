@@ -204,7 +204,7 @@ class MasteryResult extends StatelessWidget {
                 color:
                     ((game.earnedStarMask | (record.starMask & 8)) & bit) != 0
                     ? brass
-                    : const Color(0xFFB5C5BB),
+                    : menuMuted,
               ),
               const SizedBox(width: 6),
               Flexible(
@@ -217,7 +217,7 @@ class MasteryResult extends StatelessWidget {
                         ((game.earnedStarMask | (record.starMask & 8)) & bit) !=
                             0
                         ? brass
-                        : const Color(0xFFB5C5BB),
+                        : menuMuted,
                   ),
                 ),
               ),
@@ -294,10 +294,7 @@ class DailyCard extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 '${DailyChallenge.key(date)} · UTC',
-                style: const TextStyle(
-                  color: menuText,
-                  fontFamily: 'monospace',
-                ),
+                style: TextStyle(color: menuText, fontFamily: 'monospace'),
               ),
               const SizedBox(height: 16),
               SizedBox(

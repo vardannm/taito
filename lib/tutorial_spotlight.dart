@@ -177,7 +177,7 @@ class _TutorialSpotlightState extends State<TutorialSpotlight>
                           backgroundColor: menuBackground.withAlpha(150),
                           minimumSize: const Size(54, 34),
                           padding: const EdgeInsets.symmetric(horizontal: 12),
-                          shape: const StadiumBorder(
+                          shape: StadiumBorder(
                             side: BorderSide(color: menuLine),
                           ),
                           textStyle: const TextStyle(
@@ -257,7 +257,7 @@ class TutorialCard extends StatelessWidget {
                 Container(
                   width: 38,
                   height: 38,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
                       center: Alignment(-.3, -.4),
@@ -274,7 +274,7 @@ class TutorialCard extends StatelessWidget {
                   children: [
                     Text(
                       count > 0 ? 'TUTORIAL · $current OF $count' : 'TUTORIAL',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: menuGold,
                         fontSize: 9,
                         letterSpacing: 1.6,
@@ -285,7 +285,7 @@ class TutorialCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         title!,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: menuText,
                           fontSize: 17,
                           height: 1.15,

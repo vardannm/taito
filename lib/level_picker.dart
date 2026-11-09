@@ -164,7 +164,7 @@ class _LevelPickerState extends State<LevelPicker> {
                               children: [
                                 Text(
                                   title,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 25,
                                     fontWeight: FontWeight.w800,
                                     color: menuText,
@@ -295,7 +295,7 @@ class _LevelPickerState extends State<LevelPicker> {
                                                               MainAxisAlignment
                                                                   .center,
                                                           children: [
-                                                            const Icon(
+                                                            Icon(
                                                               Icons
                                                                   .lock_outline_rounded,
                                                               size: 18,
@@ -303,13 +303,11 @@ class _LevelPickerState extends State<LevelPicker> {
                                                             ),
                                                             Text(
                                                               '$number',
-                                                              style:
-                                                                  const TextStyle(
-                                                                    fontSize:
-                                                                        12,
-                                                                    color:
-                                                                        menuMuted,
-                                                                  ),
+                                                              style: TextStyle(
+                                                                fontSize: 12,
+                                                                color:
+                                                                    menuMuted,
+                                                              ),
                                                             ),
                                                           ],
                                                         ),
@@ -323,7 +321,7 @@ class _LevelPickerState extends State<LevelPicker> {
                                                   maxLines: 2,
                                                   overflow:
                                                       TextOverflow.ellipsis,
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     backgroundColor:
                                                         menuBackground,
                                                     fontSize: 11,
@@ -356,7 +354,7 @@ class _LevelPickerState extends State<LevelPicker> {
                                                       : number % 10 == 0
                                                       ? 'FINALE'
                                                       : 'UNPLAYED',
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     backgroundColor:
                                                         menuBackground,
                                                     fontSize: 9,
@@ -371,7 +369,7 @@ class _LevelPickerState extends State<LevelPicker> {
                                                   formatRunTime(
                                                     record.bestTime!,
                                                   ),
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     backgroundColor:
                                                         menuBackground,
                                                     fontSize: 9,

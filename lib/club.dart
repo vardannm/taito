@@ -231,7 +231,7 @@ class _ClubScreenState extends State<ClubScreen> {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w800,
               color: menuGold,

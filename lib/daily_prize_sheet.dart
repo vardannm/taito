@@ -76,7 +76,7 @@ class _DailyPrizeSheetState extends State<DailyPrizeSheet> {
       const SizedBox(height: 16),
       for (var i = firstDay; i < firstDay + DailyPrizes.rewardInterval; i++)
         Card(
-          color: i == day ? const Color(0xFF2C4140) : menuPanel,
+          color: i == day ? menuHighlight : menuPanel,
           child: ListTile(
             minVerticalPadding: tablet ? 18 : null,
             minLeadingWidth: tablet ? 40 : null,

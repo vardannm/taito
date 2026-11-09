@@ -2,24 +2,176 @@ import 'ui_audio.dart';
 import 'package:flutter/material.dart';
 import 'responsive_layout.dart';
 
-const menuBackground = Color(0xFF0D171A);
-const menuPanel = Color(0xFF19282C);
-const menuRaised = Color(0xFF23363A);
-const menuLine = Color(0xFF34494D);
-const menuText = Color(0xFFF6F0E3);
-const menuMuted = Color(0xFFA8BABD);
-const menuGold = Color(0xFFE9C47C);
-const menuMint = Color(0xFF82D9BE);
+/// Menu and button color themes under evaluation. Only the static UI reads
+/// these; ball worlds, boards and enemies keep their own colors.
+enum UiTheme {
+  deepTeal('Deep teal'),
+  midnightIndigo('Midnight indigo'),
+  slateSky('Slate sky'),
+  plumDusk('Plum dusk'),
+  cloudLight('Cloud light'),
+  sandLight('Sand light');
+
+  const UiTheme(this.label);
+  final String label;
+
+  static UiTheme named(String? name) =>
+      values.where((t) => t.name == name).firstOrNull ?? deepTeal;
+}
+
+class UiPalette {
+  const UiPalette({
+    required this.background,
+    required this.panel,
+    required this.raised,
+    required this.highlight,
+    required this.line,
+    required this.text,
+    required this.muted,
+    required this.accent,
+    required this.onAccent,
+    required this.secondary,
+    this.brightness = Brightness.dark,
+  });
+  final Color background, panel, raised, highlight, line, text, muted;
+  final Color accent, onAccent, secondary;
+  final Brightness brightness;
+
+  static const themes = <UiTheme, UiPalette>{
+    UiTheme.deepTeal: UiPalette(
+      background: Color(0xFF0D171A),
+      panel: Color(0xFF19282C),
+      raised: Color(0xFF23363A),
+      highlight: Color(0xFF2C4140),
+      line: Color(0xFF34494D),
+      text: Color(0xFFF6F0E3),
+      muted: Color(0xFFA8BABD),
+      accent: Color(0xFFE9C47C),
+      onAccent: Color(0xFF0D171A),
+      secondary: Color(0xFF82D9BE),
+    ),
+    UiTheme.midnightIndigo: UiPalette(
+      background: Color(0xFF1C2140),
+      panel: Color(0xFF282F57),
+      raised: Color(0xFF313966),
+      highlight: Color(0xFF3A4478),
+      line: Color(0xFF3B4473),
+      text: Color(0xFFF3F4FF),
+      muted: Color(0xFFAEB4D9),
+      accent: Color(0xFFFFB86B),
+      onAccent: Color(0xFF1C2140),
+      secondary: Color(0xFF8EC9FF),
+    ),
+    UiTheme.slateSky: UiPalette(
+      background: Color(0xFF2A3242),
+      panel: Color(0xFF364055),
+      raised: Color(0xFF3E4A62),
+      highlight: Color(0xFF465674),
+      line: Color(0xFF4A5670),
+      text: Color(0xFFF2F5FA),
+      muted: Color(0xFFB3BCCC),
+      accent: Color(0xFF5EC8FF),
+      onAccent: Color(0xFF10202E),
+      secondary: Color(0xFFFFD166),
+    ),
+    UiTheme.plumDusk: UiPalette(
+      background: Color(0xFF2B2238),
+      panel: Color(0xFF3B2F4E),
+      raised: Color(0xFF45385A),
+      highlight: Color(0xFF514268),
+      line: Color(0xFF544468),
+      text: Color(0xFFFBF3FF),
+      muted: Color(0xFFC2B3D4),
+      accent: Color(0xFFFF8FB1),
+      onAccent: Color(0xFF2B1020),
+      secondary: Color(0xFFB8A1FF),
+    ),
+    UiTheme.cloudLight: UiPalette(
+      background: Color(0xFFEEF1F7),
+      panel: Color(0xFFFFFFFF),
+      raised: Color(0xFFF5F7FB),
+      highlight: Color(0xFFE2E8FF),
+      line: Color(0xFFD5DBE7),
+      text: Color(0xFF1B2233),
+      muted: Color(0xFF5D667A),
+      accent: Color(0xFF4F6BFF),
+      onAccent: Color(0xFFFFFFFF),
+      secondary: Color(0xFFE8613F),
+      brightness: Brightness.light,
+    ),
+    UiTheme.sandLight: UiPalette(
+      background: Color(0xFFF5EFE6),
+      panel: Color(0xFFFFFCF6),
+      raised: Color(0xFFFBF6EE),
+      highlight: Color(0xFFF7E4D3),
+      line: Color(0xFFE3D8C6),
+      text: Color(0xFF2E2A24),
+      muted: Color(0xFF7A7062),
+      accent: Color(0xFFD95F33),
+      onAccent: Color(0xFFFFFFFF),
+      secondary: Color(0xFF3E7BCB),
+      brightness: Brightness.light,
+    ),
+  };
+}
+
+/// The theme the whole app currently paints its menus with.
+UiTheme currentUiTheme = UiTheme.deepTeal;
+UiPalette get uiPalette => UiPalette.themes[currentUiTheme]!;
+
+Color get menuBackground => uiPalette.background;
+Color get menuPanel => uiPalette.panel;
+Color get menuRaised => uiPalette.raised;
+
+/// A selected card or row, a step above [menuPanel].
+Color get menuHighlight => uiPalette.highlight;
+Color get menuLine => uiPalette.line;
+Color get menuText => uiPalette.text;
+Color get menuMuted => uiPalette.muted;
+
+/// The main accent (buttons, icons, selection). Named for the original gold.
+Color get menuGold => uiPalette.accent;
+Color get menuOnAccent => uiPalette.onAccent;
+
+/// The second accent. Named for the original mint.
+Color get menuMint => uiPalette.secondary;
+
+/// The home screen sits on the equipped ball's world, which is always dark
+/// art, so light themes keep light ink and a dark shade there.
+bool get _lightUi => uiPalette.brightness == Brightness.light;
+Color get menuSceneryText => _lightUi ? const Color(0xFFF6F0E3) : menuText;
+Color get menuSceneryMuted => _lightUi ? const Color(0xFFCBD3DA) : menuMuted;
+Color get menuSceneryShade =>
+    _lightUi ? const Color(0xFF151A26) : menuBackground;
+
+/// Applies [theme] and rebuilds every widget, including ones and open
+/// sheets, so the new colors reach the whole screen at once.
+void applyUiTheme(UiTheme theme) {
+  if (currentUiTheme == theme) return;
+  currentUiTheme = theme;
+  void rebuild(Element element) {
+    element.markNeedsBuild();
+    // Painters that never ask to repaint still read the new colors.
+    if (element is RenderObjectElement) element.renderObject.markNeedsPaint();
+    element.visitChildren(rebuild);
+  }
+
+  WidgetsBinding.instance.rootElement?.visitChildren(rebuild);
+}
 
 ThemeData arcadeMenuTheme() {
-  final base = ThemeData.dark(useMaterial3: true);
+  final light = uiPalette.brightness == Brightness.light;
+  final base = light
+      ? ThemeData.light(useMaterial3: true)
+      : ThemeData.dark(useMaterial3: true);
+  final scheme = light ? ColorScheme.light() : ColorScheme.dark();
   return base.copyWith(
     scaffoldBackgroundColor: menuBackground,
-    colorScheme: const ColorScheme.dark(
+    colorScheme: scheme.copyWith(
       primary: menuGold,
-      onPrimary: menuBackground,
+      onPrimary: menuOnAccent,
       secondary: menuMint,
-      onSecondary: menuBackground,
+      onSecondary: menuOnAccent,
       surface: menuPanel,
       onSurface: menuText,
       outline: menuLine,
@@ -29,13 +181,9 @@ ThemeData arcadeMenuTheme() {
       bodyColor: menuText,
       displayColor: menuText,
     ),
-    iconTheme: const IconThemeData(color: menuGold),
-    dividerTheme: const DividerThemeData(
-      color: menuLine,
-      thickness: 1,
-      space: 24,
-    ),
-    bottomSheetTheme: const BottomSheetThemeData(
+    iconTheme: IconThemeData(color: menuGold),
+    dividerTheme: DividerThemeData(color: menuLine, thickness: 1, space: 24),
+    bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: menuBackground,
       surfaceTintColor: Colors.transparent,
       dragHandleColor: menuLine,
@@ -43,7 +191,7 @@ ThemeData arcadeMenuTheme() {
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
     ),
-    dialogTheme: const DialogThemeData(
+    dialogTheme: DialogThemeData(
       backgroundColor: menuPanel,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.all(Radius.circular(24)),
@@ -55,18 +203,18 @@ ThemeData arcadeMenuTheme() {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: const BorderSide(color: menuLine),
+        side: BorderSide(color: menuLine),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         backgroundColor: menuGold,
-        foregroundColor: menuBackground,
+        foregroundColor: menuOnAccent,
         disabledBackgroundColor: menuRaised,
         disabledForegroundColor: menuMuted,
-        minimumSize: const Size(48, 48),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        textStyle: const TextStyle(
+        minimumSize: Size(48, 48),
+        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        textStyle: TextStyle(
           fontFamily: 'sans-serif',
           fontSize: 13,
           fontWeight: FontWeight.w800,
@@ -78,9 +226,9 @@ ThemeData arcadeMenuTheme() {
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: menuText,
-        side: const BorderSide(color: menuLine),
-        minimumSize: const Size(48, 48),
-        textStyle: const TextStyle(
+        side: BorderSide(color: menuLine),
+        minimumSize: Size(48, 48),
+        textStyle: TextStyle(
           fontFamily: 'sans-serif',
           fontSize: 13,
           fontWeight: FontWeight.w700,
@@ -91,7 +239,7 @@ ThemeData arcadeMenuTheme() {
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: menuGold,
-        textStyle: const TextStyle(
+        textStyle: TextStyle(
           fontFamily: 'sans-serif',
           fontSize: 13,
           fontWeight: FontWeight.w700,
@@ -102,16 +250,16 @@ ThemeData arcadeMenuTheme() {
       backgroundColor: menuPanel,
       selectedColor: menuGold,
       disabledColor: menuPanel,
-      side: const BorderSide(color: menuLine),
+      side: BorderSide(color: menuLine),
       showCheckmark: false,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      labelStyle: const TextStyle(
+      labelStyle: TextStyle(
         fontFamily: 'sans-serif',
         color: menuText,
         fontSize: 12,
         fontWeight: FontWeight.w700,
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
     ),
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith(
@@ -133,13 +281,13 @@ ThemeData arcadeMenuTheme() {
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: menuBackground,
-      hintStyle: const TextStyle(color: menuMuted),
+      hintStyle: TextStyle(color: menuMuted),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: menuLine),
+        borderSide: BorderSide(color: menuLine),
       ),
     ),
-    progressIndicatorTheme: const ProgressIndicatorThemeData(
+    progressIndicatorTheme: ProgressIndicatorThemeData(
       color: menuMint,
       linearTrackColor: menuLine,
     ),
@@ -163,7 +311,7 @@ class MenuSurface extends StatelessWidget {
       child: Theme(
         data: arcadeMenuTheme(),
         child: DefaultTextStyle(
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'sans-serif',
             color: menuText,
             fontSize: 14,
@@ -171,7 +319,7 @@ class MenuSurface extends StatelessWidget {
           ),
           child: Material(
             color: menuBackground,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
             child: LayoutBuilder(
               builder: (context, bounds) => Padding(
                 padding: EdgeInsets.symmetric(
@@ -203,21 +351,18 @@ class MenuHeading extends StatelessWidget {
   final Widget? trailing;
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 10, bottom: 18),
+    padding: EdgeInsets.only(top: 10, bottom: 18),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (eyebrow != null) ...[
-          MenuSection(eyebrow!),
-          const SizedBox(height: 8),
-        ],
+        if (eyebrow != null) ...[MenuSection(eyebrow!), SizedBox(height: 8)],
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   color: menuText,
                   fontSize: 30,
                   height: 1.1,
@@ -226,18 +371,14 @@ class MenuHeading extends StatelessWidget {
                 ),
               ),
             ),
-            if (trailing != null) ...[const SizedBox(width: 8), trailing!],
+            if (trailing != null) ...[SizedBox(width: 8), trailing!],
           ],
         ),
         if (subtitle != null) ...[
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           Text(
             subtitle!,
-            style: const TextStyle(
-              color: menuMuted,
-              fontSize: 13,
-              height: 1.45,
-            ),
+            style: TextStyle(color: menuMuted, fontSize: 13, height: 1.45),
           ),
         ],
       ],
@@ -251,7 +392,7 @@ class MenuSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(
     text.toUpperCase(),
-    style: const TextStyle(
+    style: TextStyle(
       color: menuGold,
       fontSize: 10,
       letterSpacing: 1.8,
@@ -277,9 +418,7 @@ class MenuPanel extends StatelessWidget {
       gradient: LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: selected
-            ? [const Color(0xFF2C4140), menuPanel]
-            : [menuRaised, menuPanel],
+        colors: selected ? [menuHighlight, menuPanel] : [menuRaised, menuPanel],
       ),
       borderRadius: BorderRadius.circular(20),
       border: Border.all(color: selected ? menuGold.withAlpha(180) : menuLine),
@@ -338,13 +477,13 @@ class MenuIconButton extends StatelessWidget {
     tooltip: tooltip,
     onPressed: uiAction(context, onPressed),
     style: IconButton.styleFrom(
-      minimumSize: const Size(44, 44),
-      maximumSize: const Size(44, 44),
+      minimumSize: Size(44, 44),
+      maximumSize: Size(44, 44),
       backgroundColor: menuPanel,
       foregroundColor: menuText,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: menuLine),
+        side: BorderSide(color: menuLine),
       ),
     ),
     icon: Badge(
@@ -356,49 +495,46 @@ class MenuIconButton extends StatelessWidget {
 }
 
 class MenuPill extends StatelessWidget {
-  const MenuPill(
-    this.text, {
-    super.key,
-    this.icon,
-    this.leading,
-    this.accent = menuGold,
-  });
+  const MenuPill(this.text, {super.key, this.icon, this.leading, this.accent});
   final String text;
   final IconData? icon;
 
   /// Replaces [icon] with a custom mark, such as the painted coin.
   final Widget? leading;
-  final Color accent;
+  final Color? accent;
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-    decoration: BoxDecoration(
-      color: accent.withAlpha(14),
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: accent.withAlpha(60)),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (leading != null || icon != null) ...[
-          leading ?? Icon(icon, size: 16, color: accent),
-          const SizedBox(width: 6),
-        ],
-        Flexible(
-          child: Text(
-            text,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: accent,
-              fontWeight: FontWeight.w800,
-              fontSize: 12,
+  Widget build(BuildContext context) {
+    final accent = this.accent ?? menuGold;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: accent.withAlpha(14),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: accent.withAlpha(60)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (leading != null || icon != null) ...[
+            leading ?? Icon(icon, size: 16, color: accent),
+            const SizedBox(width: 6),
+          ],
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: accent,
+                fontWeight: FontWeight.w800,
+                fontSize: 12,
+              ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
 class MenuAction extends StatelessWidget {
@@ -422,7 +558,7 @@ class MenuAction extends StatelessWidget {
       color: menuPanel,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: const BorderSide(color: menuLine),
+        side: BorderSide(color: menuLine),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -447,7 +583,7 @@ class MenuAction extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: menuText,
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -457,7 +593,7 @@ class MenuAction extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         subtitle!,
-                        style: const TextStyle(color: menuMuted, fontSize: 12),
+                        style: TextStyle(color: menuMuted, fontSize: 12),
                       ),
                     ],
                   ],
@@ -465,11 +601,7 @@ class MenuAction extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               trailing ??
-                  const Icon(
-                    Icons.arrow_forward_rounded,
-                    size: 18,
-                    color: menuMuted,
-                  ),
+                  Icon(Icons.arrow_forward_rounded, size: 18, color: menuMuted),
             ],
           ),
         ),
@@ -513,7 +645,7 @@ class MenuToggle extends StatelessWidget {
               ? null
               : Text(
                   subtitle!,
-                  style: const TextStyle(fontSize: 11, color: menuMuted),
+                  style: TextStyle(fontSize: 11, color: menuMuted),
                 ),
           value: value,
           onChanged: uiChange(context, onChanged),
@@ -526,6 +658,152 @@ class MenuToggle extends StatelessWidget {
 /// A 0-100 volume row matching the pause menu: the icon mutes and restores,
 /// the slider sets the level, and [onChangeEnd] fires once the drag ends so
 /// the caller can save.
+/// Temporary picker for comparing menu themes. Each tile previews its own
+/// palette: background, panel, accent button and second accent.
+class UiThemePicker extends StatelessWidget {
+  const UiThemePicker({
+    super.key,
+    required this.value,
+    required this.onChanged,
+  });
+  final UiTheme value;
+  final ValueChanged<UiTheme> onChanged;
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, bounds) {
+      final columns = bounds.maxWidth >= 520 ? 3 : 2;
+      final width = (bounds.maxWidth - 10 * (columns - 1)) / columns;
+      return Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          for (final theme in UiTheme.values)
+            SizedBox(
+              width: width,
+              child: _ThemeTile(
+                theme: theme,
+                selected: theme == value,
+                onTap: () => onChanged(theme),
+              ),
+            ),
+        ],
+      );
+    },
+  );
+}
+
+class _ThemeTile extends StatelessWidget {
+  const _ThemeTile({
+    required this.theme,
+    required this.selected,
+    required this.onTap,
+  });
+  final UiTheme theme;
+  final bool selected;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    final p = UiPalette.themes[theme]!;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '${theme.label} theme',
+      child: Material(
+        color: p.background,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          key: ValueKey('ui-theme-${theme.name}'),
+          borderRadius: BorderRadius.circular(16),
+          onTap: uiAction(context, onTap),
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: selected ? p.accent : p.line,
+                width: selected ? 2.5 : 1,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  height: 28,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: p.accent,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Icon(
+                    Icons.play_arrow_rounded,
+                    size: 20,
+                    color: p.onAccent,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  height: 22,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: p.panel,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: p.line),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: p.muted.withAlpha(110),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: p.secondary,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        theme.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: p.text,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    if (selected)
+                      Icon(
+                        Icons.check_circle_rounded,
+                        size: 16,
+                        color: p.accent,
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class MenuVolumeSlider extends StatelessWidget {
   const MenuVolumeSlider({
     super.key,
@@ -590,10 +868,7 @@ class MenuVolumeSlider extends StatelessWidget {
                         if (showSubtitle)
                           Text(
                             subtitle!,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: menuMuted,
-                            ),
+                            style: TextStyle(fontSize: 11, color: menuMuted),
                           ),
                       ],
                     ),
@@ -672,7 +947,7 @@ class MenuTabs extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                     side: minimal
                         ? BorderSide.none
-                        : const BorderSide(color: menuLine),
+                        : BorderSide(color: menuLine),
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
@@ -749,8 +1024,12 @@ class MenuBackdrop extends CustomPainter {
     canvas.drawRect(
       Offset.zero & size,
       Paint()
-        ..shader = const LinearGradient(
-          colors: [Color(0xFF243D3F), menuBackground, Color(0xFF152429)],
+        ..shader = LinearGradient(
+          colors: [
+            menuRaised,
+            menuBackground,
+            Color.lerp(menuBackground, Colors.black, .2)!,
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ).createShader(Offset.zero & size),

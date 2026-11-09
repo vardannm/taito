@@ -219,7 +219,7 @@ class _CaptureLobbyState extends State<CaptureLobby> {
               children: [
                 Text(
                   widget.levelCapture ? 'Level capture' : 'App Store capture',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: menuText,
                     fontSize: 30,
                     fontWeight: FontWeight.w800,
@@ -230,7 +230,7 @@ class _CaptureLobbyState extends State<CaptureLobby> {
                   widget.levelCapture
                       ? 'Choose any Classic level and play with two fingers. After the level ends, export its JSON file to replay on another device. Normal progress is untouched.'
                       : 'A separate Infinite run with the same seed every time. Play with two fingers. Inputs save in the background; each new take replaces the saved take. Normal progress is untouched.',
-                  style: const TextStyle(color: menuMuted, height: 1.5),
+                  style: TextStyle(color: menuMuted, height: 1.5),
                 ),
                 const SizedBox(height: 24),
                 OutlinedButton.icon(
@@ -276,7 +276,7 @@ class _CaptureLobbyState extends State<CaptureLobby> {
                     bundledInfo!,
                     key: const ValueKey('bundled-take-info'),
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: menuMuted),
+                    style: TextStyle(color: menuMuted),
                   ),
                   FilledButton(
                     onPressed: () => play(bundled),
@@ -284,7 +284,7 @@ class _CaptureLobbyState extends State<CaptureLobby> {
                   ),
                 ],
                 const SizedBox(height: 18),
-                const Text(
+                Text(
                   'To send a take: pause → Finish & save → Export JSON file → Save to Files. On wide screens, double-tap the top-right corner to pause recording. Replay starts after a 3-second countdown; trim that countdown from the video.',
                   style: TextStyle(color: menuMuted, height: 1.5),
                 ),
@@ -681,7 +681,7 @@ class _CaptureScreenState extends State<CaptureScreen>
                           : 'Level ended')
                     : 'Paused',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   color: menuText,
                   fontSize: 30,
                   fontWeight: FontWeight.w800,
@@ -693,7 +693,7 @@ class _CaptureScreenState extends State<CaptureScreen>
                     ? '${(ticks / captureHz).toStringAsFixed(1)} seconds · ${game.score} points'
                     : 'Level ${game.level} · ${game.completed}/10 targets · ${(ticks / captureHz).toStringAsFixed(1)} seconds',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: menuMuted),
+                style: TextStyle(color: menuMuted),
               ),
               if (error != null)
                 Text(
@@ -785,7 +785,7 @@ class _CaptureScreenState extends State<CaptureScreen>
             ValueListenableBuilder(
               valueListenable: frame,
               builder: (context, _, _) => game.waitingForInput
-                  ? const IgnorePointer(
+                  ? IgnorePointer(
                       child: Center(
                         child: Text(
                           'Move both handles to start',
@@ -800,7 +800,7 @@ class _CaptureScreenState extends State<CaptureScreen>
               child: Center(
                 child: Text(
                   '$countdown',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: menuText,
                     fontSize: 96,
                     fontWeight: FontWeight.w800,

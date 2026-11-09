@@ -27,9 +27,7 @@ class RunCoinSummary extends StatelessWidget {
         vertical: compact ? 7 : 15,
       ),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF26362F), Color(0xFF162C30)],
-        ),
+        gradient: LinearGradient(colors: [menuRaised, menuPanel]),
         border: Border.all(color: menuGold.withAlpha(80)),
         borderRadius: BorderRadius.circular(compact ? 18 : 22),
       ),
@@ -45,7 +43,7 @@ class RunCoinSummary extends StatelessWidget {
           if (compact) ...[
             Text(
               unlimited ? '∞' : '$wallet',
-              style: const TextStyle(
+              style: TextStyle(
                 color: menuGold,
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
@@ -55,7 +53,7 @@ class RunCoinSummary extends StatelessWidget {
             const SizedBox(width: 10),
             Text(
               '+$collected',
-              style: const TextStyle(
+              style: TextStyle(
                 color: menuMint,
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
@@ -97,7 +95,7 @@ class RunCoinSummary extends StatelessWidget {
     children: [
       Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           color: menuMuted,
           fontSize: 10,
           fontWeight: FontWeight.w600,

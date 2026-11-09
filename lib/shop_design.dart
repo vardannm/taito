@@ -26,7 +26,7 @@ class ShopRevealRoute extends PageRouteBuilder<void> {
              : const Duration(milliseconds: 360),
          pageBuilder: (context, animation, secondaryAnimation) =>
              AnnotatedRegion<SystemUiOverlayStyle>(
-               value: const SystemUiOverlayStyle(
+               value: SystemUiOverlayStyle(
                  statusBarColor: Colors.transparent,
                  statusBarIconBrightness: Brightness.light,
                  statusBarBrightness: Brightness.dark,
@@ -118,7 +118,7 @@ class ShopPurchaseButton extends StatelessWidget {
     style: FilledButton.styleFrom(
       backgroundColor: menuGold,
       foregroundColor: menuBackground,
-      disabledBackgroundColor: equipped ? const Color(0xFF233D39) : menuRaised,
+      disabledBackgroundColor: equipped ? menuHighlight : menuRaised,
       disabledForegroundColor: equipped ? menuMint : menuMuted,
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
       minimumSize: const Size(96, 48),

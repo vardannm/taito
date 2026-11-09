@@ -170,8 +170,8 @@ class PremiumMenuBackdrop extends CustomPainter {
             night.withAlpha(150),
             night.withAlpha(60),
             night.withAlpha(40),
-            menuBackground.withAlpha(185),
-            menuBackground,
+            menuSceneryShade.withAlpha(185),
+            menuSceneryShade,
           ],
         ).createShader(Offset.zero & size),
     );
@@ -375,7 +375,7 @@ class MenuBallStage extends CustomPainter {
           ..close();
         canvas.drawPath(
           side,
-          Paint()..color = Color.lerp(color, menuBackground, .55)!,
+          Paint()..color = Color.lerp(color, menuSceneryShade, .55)!,
         );
         canvas.drawPath(
           top,
@@ -398,7 +398,7 @@ class MenuBallStage extends CustomPainter {
               fontFamily: 'sans-serif',
               fontSize: r * .19,
               fontWeight: FontWeight.w800,
-              color: menuBackground.withAlpha(170),
+              color: menuSceneryShade.withAlpha(170),
             ),
           ),
           textDirection: TextDirection.ltr,
@@ -468,10 +468,10 @@ class _PremiumPlayButtonState extends State<PremiumPlayButton> {
           height: widget.height,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            gradient: const LinearGradient(
+            gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFFF5D9A0), Color(0xFFDDB574)],
+              colors: [Color.lerp(menuGold, Colors.white, .3)!, menuGold],
             ),
             boxShadow: [
               BoxShadow(
@@ -479,7 +479,10 @@ class _PremiumPlayButtonState extends State<PremiumPlayButton> {
                 blurRadius: 22,
                 offset: const Offset(0, 9),
               ),
-              const BoxShadow(color: Color(0xFF99783F), offset: Offset(0, 3)),
+              BoxShadow(
+                color: Color.lerp(menuGold, Colors.black, .4)!,
+                offset: const Offset(0, 3),
+              ),
             ],
           ),
           child: Material(
@@ -502,9 +505,9 @@ class _PremiumPlayButtonState extends State<PremiumPlayButton> {
                           fit: BoxFit.scaleDown,
                           child: Text(
                             widget.label,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: 'sans-serif',
-                              color: Color(0xFF243239),
+                              color: menuOnAccent,
                               fontSize: 19,
                               letterSpacing: 4,
                               fontWeight: FontWeight.w800,
@@ -513,10 +516,10 @@ class _PremiumPlayButtonState extends State<PremiumPlayButton> {
                         ),
                       ),
                     ),
-                    const Icon(
+                    Icon(
                       Icons.play_arrow_rounded,
                       size: 24,
-                      color: Color(0xFF243239),
+                      color: menuOnAccent,
                     ),
                   ],
                 ),
@@ -561,7 +564,7 @@ class MenuQuietButton extends StatelessWidget {
               Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  Icon(icon, size: 21, color: menuMuted),
+                  Icon(icon, size: 21, color: menuSceneryMuted),
                   if (badge)
                     Positioned(
                       right: -4,
@@ -569,7 +572,7 @@ class MenuQuietButton extends StatelessWidget {
                       child: Container(
                         width: 5,
                         height: 5,
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           color: menuGold,
                           shape: BoxShape.circle,
                         ),
@@ -586,10 +589,10 @@ class MenuQuietButton extends StatelessWidget {
                       fit: BoxFit.scaleDown,
                       child: Text(
                         label!,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'sans-serif',
                           fontSize: 10,
-                          color: menuMuted,
+                          color: menuSceneryMuted,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -645,12 +648,12 @@ class MenuBestScore extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.emoji_events_outlined, color: menuGold, size: 15),
+          Icon(Icons.emoji_events_outlined, color: menuGold, size: 15),
           const SizedBox(width: 7),
-          const Text(
+          Text(
             'BEST',
             style: TextStyle(
-              color: menuMuted,
+              color: menuSceneryMuted,
               fontSize: 10,
               letterSpacing: 1.5,
               fontWeight: FontWeight.w600,
@@ -661,7 +664,7 @@ class MenuBestScore extends StatelessWidget {
             formatCompactScore(score),
             key: const ValueKey('menu-best-score'),
             style: TextStyle(
-              color: menuText,
+              color: menuSceneryText,
               fontSize: scoreFontSize(18, formatCompactScore(score)),
               fontWeight: FontWeight.w600,
             ),
@@ -685,13 +688,13 @@ class MenuEarnedStars extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.star_rounded, color: menuGold, size: 25),
+          Icon(Icons.star_rounded, color: menuGold, size: 25),
           const SizedBox(width: 7),
           Text(
             formatMenuScore(stars),
             key: const ValueKey('menu-earned-stars'),
-            style: const TextStyle(
-              color: menuText,
+            style: TextStyle(
+              color: menuSceneryText,
               fontSize: 22,
               fontWeight: FontWeight.w600,
             ),
@@ -750,8 +753,8 @@ class MenuActionButton extends StatelessWidget {
     style: FilledButton.styleFrom(
       backgroundColor: glass.withAlpha(140),
       disabledBackgroundColor: glass.withAlpha(140),
-      foregroundColor: menuText,
-      disabledForegroundColor: menuText.withAlpha(150),
+      foregroundColor: menuSceneryText,
+      disabledForegroundColor: menuSceneryText.withAlpha(150),
       padding: const EdgeInsets.symmetric(horizontal: 12),
       side: BorderSide(
         color: Color.lerp(Colors.white, tint, .4)!.withAlpha(55),

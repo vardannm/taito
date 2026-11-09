@@ -35,7 +35,7 @@ class ShopHeader extends StatelessWidget {
           icon: Icons.arrow_back_ios_new_rounded,
         ),
         const SizedBox(width: 6),
-        const Expanded(
+        Expanded(
           child: FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
@@ -120,7 +120,7 @@ class ShopShowcase extends StatelessWidget {
                     fit: BoxFit.scaleDown,
                     child: Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: menuGold,
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
@@ -130,9 +130,7 @@ class ShopShowcase extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
-                  child: Divider(color: Color(0xFF385054), height: 1),
-                ),
+                Expanded(child: Divider(color: menuLine, height: 1)),
               ],
             ),
           ),
@@ -140,7 +138,7 @@ class ShopShowcase extends StatelessWidget {
           Text(
             '${(index + 1).toString().padLeft(2, '0')} / $count',
             key: ValueKey(compact ? 'platform-position' : 'ball-position'),
-            style: const TextStyle(
+            style: TextStyle(
               color: menuMuted,
               fontSize: 10,
               fontFeatures: [FontFeature.tabularFigures()],
@@ -211,7 +209,7 @@ class ShopShowcase extends StatelessWidget {
           decoration: BoxDecoration(
             color: menuPanel.withAlpha(180),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF3C5151)),
+            border: Border.all(color: menuLine),
           ),
           child: Row(
             children: [
@@ -222,7 +220,7 @@ class ShopShowcase extends StatelessWidget {
                     Text(
                       name,
                       key: const ValueKey('platform-name'),
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: menuText,
                         fontSize: 17,
                         fontWeight: FontWeight.w500,
@@ -232,7 +230,7 @@ class ShopShowcase extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       '+${formatBoost(bonus)}× Infinite points',
-                      style: const TextStyle(color: menuGold, fontSize: 10),
+                      style: TextStyle(color: menuGold, fontSize: 10),
                     ),
                   ],
                 ),
@@ -262,7 +260,7 @@ class ShopShowcase extends StatelessWidget {
         Text(
           subtitle,
           textAlign: TextAlign.center,
-          style: const TextStyle(color: menuMuted, fontSize: 10, height: 1.4),
+          style: TextStyle(color: menuMuted, fontSize: 10, height: 1.4),
         ),
         if (magnet != null)
           Padding(
@@ -270,7 +268,7 @@ class ShopShowcase extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const SizedBox.square(
+                SizedBox.square(
                   dimension: 14,
                   child: CustomPaint(painter: _MagnetPainter(menuGold)),
                 ),
@@ -279,7 +277,7 @@ class ShopShowcase extends StatelessWidget {
                   child: Text(
                     magnet!,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: menuGold, fontSize: 10),
+                    style: TextStyle(color: menuGold, fontSize: 10),
                   ),
                 ),
               ],
@@ -291,11 +289,11 @@ class ShopShowcase extends StatelessWidget {
           decoration: BoxDecoration(
             color: menuPanel.withAlpha(180),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF3C5151)),
+            border: Border.all(color: menuLine),
           ),
           child: Row(
             children: [
-              const Icon(Icons.bolt_rounded, color: menuGold, size: 24),
+              Icon(Icons.bolt_rounded, color: menuGold, size: 24),
               const SizedBox(width: 7),
               Expanded(
                 child: Column(
@@ -307,7 +305,7 @@ class ShopShowcase extends StatelessWidget {
                       child: Text(
                         '+${formatBoost(bonus)}×',
                         maxLines: 1,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: menuGold,
                           fontSize: 22,
                           height: 1.05,
@@ -316,7 +314,7 @@ class ShopShowcase extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 3),
-                    const Text(
+                    Text(
                       'Infinite points',
                       style: TextStyle(
                         color: menuMuted,
@@ -360,9 +358,9 @@ class _BrowseArrow extends StatelessWidget {
       maximumSize: const Size(48, 48),
       foregroundColor: menuText,
       disabledForegroundColor: menuLine,
-      backgroundColor: const Color(0xFF1B3034),
-      disabledBackgroundColor: const Color(0xFF192A2E),
-      side: const BorderSide(color: Color(0xFF385054)),
+      backgroundColor: menuRaised,
+      disabledBackgroundColor: menuPanel,
+      side: BorderSide(color: menuLine),
       shape: const CircleBorder(),
     ),
     icon: Icon(
@@ -384,7 +382,7 @@ class _PriceTag extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
     decoration: BoxDecoration(
-      color: const Color(0xFF14272C),
+      color: menuPanel,
       borderRadius: BorderRadius.circular(20),
       border: Border.all(color: (owned ? menuMint : menuGold).withAlpha(100)),
     ),
@@ -394,7 +392,7 @@ class _PriceTag extends StatelessWidget {
         if (!owned)
           const CoinIcon(size: 14)
         else
-          const Icon(Icons.check_rounded, size: 13, color: menuMint),
+          Icon(Icons.check_rounded, size: 13, color: menuMint),
         const SizedBox(width: 5),
         Text(
           owned ? 'OWNED' : formatShopPrice(cost),
@@ -406,7 +404,7 @@ class _PriceTag extends StatelessWidget {
           ),
         ),
         if (premium)
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(left: 4),
             child: Icon(Icons.auto_awesome_rounded, size: 12, color: menuGold),
           ),
@@ -577,14 +575,14 @@ class ShopUpgradePanel extends StatelessWidget {
     key: const ValueKey('shop-upgrades'),
     padding: const EdgeInsets.fromLTRB(16, 16, 12, 10),
     decoration: BoxDecoration(
-      color: const Color(0xFF182A2E),
+      color: menuPanel,
       borderRadius: BorderRadius.circular(22),
-      border: Border.all(color: const Color(0xFF354B4E)),
+      border: Border.all(color: menuLine),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Row(
+        Row(
           children: [
             Expanded(
               child: Text(
@@ -619,7 +617,7 @@ class ShopUpgradePanel extends StatelessWidget {
             onClosed: onWalletChanged,
           ),
         const SizedBox(height: 6),
-        const Text(
+        Text(
           'For Infinite. Extra hearts apply to your next run.',
           textAlign: TextAlign.center,
           style: TextStyle(color: menuMuted, fontSize: 9, height: 1.4),
@@ -682,7 +680,7 @@ class ShopUpgradePanel extends StatelessWidget {
                           Expanded(
                             child: Text(
                               name,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: menuText,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
@@ -691,10 +689,7 @@ class ShopUpgradePanel extends StatelessWidget {
                           ),
                           Text(
                             '$level/${upgrade.maxLevel}',
-                            style: const TextStyle(
-                              color: menuMuted,
-                              fontSize: 9,
-                            ),
+                            style: TextStyle(color: menuMuted, fontSize: 9),
                           ),
                         ],
                       ),
@@ -704,14 +699,14 @@ class ShopUpgradePanel extends StatelessWidget {
                         children: [
                           Text(
                             value(level),
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: menuMuted,
                               fontSize: 9,
                               height: 1.3,
                             ),
                           ),
                           if (!maxed)
-                            const Padding(
+                            Padding(
                               padding: EdgeInsets.symmetric(horizontal: 3),
                               child: Icon(
                                 Icons.arrow_forward_rounded,
@@ -724,7 +719,7 @@ class ShopUpgradePanel extends StatelessWidget {
                               maxed
                                   ? ' · Max level'
                                   : '${value(level + 1)}${upgrade == SurvivalUpgrade.hearts ? ' hearts' : ' duration'}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: menuMuted,
                                 fontSize: 9,
                                 height: 1.3,
@@ -742,9 +737,7 @@ class ShopUpgradePanel extends StatelessWidget {
                                 height: 4,
                                 margin: const EdgeInsets.only(right: 4),
                                 decoration: BoxDecoration(
-                                  color: i < level
-                                      ? tint
-                                      : const Color(0xFF34494D),
+                                  color: i < level ? tint : menuLine,
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                               ),

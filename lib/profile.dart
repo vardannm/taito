@@ -497,6 +497,9 @@ class PlayerProfile {
   Future<void> _tutorialWrites = Future<void>.value();
   ControlMode _controlMode = ControlMode.twoFinger;
   bool haloJoystick = false;
+
+  /// Menu color theme being trialled, by `UiTheme` name.
+  String uiTheme = 'deepTeal';
   bool _oneFingerPadAvailable = true;
   bool get oneFingerPadAvailable => _oneFingerPadAvailable;
   bool _needsInitialControlDefault = false;
@@ -818,6 +821,7 @@ class PlayerProfile {
       soundVolume = savedSound.isFinite ? savedSound.clamp(0.0, 1.0) : 1;
       musicVolume = savedMusic.isFinite ? savedMusic.clamp(0.0, 1.0) : 1;
       haptics = await storage.getBool('gilt.haptics') ?? true;
+      uiTheme = await storage.getString('gilt.uiTheme') ?? uiTheme;
       _loadRecords(await storage.getString('gilt.mastery.v1'));
       final legacyMaze = await storage.getString('gilt.maze.v1');
       _loadEconomy(await storage.getString(_economyKey));
@@ -875,6 +879,7 @@ class PlayerProfile {
       await storage.setDouble('gilt.soundVolume', soundVolume);
       await storage.setDouble('gilt.musicVolume', musicVolume);
       await storage.setBool('gilt.haptics', haptics);
+      await storage.setString('gilt.uiTheme', uiTheme);
       await storage.setBool(
         'gilt.oneFinger',
         _controlMode == ControlMode.oneFinger,
