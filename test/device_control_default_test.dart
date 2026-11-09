@@ -30,9 +30,7 @@ void main() {
       final profile = PlayerProfile();
       await profile.load();
       profile.sound = profile.music = profile.haptics = false;
-      final expected = size.shortestSide >= 600
-          ? ControlMode.twoFinger
-          : ControlMode.oneFinger;
+      const expected = ControlMode.twoFinger;
       await tester.pumpWidget(ArcadeApp(profile: profile));
       final game = tester.widget<PivotBoard>(find.byType(PivotBoard)).game;
       expect(profile.controlMode, expected);
@@ -42,31 +40,24 @@ void main() {
       await tester.runAsync(() async {
         final reloaded = PlayerProfile();
         await reloaded.load();
-        reloaded.applyInitialControlDefault(
-          shortestSide: expected == ControlMode.oneFinger ? 820 : 390,
-        );
+        expect(reloaded.applyInitialControlDefault(shortestSide: 390), isFalse);
         expect(reloaded.controlMode, expected);
       });
 
-      // Expanding hides the original pad; an unchanged control keeps its input.
+      // Crossing the layout threshold keeps the active two-finger input.
       game.beginInput();
       game.grabPivot(0);
       game.dragPivot(0, -10);
       final epoch = game.inputEpoch;
       final target = game.pivotTargets[0];
-      tester.view.physicalSize = expected == ControlMode.oneFinger
+      tester.view.physicalSize = size.shortestSide < 600
           ? const Size(1640, 2360)
           : const Size(780, 1688);
       await tester.pump();
       expect(game.controlMode, ControlMode.twoFinger);
       expect(profile.preferredControlMode, expected);
-      if (expected == ControlMode.oneFinger) {
-        expect(game.inputEpoch, greaterThan(epoch));
-        expect(game.pivotTargets[0], isNull);
-      } else {
-        expect(game.inputEpoch, epoch);
-        expect(game.pivotTargets[0], target);
-      }
+      expect(game.inputEpoch, epoch);
+      expect(game.pivotTargets[0], target);
       tester.view.physicalSize = size * 2;
       await tester.pump();
       expect(game.controlMode, expected);
@@ -95,6 +86,12 @@ void main() {
           oneFinger ? ControlMode.oneFinger : ControlMode.twoFinger,
         );
       }
+      await storage.remove('gilt.oneFinger');
+      await storage.setBool('gilt.haloJoystick', true);
+      final halo = PlayerProfile();
+      await halo.load();
+      expect(halo.applyInitialControlDefault(shortestSide: 820), isFalse);
+      expect(halo.controlMode, ControlMode.oneFinger);
     },
   );
 

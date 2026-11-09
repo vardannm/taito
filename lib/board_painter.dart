@@ -843,7 +843,7 @@ class BoardPainter extends CustomPainter {
       paintInfiniteEnergy(canvas, game, reducedMotion);
     }
     // Short, fading wake behind the ball. This never changes hit geometry.
-    if (game.phase == GamePhase.playing && game.started) {
+    if (game.infinite && game.phase == GamePhase.playing && game.started) {
       final energy = (game.motionSpeed / 220).clamp(0.0, 1.0);
       final tint = Color.lerp(
         const Color(0xFF62E4D3),
@@ -928,6 +928,7 @@ class BoardPainter extends CustomPainter {
       game.renderPlatformStyle,
       time: game.clock,
       reducedMotion: reducedMotion,
+      particlesEnabled: game.infinite,
     );
     canvas.restore();
     paintGapWarning(canvas, game, reducedMotion);
@@ -982,7 +983,7 @@ class BoardPainter extends CustomPainter {
     }
     if (!game.merging && game.ballScale > 0) {
       final p = Offset(game.visualX, game.screenY(game.visualY));
-      if (!reducedMotion)
+      if (game.infinite && !reducedMotion)
         paintCosmeticTrail(
           canvas,
           p,
@@ -1006,6 +1007,7 @@ class BoardPainter extends CustomPainter {
         rotation: game.ballRotation,
         reducedMotion: reducedMotion,
         steelPalette: palette.ball,
+        particlesEnabled: game.infinite,
       );
       paintInfiniteMagnet(canvas, game, reducedMotion);
       paintInfiniteShield(canvas, game, reducedMotion);

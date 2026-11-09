@@ -35,6 +35,81 @@ List<(double, double)> _ringArcs(LaserRing ring, double time) {
   ];
 }
 
+void _paintColossusMine(
+  Canvas canvas,
+  Offset center,
+  LateEnemyShot shot,
+  Color cyan,
+  Color violet,
+) {
+  final charging = shot.age < 0;
+  if (!charging && !shot.visible) return;
+
+  const midnight = Color(0xFF121127), ice = Color(0xFFE9FBFF);
+  final radius = shot.radius;
+  final disk = Rect.fromCircle(center: center, radius: radius);
+  // The fill marks the entire blast area, and the rim marks its fixed edge.
+  final field = charging
+      ? const RadialGradient(colors: [Color(0xDC34325F), Color(0xEE18152F)])
+      : const RadialGradient(colors: [Color(0xFF4C357D), Color(0xFF221C46)]);
+  canvas.drawCircle(
+    center,
+    radius,
+    Paint()..shader = field.createShader(disk),
+  );
+  canvas.drawCircle(center, radius, _outline(midnight, 4));
+  canvas.drawCircle(center, radius, _outline(charging ? violet : cyan, 1.5));
+
+  if (charging) {
+    final progress = (1 + shot.age / InfiniteBoss.mineWarning).clamp(0.0, 1.0);
+    final dial = Path();
+    final track = disk.deflate(radius * .15);
+    for (var i = 0; i < 12; i++) {
+      dial.addArc(track, -math.pi / 2 + i * math.pi / 6 + .06, .40);
+    }
+    canvas.drawPath(dial, _outline(violet.withAlpha(125), 1.25));
+    canvas.drawArc(
+      track,
+      -math.pi / 2,
+      math.pi * 2 * progress,
+      false,
+      _outline(cyan, 2.5),
+    );
+  } else {
+    // Three branches reach across the disk during the active discharge.
+    final arcs = Path();
+    for (var i = 0; i < 3; i++) {
+      final angle = -math.pi / 2 + i * math.pi * 2 / 3;
+      final axis = Offset(math.cos(angle), math.sin(angle)) * radius;
+      final side = Offset(-axis.dy, axis.dx);
+      final elbow = center + axis * .29 + side * .16;
+      final bend = center + axis * .46 - side * .09;
+      final tip = center + axis * .85 + side * .05;
+      final fork = center + axis * .63 - side * .45;
+      arcs
+        ..moveTo(center.dx, center.dy)
+        ..lineTo(elbow.dx, elbow.dy)
+        ..lineTo(bend.dx, bend.dy)
+        ..lineTo(tip.dx, tip.dy)
+        ..moveTo(bend.dx, bend.dy)
+        ..lineTo(fork.dx, fork.dy);
+    }
+    canvas.drawPath(arcs, _outline(violet, 6));
+    canvas.drawPath(arcs, _outline(cyan, 3));
+    canvas.drawPath(arcs, _outline(ice, 1));
+  }
+
+  final coreWidth = radius * .15, coreHeight = radius * .25;
+  final core = Path()
+    ..moveTo(center.dx, center.dy - coreHeight)
+    ..lineTo(center.dx + coreWidth, center.dy)
+    ..lineTo(center.dx, center.dy + coreHeight)
+    ..lineTo(center.dx - coreWidth, center.dy)
+    ..close();
+  canvas.drawPath(core, Paint()..color = charging ? midnight : ice);
+  canvas.drawPath(core, _outline(cyan, 1.25));
+}
+
 /// Shared shot geometry keeps the aim warnings, pools and laser hitboxes in
 /// agreement. Bullets are batched; the encounter uses no blur or saveLayer.
 void paintInfiniteBoss(Canvas canvas, BalanceGame game, bool reducedMotion) {
@@ -173,44 +248,7 @@ void paintInfiniteBoss(Canvas canvas, BalanceGame game, bool reducedMotion) {
         bulletCores.addOval(Rect.fromCircle(center: at, radius: 2));
       }
     } else if (shot.kind == LateShotKind.mine) {
-      const black = Color(0xFF08090B), laserRed = Color(0xFFF13735);
-      final stripes = Path();
-      final direction = Offset(math.cos(.35), math.sin(.35));
-      final normal = Offset(-direction.dy, direction.dx);
-      for (final offset in [-24.0, -12.0, 0.0, 12.0, 24.0]) {
-        final center = at + normal * offset;
-        final half = math.sqrt(shot.radius * shot.radius - offset * offset) - 4;
-        final a = center - direction * half, b = center + direction * half;
-        stripes.moveTo(a.dx, a.dy);
-        stripes.lineTo(b.dx, b.dy);
-      }
-      if (shot.age < 0) {
-        final progress = (1 + shot.age / InfiniteBoss.mineWarning).clamp(
-          0.0,
-          1.0,
-        );
-        canvas.drawCircle(at, shot.radius, Paint()..color = black);
-        canvas.drawPath(stripes, _outline(laserRed.withAlpha(65), 1));
-        canvas.drawCircle(
-          at,
-          shot.radius,
-          _outline(laserRed.withAlpha(95), 1.5),
-        );
-        canvas.drawArc(
-          Rect.fromCircle(center: at, radius: shot.radius),
-          -math.pi / 2,
-          math.pi * 2 * progress,
-          false,
-          _outline(laserRed, 3),
-        );
-      } else if (shot.visible) {
-        // The whole marked disk damages during the burst, including its center.
-        canvas.drawCircle(at, shot.radius + 2, Paint()..color = black);
-        canvas.drawCircle(at, shot.radius, _outline(laserRed, 2));
-        canvas.drawPath(stripes, _outline(const Color(0xFF8C1519), 7));
-        canvas.drawPath(stripes, _outline(laserRed, 3.5));
-        canvas.drawPath(stripes, _outline(const Color(0xFFFFB7A2), .8));
-      }
+      _paintColossusMine(canvas, at, shot, amber, hot);
     } else if (storm && shot.visible && shot.kind == LateShotKind.ricochet) {
       canvas.drawCircle(at, 9, Paint()..color = ink);
       canvas.drawCircle(at, 6, Paint()..color = colossusShotViolet);

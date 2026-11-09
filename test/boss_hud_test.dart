@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/infinite_boss.dart';
 import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/one_finger_controls.dart';
@@ -35,6 +36,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final p = PlayerProfile()
+      ..controlMode = ControlMode.oneFinger
       ..sound = false
       ..music = false
       ..haptics = false

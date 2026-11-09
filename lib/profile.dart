@@ -495,7 +495,7 @@ class PlayerProfile {
   bool tutorialSeen = false;
   TutorialProgress tutorial = TutorialProgress();
   Future<void> _tutorialWrites = Future<void>.value();
-  ControlMode _controlMode = ControlMode.oneFinger;
+  ControlMode _controlMode = ControlMode.twoFinger;
   bool haloJoystick = false;
   bool _oneFingerPadAvailable = true;
   bool get oneFingerPadAvailable => _oneFingerPadAvailable;
@@ -518,16 +518,14 @@ class PlayerProfile {
     _oneFingerPadAvailable = allowsOneFingerPad(shortestSide);
   }
 
-  /// Choose once from the first usable app window, including foldable screens.
+  /// Persist the default once the app has a usable window.
   bool applyInitialControlDefault({required double shortestSide}) {
     if (!_needsInitialControlDefault ||
         !shortestSide.isFinite ||
         shortestSide <= 0) {
       return false;
     }
-    controlMode = allowsOneFingerPad(shortestSide)
-        ? ControlMode.oneFinger
-        : ControlMode.twoFinger;
+    controlMode = ControlMode.twoFinger;
     return true;
   }
 
@@ -645,7 +643,7 @@ class PlayerProfile {
 
   Future<void> replayTutorial() {
     tutorialSeen = false;
-    tutorial = TutorialProgress();
+    tutorial = TutorialProgress(twoFingerReplay: true);
     return saveTutorial();
   }
 
@@ -791,15 +789,16 @@ class PlayerProfile {
       tutorialSeen = await storage.getBool('gilt.tutorial.v1.seen') ?? false;
       final savedOneFinger = await storage.getBool('gilt.oneFinger');
       haloJoystick = await storage.getBool('gilt.haloJoystick') ?? false;
-      controlMode = savedOneFinger == false
-          ? ControlMode.twoFinger
-          : ControlMode.oneFinger;
+      controlMode = (savedOneFinger ?? haloJoystick)
+          ? ControlMode.oneFinger
+          : ControlMode.twoFinger;
       final savedMode = await storage.getString('gilt.controlMode');
       controlMode =
           (ControlMode.values.where((m) => m.name == savedMode).firstOrNull ??
                   _controlMode)
               .supportedMode;
-      _needsInitialControlDefault = savedMode == null && savedOneFinger == null;
+      _needsInitialControlDefault =
+          savedMode == null && savedOneFinger == null && !haloJoystick;
       classicLevel = (await storage.getInt('gilt.classicLevel') ?? 1).clamp(
         1,
         ClassicLevels.count,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -12,7 +13,9 @@ import 'package:balance_arcade/tutorial_spotlight.dart';
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/infinite_boss.dart';
 import 'package:balance_arcade/late_enemies.dart';
-import 'package:balance_arcade/one_finger_controls.dart';
+import 'package:balance_arcade/menu_design.dart';
+import 'package:balance_arcade/premium_menu.dart';
+import 'package:balance_arcade/two_finger_feedback.dart';
 
 Future<void> frames(WidgetTester tester, [int count = 25]) async {
   for (var i = 0; i < count; i++) {
@@ -27,6 +30,18 @@ PlayerProfile profileAt(TutorialStep step) => PlayerProfile()
   ..tutorial = TutorialProgress(step: step);
 BalanceGame currentGame(WidgetTester tester) =>
     tester.widget<PivotBoard>(find.byType(PivotBoard)).game;
+Offset twoFingerContact(WidgetTester tester, int side) {
+  final board = find.byType(PivotBoard);
+  final size = tester.getSize(board);
+  final pivotBoard = tester.widget<PivotBoard>(board);
+  return tester.getTopLeft(board) +
+      TwoFingerFeedbackPainter.halfCenter(
+        pivotBoard.viewportFor(size, tester.view.physicalSize),
+        pivotBoard.game,
+        side,
+      );
+}
+
 Future<void> launch(WidgetTester tester, PlayerProfile profile) async {
   tester.view.physicalSize = const Size(320, 568);
   tester.view.devicePixelRatio = 1;
@@ -34,6 +49,12 @@ Future<void> launch(WidgetTester tester, PlayerProfile profile) async {
   await tester.pumpWidget(ArcadeApp(profile: profile));
   await frames(tester, 3);
 }
+
+Finder menuButton(String tooltip) =>
+    find.byWidgetPredicate((w) => w is MenuQuietButton && w.tooltip == tooltip);
+Finder shopBack() => find.byWidgetPredicate(
+  (w) => w is MenuBackButton && w.tooltip == 'Done shopping',
+);
 
 void simulate(BalanceGame game, TutorialRun tutorial, double seconds) {
   for (var i = 0; i < (seconds * 120).ceil(); i++) {
@@ -52,7 +73,7 @@ void main() {
     () async {
       final p = PlayerProfile();
       await p.load();
-      expect(p.controlMode, ControlMode.oneFinger);
+      expect(p.controlMode, ControlMode.twoFinger);
       expect(p.tutorial.step, TutorialStep.controls);
       p.controlMode = ControlMode.analog;
       await p.save();
@@ -73,6 +94,8 @@ void main() {
       await resumed.load();
       expect(resumed.tutorial.step, TutorialStep.freePlay);
       expect(resumed.tutorial.freePlaySeconds, 23);
+      expect(resumed.tutorial.twoFingerReplay, isTrue);
+      expect(resumed.preferredControlMode, ControlMode.oneFinger);
       expect(resumed.runs, 0);
       expect(resumed.wallet, 0);
       await resumed.completeTutorial();
@@ -282,42 +305,130 @@ void main() {
     },
   );
   testWidgets(
-    'first launch learns movement, skips, and replays from Settings',
+    'first launch practices tilt, lift and re-grab, then replays from Settings',
     (tester) async {
       final p = profileAt(TutorialStep.controls);
       await launch(tester, p);
       final g = currentGame(tester);
-      expect(g.oneFinger, isTrue);
-      expect(find.textContaining('Drag the thumb pad:'), findsOneWidget);
+      expect(g.controlMode, ControlMode.twoFinger);
+      expect(find.text('Tilt with one thumb'), findsOneWidget);
       await frames(tester);
       expect(p.tutorial.step, TutorialStep.controls);
-      final finger = await tester.startGesture(
-        tester.getCenter(find.byType(OneFingerControls)),
-      );
-      await finger.moveBy(const Offset(0, -30));
+      final spotlight = find.byType(TutorialSpotlight);
+      final layer = tester.renderObject<RenderBox>(spotlight);
+      final targets = tester
+          .widget<TutorialSpotlight>(spotlight)
+          .targets(layer);
+      expect(targets, hasLength(2));
+      for (final side in [0, 1]) {
+        final center = layer.localToGlobal(targets[side].center);
+        expect(
+          (center - twoFingerContact(tester, side)).distance,
+          lessThan(.01),
+        );
+      }
+      final left = await tester.startGesture(twoFingerContact(tester, 0));
+      await left.moveBy(const Offset(0, 30));
+      await frames(tester, 2);
+      expect(p.tutorial.step, TutorialStep.controlsLift);
+      await left.moveBy(const Offset(0, -30));
+      await frames(tester, 2);
+      expect(p.tutorial.step, TutorialStep.controlsLift);
+      final right = await tester.startGesture(twoFingerContact(tester, 1));
+      await left.moveBy(const Offset(0, -30));
+      await right.moveBy(const Offset(0, -30));
+      await frames(tester, 2);
+      expect(p.tutorial.step, TutorialStep.controlsRegrab);
+      await left.up();
+      await right.moveBy(const Offset(0, -20));
+      await frames(tester, 2);
+      expect(p.tutorial.step, TutorialStep.controlsRegrab);
+      await right.up();
+      await frames(tester, 2);
+      expect(p.tutorial.step, TutorialStep.controlsRegrab);
+      final leftAgain = await tester.startGesture(twoFingerContact(tester, 0));
+      final rightAgain = await tester.startGesture(twoFingerContact(tester, 1));
+      await leftAgain.moveBy(const Offset(0, -20));
+      await frames(tester, 2);
+      expect(p.tutorial.step, TutorialStep.controlsRegrab);
+      await rightAgain.moveBy(const Offset(0, -20));
       await frames(tester, 2);
       expect(p.tutorial.step, TutorialStep.heartsHoles);
-      expect(g.controlHeld, isTrue);
-      await finger.up();
+      expect(g.pivotHeld(0), isTrue);
+      expect(g.pivotHeld(1), isTrue);
+      await leftAgain.up();
+      await rightAgain.up();
       await tester.tap(find.byKey(const ValueKey('skip-tutorial')));
       await tester.pump();
       expect(p.tutorial.step, TutorialStep.completed);
       expect(g.tutorialCourse, isFalse);
-      await tester.tap(find.byTooltip('Pause'));
+      await tester.tap(find.byKey(const ValueKey('board-pause')));
       await tester.pump();
       await tester.ensureVisible(find.text('BACK TO MENU'));
       await tester.tap(find.text('BACK TO MENU'));
       await frames(tester, 35);
-      await tester.tap(find.byTooltip('Settings'));
+      await tester.tap(menuButton('Settings'));
       await frames(tester);
       await tester.tap(find.byKey(const ValueKey('replay-tutorial')));
       await frames(tester);
       expect(p.tutorial.step, TutorialStep.controls);
-      expect(currentGame(tester).oneFinger, isTrue);
+      expect(currentGame(tester).controlMode, ControlMode.twoFinger);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
     },
   );
+  testWidgets(
+    'keyboard players can tilt, lift, release and lift again',
+    variant: const TargetPlatformVariant({TargetPlatform.macOS}),
+    (tester) async {
+      final p = profileAt(TutorialStep.controls);
+      await launch(tester, p);
+      expect(find.text('Tilt one end'), findsOneWidget);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.keyS);
+      await frames(tester);
+      expect(p.tutorial.step, TutorialStep.controlsLift);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.keyS);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.keyW);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowUp);
+      await frames(tester);
+      expect(p.tutorial.step, TutorialStep.controlsRegrab);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.keyW);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowUp);
+      await frames(tester, 2);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.keyW);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowUp);
+      await frames(tester, 15);
+      expect(p.tutorial.step, TutorialStep.heartsHoles);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.keyW);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+  testWidgets('resumed replay uses Two-Finger and returns to the saved Halo', (
+    tester,
+  ) async {
+    final original = profileAt(TutorialStep.completed)
+      ..controlMode = ControlMode.oneFinger
+      ..haloJoystick = true;
+    await original.save();
+    await original.replayTutorial();
+    original.tutorial.step = TutorialStep.controlsRegrab;
+    await original.saveTutorial();
+    final resumed = PlayerProfile();
+    await resumed.load();
+    await launch(tester, resumed);
+    expect(resumed.preferredControlMode, ControlMode.oneFinger);
+    expect(currentGame(tester).controlMode, ControlMode.twoFinger);
+    expect(find.text('Release and grab again'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('skip-tutorial')));
+    await frames(tester, 40);
+    expect(currentGame(tester).controlMode, ControlMode.oneFinger);
+    expect(currentGame(tester).haloJoystick, isTrue);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   for (final step in [TutorialStep.controls, TutorialStep.classicPlay]) {
     testWidgets('skipping $step before moving returns to the menu', (
       tester,
@@ -360,7 +471,7 @@ void main() {
       expect(p.tutorial.step, TutorialStep.shopBrowse);
       expect(p.wallet, 1);
       expect(find.byType(TutorialSpotlight), findsNothing);
-      await tester.tap(find.byTooltip('Done shopping'));
+      await tester.tap(shopBack());
       await frames(tester);
       expect(p.tutorial.step, TutorialStep.levels);
       expect(find.text('Classic levels'), findsOneWidget);
@@ -374,7 +485,7 @@ void main() {
       expect(g.mode, GameMode.classic);
       expect(g.level, 1);
       expect(find.textContaining('Daily Challenge:'), findsNothing);
-      await tester.tap(find.byType(OneFingerControls));
+      await tester.tapAt(twoFingerContact(tester, 0));
       await frames(tester, 2);
       expect(find.byType(TutorialSpotlight), findsNothing);
       g.won = true;
@@ -390,7 +501,7 @@ void main() {
       // The win moved Classic on, without tapping Next Level.
       expect(p.classicLevel, 2);
       expect(find.textContaining('Daily Challenge:'), findsOneWidget);
-      await tester.tap(find.byTooltip('Modes'));
+      await tester.tap(menuButton('Modes'));
       await frames(tester);
       expect(p.tutorial.step, TutorialStep.completed);
       expect(tester.takeException(), isNull);
@@ -404,7 +515,7 @@ void main() {
     await launch(tester, p);
     expect(find.byType(TutorialSpotlight), findsNothing);
     expect(p.tutorial.freePlaySeconds, 20);
-    await tester.tap(find.byType(OneFingerControls));
+    await tester.tapAt(twoFingerContact(tester, 0));
     await frames(tester);
     expect(p.tutorial.freePlaySeconds, greaterThan(20));
     await tester.pumpWidget(const SizedBox());
@@ -426,7 +537,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('buy-platform-classic')));
       await frames(tester);
       expect(p.tutorial.step, TutorialStep.shopBrowse);
-      await tester.tap(find.byTooltip('Done shopping'));
+      await tester.tap(shopBack());
       await frames(tester);
       await tester.tap(find.byKey(const ValueKey('choose-level')));
       await frames(tester);
@@ -445,7 +556,7 @@ void main() {
       expect(g.level, 1);
       expect(g.mode, GameMode.classic);
       expect(g.waitingForInput, isTrue);
-      await tester.tap(find.byType(OneFingerControls));
+      await tester.tapAt(twoFingerContact(tester, 0));
       await frames(tester, 2);
       expect(find.byType(TutorialSpotlight), findsNothing);
       expect(tester.takeException(), isNull);

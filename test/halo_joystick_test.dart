@@ -31,7 +31,9 @@ void main() {
   test(
     'Halo preference saves and restores without splitting one-finger records',
     () async {
-      final p = PlayerProfile()..haloJoystick = true;
+      final p = PlayerProfile()
+        ..controlMode = ControlMode.oneFinger
+        ..haloJoystick = true;
       p.levelRecords[p.recordKey(1, ControlMode.oneFinger)] = const LevelRecord(
         starMask: 7,
       );

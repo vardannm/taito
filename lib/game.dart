@@ -156,7 +156,7 @@ enum GameMode { classic, infinite, practice, daily, merge2048 }
 enum ControlMode { twoFinger, oneFinger, analog, tiltLift, boardTilt }
 
 // Keep legacy modes for saved records and backups, but offer only these controls.
-const selectableControlModes = [ControlMode.oneFinger, ControlMode.twoFinger];
+const selectableControlModes = [ControlMode.twoFinger, ControlMode.oneFinger];
 
 extension ControlModeLabel on ControlMode {
   ControlMode get supportedMode =>
@@ -973,6 +973,7 @@ class BalanceGame {
 
   final pivotTargets = <double?>[null, null];
   final _released = [false, false];
+  bool pivotHeld(int side) => pivotTargets[side] != null && !_released[side];
 
   /// Optional command journal for the separate App Store capture build.
   /// Runs before an accepted input changes state; normal games leave it null.
@@ -1252,7 +1253,7 @@ class BalanceGame {
       final oldX = ballX, oldY = ballY;
       _tick(h);
       if (!paused) {
-        if (started && phase == GamePhase.playing) {
+        if (infinite && started && phase == GamePhase.playing) {
           final distance = math.sqrt(
             math.pow((ballX - oldX) * arenaStretch, 2) +
                 math.pow(ballY - oldY, 2),

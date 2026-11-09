@@ -20,6 +20,7 @@ void main() {
     'legacy backups preserve active progress while discarding retired records',
     () async {
       final source = PlayerProfile(unlimitedCoins: false)
+        ..controlMode = ControlMode.oneFinger
         ..wallet = 450
         ..classicLevel = 8
         ..infiniteBest = 900

@@ -200,8 +200,7 @@ class InfiniteBoss {
     BossPhase.pools => 'BOSS · Keep clear of the amber pools',
     BossPhase.ricochets => 'BOSS · Watch the energy orbs bounce off the rails',
     BossPhase.blades => 'BOSS · Dodge the curving blade volleys',
-    BossPhase.mines =>
-      'BOSS · Leave the black circles before their lasers fire',
+    BossPhase.mines => 'BOSS · Leave the marked circles before they discharge',
     BossPhase.petals => 'BOSS · Slip between the crystal petals',
     BossPhase.curtains => 'BOSS · Find a lane between the laser curtains',
     BossPhase.comets => 'BOSS · Move away from the comet trails',
@@ -499,6 +498,7 @@ class InfiniteBoss {
     }
 
     final beamTop = top + 150;
+    const verticalGap = 72.0;
     // Phase 1: four rings, 1.5 seconds (about 160 units) apart.
     while (_bulletWave < 4 && age >= 2.6 + _bulletWave * 1.5) {
       final wave = _bulletWave++;
@@ -529,7 +529,7 @@ class InfiniteBoss {
                   x: 180 + side * 60 + 70 * math.sin(math.pi * 2 * t / 2.6),
                   y: beamTop,
                 ),
-          LaserDashes(length: 62, gap: 54, speed: side * -45),
+          LaserDashes(length: 62, gap: verticalGap, speed: side * -45),
           'Nova rail. Slip through a gap as it passes.',
         );
       }
@@ -546,7 +546,7 @@ class InfiniteBoss {
           x: 180 + 138 * math.sin(math.pi * 2 * t / 3.4 + phase),
           y: beamTop,
         ),
-        const LaserDashes(length: 70, gap: 52, speed: 90),
+        const LaserDashes(length: 70, gap: verticalGap, speed: 90),
         'Nova lance. Cross it through a gap.',
       );
     }
@@ -761,7 +761,7 @@ class InfiniteBoss {
             life: mineLife,
             radiusOverride: mineRadius,
             reasonOverride:
-                'Colossus laser mine. Leave the black circle before it fires.',
+                'Colossus shock mine. Move outside the marked circle.',
           ),
         );
       }

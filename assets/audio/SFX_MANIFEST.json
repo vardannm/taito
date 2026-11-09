@@ -125,8 +125,9 @@
   },
   "enemy_crystal": {
     "seconds": 0.32,
-    "peak": 0.68,
-    "sha256": "a6551237e1c6e29dd5cc6ae93dbcb6f4efa3788bf75658a32b4738ec23a81229"
+    "peak": 0.48,
+    "sha256": "3a23e8c7c95bd6c0b7297118797db4b5f361333f82a01082888bc4b5e7642054",
+    "source": "Original procedural design: tool/refine_seraph_shot.py"
   },
   "enemy_laserCharge": {
     "seconds": 0.8,

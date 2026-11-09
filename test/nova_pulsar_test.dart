@@ -91,6 +91,7 @@ void main() {
     ]));
     expect(rings, hasLength(6));
     expect(beams, hasLength(5), reason: 'two pairs of rails and one lance');
+    expect(beams.map((shot) => shot.dashes!.gap), everyElement(72.0));
     expect(boss.displayName, 'NOVA PULSAR');
   });
 

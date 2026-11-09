@@ -51,9 +51,11 @@ void main() {
     feedback.dispose();
   });
 
-  test('electrical laser cues have restrained independent playback levels', () {
-    expect(EnemyCue.laserCharge.volume, .13);
-    expect(EnemyCue.laserFire.volume, .18);
-    expect(EnemyCue.laserFire.volume, lessThan(EnemyCue.bullet.volume));
+  test('maze gates share the laser sound at their original playback level', () {
+    const gate = EnemyCue.mazeGateFire;
+    expect(gate.asset, EnemyCue.laserFire.asset);
+    expect(gate.volume, .18);
+    expect(EnemyCue.laserCharge.volume, greaterThan(gate.volume));
+    expect(EnemyCue.laserFire.volume, greaterThan(gate.volume));
   });
 }

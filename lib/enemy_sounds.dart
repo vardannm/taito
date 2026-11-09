@@ -21,6 +21,7 @@ enum EnemyCue {
   crystal,
   laserCharge,
   laserFire,
+  mazeGateFire,
   bombThrow,
   poolLand,
   mineCharge,
@@ -32,7 +33,11 @@ enum EnemyCue {
 }
 
 extension EnemyCueAudio on EnemyCue {
-  String get asset => 'audio/enemy_$name.wav';
+  String get asset {
+    final sample = this == EnemyCue.mazeGateFire ? EnemyCue.laserFire : this;
+    return 'audio/enemy_${sample.name}.wav';
+  }
+
   double get seconds => switch (this) {
     EnemyCue.insectArrival => .28,
     EnemyCue.wingArrival => .4,
@@ -49,7 +54,7 @@ extension EnemyCueAudio on EnemyCue {
     EnemyCue.petal => .28,
     EnemyCue.crystal => .32,
     EnemyCue.laserCharge => .8,
-    EnemyCue.laserFire => .75,
+    EnemyCue.laserFire || EnemyCue.mazeGateFire => .75,
     EnemyCue.bombThrow => .3,
     EnemyCue.poolLand => .36,
     EnemyCue.mineCharge => .85,
@@ -66,10 +71,11 @@ extension EnemyCueAudio on EnemyCue {
     EnemyCue.prismArrival ||
     EnemyCue.venomArrival ||
     EnemyCue.novaArrival => .5,
-    EnemyCue.laserCharge => .13,
-    EnemyCue.laserFire => .18,
+    EnemyCue.laserCharge => .5,
+    EnemyCue.laserFire => .65,
+    EnemyCue.mazeGateFire => .18,
     EnemyCue.web || EnemyCue.quills => .16,
-    EnemyCue.mineFire => .4,
+    EnemyCue.mineFire => .8,
     EnemyCue.insectArrival || EnemyCue.wingArrival || EnemyCue.snakeHiss => .27,
     _ => .3,
   };
@@ -197,7 +203,7 @@ class EnemySoundDirector {
         emit(EnemyCue.laserFire);
     }
     for (final gate in game.mazeGates) {
-      arrival(gate, EnemyCue.laserFire, onBoard: visible(gate.y));
+      arrival(gate, EnemyCue.mazeGateFire, onBoard: visible(gate.y));
     }
     _ages.removeWhere((object, _) => !present.contains(object));
     _arrivals.removeWhere((object) => !present.contains(object));

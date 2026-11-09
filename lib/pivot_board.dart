@@ -38,18 +38,28 @@ class PivotBoard extends StatefulWidget {
   final bool showHint;
   final bool dimUntilInput;
   final Widget? overlay;
+
+  // Only landscape arenas narrow; scenery still paints the full window.
+  double _arenaWidthFraction(Size window) =>
+      usesWideStage(window) && window.width > window.height ? .41 : .74;
+
+  double get _bottomInset => bottomInset ?? controlStrip(game);
+
+  BoardViewport viewportFor(Size size, Size window) => BoardViewport.forGame(
+    size,
+    game,
+    fillWidth: fillWidth,
+    bottomInset: _bottomInset,
+    fitHeight: fitHeight,
+    contentTop: contentTop,
+    arenaWidthFraction: _arenaWidthFraction(window),
+  );
+
   @override
   State<PivotBoard> createState() => _PivotBoardState();
 }
 
 class _PivotBoardState extends State<PivotBoard> {
-  // Only landscape arenas narrow; scenery still paints the full window.
-  double arenaWidthFraction(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-    return usesWideStage(size) && size.width > size.height ? .41 : .74;
-  }
-
-  double get bottomInset => widget.bottomInset ?? controlStrip(widget.game);
   final pointers = <int, int>{};
   // Where each side's finger is, for the two-finger feedback overlay.
   final fingers = <int, Offset>{};
@@ -69,15 +79,9 @@ class _PivotBoardState extends State<PivotBoard> {
       if (!widget.game.oneFinger || widget.game.haloJoystick) {
         return buildBoard(context, bounds);
       }
-      final scale = BoardViewport.forGame(
-        bounds.biggest,
-        widget.game,
-        fillWidth: widget.fillWidth,
-        bottomInset: bottomInset,
-        fitHeight: widget.fitHeight,
-        contentTop: widget.contentTop,
-        arenaWidthFraction: arenaWidthFraction(context),
-      ).scale;
+      final scale = widget
+          .viewportFor(bounds.biggest, MediaQuery.sizeOf(context))
+          .scale;
       return Stack(
         fit: StackFit.expand,
         children: [
@@ -114,16 +118,9 @@ class _PivotBoardState extends State<PivotBoard> {
 
   Widget buildBoard(BuildContext context, BoxConstraints bounds) {
     final game = widget.game;
+    final window = MediaQuery.sizeOf(context);
     synchronize();
-    BoardViewport viewportNow() => BoardViewport.forGame(
-      bounds.biggest,
-      game,
-      fillWidth: widget.fillWidth,
-      bottomInset: bottomInset,
-      fitHeight: widget.fitHeight,
-      contentTop: widget.contentTop,
-      arenaWidthFraction: arenaWidthFraction(context),
-    );
+    BoardViewport viewportNow() => widget.viewportFor(bounds.biggest, window);
     game.arenaStretch = viewportNow().stretch;
     game.visibleTop = -viewportNow().topExtension;
     game.visibleBottom = viewportNow().paintBottom;
@@ -196,8 +193,8 @@ class _PivotBoardState extends State<PivotBoard> {
                   fillWidth: widget.fillWidth,
                   fitHeight: widget.fitHeight,
                   contentTop: widget.contentTop,
-                  arenaWidthFraction: arenaWidthFraction(context),
-                  bottomInset: bottomInset,
+                  arenaWidthFraction: widget._arenaWidthFraction(window),
+                  bottomInset: widget._bottomInset,
                   showHud: widget.overlay == null,
                 ),
                 child: const SizedBox.expand(),
@@ -236,7 +233,9 @@ class _PivotBoardState extends State<PivotBoard> {
               ),
             if (widget.dimUntilInput)
               Positioned.fill(
-                bottom: game.oneFinger && !game.haloJoystick ? bottomInset : 0,
+                bottom: game.oneFinger && !game.haloJoystick
+                    ? widget._bottomInset
+                    : 0,
                 child: IgnorePointer(
                   child: ExcludeSemantics(
                     child: AnimatedBuilder(

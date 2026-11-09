@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/main.dart';
+import 'package:balance_arcade/premium_menu.dart';
 import 'package:balance_arcade/profile.dart';
 import 'package:balance_arcade/progress_backup.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +18,7 @@ Future<PlayerProfile> launchControls(WidgetTester tester, Size size) async {
   addTearDown(tester.view.reset);
   final profile = PlayerProfile()
     ..tutorialSeen = true
+    ..controlMode = ControlMode.oneFinger
     ..sound = false
     ..music = false
     ..haptics = false;
@@ -25,7 +27,11 @@ Future<PlayerProfile> launchControls(WidgetTester tester, Size size) async {
 }
 
 Future<void> openSettings(WidgetTester tester) async {
-  await tester.tap(find.byTooltip('Settings'));
+  await tester.tap(
+    find.byWidgetPredicate(
+      (w) => w is MenuQuietButton && w.tooltip == 'Settings',
+    ),
+  );
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 400));
 }

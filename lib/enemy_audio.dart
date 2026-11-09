@@ -16,7 +16,7 @@ class EnemyAudio {
   EnemyAudio({EnemySoundStart? start}) : _injectedStart = start;
   final EnemySoundStart? _injectedStart;
   double volume = 1;
-  final _pools = <EnemyCue, Future<AudioPool>>{};
+  final _pools = <String, Future<AudioPool>>{};
   final _voices = <_EnemyVoice>{};
   bool _enabled = false, _disposed = false;
   bool _warming = false;
@@ -45,10 +45,10 @@ class EnemyAudio {
     }
   }
 
-  Future<AudioPool> _pool(EnemyCue cue) => _pools.putIfAbsent(
-    cue,
+  Future<AudioPool> _pool(String asset) => _pools.putIfAbsent(
+    asset,
     () => AudioPool.create(
-      source: AssetSource(cue.asset),
+      source: AssetSource(asset),
       minPlayers: 1,
       maxPlayers: 4,
       playerMode: PlayerMode.lowLatency,
@@ -63,7 +63,7 @@ class EnemyAudio {
       for (final cue in EnemyCue.values) {
         if (!_enabled || _disposed) break;
         try {
-          await _pool(cue);
+          await _pool(cue.asset);
         } catch (_) {
           /* Platform may be unavailable. */
         }
@@ -75,7 +75,7 @@ class EnemyAudio {
 
   Future<StopFunction> _start(EnemyCue cue) async {
     final epoch = _epoch;
-    final pool = await _pool(cue);
+    final pool = await _pool(cue.asset);
     if (!_enabled || _disposed || epoch != _epoch) return () async {};
     return pool.start(volume: cue.volume * volume);
   }

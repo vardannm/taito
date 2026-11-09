@@ -11,6 +11,7 @@ void paintCosmetic(
   double time = 0,
   double rotation = 0,
   bool reducedMotion = false,
+  bool particlesEnabled = true,
   List<Color>? steelPalette,
 }) {
   final tint = Color(ball.color);
@@ -338,6 +339,7 @@ void paintCosmetic(
   );
   canvas.restore();
   canvas.restore();
+  if (!particlesEnabled) return;
   final phase = reducedMotion ? 0.0 : time * .7;
   if (ball.purchaseOnly) {
     paintPremiumBallEffects(canvas, center, radius, ball, time, reducedMotion);

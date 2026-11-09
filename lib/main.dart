@@ -38,6 +38,7 @@ import 'level_picker.dart';
 import 'profile.dart';
 import 'onboarding.dart';
 import 'tutorial_spotlight.dart';
+import 'two_finger_feedback.dart';
 import 'rewards.dart';
 import 'mastery_widgets.dart';
 import 'analog_controls.dart';
@@ -128,13 +129,16 @@ class ArcadeApp extends StatelessWidget {
       volume: () => profile.effectiveSoundVolume,
       child: PhoneOrientationFrame(
         isIOSPhone: isIOSPhone,
-        child: intro
-            ? GiltIntroGate(
-                ball: profile.selectedBall,
-                platform: profile.selectedPlatform,
-                child: child ?? const SizedBox(),
-              )
-            : child ?? const SizedBox(),
+        child: TooltipVisibility(
+          visible: false,
+          child: intro
+              ? GiltIntroGate(
+                  ball: profile.selectedBall,
+                  platform: profile.selectedPlatform,
+                  child: child ?? const SizedBox(),
+                )
+              : child ?? const SizedBox(),
+        ),
       ),
     ),
     home: GameScreen(
@@ -216,20 +220,7 @@ class _GameScreenState extends State<GameScreen>
 
   void tutorialChanged() {
     unawaited(profile.saveTutorial());
-    restoreReplayControl();
     if (mounted) setState(() {});
-  }
-
-  /// Keep the player's choice while the replay picks its starting controls.
-  /// The current layout's control availability still applies.
-  ControlMode? controlBeforeReplay;
-
-  void restoreReplayControl() {
-    final mode = controlBeforeReplay;
-    if (mode == null || tutorialActive) return;
-    controlBeforeReplay = null;
-    profile.controlMode = mode;
-    unawaited(profile.save());
   }
 
   void advanceTutorial(TutorialStep step) {
@@ -244,16 +235,13 @@ class _GameScreenState extends State<GameScreen>
     unawaited(profile.completeTutorial());
     game.endTutorialCourse();
     tutorialRun = null;
-    restoreReplayControl();
+    if (game.waitingForInput && !unstarted) syncControlMode();
     setState(() {});
     if (unstarted) unawaited(home());
   }
 
   void replayTutorial() {
     unawaited(profile.replayTutorial());
-    controlBeforeReplay ??= profile.preferredControlMode;
-    profile.controlMode = ControlMode.oneFinger;
-    unawaited(profile.save());
     setState(() {
       // Open the board first, so the lesson board accepts the first touch.
       entrance.value = 1;
@@ -280,13 +268,12 @@ class _GameScreenState extends State<GameScreen>
       ? (MediaQuery.sizeOf(context).height * .19).clamp(104.0, 140.0)
       : 0;
 
-  BoardViewport boardViewport(Size size) => BoardViewport.forGame(
-    size,
-    game,
-    fillWidth: expansion,
-    bottomInset: (boardKey.currentWidget as PivotBoard?)?.bottomInset,
-    fitHeight: (boardKey.currentWidget as PivotBoard?)?.fitHeight ?? false,
-  );
+  BoardViewport boardViewport(Size size) =>
+      (boardKey.currentWidget as PivotBoard?)?.viewportFor(
+        size,
+        MediaQuery.sizeOf(context),
+      ) ??
+      BoardViewport.forGame(size, game, fillWidth: expansion);
   int selectedMode = 0;
   bool carouselMoving = false;
   PlayerProfile get profile => widget.profile;
@@ -362,9 +349,14 @@ class _GameScreenState extends State<GameScreen>
     )) {
       unawaited(profile.save());
     }
-    if (game.controlMode != profile.controlMode) {
+    syncControlMode();
+  }
+
+  void syncControlMode() {
+    final control = controlForMode(game.mode);
+    if (game.controlMode != control) {
       clearControls();
-      game.setControlMode(profile.controlMode);
+      game.setControlMode(control);
     }
   }
 
@@ -640,7 +632,13 @@ class _GameScreenState extends State<GameScreen>
     return true;
   }
 
-  ControlMode controlForMode(GameMode mode) => profile.controlMode;
+  ControlMode? get tutorialControl =>
+      tutorialActive && profile.tutorial.twoFingerReplay
+      ? ControlMode.twoFinger
+      : null;
+
+  ControlMode controlForMode(GameMode mode) =>
+      tutorialControl ?? profile.controlMode;
 
   void start(GameMode mode, {DateTime? challengeDate}) => setState(() {
     if (adBusy) return;
@@ -741,7 +739,7 @@ class _GameScreenState extends State<GameScreen>
             selected: profile.classicLevel,
             totalStars: profile.totalStars,
             allLevelsUnlocked: profile.temporaryLevelAccess,
-            controlMode: profile.preferredControlMode,
+            controlMode: tutorialControl ?? profile.preferredControlMode,
             haloJoystick: profile.haloJoystick,
             recordForControl: (number, mode) =>
                 profile.levelRecord(number, mode),
@@ -1267,6 +1265,13 @@ class _GameScreenState extends State<GameScreen>
         step == TutorialStep.boss &&
         (game.boss?.phase ?? BossPhase.arriving) != BossPhase.arriving)
       return null;
+    final twoFinger = game.controlMode == ControlMode.twoFinger;
+    final desktop = switch (Theme.of(context).platform) {
+      TargetPlatform.linux ||
+      TargetPlatform.macOS ||
+      TargetPlatform.windows => true,
+      _ => false,
+    };
     final controlsText = game.oneFinger
         ? game.haloJoystick
               ? 'Touch anywhere on the board. Drag sideways to tilt, up or down to lift. The Halo hides when you release.'
@@ -1297,7 +1302,30 @@ class _GameScreenState extends State<GameScreen>
                   'Your Infinite lessons pick up where you left off. Tap Play.',
                 )
         : switch (step) {
-            TutorialStep.controls => (
+            TutorialStep.controls when twoFinger => (
+              desktop ? 'Tilt one end' : 'Tilt with one thumb',
+              Icons.swipe_vertical_rounded,
+              desktop
+                  ? 'Press S or ↓ to lower one end. The ball rolls toward that side.'
+                  : 'Drag down on either highlighted side. The ball rolls toward the lower end.',
+            ),
+            TutorialStep.controlsLift when twoFinger => (
+              desktop ? 'Lift both ends' : 'Lift with both thumbs',
+              Icons.arrow_upward_rounded,
+              desktop
+                  ? 'Hold W and ↑ together to lift both ends.'
+                  : 'Drag both sides up together. Keep the platform level to steady the ball.',
+            ),
+            TutorialStep.controlsRegrab when twoFinger => (
+              desktop ? 'Release and lift again' : 'Release and grab again',
+              Icons.touch_app_rounded,
+              desktop
+                  ? 'Let go of both keys, then hold W and ↑ again.'
+                  : 'Lift both thumbs off the screen. Grab both sides again and drag.',
+            ),
+            TutorialStep.controls ||
+            TutorialStep.controlsLift ||
+            TutorialStep.controlsRegrab => (
               'Move the platform',
               Icons.open_with_rounded,
               controlsText,
@@ -1305,7 +1333,9 @@ class _GameScreenState extends State<GameScreen>
             TutorialStep.heartsHoles => (
               'Dodge the holes',
               Icons.favorite_rounded,
-              'Avoid holes. A fall costs 1 heart, and the run ends when they run out. Steer around this one.',
+              twoFinger
+                  ? 'Lower the side away from the hole to steer around it. A fall costs 1 heart.'
+                  : 'Avoid holes. A fall costs 1 heart, and the run ends when they run out. Steer around this one.',
             ),
             TutorialStep.heartsFeedback => (
               'Hearts',
@@ -1317,7 +1347,9 @@ class _GameScreenState extends State<GameScreen>
             TutorialStep.coins => (
               'Grab the coin',
               Icons.toll_rounded,
-              'Collect coins. They fill your wallet for the Shop.',
+              twoFinger
+                  ? 'Level the platform when the ball lines up with the coin. Collect it to spend in the Shop.'
+                  : 'Collect coins. They fill your wallet for the Shop.',
             ),
             TutorialStep.coinsFeedback => (
               'Coin saved',
@@ -1372,7 +1404,9 @@ class _GameScreenState extends State<GameScreen>
             TutorialStep.classicPlay => (
               'Level 1',
               Icons.flag_rounded,
-              game.oneFinger
+              twoFinger
+                  ? 'Lift both ends and tilt to reach glowing targets 1–10 in order. Avoid dark holes.'
+                  : game.oneFinger
                   ? game.haloJoystick
                         ? 'Same floating Halo controls. Lift to glowing holes in order, 1–10. Avoid dark holes. Drag anywhere to begin.'
                         : 'Same thumb-pad controls. Lift to glowing holes in order, 1–10. Avoid dark holes. Drag to begin.'
@@ -1465,6 +1499,21 @@ class _GameScreenState extends State<GameScreen>
                         20,
                   ),
             );
+          } else if (twoFinger) {
+            final viewport = boardViewport(board.size);
+            for (final side in [0, 1]) {
+              final anchor = TwoFingerFeedbackPainter.halfCenter(
+                viewport,
+                game,
+                side,
+              );
+              result.add(
+                Rect.fromCircle(
+                  center: layer.globalToLocal(board.localToGlobal(anchor)),
+                  radius: 28,
+                ),
+              );
+            }
           } else {
             worldPoint(20, game.left, 28);
             worldPoint(340, game.right, 28);
@@ -1487,7 +1536,9 @@ class _GameScreenState extends State<GameScreen>
           );
         } else {
           switch (step) {
-            case TutorialStep.controls:
+            case TutorialStep.controls ||
+                TutorialStep.controlsLift ||
+                TutorialStep.controlsRegrab:
               controls();
             case TutorialStep.heartsHoles:
               if (tutorialRun?.hole case final hole?)
@@ -2178,6 +2229,9 @@ class _GameScreenState extends State<GameScreen>
                   !returning,
               showHint:
                   (tutorialBoard || playArmed) &&
+                  !(tutorialBoard &&
+                      tutorialStep.teachesControls &&
+                      game.controlMode == ControlMode.twoFinger) &&
                   game.waitingForInput &&
                   !carouselMoving &&
                   !returning &&
@@ -2375,7 +2429,10 @@ class _GameScreenState extends State<GameScreen>
   int savedWorldScore(int index) => switch (arcadeModes[index]) {
     GameMode.infinite => profile.infiniteBestScore,
     GameMode.merge2048 => profile.mergeBest,
-    _ => profile.levelRecord(worldLevel(index), profile.controlMode).bestScore,
+    _ =>
+      profile
+          .levelRecord(worldLevel(index), controlForMode(arcadeModes[index]))
+          .bestScore,
   };
 
   bool get compactMenu =>

@@ -6,6 +6,7 @@ import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/hazards.dart';
 import 'package:balance_arcade/infinite_boss.dart';
 import 'package:balance_arcade/late_enemies.dart';
+import 'package:balance_arcade/maze_gates.dart';
 import 'package:balance_arcade/porcupines.dart';
 import 'package:balance_arcade/spider_web.dart';
 import 'package:balance_arcade/spiders.dart';
@@ -97,6 +98,22 @@ void main() {
     laser.step(.11, 0);
     game.elapsed += .11;
     expect(sound.capture(game), [EnemyCue.laserFire]);
+    expect(sound.capture(game), isEmpty);
+  });
+
+  test('an Infinite maze gate keeps its quiet cue when it enters view', () {
+    final game = run();
+    final sound = EnemySoundDirector();
+    final gate = MazeGate(
+      y: game.visibleTop + 31,
+      gapCenter: 180,
+      gapWidth: 110,
+    );
+    game.mazeGates.add(gate);
+    expect(sound.capture(game), isEmpty);
+
+    gate.y += 2;
+    expect(sound.capture(game), [EnemyCue.mazeGateFire]);
     expect(sound.capture(game), isEmpty);
   });
 
