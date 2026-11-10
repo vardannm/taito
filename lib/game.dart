@@ -1324,11 +1324,10 @@ class BalanceGame {
       _moveHoles(dt);
       if (phase == GamePhase.sinking || phase == GamePhase.returning) {
         // The ball is hidden, but the level's patrols and hazard cycle keep
-        // advancing. Pause still freezes everything at the top of _tick. A
-        // lost heart calls off every chase: spiders walk back to patrol and
-        // cannot notice the hidden ball until it is back in play.
+        // advancing. Spiders call off every chase and walk back to patrol
+        // while the ball sinks and returns to play.
         for (final spider in spiders) {
-          if (!lastSuccess) spider.calm();
+          spider.calm();
           spider.step(
             dt,
             captureX,
