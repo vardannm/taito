@@ -39,6 +39,7 @@ class BallWorld {
       Color(0xFFC7EEE5),
       Color(0xFF5DA7AE),
       Color(0xFFF3A092),
+      deep: Color(0xFF062E5F), // abyss navy, not the slate-grey fallback
     ),
     BallCosmetic.circuit => const BallWorld(
       'Circuit Garden',
