@@ -9,7 +9,8 @@ import 'rewards.dart';
 
 /// Explicitly version this whenever physics or generation changes. Replays
 /// fail closed at checkpoints instead of silently filming a different run.
-const captureRules = 'rollrise-0.13.6+24-capture-1';
+const captureRules = 'rollrise-0.13.6+24-capture-2';
+const _legacyCaptureRules = 'rollrise-0.13.6+24-capture-1';
 const captureSeed = 7112026;
 const captureHz = 120;
 const captureMaxTicks = captureHz * 60 * 10;
@@ -35,20 +36,21 @@ class CaptureSetup {
   /// Null preserves the original fixed Infinite recording format.
   final int? level;
 
-  BalanceGame createGame() => BalanceGame(seed: captureSeed)
-    ..cosmetic = ball
-    ..platformStyle = platform
-    ..cabinet = cabinet
-    ..infiniteMaxLives = hearts
-    ..shieldDuration = shieldSeconds
-    ..magnetDuration = magnetSeconds
-    ..firstBossOverride = firstBoss
-    ..setControlMode(ControlMode.twoFinger)
-    ..start(
-      gameMode: level == null ? GameMode.infinite : GameMode.classic,
-      levelNumber: level ?? 1,
-      waitForInput: true,
-    );
+  BalanceGame createGame({bool legacyPhysics = false}) =>
+      BalanceGame(seed: captureSeed, legacyCapturePhysics: legacyPhysics)
+        ..cosmetic = ball
+        ..platformStyle = platform
+        ..cabinet = cabinet
+        ..infiniteMaxLives = hearts
+        ..shieldDuration = shieldSeconds
+        ..magnetDuration = magnetSeconds
+        ..firstBossOverride = firstBoss
+        ..setControlMode(ControlMode.twoFinger)
+        ..start(
+          gameMode: level == null ? GameMode.infinite : GameMode.classic,
+          levelNumber: level ?? 1,
+          waitForInput: true,
+        );
 
   Map<String, Object> toJson() => {
     'ball': ball.name,
@@ -207,6 +209,7 @@ String captureFingerprint(BalanceGame g) {
 
 class CaptureFile {
   CaptureFile({
+    this.rules = captureRules,
     required this.setup,
     required this.geometry,
     required this.ticks,
@@ -214,6 +217,7 @@ class CaptureFile {
     required this.checkpoints,
     required this.summary,
   });
+  final String rules;
   final CaptureSetup setup;
   final CaptureGeometry geometry;
   final int ticks;
@@ -223,7 +227,7 @@ class CaptureFile {
   String encode() => jsonEncode({
     'format': 'rollrise-input-capture',
     'version': setup.level == null ? 1 : 2,
-    'rules': captureRules,
+    'rules': rules,
     'seed': captureSeed,
     'hz': captureHz,
     'ticks': ticks,
@@ -241,7 +245,7 @@ class CaptureFile {
       final j = jsonDecode(text) as Map<String, dynamic>;
       if (j['format'] != 'rollrise-input-capture' ||
           ![1, 2].contains(j['version']) ||
-          j['rules'] != captureRules ||
+          ![captureRules, _legacyCaptureRules].contains(j['rules']) ||
           j['seed'] != captureSeed ||
           j['hz'] != captureHz) {
         throw const FormatException(
@@ -280,6 +284,7 @@ class CaptureFile {
         throw const FormatException('Capture version does not match its mode.');
       }
       return CaptureFile(
+        rules: j['rules'] as String,
         setup: setup,
         geometry: CaptureGeometry.fromJson(j['geometry'] as List),
         ticks: ticks,
@@ -356,7 +361,9 @@ class CapturePlayer {
     this.file, {
     BallCosmetic? visualBall,
     PlatformStyle? visualPlatform,
-  }) : game = file.setup.createGame() {
+  }) : game = file.setup.createGame(
+         legacyPhysics: file.rules == _legacyCaptureRules,
+       ) {
     game.visualBallOverride = visualBall;
     game.visualPlatformOverride = visualPlatform;
   }

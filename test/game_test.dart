@@ -39,6 +39,36 @@ void main() {
     advance(left, .1);
     expect(left.ballX, greaterThan(previous));
   });
+  test('releasing the last control eases rolling speed to 15 percent', () {
+    final game = BalanceGame()
+      ..start(gameMode: GameMode.practice)
+      ..left = 340
+      ..right = 500
+      ..ballX = 60
+      ..velocity = 265;
+    game.board.clear();
+    game.grabPivot(0);
+    game.grabPivot(1);
+    game.releasePivot(0);
+    game.step(1 / 120);
+    expect(game.velocity, 265);
+
+    game.releasePivot(1);
+    final x = game.ballX;
+    game.step(1 / 120);
+    expect(game.velocity, inExclusiveRange(260, 265));
+    expect(game.ballX - x, closeTo(game.velocity / 120, 1e-9));
+    advance(game, 23 / 120);
+    expect(game.velocity, closeTo(265 * .575, 1e-9));
+    advance(game, .2);
+    expect(game.velocity, closeTo(265 * .15, 1e-9));
+    advance(game, .1);
+    expect(game.velocity, closeTo(265 * .15, 1e-9));
+
+    game.grabPivot(0);
+    game.step(1 / 120);
+    expect(game.velocity, 265);
+  });
   test(
     'Classic target advances once without score, returns and rearms controls',
     () {

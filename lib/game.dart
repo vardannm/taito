@@ -173,8 +173,11 @@ extension ControlModeLabel on ControlMode {
 
 /// Fixed-step simulation. No Flutter imports: physics can be tested in isolation.
 class BalanceGame {
-  BalanceGame({int? seed}) : _runRandom = math.Random(seed);
+  BalanceGame({int? seed, bool legacyCapturePhysics = false})
+    : _runRandom = math.Random(seed),
+      _legacyCapturePhysics = legacyCapturePhysics;
   final math.Random _runRandom;
+  final bool _legacyCapturePhysics;
   // Match the baked Infinite carousel image without consuming run randomness.
   math.Random? _previewRandom;
   math.Random get _random => _previewRandom ?? _runRandom;
@@ -835,6 +838,16 @@ class BalanceGame {
   }
 
   double left = 526, right = 526, ballX = 180, velocity = 0;
+  static const _idleRollSeconds = .4;
+  static const _idleRollSpeed = .15;
+  double _idleRollTime = 0;
+
+  double get _rollSpeedScale {
+    final t = _idleRollTime / _idleRollSeconds;
+    final eased = t * t * (3 - 2 * t);
+    return _idleRollSpeed + (1 - _idleRollSpeed) * (1 - eased);
+  }
+
   double ballRotation = 0;
   final ballTrail = <({double x, double y, double time})>[];
   double motionSpeed = 0;
@@ -871,6 +884,7 @@ class BalanceGame {
     inputLocked = false;
     clearInput();
     velocity = leftSpeed = rightSpeed = 0;
+    _idleRollTime = 0;
     ballTrail.clear();
     motionSpeed = 0;
     fellThroughGap = caughtBySpider = false;
@@ -978,6 +992,12 @@ class BalanceGame {
   final pivotTargets = <double?>[null, null];
   final _released = [false, false];
   bool pivotHeld(int side) => pivotTargets[side] != null && !_released[side];
+  bool get _rollControlHeld =>
+      controlHeld ||
+      pivotHeld(0) ||
+      pivotHeld(1) ||
+      leftInput != 0 ||
+      rightInput != 0;
 
   /// Optional command journal for the separate App Store capture build.
   /// Runs before an accepted input changes state; normal games leave it null.
@@ -1049,6 +1069,7 @@ class BalanceGame {
     ballX = 180;
     ballRotation = 0;
     velocity = leftSpeed = rightSpeed = 0;
+    _idleRollTime = 0;
     legTime = 0;
     controlPosition = 0;
     clearInput();
@@ -1455,12 +1476,24 @@ class BalanceGame {
         right = left - 180;
       }
     }
-    // A rolling sphere: 5/7 of gravity projected onto the bar, then onto x.
+    var rollSpeedScale = 1.0;
+    if (!_legacyCapturePhysics) {
+      final previousScale = _rollSpeedScale;
+      _idleRollTime = _rollControlHeld
+          ? 0
+          : math.min(_idleRollSeconds, _idleRollTime + dt);
+      rollSpeedScale = _rollSpeedScale;
+      // Scale the ball's existing momentum along with the downhill pull.
+      velocity *= rollSpeedScale / previousScale;
+    }
+    // Gravity projected onto the bar, then onto x.
     final slope = (right - left) / (320 * arenaStretch);
-    velocity +=
+    final gravityStep =
         (6 / 7) * 1700 * slope / (1 + slope * slope) * dt / arenaStretch;
+    velocity += gravityStep * rollSpeedScale;
     velocity *= math.exp(-.48 * dt);
-    velocity = velocity.clamp(-265.0 / arenaStretch, 265.0 / arenaStretch);
+    final maxRollSpeed = 265.0 / arenaStretch * rollSpeedScale;
+    velocity = velocity.clamp(-maxRollSpeed, maxRollSpeed);
     ballX += velocity * dt;
     final laserContactX =
         sideRailX + (sideLaserWidth / 2 + ballRadius) / arenaStretch;
