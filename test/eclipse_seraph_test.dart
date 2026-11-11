@@ -14,12 +14,19 @@ void main() {
         ..lateEnemiesEnabled = false
         ..snakeEncountersEnabled = false;
       double? previousEnd;
+      // A shield pickup would swap the long shield for a short one.
+      void tick() {
+        game.survival.shield = 1000;
+        advance(game, 1 / 120);
+        expect(game.finished, isFalse);
+      }
+
       for (final kind in game.bossOrder) {
-        while (game.boss == null) advance(game, 1 / 120);
+        while (game.boss == null) tick();
         expect(game.boss!.kind, kind);
         if (previousEnd != null)
           expect(game.elapsed - previousEnd, greaterThanOrEqualTo(63));
-        while (game.boss != null) advance(game, 1 / 120);
+        while (game.boss != null) tick();
         previousEnd = game.elapsed;
       }
       expect(game.bossesEncountered, BossKind.values.length);
@@ -111,19 +118,19 @@ void main() {
   );
 
   test(
-    'third boss respects threshold, owns a clear arena and never repeats',
+    'fourth boss respects threshold, owns a clear arena and never repeats',
     () {
       final game = run()
-        ..bossesEncountered = 2
+        ..bossesEncountered = 3
         ..survival.points = 500000
         ..survival.shield = 1000;
       advance(game, .1);
       expect(game.boss, isNull);
       expect(game.bossPending, isFalse);
-      game.survival.points = game.bossScoreThresholds[2].toDouble();
+      game.survival.points = game.bossScoreThresholds[3].toDouble();
       advance(game, 3.1);
-      expect(game.boss!.kind, game.bossOrder[2]);
-      expect(game.bossesEncountered, 3);
+      expect(game.boss!.kind, game.bossOrder[3]);
+      expect(game.bossesEncountered, 4);
       while (game.boss != null) {
         expect(game.board, isEmpty);
         expect(game.specialHazards, isEmpty);
@@ -144,7 +151,7 @@ void main() {
       game.phase = GamePhase.over;
       expect(game.reviveInfinite(), isTrue);
       expect(game.bossScoreThresholds, same(thresholds));
-      expect(game.bossesEncountered, 3);
+      expect(game.bossesEncountered, 4);
       game.start(gameMode: GameMode.infinite);
       expect(game.bossesEncountered, 0);
     },

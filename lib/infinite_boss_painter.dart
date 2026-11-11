@@ -17,6 +17,7 @@ const toxicLime = Color(0xFFB6FF19), toxicYellow = Color(0xFFEFFF35);
 const toxicMagenta = Color(0xFFFF3ABF);
 const colossusShotViolet = Color(0xFF6418A6), colossusShotPink = Color(0xFFFF3ABF);
 const novaCyan = Color(0xFF6FF2FF), novaViolet = Color(0xFF9B5CFF);
+const tideLavender = Color(0xFFB9A2FF), tideCoral = Color(0xFFFF8A5C);
 
 /// Lit arcs of a [LaserRing] at [time], as (start angle, sweep) pairs.
 List<(double, double)> _ringArcs(LaserRing ring, double time) {
@@ -120,8 +121,11 @@ void paintInfiniteBoss(Canvas canvas, BalanceGame game, bool reducedMotion) {
   final prism = boss.kind == BossKind.prismReaver;
   final venom = boss.kind == BossKind.venomCrown;
   final nova = boss.kind == BossKind.novaPulsar;
+  final tide = boss.kind == BossKind.tideHerald;
   final amber = nova
       ? novaCyan
+      : tide
+      ? tideLavender
       : venom
       ? toxicLime
       : prism
@@ -131,6 +135,8 @@ void paintInfiniteBoss(Canvas canvas, BalanceGame game, bool reducedMotion) {
       : const Color(0xFFFFB543);
   final hot = nova
       ? novaViolet
+      : tide
+      ? tideCoral
       : venom
       ? toxicMagenta
       : prism
@@ -148,6 +154,9 @@ void paintInfiniteBoss(Canvas canvas, BalanceGame game, bool reducedMotion) {
   final bullets = Path(), bulletCores = Path();
   final toxicBullets = Path(), toxicCores = Path(), toxicWarnings = Path();
   final crystalTrails = Path(), cometWarnings = Path(), cometMarks = Path();
+  final tideBubbles = Path(), tideGlints = Path(), tideArrows = Path();
+  final geyserMarks = Path(), geyserRise = Path();
+  final geysers = Path(), geyserCores = Path();
   if (venom) {
     final routes = Path();
     for (final wall in boss.toxicWalls) {
@@ -175,7 +184,48 @@ void paintInfiniteBoss(Canvas canvas, BalanceGame game, bool reducedMotion) {
   for (final shot in boss.shots) {
     if (shot.cancelled) continue;
     final at = _point(shot.position);
-    if (venom && shot.kind == LateShotKind.shard) {
+    if (tide && shot.kind == LateShotKind.shard) {
+      if (shot.visible) {
+        tideBubbles.addOval(Rect.fromCircle(center: at, radius: shot.radius));
+        tideGlints.addOval(
+          Rect.fromCircle(center: at + const Offset(-2.5, -2.5), radius: 1.8),
+        );
+      }
+    } else if (tide && shot.kind == LateShotKind.laser && shot.dashes == null) {
+      // A geyser column, drawn as wide as the laser itself. While it
+      // charges, the fill climbs from the floor to show how long is left.
+      final column = Rect.fromLTRB(
+        shot.origin.x - shot.radius,
+        shot.origin.y,
+        shot.origin.x + shot.radius,
+        shot.beam.end.y,
+      );
+      if (shot.age < 0) {
+        final progress = (1 + shot.age / InfiniteBoss.laserWarning).clamp(
+          0.0,
+          1.0,
+        );
+        geyserMarks.addRect(column);
+        geyserRise.addRect(
+          Rect.fromLTRB(
+            column.left,
+            column.bottom - column.height * progress,
+            column.right,
+            column.bottom,
+          ),
+        );
+      } else if (shot.visible) {
+        geysers.addRRect(
+          RRect.fromRectAndRadius(column, Radius.circular(shot.radius)),
+        );
+        geyserCores.addRRect(
+          RRect.fromRectAndRadius(
+            column.deflate(shot.radius * .62),
+            const Radius.circular(8),
+          ),
+        );
+      }
+    } else if (venom && shot.kind == LateShotKind.shard) {
       final oval = Rect.fromCircle(center: at, radius: shot.radius);
       if (shot.age < 0) {
         toxicWarnings.addOval(oval);
@@ -331,9 +381,28 @@ void paintInfiniteBoss(Canvas canvas, BalanceGame game, bool reducedMotion) {
           canvas.drawLine(along(a), along(b), _outline(hot.withAlpha(150), 7));
           canvas.drawLine(along(a), along(b), _outline(shell, 4));
         }
-        final destination = _point(shot.beamAt(shot.life).start);
-        canvas.drawLine(start, destination, _outline(amber.withAlpha(150), 1.5));
-        canvas.drawCircle(destination, 4, _outline(amber, 1.5));
+        if (tide) {
+          // A wave rolls straight down: point at each opening instead.
+          var open = 0.0;
+          for (final (a, b) in [...segments, (length, length)]) {
+            if (a - open > 40) {
+              final tip = along((open + a) / 2) + const Offset(0, 22);
+              tideArrows
+                ..moveTo(tip.dx - 7, tip.dy - 8)
+                ..lineTo(tip.dx, tip.dy)
+                ..lineTo(tip.dx + 7, tip.dy - 8);
+            }
+            open = b;
+          }
+        } else {
+          final destination = _point(shot.beamAt(shot.life).start);
+          canvas.drawLine(
+            start,
+            destination,
+            _outline(amber.withAlpha(150), 1.5),
+          );
+          canvas.drawCircle(destination, 4, _outline(amber, 1.5));
+        }
       } else if (shot.visible) {
         for (final (a, b) in segments) {
           canvas.drawLine(along(a), along(b), _outline(ink, 12));
@@ -456,6 +525,19 @@ void paintInfiniteBoss(Canvas canvas, BalanceGame game, bool reducedMotion) {
   canvas.drawPath(bullets, _outline(ink, 4));
   canvas.drawPath(bullets, Paint()..color = amber);
   canvas.drawPath(bulletCores, Paint()..color = pale);
+  if (tide) {
+    // Every bubble, arrow and geyser shares a batch: a fixed number of draws.
+    canvas.drawPath(geyserRise, Paint()..color = hot.withAlpha(70));
+    canvas.drawPath(geyserMarks, _outline(hot, 1.5));
+    canvas.drawPath(geysers, _outline(ink, 4));
+    canvas.drawPath(geysers, Paint()..color = hot);
+    canvas.drawPath(geyserCores, Paint()..color = pale.withAlpha(215));
+    canvas.drawPath(tideArrows, _outline(amber, 2.5));
+    canvas.drawPath(tideBubbles, _outline(ink, 4));
+    canvas.drawPath(tideBubbles, Paint()..color = amber.withAlpha(215));
+    canvas.drawPath(tideBubbles, _outline(pale, 1.2));
+    canvas.drawPath(tideGlints, Paint()..color = pale);
+  }
   if (venom) {
     // Dense volleys are batched, so bullet count does not multiply draw calls.
     canvas.drawPath(toxicWarnings, _outline(toxicMagenta.withAlpha(150), 1.5));
@@ -471,6 +553,12 @@ void paintInfiniteBoss(Canvas canvas, BalanceGame game, bool reducedMotion) {
   if (boss.training) canvas.scale(.75);
   if (nova) {
     _paintNova(canvas, boss, reducedMotion, ink);
+    canvas.restore();
+    canvas.restore();
+    return;
+  }
+  if (tide) {
+    _paintTide(canvas, boss, reducedMotion, ink);
     canvas.restore();
     canvas.restore();
     return;
@@ -777,6 +865,107 @@ void _paintVenom(
     const Offset(9, 31),
     _outline(toxicLime, 2),
   );
+}
+
+/// A glowing jellyfish: a breathing bell over five trailing tentacles. The
+/// bell squeezes with every volley and its heart swells while an attack
+/// charges. Softer and rounder than the bosses that follow it.
+void _paintTide(Canvas canvas, InfiniteBoss boss, bool reducedMotion, Color ink) {
+  const deep = Color(0xFF2B2550), pale = Color(0xFFFFF4E6);
+  final time = reducedMotion ? 0.0 : boss.age;
+  final recoil = reducedMotion ? 0.0 : boss.recoil;
+  final charge = boss.charge;
+  final breath = math.sin(time * 3) * .05 - recoil * .09;
+  final w = 40 * (1 + breath), h = 44 * (1 - breath * .8);
+  canvas.rotate(math.sin(time * 1.3) * .05);
+  canvas.drawCircle(
+    const Offset(0, -6),
+    50 + recoil * 5,
+    Paint()..color = tideLavender.withAlpha((28 + 50 * charge).round()),
+  );
+  // Tentacles trail from the rim and sway out of step with one another.
+  final tentacles = Path(), beads = Path();
+  for (var i = 0; i < 5; i++) {
+    final x = (i - 2) * w * .42;
+    final length = i.isEven ? 44.0 : 34.0;
+    final sway = math.sin(time * 2.6 + i * 1.1) * 7 + recoil * (i - 2) * 3;
+    tentacles
+      ..moveTo(x, 6)
+      ..cubicTo(
+        x + sway,
+        6 + length * .35,
+        x - sway,
+        6 + length * .7,
+        x + sway * .6,
+        6 + length,
+      );
+    beads.addOval(
+      Rect.fromCircle(center: Offset(x + sway * .6, 6 + length), radius: 3),
+    );
+  }
+  canvas.drawPath(tentacles, _outline(ink, 6));
+  canvas.drawPath(tentacles, _outline(tideCoral, 2.5));
+  canvas.drawPath(beads, Paint()..color = pale);
+  final bell = Path()
+    ..moveTo(-w, 6)
+    ..cubicTo(-w * 1.06, -h * 1.02, w * 1.06, -h * 1.02, w, 6);
+  // A scalloped rim: four soft lobes back along the underside.
+  for (var i = 0; i < 4; i++) {
+    final from = w - i * w / 2;
+    bell.quadraticBezierTo(from - w / 4, 17, from - w / 2, 6);
+  }
+  bell.close();
+  final dome = Rect.fromLTRB(-w, -h, w, 17);
+  canvas.drawPath(bell, _outline(ink, 5));
+  canvas.drawPath(
+    bell,
+    Paint()
+      ..shader = const LinearGradient(
+        colors: [pale, tideLavender, Color(0xFF6B58C8)],
+        stops: [0, .45, 1],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+      ).createShader(dome),
+  );
+  canvas.drawPath(bell, _outline(deep, 1.5));
+  canvas.drawArc(
+    Rect.fromLTRB(-w * .72, -h * .8, w * .72, h * .2),
+    math.pi * 1.12,
+    math.pi * .5,
+    false,
+    _outline(pale.withAlpha(190), 3),
+  );
+  // The heart glows through the bell and swells as an attack charges.
+  final heart = Rect.fromCircle(
+    center: const Offset(0, -16),
+    radius: 8 + charge * 5,
+  );
+  canvas.drawOval(
+    heart,
+    Paint()
+      ..shader = const RadialGradient(
+        colors: [pale, tideCoral, Color(0x00FF8A5C)],
+        stops: [0, .55, 1],
+      ).createShader(heart),
+  );
+  final eyes = Path(), glints = Path();
+  for (final side in [-1.0, 1.0]) {
+    eyes.addOval(
+      Rect.fromCenter(center: Offset(side * 15, -2), width: 8, height: 10),
+    );
+    glints.addOval(
+      Rect.fromCircle(center: Offset(side * 15 - 1.5, -4), radius: 1.6),
+    );
+  }
+  canvas.drawPath(eyes, Paint()..color = deep);
+  canvas.drawPath(glints, Paint()..color = pale);
+  if (!reducedMotion && recoil > 0) {
+    canvas.drawCircle(
+      const Offset(0, -6),
+      44 + (1 - recoil) * 16,
+      _outline(tideCoral.withAlpha((recoil * 210).round()), 2),
+    );
+  }
 }
 
 /// A pulsar: a white-hot core inside two tilted orbit rings that spin

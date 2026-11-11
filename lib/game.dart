@@ -840,6 +840,10 @@ class BalanceGame {
   double left = 526, right = 526, ballX = 180, velocity = 0;
   static const _idleRollSeconds = .4;
   static const _idleRollSpeed = .15;
+
+  /// How long a fully slowed ball takes to pick its speed back up once the
+  /// platform is controlled again.
+  static const _resumeRollSeconds = .3;
   double _idleRollTime = 0;
 
   double get _rollSpeedScale {
@@ -922,9 +926,13 @@ class BalanceGame {
     final encounterSeed = _random.nextInt(1 << 30);
     enemyDirector = EncounterDirector(encounterSeed);
     final bossRandom = math.Random(encounterSeed ^ 0xB055);
-    _bossOrder = List.unmodifiable(
-      BossKind.values.toList()..shuffle(bossRandom),
-    );
+    // The gentle Tide Herald always opens the run; the other six are
+    // shuffled across the later slots.
+    _bossOrder = List.unmodifiable([
+      BossKind.tideHerald,
+      ...BossKind.values.where((kind) => kind != BossKind.tideHerald).toList()
+        ..shuffle(bossRandom),
+    ]);
     final first = firstBossOverride;
     if (first != null) {
       final order = _bossOrder.toList();
@@ -933,10 +941,16 @@ class BalanceGame {
       order[0] = first;
       _bossOrder = List.unmodifiable(order);
     }
-    _bossScoreThresholds = List.unmodifiable([
-      // Score windows belong to encounter slots, independently of boss order.
-      for (final (low, high) in bossScoreWindows)
+    // Score windows belong to encounter slots, independently of boss order.
+    // The later slots draw first, as they did before the early slot existed.
+    final later = [
+      for (final (low, high) in bossScoreWindows.skip(1))
         low + bossRandom.nextInt(high - low + 1),
+    ];
+    final (earlyLow, earlyHigh) = bossScoreWindows.first;
+    _bossScoreThresholds = List.unmodifiable([
+      earlyLow + bossRandom.nextInt(earlyHigh - earlyLow + 1),
+      ...later,
     ]);
   }
 
@@ -1479,8 +1493,13 @@ class BalanceGame {
     var rollSpeedScale = 1.0;
     if (!_legacyCapturePhysics) {
       final previousScale = _rollSpeedScale;
+      // Letting go eases the ball down; taking hold again eases it back up
+      // along the same curve, instead of snapping to full speed in one tick.
       _idleRollTime = _rollControlHeld
-          ? 0
+          ? math.max(
+              0,
+              _idleRollTime - dt * _idleRollSeconds / _resumeRollSeconds,
+            )
           : math.min(_idleRollSeconds, _idleRollTime + dt);
       rollSpeedScale = _rollSpeedScale;
       // Scale the ball's existing momentum along with the downhill pull.

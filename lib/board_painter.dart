@@ -761,6 +761,8 @@ class BoardPainter extends CustomPainter {
           BossPhase.novaRings => 'NOVA RINGS',
           BossPhase.dashedRails => 'DASHED RAILS',
           BossPhase.novaLance => 'NOVA LANCE',
+          BossPhase.driftBubbles => 'DRIFT BUBBLES',
+          BossPhase.tideWaves => 'TIDE WAVES',
           _ => boss.phase.name.toUpperCase(),
         }} · ${boss.secondsLeft.ceil()}s',
         Offset(180, labelY + 16),

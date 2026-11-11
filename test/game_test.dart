@@ -39,7 +39,7 @@ void main() {
     advance(left, .1);
     expect(left.ballX, greaterThan(previous));
   });
-  test('releasing the last control eases rolling speed to 15 percent', () {
+  test('releasing the last control eases rolling speed down, and back', () {
     final game = BalanceGame()
       ..start(gameMode: GameMode.practice)
       ..left = 340
@@ -65,9 +65,14 @@ void main() {
     advance(game, .1);
     expect(game.velocity, closeTo(265 * .15, 1e-9));
 
+    // Taking hold again eases the speed back up instead of snapping to it.
     game.grabPivot(0);
     game.step(1 / 120);
-    expect(game.velocity, 265);
+    expect(game.velocity, inExclusiveRange(265 * .15, 265 * .2));
+    advance(game, .15);
+    expect(game.velocity, inExclusiveRange(265 * .4, 265 * .8));
+    advance(game, .15);
+    expect(game.velocity, closeTo(265, 1e-9));
   });
   test(
     'Classic target advances once without score, returns and rearms controls',

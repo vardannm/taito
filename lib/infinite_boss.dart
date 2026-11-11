@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'late_enemies.dart';
 
 enum BossKind {
+  tideHerald,
   skyWarden,
   stormColossus,
   eclipseSeraph,
@@ -10,10 +11,11 @@ enum BossKind {
   novaPulsar,
 }
 
-/// Score windows for the 1st to 6th boss of a run. Each run picks one score
-/// inside every window; the bosses themselves are shuffled, so any of the
-/// six can fill any slot.
+/// Score windows for the 1st to 7th boss of a run. Each run picks one score
+/// inside every window. The first, early window always belongs to the gentle
+/// Tide Herald; the other six bosses are shuffled across the later slots.
 const bossScoreWindows = [
+  (25000, 32000),
   (70000, 110000),
   (220000, 250000),
   (450000, 520000),
@@ -24,6 +26,7 @@ const bossScoreWindows = [
 
 extension BossKindDetails on BossKind {
   String get name => switch (this) {
+    BossKind.tideHerald => 'TIDE HERALD',
     BossKind.skyWarden => 'SKY WARDEN',
     BossKind.stormColossus => 'STORM COLOSSUS',
     BossKind.eclipseSeraph => 'ECLIPSE SERAPH',
@@ -53,6 +56,9 @@ enum BossPhase {
   novaRings,
   dashedRails,
   novaLance,
+  driftBubbles,
+  tideWaves,
+  geysers,
   leaving,
 }
 
@@ -78,7 +84,7 @@ class InfiniteBoss {
   static const duration = 28.0;
   static const trainingDuration = 16.0;
 
-  /// Play time between Overdrive bosses, once all six have been met.
+  /// Play time between Overdrive bosses, once every boss has been met.
   static const overdriveGapSeconds = 150.0;
   static const laserWarning = 1.1;
   static const laserLife = 1.3;
@@ -93,7 +99,7 @@ class InfiniteBoss {
   final bool training;
 
   /// 0 for a run's first meeting with this boss; each Overdrive lap after
-  /// all six bosses adds one, up to a speed cap.
+  /// every boss adds one, up to a speed cap.
   final int lap;
   final math.Random _random;
   String get displayName => training
@@ -166,6 +172,7 @@ class InfiniteBoss {
             : BossPhase.leaving
       : age < 10
       ? switch (kind) {
+          BossKind.tideHerald => BossPhase.driftBubbles,
           BossKind.skyWarden => BossPhase.bullets,
           BossKind.stormColossus => BossPhase.ricochets,
           BossKind.eclipseSeraph => BossPhase.petals,
@@ -175,6 +182,7 @@ class InfiniteBoss {
         }
       : age < 18
       ? switch (kind) {
+          BossKind.tideHerald => BossPhase.tideWaves,
           BossKind.skyWarden => BossPhase.lasers,
           BossKind.stormColossus => BossPhase.blades,
           BossKind.eclipseSeraph => BossPhase.curtains,
@@ -184,6 +192,7 @@ class InfiniteBoss {
         }
       : age < 26
       ? switch (kind) {
+          BossKind.tideHerald => BossPhase.geysers,
           BossKind.skyWarden => BossPhase.pools,
           BossKind.stormColossus => BossPhase.mines,
           BossKind.eclipseSeraph => BossPhase.comets,
@@ -215,6 +224,9 @@ class InfiniteBoss {
     BossPhase.dashedRails =>
       'BOSS · Slip through the gaps as the side lasers pass',
     BossPhase.novaLance => 'BOSS · Cross the sweeping laser through its gaps',
+    BossPhase.driftBubbles => 'BOSS · Slip between the drifting bubbles',
+    BossPhase.tideWaves => 'BOSS · Wait under a gap as the wave rolls down',
+    BossPhase.geysers => 'BOSS · Step out of the marked geyser columns',
     BossPhase.leaving => 'BOSS · Clear! Keep climbing',
   };
 
@@ -229,6 +241,8 @@ class InfiniteBoss {
         ? 180 + math.sin(time * .65) * 35
         : kind == BossKind.novaPulsar
         ? 180 + math.sin(time * .55) * 28
+        : kind == BossKind.tideHerald
+        ? 180 + math.sin(time * .6) * 38
         : kind == BossKind.prismReaver
         ? 180 + math.sin(time * 1.05) * 52 + math.sin(time * 1.83) * 16
         : time < 10
@@ -240,7 +254,12 @@ class InfiniteBoss {
         : 180.0;
     final entrance = time < 2 ? -150 * math.pow(1 - time / 2, 2) : 0.0;
     final exit = time > 26 ? -170 * math.pow((time - 26) / 2, 2) : 0.0;
-    final drift = kind == BossKind.prismReaver ? math.sin(time * 1.4) * 8 : 0.0;
+    // The Reaver jitters; the Herald bobs slowly like a jellyfish.
+    final drift = kind == BossKind.prismReaver
+        ? math.sin(time * 1.4) * 8
+        : kind == BossKind.tideHerald
+        ? math.sin(time * 1.7) * 5
+        : 0.0;
     return (x: x, y: top + 105 + entrance + exit + drift);
   }
 
@@ -279,6 +298,8 @@ class InfiniteBoss {
         _prismWeapons(before, target);
       } else if (kind == BossKind.novaPulsar) {
         _novaWeapons(before, target);
+      } else if (kind == BossKind.tideHerald) {
+        _tideWeapons(before, target);
       } else {
         _toxicWeapons(before, target);
       }
@@ -434,6 +455,112 @@ class InfiniteBoss {
       );
     }
   }
+
+  /// Tide Herald, the early boss: slow swaying bubbles, then rolling waves
+  /// with two wide openings, then broad geyser columns that alternate. Every
+  /// attack is slow, locked before it starts and leaves generous room.
+  void _tideWeapons(double before, EnemyPoint target) {
+    // Phase 1: four volleys of three bubbles. They fan out to fixed columns
+    // 104 units apart and sway together, so the lanes between them stay open.
+    while (_bulletWave < 4 && age >= 2.6 + _bulletWave * 1.7) {
+      final at = 2.6 + _bulletWave++ * 1.7;
+      _lastVolleyAt = at;
+      final body = positionAt(at);
+      final origin = (x: body.x, y: body.y + 30);
+      final aimed = target.x.clamp(60.0, 300.0);
+      final speed = math.max(105.0, (target.y - origin.y) / 3.0);
+      final life = ((548 - origin.y) / speed).clamp(1.0, 5.0);
+      for (final offset in [-tideBubbleSpacing, 0.0, tideBubbleSpacing]) {
+        var column = aimed + offset;
+        // A column that would leave the board wraps to the far side instead.
+        if (column < 40) column += tideBubbleSpacing * 3;
+        if (column > 320) column -= tideBubbleSpacing * 3;
+        shots.add(
+          LateEnemyShot(
+            kind: LateShotKind.shard,
+            origin: origin,
+            velocity: (x: 0, y: 0),
+            delay: at - before,
+            life: life,
+            positionPath: (t) {
+              final spread = (t / .9).clamp(0.0, 1.0);
+              final eased = spread * spread * (3 - 2 * spread);
+              return (
+                x:
+                    origin.x +
+                    (column - origin.x) * eased +
+                    tideBubbleSway * math.sin(t * 2.4) * eased,
+                y: origin.y + speed * t,
+              );
+            },
+            radiusOverride: tideBubbleRadius,
+            reasonOverride: 'Herald bubble. Slip between the drifting bubbles.',
+          ),
+        );
+      }
+    }
+    // Phase 2: three waves roll down the whole board. Each has two wide
+    // openings, marked first. They drift sideways too slowly to carry a
+    // ball waiting at the middle of an opening into the lit part.
+    while (_laserWave < 3 && age >= 10.2 + _laserWave * 2.3) {
+      final wave = _laserWave++;
+      final at = 10.2 + wave * 2.3;
+      _lastVolleyAt = at + laserWarning;
+      final from = top + 175;
+      EnemyBeam path(double time) {
+        final y = from + (560 - from) * (time / tideWaveLife).clamp(0.0, 1.0);
+        return (start: (x: 24.0, y: y), end: (x: 336.0, y: y));
+      }
+
+      final first = path(0);
+      shots.add(
+        LateEnemyShot(
+          kind: LateShotKind.laser,
+          origin: first.start,
+          velocity: (x: 0, y: 0),
+          delay: at - before + laserWarning,
+          life: tideWaveLife,
+          beamEnd: first.end,
+          beamPath: path,
+          radiusOverride: 4,
+          // Two dashes and two openings span the board exactly.
+          dashes: LaserDashes(
+            length: 156 - tideWaveGap,
+            gap: tideWaveGap,
+            speed: wave.isEven ? 10 : -10,
+            offset: const [0.0, 78.0, 39.0][wave],
+          ),
+          reasonOverride: 'Herald wave. Wait under one of its openings.',
+        ),
+      );
+    }
+    // Phase 3: geysers. The outer and middle columns erupt, then the two
+    // between them, twice over. The next set is marked while one is live.
+    while (_poolWave < 4 && age >= 18 + _poolWave * 1.8) {
+      final wave = _poolWave++;
+      final at = 18 + wave * 1.8;
+      _lastVolleyAt = at + laserWarning;
+      for (final x in wave.isEven ? [55.0, 180.0, 305.0] : [117.5, 242.5]) {
+        shots.add(
+          LateEnemyShot(
+            kind: LateShotKind.laser,
+            origin: (x: x, y: top + 170),
+            velocity: (x: 0, y: 0),
+            delay: at - before + laserWarning,
+            life: tideGeyserLife,
+            beamEnd: (x: x, y: 537),
+            radiusOverride: tideGeyserRadius,
+            reasonOverride: 'Herald geyser. Step out of the marked column.',
+          ),
+        );
+      }
+    }
+  }
+
+  static const tideBubbleSpacing = 104.0, tideBubbleSway = 14.0;
+  static const tideBubbleRadius = 7.0;
+  static const tideWaveLife = 3.0, tideWaveGap = 100.0;
+  static const tideGeyserLife = 1.0, tideGeyserRadius = 22.0;
 
   /// Nova Pulsar: growing rings with turning openings, then dashed side
   /// lasers that cross the board, then one sweeping dashed lance. Every gap

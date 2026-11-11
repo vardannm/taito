@@ -162,6 +162,13 @@ void main() {
         expect(bounces, isNull);
       }
       expect(counts, switch (kind) {
+        // Four bubble volleys, three waves and four sets of geysers.
+        BossKind.tideHerald => {
+          EnemyCue.tideArrival: 1,
+          EnemyCue.bullet: 4,
+          EnemyCue.laserCharge: 7,
+          EnemyCue.laserFire: 7,
+        },
         BossKind.skyWarden => {
           EnemyCue.wardenArrival: 1,
           EnemyCue.bullet: 5,

@@ -5,8 +5,9 @@ import 'package:balance_arcade/late_enemies.dart';
 import 'infinite_boss_test.dart' show advance, run;
 
 void main() {
-  test('the six slots use the set windows and any boss can fill any slot', () {
+  test('the Herald opens early; the other six shuffle over the set windows', () {
     expect(bossScoreWindows, [
+      (25000, 32000),
       (70000, 110000),
       (220000, 250000),
       (450000, 520000),
@@ -14,7 +15,7 @@ void main() {
       (1000000, 1100000),
       (1300000, 1400000),
     ]);
-    final bySlot = List.generate(6, (_) => <BossKind>{});
+    final bySlot = List.generate(7, (_) => <BossKind>{});
     for (var seed = 0; seed < 300; seed++) {
       final game = BalanceGame(seed: seed)..start(gameMode: GameMode.infinite);
       expect(game.bossOrder.toSet(), BossKind.values.toSet());
@@ -22,9 +23,11 @@ void main() {
         bySlot[slot].add(kind);
       }
     }
-    // Venom Crown can open a run, Sky Warden can close it, and so on.
-    for (final kinds in bySlot) {
-      expect(kinds, BossKind.values.toSet());
+    // The early slot is always the gentle Tide Herald. After it, Venom Crown
+    // can come first, Sky Warden can close the lap, and so on.
+    expect(bySlot.first, {BossKind.tideHerald});
+    for (final kinds in bySlot.skip(1)) {
+      expect(kinds, BossKind.values.toSet()..remove(BossKind.tideHerald));
     }
   });
 
@@ -63,7 +66,7 @@ void main() {
     },
   );
 
-  test('after all six, Overdrive bosses return on time and run faster', () {
+  test('after all seven, Overdrive bosses return on time and run faster', () {
     final game = run()
       ..lateEnemiesEnabled = false
       ..snakeEncountersEnabled = false

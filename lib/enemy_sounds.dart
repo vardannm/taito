@@ -14,6 +14,7 @@ enum EnemyCue {
   prismArrival,
   venomArrival,
   novaArrival,
+  tideArrival,
   bullet,
   seedSpit,
   ricochet,
@@ -35,7 +36,12 @@ enum EnemyCue {
 
 extension EnemyCueAudio on EnemyCue {
   String get asset {
-    final sample = this == EnemyCue.mazeGateFire ? EnemyCue.laserFire : this;
+    // Two cues borrow an existing recording at their own volume.
+    final sample = switch (this) {
+      EnemyCue.mazeGateFire => EnemyCue.laserFire,
+      EnemyCue.tideArrival => EnemyCue.venomArrival,
+      _ => this,
+    };
     return 'audio/enemy_${sample.name}.wav';
   }
 
@@ -48,7 +54,8 @@ extension EnemyCueAudio on EnemyCue {
     EnemyCue.seraphArrival => 1.05,
     EnemyCue.prismArrival ||
     EnemyCue.venomArrival ||
-    EnemyCue.novaArrival => .9,
+    EnemyCue.novaArrival ||
+    EnemyCue.tideArrival => .9,
     EnemyCue.bullet => .14,
     EnemyCue.seedSpit => .4,
     EnemyCue.ricochet => .22,
@@ -73,6 +80,7 @@ extension EnemyCueAudio on EnemyCue {
     EnemyCue.prismArrival ||
     EnemyCue.venomArrival ||
     EnemyCue.novaArrival => .5,
+    EnemyCue.tideArrival => .4,
     EnemyCue.laserCharge => .5,
     EnemyCue.laserFire => .65,
     EnemyCue.mazeGateFire => .18,
@@ -154,6 +162,7 @@ class EnemySoundDirector {
     final boss = game.boss;
     if (boss != null) {
       arrival(boss, switch (boss.kind) {
+        BossKind.tideHerald => EnemyCue.tideArrival,
         BossKind.skyWarden => EnemyCue.wardenArrival,
         BossKind.stormColossus => EnemyCue.colossusArrival,
         BossKind.eclipseSeraph => EnemyCue.seraphArrival,
