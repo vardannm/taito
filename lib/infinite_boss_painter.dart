@@ -15,9 +15,11 @@ Paint _outline(Color color, double width) => Paint()
 Offset _point(EnemyPoint point) => Offset(point.x, point.y);
 const toxicLime = Color(0xFFB6FF19), toxicYellow = Color(0xFFEFFF35);
 const toxicMagenta = Color(0xFFFF3ABF);
-const colossusShotViolet = Color(0xFF6418A6), colossusShotPink = Color(0xFFFF3ABF);
+const colossusShotViolet = Color(0xFF6418A6),
+    colossusShotPink = Color(0xFFFF3ABF);
 const novaCyan = Color(0xFF6FF2FF), novaViolet = Color(0xFF9B5CFF);
 const tideLavender = Color(0xFFB9A2FF), tideCoral = Color(0xFFFF8A5C);
+const chronoGold = Color(0xFFFFCF73), chronoMint = Color(0xFF70F3D4);
 
 /// Lit arcs of a [LaserRing] at [time], as (start angle, sweep) pairs.
 List<(double, double)> _ringArcs(LaserRing ring, double time) {
@@ -53,11 +55,7 @@ void _paintColossusMine(
   final field = charging
       ? const RadialGradient(colors: [Color(0xDC34325F), Color(0xEE18152F)])
       : const RadialGradient(colors: [Color(0xFF4C357D), Color(0xFF221C46)]);
-  canvas.drawCircle(
-    center,
-    radius,
-    Paint()..shader = field.createShader(disk),
-  );
+  canvas.drawCircle(center, radius, Paint()..shader = field.createShader(disk));
   canvas.drawCircle(center, radius, _outline(midnight, 4));
   canvas.drawCircle(center, radius, _outline(charging ? violet : cyan, 1.5));
 
@@ -122,6 +120,7 @@ void paintInfiniteBoss(Canvas canvas, BalanceGame game, bool reducedMotion) {
   final venom = boss.kind == BossKind.venomCrown;
   final nova = boss.kind == BossKind.novaPulsar;
   final tide = boss.kind == BossKind.tideHerald;
+  final chrono = boss.kind == BossKind.chronoKeeper;
   final amber = nova
       ? novaCyan
       : tide
@@ -157,6 +156,8 @@ void paintInfiniteBoss(Canvas canvas, BalanceGame game, bool reducedMotion) {
   final tideBubbles = Path(), tideGlints = Path(), tideArrows = Path();
   final geyserMarks = Path(), geyserRise = Path();
   final geysers = Path(), geyserCores = Path();
+  final clockTrails = Path(), clockWarnings = Path(), clockBolts = Path();
+  final clockCores = Path(), clockHolds = Path();
   if (venom) {
     final routes = Path();
     for (final wall in boss.toxicWalls) {
@@ -184,7 +185,50 @@ void paintInfiniteBoss(Canvas canvas, BalanceGame game, bool reducedMotion) {
   for (final shot in boss.shots) {
     if (shot.cancelled) continue;
     final at = _point(shot.position);
-    if (tide && shot.kind == LateShotKind.shard) {
+    if (chrono && shot.kind == LateShotKind.shard) {
+      // A thin dashed route remains visible through the stop and return trip.
+      // All clock projectiles are batched, including their warnings and trails.
+      for (var t = 0.0; t < shot.life; t += .15) {
+        final a = _point(shot.positionAt(t));
+        final b = _point(shot.positionAt(math.min(t + .045, shot.life)));
+        clockTrails.moveTo(a.dx, a.dy);
+        clockTrails.lineTo(b.dx, b.dy);
+      }
+      if (shot.age < 0 || shot.visible) {
+        final shape = shot.age < 0 ? clockWarnings : clockBolts;
+        final r = shot.radius;
+        shape
+          ..moveTo(at.dx, at.dy - r)
+          ..lineTo(at.dx + r, at.dy)
+          ..lineTo(at.dx, at.dy + r)
+          ..lineTo(at.dx - r, at.dy)
+          ..close();
+        if (shot.visible) {
+          clockCores.addOval(Rect.fromCircle(center: at, radius: 2));
+          final ahead = _point(
+            shot.positionAt(math.min(shot.age + .04, shot.life)),
+          );
+          if ((ahead - at).distance < .1) {
+            // The pause is marked by a ring, so it cannot look like despawn.
+            clockHolds.addOval(Rect.fromCircle(center: at, radius: 10));
+          } else {
+            final direction = (ahead - at) / (ahead - at).distance;
+            final perpendicular = Offset(-direction.dy, direction.dx);
+            final tip = at + direction * 13;
+            clockHolds
+              ..moveTo(
+                (tip - direction * 4 + perpendicular * 3).dx,
+                (tip - direction * 4 + perpendicular * 3).dy,
+              )
+              ..lineTo(tip.dx, tip.dy)
+              ..lineTo(
+                (tip - direction * 4 - perpendicular * 3).dx,
+                (tip - direction * 4 - perpendicular * 3).dy,
+              );
+          }
+        }
+      }
+    } else if (tide && shot.kind == LateShotKind.shard) {
       if (shot.visible) {
         tideBubbles.addOval(Rect.fromCircle(center: at, radius: shot.radius));
         tideGlints.addOval(
@@ -547,10 +591,25 @@ void paintInfiniteBoss(Canvas canvas, BalanceGame game, bool reducedMotion) {
     canvas.drawPath(toxicCores, Paint()..color = toxicYellow);
   }
 
+  if (chrono) {
+    canvas.drawPath(clockTrails, _outline(chronoMint.withAlpha(150), 1));
+    canvas.drawPath(clockWarnings, _outline(chronoGold, 2));
+    canvas.drawPath(clockBolts, _outline(ink, 4));
+    canvas.drawPath(clockBolts, Paint()..color = chronoGold);
+    canvas.drawPath(clockCores, Paint()..color = ink);
+    canvas.drawPath(clockHolds, _outline(chronoMint, 1.5));
+  }
+
   canvas.save();
   canvas.translate(position.dx, position.dy);
   // The practice boss reads as a smaller, lesser version of the real one.
   if (boss.training) canvas.scale(.75);
+  if (chrono) {
+    _paintChrono(canvas, boss, reducedMotion, ink);
+    canvas.restore();
+    canvas.restore();
+    return;
+  }
   if (nova) {
     _paintNova(canvas, boss, reducedMotion, ink);
     canvas.restore();
@@ -682,6 +741,85 @@ void paintInfiniteBoss(Canvas canvas, BalanceGame game, bool reducedMotion) {
   }
   canvas.restore();
   canvas.restore();
+}
+
+void _paintChrono(
+  Canvas canvas,
+  InfiniteBoss boss,
+  bool reducedMotion,
+  Color ink,
+) {
+  const shell = Color(0xFF243638);
+  final time = reducedMotion ? 0.0 : boss.age;
+  final reverse = boss.phase == BossPhase.rewind ? -1.0 : 1.0;
+  final gear = Path(), ticks = Path(), cables = Path(), satellites = Path();
+  // A toothed clock and two suspended hourglasses make a distinct silhouette.
+  for (var i = 0; i < 48; i++) {
+    final angle = i * math.pi / 24 + time * .12 * reverse;
+    final radius = i % 4 < 2 ? 47.0 : 41.0;
+    final p = Offset(math.cos(angle), math.sin(angle)) * radius;
+    if (i == 0) {
+      gear.moveTo(p.dx, p.dy);
+    } else {
+      gear.lineTo(p.dx, p.dy);
+    }
+  }
+  gear.close();
+  for (final side in [-1.0, 1.0]) {
+    final x = side * 68;
+    final y = math.sin(time * 2 + side) * 4;
+    cables
+      ..moveTo(side * 34, -16)
+      ..quadraticBezierTo(side * 53, -30, x, y - 15);
+    satellites
+      ..moveTo(x - 10, y - 15)
+      ..lineTo(x + 10, y - 15)
+      ..lineTo(x + 3, y)
+      ..lineTo(x + 10, y + 15)
+      ..lineTo(x - 10, y + 15)
+      ..lineTo(x - 3, y)
+      ..close();
+  }
+  canvas.drawPath(cables, _outline(ink, 4));
+  canvas.drawPath(cables, _outline(chronoMint, 1.5));
+  canvas.drawPath(satellites, Paint()..color = shell);
+  canvas.drawPath(satellites, _outline(ink, 4));
+  canvas.drawPath(satellites, _outline(chronoMint, 1.5));
+  canvas.drawPath(gear, _outline(ink, 5));
+  canvas.drawPath(gear, Paint()..color = shell);
+  canvas.drawPath(gear, _outline(chronoGold, 2));
+  canvas.drawCircle(Offset.zero, 35, Paint()..color = const Color(0xFF152B36));
+  canvas.drawCircle(Offset.zero, 35, _outline(chronoMint, 1.5));
+  for (var i = 0; i < 12; i++) {
+    final angle = i * math.pi / 6;
+    final direction = Offset(math.cos(angle), math.sin(angle));
+    ticks.moveTo(direction.dx * 27, direction.dy * 27);
+    ticks.lineTo(direction.dx * 31, direction.dy * 31);
+  }
+  canvas.drawPath(ticks, _outline(chronoGold, 2));
+  final hands = Path();
+  for (final (speed, length) in [(1.8, 24.0), (.38, 16.0)]) {
+    final angle = time * speed * reverse - math.pi / 2;
+    hands.moveTo(0, 0);
+    hands.lineTo(math.cos(angle) * length, math.sin(angle) * length);
+  }
+  canvas.drawPath(hands, _outline(chronoGold, 3));
+  canvas.drawCircle(
+    Offset.zero,
+    4 + boss.charge * 2,
+    Paint()..color = chronoMint,
+  );
+  // Two narrow eyes keep the clock readable as a guardian.
+  canvas.drawLine(
+    const Offset(-17, -10),
+    const Offset(-8, -7),
+    _outline(chronoMint, 3),
+  );
+  canvas.drawLine(
+    const Offset(8, -7),
+    const Offset(17, -10),
+    _outline(chronoMint, 3),
+  );
 }
 
 void _paintColossus(
@@ -870,7 +1008,12 @@ void _paintVenom(
 /// A glowing jellyfish: a breathing bell over five trailing tentacles. The
 /// bell squeezes with every volley and its heart swells while an attack
 /// charges. Softer and rounder than the bosses that follow it.
-void _paintTide(Canvas canvas, InfiniteBoss boss, bool reducedMotion, Color ink) {
+void _paintTide(
+  Canvas canvas,
+  InfiniteBoss boss,
+  bool reducedMotion,
+  Color ink,
+) {
   const deep = Color(0xFF2B2550), pale = Color(0xFFFFF4E6);
   final time = reducedMotion ? 0.0 : boss.age;
   final recoil = reducedMotion ? 0.0 : boss.recoil;
@@ -970,7 +1113,12 @@ void _paintTide(Canvas canvas, InfiniteBoss boss, bool reducedMotion, Color ink)
 
 /// A pulsar: a white-hot core inside two tilted orbit rings that spin
 /// opposite ways, with emitter nodes that flare while an attack charges.
-void _paintNova(Canvas canvas, InfiniteBoss boss, bool reducedMotion, Color ink) {
+void _paintNova(
+  Canvas canvas,
+  InfiniteBoss boss,
+  bool reducedMotion,
+  Color ink,
+) {
   const shell = Color(0xFF151A3A), pale = Color(0xFFF4FBFF);
   final time = reducedMotion ? 0.0 : boss.age;
   final charge = boss.charge, recoil = reducedMotion ? 0.0 : boss.recoil;
@@ -998,7 +1146,10 @@ void _paintNova(Canvas canvas, InfiniteBoss boss, bool reducedMotion, Color ink)
   for (var i = 0; i < 8; i++) {
     final a = i * math.pi / 4 + math.pi / 8;
     final r = i.isEven ? 30.0 : 24.0;
-    final p = Offset(math.cos(a) * r, math.sin(a) * r + InfiniteBoss.novaCoreOffset);
+    final p = Offset(
+      math.cos(a) * r,
+      math.sin(a) * r + InfiniteBoss.novaCoreOffset,
+    );
     if (i == 0) {
       body.moveTo(p.dx, p.dy);
     } else {
@@ -1013,15 +1164,16 @@ void _paintNova(Canvas canvas, InfiniteBoss boss, bool reducedMotion, Color ink)
     const Offset(0, InfiniteBoss.novaCoreOffset),
     15 + charge * 4,
     Paint()
-      ..shader = const RadialGradient(
-        colors: [pale, novaCyan, novaViolet],
-        stops: [0, .45, 1],
-      ).createShader(
-        Rect.fromCircle(
-          center: const Offset(0, InfiniteBoss.novaCoreOffset),
-          radius: 19,
-        ),
-      ),
+      ..shader =
+          const RadialGradient(
+            colors: [pale, novaCyan, novaViolet],
+            stops: [0, .45, 1],
+          ).createShader(
+            Rect.fromCircle(
+              center: const Offset(0, InfiniteBoss.novaCoreOffset),
+              radius: 19,
+            ),
+          ),
   );
   canvas.drawCircle(
     const Offset(0, InfiniteBoss.novaCoreOffset),

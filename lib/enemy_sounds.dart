@@ -15,6 +15,7 @@ enum EnemyCue {
   venomArrival,
   novaArrival,
   tideArrival,
+  chronoArrival,
   bullet,
   seedSpit,
   ricochet,
@@ -36,10 +37,11 @@ enum EnemyCue {
 
 extension EnemyCueAudio on EnemyCue {
   String get asset {
-    // Two cues borrow an existing recording at their own volume.
+    // These cues borrow existing recordings at their own volume.
     final sample = switch (this) {
       EnemyCue.mazeGateFire => EnemyCue.laserFire,
       EnemyCue.tideArrival => EnemyCue.venomArrival,
+      EnemyCue.chronoArrival => EnemyCue.prismArrival,
       _ => this,
     };
     return 'audio/enemy_${sample.name}.wav';
@@ -55,7 +57,8 @@ extension EnemyCueAudio on EnemyCue {
     EnemyCue.prismArrival ||
     EnemyCue.venomArrival ||
     EnemyCue.novaArrival ||
-    EnemyCue.tideArrival => .9,
+    EnemyCue.tideArrival ||
+    EnemyCue.chronoArrival => .9,
     EnemyCue.bullet => .14,
     EnemyCue.seedSpit => .4,
     EnemyCue.ricochet => .22,
@@ -80,7 +83,7 @@ extension EnemyCueAudio on EnemyCue {
     EnemyCue.prismArrival ||
     EnemyCue.venomArrival ||
     EnemyCue.novaArrival => .5,
-    EnemyCue.tideArrival => .4,
+    EnemyCue.tideArrival || EnemyCue.chronoArrival => .4,
     EnemyCue.laserCharge => .5,
     EnemyCue.laserFire => .65,
     EnemyCue.mazeGateFire => .18,
@@ -136,7 +139,8 @@ class EnemySoundDirector {
         if (previous == null && shot.age < 0) {
           if (shot.kind == LateShotKind.laser) emit(EnemyCue.laserCharge);
           if (shot.kind == LateShotKind.mine) emit(EnemyCue.mineCharge);
-          if (seraph && shot.kind == LateShotKind.shard)
+          if ((seraph || bossKind == BossKind.chronoKeeper) &&
+              shot.kind == LateShotKind.shard)
             emit(EnemyCue.cometCharge);
         }
         if ((previous ?? double.negativeInfinity) < 0 && shot.age >= 0) {
@@ -169,6 +173,7 @@ class EnemySoundDirector {
         BossKind.prismReaver => EnemyCue.prismArrival,
         BossKind.venomCrown => EnemyCue.venomArrival,
         BossKind.novaPulsar => EnemyCue.novaArrival,
+        BossKind.chronoKeeper => EnemyCue.chronoArrival,
       });
       shots(boss.shots, boss.kind);
     }

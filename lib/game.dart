@@ -194,7 +194,8 @@ class BalanceGame {
   BallCosmetic? visualBallOverride;
   PlatformStyle? visualPlatformOverride;
   BallCosmetic get renderCosmetic => visualBallOverride ?? cosmetic;
-  PlatformStyle get renderPlatformStyle => visualPlatformOverride ?? platformStyle;
+  PlatformStyle get renderPlatformStyle =>
+      visualPlatformOverride ?? platformStyle;
   double get equipmentMultiplier =>
       1 + cosmetic.scoreBonus + platformStyle.scoreBonus;
   ControlMode controlMode = ControlMode.twoFinger;
@@ -333,7 +334,9 @@ class BalanceGame {
     // A ball sinking into a moving hole travels with it.
     if (phase == GamePhase.playing) _sinkingHole = null;
     final sinking = _sinkingHole;
-    if (phase == GamePhase.sinking && sinking != null && sinking < holes.length) {
+    if (phase == GamePhase.sinking &&
+        sinking != null &&
+        sinking < holes.length) {
       captureX = holes[sinking].x;
       captureY = holes[sinking].y;
     }
@@ -454,6 +457,7 @@ class BalanceGame {
   int bossesCleared = 0;
   List<BossKind> _bossOrder = List.unmodifiable(BossKind.values);
   List<BossKind> get bossOrder => _bossOrder;
+
   /// Explicit encounter choice for temporary capture scenarios only.
   BossKind? firstBossOverride;
   List<int> _bossScoreThresholds = [
@@ -466,6 +470,7 @@ class BalanceGame {
   int? get bossWarningSeconds => _bossWarningAt == null
       ? null
       : math.max(1, (_bossWarningAt! + 3 - elapsed).ceil());
+
   /// The first lap meets each boss at its score window. Overdrive laps
   /// follow on time instead: top gear multiplies points, not the clock.
   bool get bossPending =>
@@ -808,8 +813,7 @@ class BalanceGame {
     if (survival.noticeTime > 0) message = survival.notice;
     if (boss != null) message = boss!.hint;
     if (bossWarningSeconds != null)
-      message =
-          'BOSS · ${nextBossKind.name} IN $bossWarningSeconds';
+      message = 'BOSS · ${nextBossKind.name} IN $bossWarningSeconds';
   }
 
   void _loseClimb(String reason, {Hole? hole}) {
@@ -926,12 +930,14 @@ class BalanceGame {
     final encounterSeed = _random.nextInt(1 << 30);
     enemyDirector = EncounterDirector(encounterSeed);
     final bossRandom = math.Random(encounterSeed ^ 0xB055);
-    // The gentle Tide Herald always opens the run; the other six are
-    // shuffled across the later slots.
+    // Keep the opener fixed, then shuffle within each progression group.
+    // Each boss appears once before the same order repeats in Overdrive.
     _bossOrder = List.unmodifiable([
-      BossKind.tideHerald,
-      ...BossKind.values.where((kind) => kind != BossKind.tideHerald).toList()
-        ..shuffle(bossRandom),
+      BossKind.stormColossus,
+      ...([BossKind.tideHerald, BossKind.skyWarden]..shuffle(bossRandom)),
+      ...([BossKind.chronoKeeper, BossKind.eclipseSeraph, BossKind.prismReaver]
+        ..shuffle(bossRandom)),
+      ...([BossKind.venomCrown, BossKind.novaPulsar]..shuffle(bossRandom)),
     ]);
     final first = firstBossOverride;
     if (first != null) {
@@ -1817,9 +1823,7 @@ class BalanceGame {
         dashLength: wave.dashLength,
         dashGap: wave.dashGap,
         dashSpeed: wave.dashSpeed,
-        laserBottom: wave.stopAboveStart
-            ? SpecialHazard.startClearBottom
-            : 537,
+        laserBottom: wave.stopAboveStart ? SpecialHazard.startClearBottom : 537,
       ),
     );
     _finaleSequence++;

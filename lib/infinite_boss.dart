@@ -9,11 +9,12 @@ enum BossKind {
   prismReaver,
   venomCrown,
   novaPulsar,
+  chronoKeeper,
 }
 
-/// Score windows for the 1st to 7th boss of a run. Each run picks one score
-/// inside every window. The first, early window always belongs to the gentle
-/// Tide Herald; the other six bosses are shuffled across the later slots.
+/// Score windows for the 1st to 8th boss of a run. Each run picks one score
+/// inside every window. Storm Colossus opens the run; the remaining bosses
+/// shuffle within the early, middle and final groups in game.dart.
 const bossScoreWindows = [
   (25000, 32000),
   (70000, 110000),
@@ -22,6 +23,7 @@ const bossScoreWindows = [
   (700000, 780000),
   (1000000, 1100000),
   (1300000, 1400000),
+  (1650000, 1750000),
 ];
 
 extension BossKindDetails on BossKind {
@@ -33,6 +35,7 @@ extension BossKindDetails on BossKind {
     BossKind.prismReaver => 'PRISM REAVER',
     BossKind.venomCrown => 'VENOM CROWN',
     BossKind.novaPulsar => 'NOVA PULSAR',
+    BossKind.chronoKeeper => 'CHRONO KEEPER',
   };
 }
 
@@ -59,6 +62,9 @@ enum BossPhase {
   driftBubbles,
   tideWaves,
   geysers,
+  tickRain,
+  pendulum,
+  rewind,
   leaving,
 }
 
@@ -94,6 +100,7 @@ class InfiniteBoss {
   static const name = 'SKY WARDEN';
   static const mineWarning = 1.35, mineLife = .65, mineRadius = 40.0;
   static const toxicWarning = .9, toxicLife = 2.5;
+  static const chronoWarning = .75;
 
   final BossKind kind;
   final bool training;
@@ -145,7 +152,9 @@ class InfiniteBoss {
     var result = 0.0;
     for (final shot in shots) {
       if (shot.age >= 0 || shot.cancelled) continue;
-      final warning = kind == BossKind.venomCrown
+      final warning = kind == BossKind.chronoKeeper
+          ? chronoWarning
+          : kind == BossKind.venomCrown
           ? toxicWarning
           : shot.kind == LateShotKind.mine
           ? mineWarning
@@ -153,6 +162,7 @@ class InfiniteBoss {
           ? 1.2
           : laserWarning;
       if (shot.kind == LateShotKind.laser ||
+          (kind == BossKind.chronoKeeper && shot.kind == LateShotKind.shard) ||
           (kind == BossKind.venomCrown && shot.kind == LateShotKind.shard) ||
           shot.kind == LateShotKind.mine ||
           (kind == BossKind.eclipseSeraph && shot.kind == LateShotKind.shard)) {
@@ -179,6 +189,7 @@ class InfiniteBoss {
           BossKind.prismReaver => BossPhase.sweepingLaser,
           BossKind.venomCrown => BossPhase.toxicSlalom,
           BossKind.novaPulsar => BossPhase.novaRings,
+          BossKind.chronoKeeper => BossPhase.tickRain,
         }
       : age < 18
       ? switch (kind) {
@@ -189,6 +200,7 @@ class InfiniteBoss {
           BossKind.prismReaver => BossPhase.twinLasers,
           BossKind.venomCrown => BossPhase.toxicPulse,
           BossKind.novaPulsar => BossPhase.dashedRails,
+          BossKind.chronoKeeper => BossPhase.pendulum,
         }
       : age < 26
       ? switch (kind) {
@@ -199,6 +211,7 @@ class InfiniteBoss {
           BossKind.prismReaver => BossPhase.rotors,
           BossKind.venomCrown => BossPhase.toxicGauntlet,
           BossKind.novaPulsar => BossPhase.novaLance,
+          BossKind.chronoKeeper => BossPhase.rewind,
         }
       : BossPhase.leaving;
   bool get expired => age >= lifetime;
@@ -227,6 +240,9 @@ class InfiniteBoss {
     BossPhase.driftBubbles => 'BOSS · Slip between the drifting bubbles',
     BossPhase.tideWaves => 'BOSS · Wait under a gap as the wave rolls down',
     BossPhase.geysers => 'BOSS · Step out of the marked geyser columns',
+    BossPhase.tickRain => 'BOSS · The clock bolts pause, then keep falling',
+    BossPhase.pendulum => 'BOSS · Watch the paired bolts swing together',
+    BossPhase.rewind => 'BOSS · Watch out! The bolts return along their trails',
     BossPhase.leaving => 'BOSS · Clear! Keep climbing',
   };
 
@@ -237,7 +253,9 @@ class InfiniteBoss {
       final exit = time > 13.5 ? -170 * math.pow((time - 13.5) / 2.5, 2) : 0.0;
       return (x: x, y: top + 105 + entrance + exit);
     }
-    final x = kind == BossKind.venomCrown
+    final x = kind == BossKind.chronoKeeper
+        ? 180 + math.sin(time * .7) * 24
+        : kind == BossKind.venomCrown
         ? 180 + math.sin(time * .65) * 35
         : kind == BossKind.novaPulsar
         ? 180 + math.sin(time * .55) * 28
@@ -300,6 +318,8 @@ class InfiniteBoss {
         _novaWeapons(before, target);
       } else if (kind == BossKind.tideHerald) {
         _tideWeapons(before, target);
+      } else if (kind == BossKind.chronoKeeper) {
+        _chronoWeapons(before, target);
       } else {
         _toxicWeapons(before, target);
       }
@@ -399,6 +419,90 @@ class InfiniteBoss {
     }
     for (final shot in shots) {
       shot.step(dt, scrollDistance: scrollDistance);
+    }
+  }
+
+  /// Clockwork bolts use premarked paths, never home, and finish before exit.
+  /// Only their travel changes: stop/start, paired swings, then a return trip.
+  void _chronoWeapons(double before, EnemyPoint target) {
+    void bolt(
+      double at,
+      EnemyPoint Function(double) path,
+      double life,
+      String reason,
+    ) {
+      _lastVolleyAt = at + chronoWarning;
+      shots.add(
+        LateEnemyShot(
+          kind: LateShotKind.shard,
+          origin: path(0),
+          velocity: (x: 0, y: 0),
+          delay: at - before + chronoWarning,
+          life: life,
+          positionPath: path,
+          radiusOverride: 6,
+          reasonOverride: reason,
+        ),
+      );
+    }
+
+    while (_bulletWave < 3 && age >= 2.4 + _bulletWave * 1.7) {
+      final wave = _bulletWave++;
+      final at = 2.4 + wave * 1.7;
+      final startY = top + 190;
+      final speed = (560 - startY) / 2.8;
+      for (final column in [68.0, 180.0, 292.0]) {
+        final x = column + (wave.isEven ? -12 : 12);
+        bolt(
+          at,
+          (t) {
+            // A half-second hold is visible on the trail; no teleport or jump.
+            final travel = t < .85
+                ? t
+                : t < 1.35
+                ? .85
+                : t - .5;
+            return (x: x, y: startY + speed * travel);
+          },
+          3.3,
+          'Clock bolt. It pauses, then continues down the marked trail.',
+        );
+      }
+    }
+    while (_laserWave < 3 && age >= 10.2 + _laserWave * 1.8) {
+      final wave = _laserWave++;
+      final at = 10.2 + wave * 1.8;
+      final startY = top + 190;
+      for (final side in [-1.0, 1.0]) {
+        bolt(
+          at,
+          (t) => (
+            x: 180 + side * 68 + 28 * math.sin(t * 2.1 + wave * math.pi),
+            y: startY + (560 - startY) * t / 3.3,
+          ),
+          3.3,
+          'Pendulum bolt. Slip between the swinging pair.',
+        );
+      }
+    }
+    while (_poolWave < 3 && age >= 18.2 + _poolWave * 1.9) {
+      final wave = _poolWave++;
+      final at = 18.2 + wave * 1.9;
+      final startY = top + 190;
+      // Lock the turn point when the warning starts, even if the ball moves.
+      final turnY = (target.y + 72).clamp(top + 260, 510.0);
+      for (final column in [80.0, 180.0, 280.0]) {
+        final x = column + (wave.isEven ? -16 : 16);
+        bolt(
+          at,
+          (t) => (
+            x: x,
+            y: startY + (turnY - startY) * math.sin(math.pi * t / 3.2),
+          ),
+          3.2,
+          'Rewind bolt. Its marked trail is dangerous on the return too.',
+        );
+      }
     }
   }
 
@@ -677,7 +781,9 @@ class InfiniteBoss {
         'Nova lance. Cross it through a gap.',
       );
     }
-    while (_poolWave >= 1 && _poolWave < 3 && age >= 19.6 + (_poolWave - 1) * 3) {
+    while (_poolWave >= 1 &&
+        _poolWave < 3 &&
+        age >= 19.6 + (_poolWave - 1) * 3) {
       final wave = _poolWave++;
       ring(19.6 + (wave - 1) * 3, 5, .48, 85, wave.isEven ? .14 : -.14);
     }

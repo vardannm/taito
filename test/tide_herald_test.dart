@@ -8,13 +8,17 @@ InfiniteBoss herald({double top = 0, int lap = 0}) =>
     InfiniteBoss(kind: BossKind.tideHerald, top: top, lap: lap);
 
 void main() {
-  test('the Herald is the first boss of every run, at 25,000 to 32,000', () {
+  test('Colossus opens at 25,000 to 32,000; Herald is second or third', () {
     expect(bossScoreWindows.first, (25000, 32000));
     final thresholds = <int>{};
     for (var seed = 0; seed < 200; seed++) {
       final game = BalanceGame(seed: seed)..start(gameMode: GameMode.infinite);
-      expect(game.bossOrder.first, BossKind.tideHerald);
-      expect(game.nextBossKind, BossKind.tideHerald);
+      expect(game.bossOrder.first, BossKind.stormColossus);
+      expect(game.nextBossKind, BossKind.stormColossus);
+      expect(
+        game.bossOrder.indexOf(BossKind.tideHerald),
+        inInclusiveRange(1, 2),
+      );
       expect(game.bossScoreThresholds.first, inInclusiveRange(25000, 32000));
       thresholds.add(game.bossScoreThresholds.first);
     }
@@ -27,7 +31,9 @@ void main() {
       ..survival.shield = 1e6
       ..lateEnemiesEnabled = false
       ..snakeEncountersEnabled = false;
-    final threshold = game.bossScoreThresholds.first;
+    final slot = game.bossOrder.indexOf(BossKind.tideHerald);
+    game.bossesEncountered = slot;
+    final threshold = game.bossScoreThresholds[slot];
     game.survival.points = threshold - 2000.0;
     advance(game, 4);
     expect(game.boss, isNull);
@@ -42,7 +48,7 @@ void main() {
       advance(game, 1 / 120);
     }
     expect(game.bossesCleared, 1);
-    // Still far below the second window: play simply carries on.
+    // Still far below the next window: play simply carries on.
     game.survival.points = 60000;
     advance(game, 70);
     expect(game.boss, isNull);
@@ -182,10 +188,7 @@ void main() {
     expect(sets[21.6]!..sort(), [55, 180, 305]);
     expect(sets[23.4]!..sort(), [117.5, 242.5]);
     // One set is spent well before the next goes live.
-    expect(
-      1.8 - InfiniteBoss.tideGeyserLife,
-      greaterThanOrEqualTo(.75),
-    );
+    expect(1.8 - InfiniteBoss.tideGeyserLife, greaterThanOrEqualTo(.75));
     // The ball's centre is safe anywhere in the lanes between live columns,
     // and each lane of one set sits inside a column of the other.
     const reach = 7 + InfiniteBoss.tideGeyserRadius;

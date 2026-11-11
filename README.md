@@ -374,11 +374,26 @@ The simulation is in `lib/late_enemies.dart` and vector art in
 `lib/late_enemy_painter.dart`. Render the warning/attack gallery with
 `scripts/flutter.ps1 test tool/render_late_enemies.dart`.
 
-Infinite shuffles all six second-tier bosses once per run, with no repeats.
-The six encounter score windows are 70,000–110,000, 220,000–250,000,
-450,000–520,000, 700,000–780,000, 1,000,000–1,100,000 and
-1,300,000–1,400,000 points (`bossScoreWindows` in `lib/infinite_boss.dart`);
-any boss can occupy any slot.
+Storm Colossus always opens Infinite at 25,000–32,000 points. Tide Herald and
+Sky Warden shuffle into slots 2–3; Chrono Keeper, Eclipse Seraph and Prism
+Reaver shuffle into slots 4–6; Venom Crown and Nova Pulsar shuffle into slots
+7–8. These groups produce 24 possible orders with no repeats per lap.
+The later encounter score windows
+are 70,000–110,000, 220,000–250,000, 450,000–520,000, 700,000–780,000,
+1,000,000–1,100,000, 1,300,000–1,400,000 and 1,650,000–1,750,000 points
+(`bossScoreWindows` in `lib/infinite_boss.dart`). After all eight, Overdrive
+repeats that run's order with 150 active seconds between encounters and
+12% faster fights per lap, capped at 36% faster.
+
+Chrono Keeper is a gold-and-mint clockwork guardian with hourglass satellites.
+Its three phases send nine stop/start clock bolts, six paired pendulum bolts,
+then nine rewind bolts that descend and return along their original trails.
+Every volley marks its full route for 0.75 seconds before release. Pause rings
+and direction arrows make stops and return trips visible; paths never home
+and all shots finish before the 26-second exit phase. Its visuals are drawn
+in code and its sounds reuse bundled audio, adding no media assets. It shares
+the existing clear arena, pause, shield, recovery and Overdrive rules.
+Preview: `artifacts/infinite-chrono-keeper.png`.
 
 Nova Pulsar is the laser boss. Nova rings grow from its core with two or three
 turning openings (the first always faces down; dashed rays mark every opening

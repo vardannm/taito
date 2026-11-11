@@ -18,7 +18,7 @@ void main() {
     () {
       final game = run();
       final sound = EnemySoundDirector();
-    game.spiders.add(BoardSpider(180, 160, 60));
+      game.spiders.add(BoardSpider(180, 160, 60));
       final porcupine = BoardPorcupine(180, 160);
       game.porcupines.add(porcupine);
       expect(sound.capture(game), isEmpty);
@@ -76,27 +76,30 @@ void main() {
     },
   );
 
-  test('seed spitter spits with its own cue; the three-way split stays a bullet', () {
-    final game = run();
-    final sound = EnemySoundDirector();
-    final visitor = LateEnemyEncounter(
-      kind: LateEnemyKind.seedSpitter,
-      origin: (x: 180, y: 130),
-      target: (x: 180, y: 430),
-    );
-    game.lateEnemy = visitor;
-    final heard = <EnemyCue>[];
-    for (var i = 0; i < 4 * 120; i++) {
-      visitor.step(1 / 120);
-      game.elapsed += 1 / 120;
-      heard.addAll(sound.capture(game));
-    }
-    expect(heard, [
-      EnemyCue.insectArrival,
-      EnemyCue.seedSpit,
-      EnemyCue.bullet,
-    ]);
-  });
+  test(
+    'seed spitter spits with its own cue; the three-way split stays a bullet',
+    () {
+      final game = run();
+      final sound = EnemySoundDirector();
+      final visitor = LateEnemyEncounter(
+        kind: LateEnemyKind.seedSpitter,
+        origin: (x: 180, y: 130),
+        target: (x: 180, y: 430),
+      );
+      game.lateEnemy = visitor;
+      final heard = <EnemyCue>[];
+      for (var i = 0; i < 4 * 120; i++) {
+        visitor.step(1 / 120);
+        game.elapsed += 1 / 120;
+        heard.addAll(sound.capture(game));
+      }
+      expect(heard, [
+        EnemyCue.insectArrival,
+        EnemyCue.seedSpit,
+        EnemyCue.bullet,
+      ]);
+    },
+  );
 
   test('laser charge and fire happen once at their actual transitions', () {
     final game = run();
@@ -199,6 +202,11 @@ void main() {
           EnemyCue.ricochet: 3,
         },
         BossKind.venomCrown => {EnemyCue.venomArrival: 1, EnemyCue.bullet: 17},
+        BossKind.chronoKeeper => {
+          EnemyCue.chronoArrival: 1,
+          EnemyCue.cometCharge: 9,
+          EnemyCue.bullet: 9,
+        },
         // Six rings, two pairs of rails (one cue per pair) and one lance.
         BossKind.novaPulsar => {
           EnemyCue.novaArrival: 1,
