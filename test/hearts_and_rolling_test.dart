@@ -69,6 +69,7 @@ void main() {
 
   test('ball rolls by travelled distance, reverses, pauses, and resets', () {
     final game = BalanceGame()..start(gameMode: GameMode.practice);
+    game.grabPivot(0);
     game.velocity = 80;
     final before = game.ballX;
     game.step(1 / 120);
@@ -81,6 +82,7 @@ void main() {
     game.step(.1);
     expect(game.ballRotation, angle);
     game.setPaused(false);
+    game.grabPivot(0);
     game.velocity = -80;
     game.step(1 / 120);
     expect(game.ballRotation, closeTo(0, 1e-9));

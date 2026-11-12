@@ -1,5 +1,4 @@
 import 'package:balance_arcade/ball_cosmetics.dart';
-import 'package:balance_arcade/ball_shop.dart';
 import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/platforms.dart';
 import 'package:balance_arcade/profile.dart';
@@ -8,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
+import 'support/shop_navigation.dart';
 
 void main() {
   setUp(
@@ -94,7 +94,7 @@ void main() {
     expect(platformShopOrder.toSet(), PlatformStyle.values.toSet());
   });
 
-  testWidgets('shop dot clears on return and collection has three tabs', (
+  testWidgets('shop dot clears on return and gear shares one screen', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(320, 568);
@@ -113,20 +113,11 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('Cabinet Styles'), findsNothing);
-    for (final tab in ['Balls', 'Platforms', 'Upgrades']) {
-      expect(find.text(tab), findsOneWidget);
+    for (final section in ['BALLS', 'PLATFORMS', 'Upgrades']) {
+      expect(find.text(section), findsOneWidget);
     }
     final buy = find.byKey(const ValueKey('buy-coral'));
-    await tester.scrollUntilVisible(
-      buy.hitTestable(),
-      180,
-      scrollable: find
-          .descendant(
-            of: find.byType(BallShop),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    );
+    await revealShopBall(tester, BallCosmetic.coral);
     await tester.tap(buy);
     await tester.pump();
     expect(p.wallet, 0);

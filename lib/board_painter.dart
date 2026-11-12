@@ -54,7 +54,12 @@ class BoardViewport {
     double fillWidth = 0,
     double focusY = 440,
     double bottomInset = 0,
+    bool fitHeight = false,
+    double? contentTop,
+    double arenaWidthFraction = .74,
   }) {
+    final spread = usesWideStage(full) || fitHeight;
+    final fitted = spread || contentTop != null;
     final progress = fillWidth.clamp(0.0, 1.0);
     final topInset = usesWideStage(full) ? 96.0 * progress : 0.0;
     final size = Size(
@@ -66,13 +71,13 @@ class BoardViewport {
     controlBottom = bottomInset > 0 ? full.height : 0;
     final fit = math.min(
       size.width / BalanceGame.width,
-      size.height / BalanceGame.height,
+      size.height / (BalanceGame.height - (contentTop ?? 0)),
     );
     // A wide window must show the complete route. Filling its width would
     // enlarge every object and turn ordinary platform movement into camera
     // panning. Fit object sizes vertically, then spread horizontal positions
     // across the arena using the same transform as pointer input.
-    scale = usesWideStage(full)
+    scale = fitted
         ? fit
         : fit +
               (size.width / BalanceGame.width - fit) *
@@ -80,8 +85,8 @@ class BoardViewport {
     final height = BalanceGame.height * scale;
     horizontalScale =
         scale +
-        (math.max(scale, full.width * .74 / 320) - scale) *
-            (usesWideStage(full) ? progress : 0);
+        (math.max(scale, full.width * arenaWidthFraction / 320) - scale) *
+            (spread ? progress : 0);
     topExtension =
         math.max(0, size.height - height) / scale * fillWidth.clamp(0.0, 1.0);
     offset = Offset(
@@ -112,11 +117,17 @@ class BoardViewport {
     BalanceGame game, {
     double fillWidth = 0,
     double? bottomInset,
+    bool fitHeight = false,
+    double? contentTop,
+    double arenaWidthFraction = .74,
   }) => BoardViewport(
     size,
     fillWidth: fillWidth,
     bottomInset: bottomInset ?? handleStrip(game),
     focusY: game.screenY((game.left + game.right) / 2),
+    fitHeight: fitHeight,
+    contentTop: contentTop,
+    arenaWidthFraction: arenaWidthFraction,
   );
   late final double scale;
   late final double horizontalScale;
@@ -198,15 +209,22 @@ class BoardPainter extends CustomPainter {
     this.fillWidth = 0,
     this.bottomInset,
     this.showHud = true,
+    this.fitHeight = false,
+    this.contentTop,
+    this.arenaWidthFraction = .74,
     Listenable? repaint,
-  }) : world = BallWorld.of(game.cosmetic),
+  }) : world = BallWorld.of(game.renderCosmetic),
        super(repaint: repaint);
   final BalanceGame game;
   final BallWorld world;
   final bool reducedMotion;
   final double fillWidth;
+  final double arenaWidthFraction;
   final double? bottomInset;
-  final bool showHud;
+
+  /// Fit an imported replay's full vertical scene without changing physics.
+  final double? contentTop;
+  final bool showHud, fitHeight;
 
   void text(
     Canvas c,
@@ -255,8 +273,11 @@ class BoardPainter extends CustomPainter {
       game,
       fillWidth: fillWidth,
       bottomInset: bottomInset,
+      fitHeight: fitHeight,
+      contentTop: contentTop,
+      arenaWidthFraction: arenaWidthFraction,
     );
-    final panoramic = usesWideStage(size) && fillWidth > 0;
+    final panoramic = (usesWideStage(size) || fitHeight) && fillWidth > 0;
     if (panoramic) {
       paintWideBoardScenery(
         canvas,
@@ -295,7 +316,7 @@ class BoardPainter extends CustomPainter {
       paintBallWorld(
         canvas,
         field.outerRect,
-        game.cosmetic,
+        game.renderCosmetic,
         background: false,
         time: game.clock,
         reducedMotion: reducedMotion,
@@ -541,6 +562,38 @@ class BoardPainter extends CustomPainter {
             ..style = PaintingStyle.stroke
             ..strokeWidth = active ? 2.5 : 1.5,
         );
+      final motion = hole.motion;
+      if (motion != null) {
+        // Moving holes share the moving-hole hazard's red ring and arrows, so
+        // a sliding trap never reads as a still one. Target holes keep their
+        // own ring and only show the arrows.
+        final cue = Paint()
+          ..color = const Color(0xFFE34336)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..strokeCap = StrokeCap.round;
+        if (hole.target == 0) canvas.drawCircle(p, rim + 1, cue);
+        final tip = rim + 9;
+        if (motion.path == HazardMotion.circle ||
+            motion.path == HazardMotion.oval) {
+          final angle = math.atan2(hole.y - hole.homeY, hole.x - hole.homeX);
+          final direction = Offset(-math.sin(angle), math.cos(angle));
+          final normal = Offset(-direction.dy, direction.dx);
+          final head = p + direction * (tip + 3);
+          canvas.drawLine(head, head - direction * 6 + normal * 4, cue);
+          canvas.drawLine(head, head - direction * 6 - normal * 4, cue);
+        } else {
+          final axis = motion.path == HazardMotion.vertical
+              ? const Offset(0, 1)
+              : const Offset(1, 0);
+          final side = Offset(-axis.dy, axis.dx);
+          for (final d in [-1.0, 1.0]) {
+            final head = p + axis * (d * tip);
+            canvas.drawLine(head, head - axis * (d * 5) + side * 5, cue);
+            canvas.drawLine(head, head - axis * (d * 5) - side * 5, cue);
+          }
+        }
+      }
       if (hole.target > 0)
         text(
           canvas,
@@ -708,8 +761,13 @@ class BoardPainter extends CustomPainter {
           BossPhase.novaRings => 'NOVA RINGS',
           BossPhase.dashedRails => 'DASHED RAILS',
           BossPhase.novaLance => 'NOVA LANCE',
+          BossPhase.driftBubbles => 'DRIFT BUBBLES',
+          BossPhase.tideWaves => 'TIDE WAVES',
+          BossPhase.tickRain => 'TICK RAIN',
+          BossPhase.pendulum => 'PENDULUM',
+          BossPhase.rewind => 'REWIND',
           _ => boss.phase.name.toUpperCase(),
-        }} · ${(boss.lifetime - boss.age).ceil()}s',
+        }} · ${boss.secondsLeft.ceil()}s',
         Offset(180, labelY + 16),
         9,
         bossInk,
@@ -790,7 +848,7 @@ class BoardPainter extends CustomPainter {
       paintInfiniteEnergy(canvas, game, reducedMotion);
     }
     // Short, fading wake behind the ball. This never changes hit geometry.
-    if (game.phase == GamePhase.playing && game.started) {
+    if (game.infinite && game.phase == GamePhase.playing && game.started) {
       final energy = (game.motionSpeed / 220).clamp(0.0, 1.0);
       final tint = Color.lerp(
         const Color(0xFF62E4D3),
@@ -872,9 +930,10 @@ class BoardPainter extends CustomPainter {
       plainCanvas,
       Offset(a.dx * viewport.stretch, a.dy),
       Offset(b.dx * viewport.stretch, b.dy),
-      game.platformStyle,
+      game.renderPlatformStyle,
       time: game.clock,
       reducedMotion: reducedMotion,
+      particlesEnabled: game.infinite,
     );
     canvas.restore();
     paintGapWarning(canvas, game, reducedMotion);
@@ -929,13 +988,13 @@ class BoardPainter extends CustomPainter {
     }
     if (!game.merging && game.ballScale > 0) {
       final p = Offset(game.visualX, game.screenY(game.visualY));
-      if (!reducedMotion)
+      if (game.infinite && !reducedMotion)
         paintCosmeticTrail(
           canvas,
           p,
           Offset(game.velocity, -(game.leftSpeed + game.rightSpeed) / 2),
           7 * game.ballScale,
-          game.cosmetic,
+          game.renderCosmetic,
         );
       canvas.drawCircle(
         p + const Offset(2, 4),
@@ -948,11 +1007,12 @@ class BoardPainter extends CustomPainter {
         canvas,
         p,
         7 * game.ballScale,
-        game.cosmetic,
+        game.renderCosmetic,
         time: game.clock,
         rotation: game.ballRotation,
         reducedMotion: reducedMotion,
         steelPalette: palette.ball,
+        particlesEnabled: game.infinite,
       );
       paintInfiniteMagnet(canvas, game, reducedMotion);
       paintInfiniteShield(canvas, game, reducedMotion);
@@ -992,6 +1052,9 @@ class BoardPainter extends CustomPainter {
       oldDelegate.game != game ||
       reducedMotion != oldDelegate.reducedMotion ||
       showHud != oldDelegate.showHud ||
+      fitHeight != oldDelegate.fitHeight ||
+      contentTop != oldDelegate.contentTop ||
+      arenaWidthFraction != oldDelegate.arenaWidthFraction ||
       fillWidth != oldDelegate.fillWidth ||
       bottomInset != oldDelegate.bottomInset;
 }

@@ -9,6 +9,7 @@ import 'package:balance_arcade/ball_shop.dart';
 import 'package:balance_arcade/profile.dart';
 import 'package:balance_arcade/ball_cosmetics.dart';
 import 'package:balance_arcade/infinite_progress.dart';
+import '../test/support/shop_navigation.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
@@ -76,16 +77,7 @@ void main() {
       await tester.tap(find.text('GEAR SHOP'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
-      await tester.scrollUntilVisible(
-        find.byKey(const ValueKey('buy-plasma')),
-        350,
-        scrollable: find
-            .descendant(
-              of: find.byType(BallShop),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
+      await revealShopBall(tester, BallCosmetic.plasma);
       await tester.pump();
       await capture('magnet-shop-${width.toInt()}');
       Navigator.of(tester.element(find.byType(BallShop))).pop();

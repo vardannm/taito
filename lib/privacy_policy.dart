@@ -1,3 +1,4 @@
+import 'ui_audio.dart';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -48,7 +49,7 @@ class _PrivacyPolicyPageState extends State<PrivacyPolicyPage> {
                   else ...[
                     Text(
                       'Updated ${snapshot.data!['updated']}',
-                      style: const TextStyle(color: menuMuted, fontSize: 12),
+                      style: TextStyle(color: menuMuted, fontSize: 12),
                     ),
                     if ((snapshot.data!['publisher'] as String).isNotEmpty)
                       Text('Publisher: ${snapshot.data!['publisher']}'),
@@ -100,10 +101,10 @@ class _PrivacyPolicyPageState extends State<PrivacyPolicyPage> {
                             Text(reference['title'] as String),
                             Text(
                               reference['url'] as String,
-                              style: const TextStyle(color: menuMint),
+                              style: TextStyle(color: menuMint),
                             ),
                             TextButton.icon(
-                              onPressed: () async {
+                              onPressed: uiAction(context, () async {
                                 try {
                                   await Clipboard.setData(
                                     ClipboardData(
@@ -128,7 +129,7 @@ class _PrivacyPolicyPageState extends State<PrivacyPolicyPage> {
                                     );
                                   }
                                 }
-                              },
+                              }),
                               icon: const Icon(Icons.copy_outlined, size: 16),
                               label: const Text('Copy link'),
                             ),

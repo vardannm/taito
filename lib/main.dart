@@ -1,10 +1,11 @@
+import 'ui_audio.dart';
 import 'playtest_recorder.dart';
 import 'rewarded_revive_ads.dart';
 import 'ad_consent.dart';
 import 'app_analytics.dart';
 import 'privacy_policy.dart';
-import 'music_credits.dart';
 import 'infinite_music.dart';
+import 'level_music.dart';
 export 'pivot_board.dart';
 import 'pivot_board.dart';
 import 'club.dart';
@@ -20,7 +21,8 @@ import 'infinite_progress.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart' show kReleaseMode;
+import 'package:flutter/foundation.dart'
+    show LicenseEntryWithLineBreaks, LicenseRegistry, kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -36,8 +38,10 @@ import 'level_picker.dart';
 import 'profile.dart';
 import 'onboarding.dart';
 import 'tutorial_spotlight.dart';
+import 'two_finger_feedback.dart';
 import 'rewards.dart';
 import 'mastery_widgets.dart';
+import 'level_fireworks.dart';
 import 'analog_controls.dart';
 import 'tilt_lift_controls.dart';
 import 'merge_widgets.dart';
@@ -52,27 +56,40 @@ import 'boot_splash.dart';
 import 'responsive_layout.dart';
 import 'infinite_coin_chip.dart';
 import 'infinite_boss.dart';
+import 'device_orientation.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks([
+      'Montserrat',
+    ], await rootBundle.loadString('assets/fonts/Montserrat-OFL.txt'));
+  });
+  final isIOSPhone = await initializeDeviceOrientation();
   // Full screen: hides the status bar (time, battery) and Android's nav bar;
   // a swipe from the edge shows them briefly. SafeAreas still avoid the notch.
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
+    SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,
       systemNavigationBarColor: menuBackground,
       systemNavigationBarIconBrightness: Brightness.light,
     ),
   );
-  final profile = PlayerProfile();
+  // Store capture setup: open every level and keep at least 300,000 coins.
+  final profile = PlayerProfile(temporaryLevelAccess: true);
   await profile.load();
+  currentUiTheme = UiTheme.named(profile.uiTheme);
+  if (profile.wallet < 300000) {
+    profile.wallet = 300000;
+    await profile.saveEconomy();
+  }
   final analytics = await AppAnalytics.initialize();
   final adConsent = AdConsent();
   runApp(
     ArcadeApp(
+      isIOSPhone: isIOSPhone,
       profile: profile,
       analytics: analytics,
       reviveAds: GoogleRewardedReviveAds(
@@ -92,11 +109,13 @@ class ArcadeApp extends StatelessWidget {
     this.reviveAds,
     this.adConsent,
     this.intro = false,
+    this.isIOSPhone = false,
   });
   final PlayerProfile profile;
   final AppAnalytics? analytics;
   final RewardedReviveAds? reviveAds;
   final AdConsent? adConsent;
+  final bool isIOSPhone;
 
   /// The boot animation belongs to the real launch only; tests pump this app
   /// straight into the menu rather than waiting an intro out.
@@ -107,9 +126,23 @@ class ArcadeApp extends StatelessWidget {
     title: 'Rollrise: Ball Balance',
     theme: arcadeMenuTheme(),
     // Wrapping the navigator keeps the intro above anything the menu opens.
-    builder: intro
-        ? (context, child) => GiltIntroGate(child: child ?? const SizedBox())
-        : null,
+    builder: (context, child) => UiAudioScope(
+      enabled: () => profile.effectiveSoundVolume > 0,
+      volume: () => profile.effectiveSoundVolume,
+      child: PhoneOrientationFrame(
+        isIOSPhone: isIOSPhone,
+        child: TooltipVisibility(
+          visible: false,
+          child: intro
+              ? GiltIntroGate(
+                  ball: profile.selectedBall,
+                  platform: profile.selectedPlatform,
+                  child: child ?? const SizedBox(),
+                )
+              : child ?? const SizedBox(),
+        ),
+      ),
+    ),
     home: GameScreen(
       profile: profile,
       analytics: analytics,
@@ -160,10 +193,12 @@ class _GameScreenState extends State<GameScreen>
   double accumulator = 0;
   Timer? resumeTimer;
   int resumeSeconds = 0;
+  UiAudio? _resumeAudio;
   bool recorded = false, newBest = false, briefing = false;
   TutorialRun? tutorialRun;
   bool tutorialSheetOpen = false;
   final shopOriginKey = GlobalKey();
+  final achievementsOriginKey = GlobalKey();
   final tutorialLevelsKey = GlobalKey();
   final tutorialDailyKey = GlobalKey();
   final tutorialPlayKey = GlobalKey();
@@ -177,7 +212,7 @@ class _GameScreenState extends State<GameScreen>
   /// ordinary menu, where only Play opens the board.
   bool get tutorialBoard => tutorialActive && !entrance.isDismissed;
 
-  /// The Levels lessons point at Choose Level, which only Classic shows.
+  /// The Levels lessons point at All levels, which only Classic shows.
   bool get tutorialOnLevels =>
       tutorialActive &&
       const [
@@ -188,20 +223,7 @@ class _GameScreenState extends State<GameScreen>
 
   void tutorialChanged() {
     unawaited(profile.saveTutorial());
-    restoreReplayControl();
     if (mounted) setState(() {});
-  }
-
-  /// Keep the player's choice while the replay picks its starting controls.
-  /// The current layout's control availability still applies.
-  ControlMode? controlBeforeReplay;
-
-  void restoreReplayControl() {
-    final mode = controlBeforeReplay;
-    if (mode == null || tutorialActive) return;
-    controlBeforeReplay = null;
-    profile.controlMode = mode;
-    unawaited(profile.save());
   }
 
   void advanceTutorial(TutorialStep step) {
@@ -216,16 +238,13 @@ class _GameScreenState extends State<GameScreen>
     unawaited(profile.completeTutorial());
     game.endTutorialCourse();
     tutorialRun = null;
-    restoreReplayControl();
+    if (game.waitingForInput && !unstarted) syncControlMode();
     setState(() {});
     if (unstarted) unawaited(home());
   }
 
   void replayTutorial() {
     unawaited(profile.replayTutorial());
-    controlBeforeReplay ??= profile.preferredControlMode;
-    profile.controlMode = ControlMode.oneFinger;
-    unawaited(profile.save());
     setState(() {
       // Open the board first, so the lesson board accepts the first touch.
       entrance.value = 1;
@@ -234,6 +253,7 @@ class _GameScreenState extends State<GameScreen>
   }
 
   bool readyRetry = false;
+
   final carouselKey = GlobalKey<ModeCarouselState>();
   final boardKey = GlobalKey();
   final analogKey = GlobalKey();
@@ -251,12 +271,12 @@ class _GameScreenState extends State<GameScreen>
       ? (MediaQuery.sizeOf(context).height * .19).clamp(104.0, 140.0)
       : 0;
 
-  BoardViewport boardViewport(Size size) => BoardViewport.forGame(
-    size,
-    game,
-    fillWidth: expansion,
-    bottomInset: (boardKey.currentWidget as PivotBoard?)?.bottomInset,
-  );
+  BoardViewport boardViewport(Size size) =>
+      (boardKey.currentWidget as PivotBoard?)?.viewportFor(
+        size,
+        MediaQuery.sizeOf(context),
+      ) ??
+      BoardViewport.forGame(size, game, fillWidth: expansion);
   int selectedMode = 0;
   bool carouselMoving = false;
   PlayerProfile get profile => widget.profile;
@@ -332,9 +352,14 @@ class _GameScreenState extends State<GameScreen>
     )) {
       unawaited(profile.save());
     }
-    if (game.controlMode != profile.controlMode) {
+    syncControlMode();
+  }
+
+  void syncControlMode() {
+    final control = controlForMode(game.mode);
+    if (game.controlMode != control) {
       clearControls();
-      game.setControlMode(profile.controlMode);
+      game.setControlMode(control);
     }
   }
 
@@ -408,7 +433,14 @@ class _GameScreenState extends State<GameScreen>
         "target": game.completed,
         "misses": game.misses,
       });
-      unawaited(feedback.play(game.event!, profile));
+      unawaited(
+        feedback.play(
+          game.event!,
+          profile,
+          mode: game.mode,
+          stars: game.event == GameEvent.complete ? levelResultStars : null,
+        ),
+      );
 
       game.event = null;
     }
@@ -458,8 +490,7 @@ class _GameScreenState extends State<GameScreen>
       if (tutorialActive &&
           tutorialStep == TutorialStep.classicPlay &&
           game.mode == GameMode.classic &&
-          game.level == 1 &&
-          game.won) {
+          game.level == 1) {
         advanceTutorial(TutorialStep.dailyChallenge);
       }
       if (!game.practice) {
@@ -610,10 +641,18 @@ class _GameScreenState extends State<GameScreen>
     return true;
   }
 
-  ControlMode controlForMode(GameMode mode) => profile.controlMode;
+  ControlMode? get tutorialControl =>
+      tutorialActive && profile.tutorial.twoFingerReplay
+      ? ControlMode.twoFinger
+      : null;
+
+  ControlMode controlForMode(GameMode mode) =>
+      tutorialControl ?? profile.controlMode;
 
   void start(GameMode mode, {DateTime? challengeDate}) => setState(() {
     if (adBusy) return;
+    // Practice remains an internal lesson simulation, never a player mode.
+    if (mode == GameMode.practice) return;
     if (game.finished) recordFinalResult();
     reviveDeclined = false;
     reviveError = null;
@@ -682,14 +721,22 @@ class _GameScreenState extends State<GameScreen>
     setState(() => tutorialSheetOpen = true);
     if (tutorialActive && tutorialStep == TutorialStep.levels)
       advanceTutorial(TutorialStep.level1);
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: menuBackground,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (context) => SizedBox(
-        height: MediaQuery.sizeOf(context).height * .84,
-        child: SafeArea(
+    final originBox =
+        tutorialLevelsKey.currentContext?.findRenderObject() as RenderBox?;
+    final viewport = MediaQuery.sizeOf(context);
+    final origin = originBox != null && originBox.hasSize
+        ? originBox.localToGlobal(Offset.zero) & originBox.size
+        : Rect.fromCenter(
+            center: Offset(viewport.width / 2, viewport.height - 48),
+            width: 48,
+            height: 48,
+          );
+    await Navigator.of(context).push<void>(
+      ShopRevealRoute(
+        name: '/levels',
+        origin: origin,
+        reducedMotion: MediaQuery.disableAnimationsOf(context),
+        builder: (context) => SafeArea(
           child: LevelPicker(
             tutorial:
                 tutorialActive &&
@@ -701,25 +748,10 @@ class _GameScreenState extends State<GameScreen>
             selected: profile.classicLevel,
             totalStars: profile.totalStars,
             allLevelsUnlocked: profile.temporaryLevelAccess,
-            controlMode: profile.preferredControlMode,
+            controlMode: tutorialControl ?? profile.preferredControlMode,
             haloJoystick: profile.haloJoystick,
             recordForControl: (number, mode) =>
                 profile.levelRecord(number, mode),
-            onControlChanged: (choice) {
-              final mode = profile.temporaryLevelAccess
-                  ? choice
-                  : choice.supportedMode;
-              setState(() {
-                if (mode == ControlMode.oneFinger &&
-                    !profile.oneFingerPadAvailable) {
-                  profile.haloJoystick = true;
-                }
-                profile.controlMode = mode;
-                game.haloJoystick = profile.haloJoystick;
-                game.setControlMode(profile.controlMode);
-              });
-              unawaited(profile.save());
-            },
             records: {
               for (var i = 1; i <= ClassicLevels.count; i++)
                 i: profile.levelRecord(i, controlForMode(GameMode.classic)),
@@ -779,7 +811,7 @@ class _GameScreenState extends State<GameScreen>
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'BEST ${profile.mergeBest}  ·  HIGHEST ${formatMergeNumber(profile.mergeHighest)}',
+                        'BEST ${formatCompactScore(profile.mergeBest)}  ·  HIGHEST ${formatMergeNumber(profile.mergeHighest)}',
                         style: label(menuGold),
                       ),
                     ],
@@ -790,10 +822,10 @@ class _GameScreenState extends State<GameScreen>
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: () {
+                  onPressed: uiAction(context, () {
                     Navigator.pop(context);
                     start(GameMode.merge2048);
-                  },
+                  }),
                   child: const Text('PLAY MERGE'),
                 ),
               ),
@@ -827,28 +859,69 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
+  /// Where a full-screen menu page grows from: [key]'s button, or a small
+  /// square at [fallback] when that button is not on screen.
+  Rect pageOrigin(GlobalKey key, Offset fallback) {
+    final box = key.currentContext?.findRenderObject() as RenderBox?;
+    return box != null && box.hasSize
+        ? box.localToGlobal(Offset.zero) & box.size
+        : Rect.fromCenter(center: fallback, width: 48, height: 48);
+  }
+
+  /// Opens a menu page like the shop: it grows from [origin], keeps a back
+  /// button on top and closes with a right swipe.
+  Future<void> openPage(String name, Rect origin, WidgetBuilder builder) =>
+      Navigator.of(context).push<void>(
+        ShopRevealRoute(
+          name: name,
+          origin: origin,
+          reducedMotion: MediaQuery.disableAnimationsOf(context),
+          builder: (context) => SwipeBackPage(child: builder(context)),
+        ),
+      );
+
   Future<void> showAchievements() async {
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: menuBackground,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (_) => FractionallySizedBox(
-        heightFactor: .85,
-        child: AchievementSheet(profile: profile),
+    final viewport = MediaQuery.sizeOf(context);
+    await openPage(
+      '/achievements',
+      pageOrigin(
+        achievementsOriginKey,
+        Offset(viewport.width - 48, viewport.height - 48),
       ),
+      (_) => AchievementSheet(profile: profile),
     );
     if (mounted) setState(() {});
   }
 
   Future<void> showDailyPrizes() async {
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: menuBackground,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (_) => DailyPrizeSheet(profile: profile),
-    );
+    final size = MediaQuery.sizeOf(context);
+    if (usesWideStage(size)) {
+      await showDialog<void>(
+        context: context,
+        builder: (_) => Dialog(
+          backgroundColor: menuBackground,
+          clipBehavior: Clip.antiAlias,
+          insetPadding: const EdgeInsets.all(32),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
+          child: SizedBox(
+            key: const ValueKey('daily-prizes-dialog'),
+            width: 680,
+            height: math.min(960, size.height * .88),
+            child: DailyPrizeSheet(profile: profile),
+          ),
+        ),
+      );
+    } else {
+      await showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: menuBackground,
+        showDragHandle: true,
+        isScrollControlled: true,
+        builder: (_) => DailyPrizeSheet(profile: profile),
+      );
+    }
     if (mounted) setState(() {});
   }
 
@@ -893,34 +966,39 @@ class _GameScreenState extends State<GameScreen>
       });
   }
 
-  /// Infinite runs to a loop; every other screen is quiet. Pausing
+  /// Classic/Daily use level loops; Infinite blends adaptive arrangements. Pausing
   /// holds the track rather than restarting it.
   void syncMusic() {
+    unawaited(feedback.setSoundVolume(profile.effectiveSoundVolume));
     feedback.setEnemyEffectsEnabled(
-      profile.sound &&
+      profile.effectiveSoundVolume > 0 &&
           game.started &&
           game.phase == GamePhase.playing &&
           !game.paused &&
           !game.waitingForInput &&
           !returning,
     );
+    final track = game.infinite
+        ? InfiniteMusic.asset
+        : LevelMusic.trackFor(game.mode, game.level);
     final wants =
-        InfiniteMusic.bundled &&
-        game.infinite &&
-        profile.music &&
-        game.started &&
-        !game.finished;
+        profile.effectiveMusicVolume > 0 && game.started && !game.finished;
     unawaited(
       feedback.updateMusic(
-        track: wants ? InfiniteMusic.asset : null,
+        track: wants ? track : null,
+        volume: (game.infinite ? .32 : .23) * profile.effectiveMusicVolume,
         playing: !game.paused && !game.waitingForInput && !returning,
         playbackSession: game.runSerial,
-        playbackRate: game.infinite
-            ? InfiniteMusic.rateFor(seconds: game.elapsed, pace: game.pace)
-            : 1,
+        mix: InfiniteMusic.mixFor(
+          seconds: game.elapsed,
+          pace: game.pace,
+          boss: game.boss != null || game.bossWarningSeconds != null,
+        ),
       ),
     );
   }
+
+  bool get _usesResumeCountdown => game.infinite || game.merging;
 
   void pause() => setState(() {
     briefing = false;
@@ -929,8 +1007,10 @@ class _GameScreenState extends State<GameScreen>
       cancelResumeCountdown();
       return;
     }
-    if (game.paused && (game.infinite || game.merging)) {
+    if (game.paused && _usesResumeCountdown) {
       resumeSeconds = 3;
+      _resumeAudio = UiAudio.of(context);
+      unawaited(_resumeAudio?.play(UiCue.countdown));
       resumeTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
         setState(() {
           resumeSeconds--;
@@ -940,6 +1020,8 @@ class _GameScreenState extends State<GameScreen>
             game.setPaused(false);
             syncMusic();
             runTicker();
+          } else {
+            unawaited(_resumeAudio?.play(UiCue.countdown));
           }
         });
       });
@@ -958,11 +1040,26 @@ class _GameScreenState extends State<GameScreen>
     resumeTimer?.cancel();
     resumeTimer = null;
     resumeSeconds = 0;
+    _resumeAudio?.silence();
+    _resumeAudio = null;
   }
 
   void prepareInfinite({bool retry = false}) {
     prepareWorld(0, retry: retry);
   }
+
+  /// Stars a classic level win shows, counting a bonus star collected on an
+  /// earlier run just as the result screen does. Null outside classic levels.
+  int? get levelResultStars => game.mode == GameMode.classic && game.won
+      ? LevelRecord.starCount(
+          game.winStarMask |
+              (profile.levelRecord(game.level, game.controlMode).starMask & 8),
+        )
+      : null;
+
+  /// Three or four stars on a classic level earn fireworks behind the result.
+  bool get celebrateLevel =>
+      game.finished && !game.paused && (levelResultStars ?? 0) >= 3;
 
   int get classicContinueLevel {
     var level = profile.classicLevel.clamp(1, ClassicLevels.count);
@@ -971,6 +1068,32 @@ class _GameScreenState extends State<GameScreen>
     }
     return level;
   }
+
+  /// The next Classic level and the stars already earned on it.
+  Widget classicLevelSummary(int level) => FittedBox(
+    key: const ValueKey('menu-classic-level-summary'),
+    fit: BoxFit.scaleDown,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Level $level',
+          style: TextStyle(
+            color: menuText,
+            fontSize: 19,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 2),
+        StarRow(
+          profile.levelRecord(level, controlForMode(GameMode.classic)).starMask,
+          count: 4,
+          size: 18,
+          dark: true,
+        ),
+      ],
+    ),
+  );
 
   int worldLevel(int index) => switch (arcadeModes[index]) {
     GameMode.classic =>
@@ -1172,6 +1295,13 @@ class _GameScreenState extends State<GameScreen>
         step == TutorialStep.boss &&
         (game.boss?.phase ?? BossPhase.arriving) != BossPhase.arriving)
       return null;
+    final twoFinger = game.controlMode == ControlMode.twoFinger;
+    final desktop = switch (Theme.of(context).platform) {
+      TargetPlatform.linux ||
+      TargetPlatform.macOS ||
+      TargetPlatform.windows => true,
+      _ => false,
+    };
     final controlsText = game.oneFinger
         ? game.haloJoystick
               ? 'Touch anywhere on the board. Drag sideways to tilt, up or down to lift. The Halo hides when you release.'
@@ -1186,23 +1316,46 @@ class _GameScreenState extends State<GameScreen>
                 )
               : tutorialOnLevels
               ? (
-                  'Handmade levels',
+                  'Classic levels',
                   Icons.route_rounded,
-                  'Classic is a road of handmade boards with stars to earn. Tap Choose Level.',
+                  'Complete Classic levels and earn stars. Tap All levels.',
                 )
               : step == TutorialStep.dailyChallenge
               ? (
                   'Daily Challenge',
                   Icons.today_rounded,
-                  'Daily Challenge: a new board each day. Earn stars and beat your best. It lives in Modes with Practice and How to Play. Tap Modes to finish.',
+                  'Daily Challenge: a new board each day. Earn stars and beat your best. Find it in Modes. Tap Modes to finish.',
                 )
               : (
-                  'Back to practice',
+                  'Back to the tutorial',
                   Icons.play_arrow_rounded,
                   'Your Infinite lessons pick up where you left off. Tap Play.',
                 )
         : switch (step) {
-            TutorialStep.controls => (
+            TutorialStep.controls when twoFinger => (
+              desktop ? 'Tilt one end' : 'Tilt with one thumb',
+              Icons.swipe_vertical_rounded,
+              desktop
+                  ? 'Press S or ↓ to lower one end. The ball rolls toward that side.'
+                  : 'Drag down on either highlighted side. The ball rolls toward the lower end.',
+            ),
+            TutorialStep.controlsLift when twoFinger => (
+              desktop ? 'Lift both ends' : 'Lift with both thumbs',
+              Icons.arrow_upward_rounded,
+              desktop
+                  ? 'Hold W and ↑ together to lift both ends.'
+                  : 'Drag both sides up together. Keep the platform level to steady the ball.',
+            ),
+            TutorialStep.controlsRegrab when twoFinger => (
+              desktop ? 'Release and lift again' : 'Release and grab again',
+              Icons.touch_app_rounded,
+              desktop
+                  ? 'Let go of both keys, then hold W and ↑ again.'
+                  : 'Lift both thumbs off the screen. Grab both sides again and drag.',
+            ),
+            TutorialStep.controls ||
+            TutorialStep.controlsLift ||
+            TutorialStep.controlsRegrab => (
               'Move the platform',
               Icons.open_with_rounded,
               controlsText,
@@ -1210,7 +1363,9 @@ class _GameScreenState extends State<GameScreen>
             TutorialStep.heartsHoles => (
               'Dodge the holes',
               Icons.favorite_rounded,
-              'Avoid holes. A fall costs 1 heart, and the run ends when they run out. Steer around this one.',
+              twoFinger
+                  ? 'Lower the side away from the hole to steer around it. A fall costs 1 heart.'
+                  : 'Avoid holes. A fall costs 1 heart, and the run ends when they run out. Steer around this one.',
             ),
             TutorialStep.heartsFeedback => (
               'Hearts',
@@ -1222,7 +1377,9 @@ class _GameScreenState extends State<GameScreen>
             TutorialStep.coins => (
               'Grab the coin',
               Icons.toll_rounded,
-              'Collect coins. They fill your wallet for the Shop.',
+              twoFinger
+                  ? 'Level the platform when the ball lines up with the coin. Collect it to spend in the Shop.'
+                  : 'Collect coins. They fill your wallet for the Shop.',
             ),
             TutorialStep.coinsFeedback => (
               'Coin saved',
@@ -1277,7 +1434,9 @@ class _GameScreenState extends State<GameScreen>
             TutorialStep.classicPlay => (
               'Level 1',
               Icons.flag_rounded,
-              game.oneFinger
+              twoFinger
+                  ? 'Lift both ends and tilt to reach glowing targets 1–10 in order. Avoid dark holes.'
+                  : game.oneFinger
                   ? game.haloJoystick
                         ? 'Same floating Halo controls. Lift to glowing holes in order, 1–10. Avoid dark holes. Drag anywhere to begin.'
                         : 'Same thumb-pad controls. Lift to glowing holes in order, 1–10. Avoid dark holes. Drag to begin.'
@@ -1370,6 +1529,21 @@ class _GameScreenState extends State<GameScreen>
                         20,
                   ),
             );
+          } else if (twoFinger) {
+            final viewport = boardViewport(board.size);
+            for (final side in [0, 1]) {
+              final anchor = TwoFingerFeedbackPainter.halfCenter(
+                viewport,
+                game,
+                side,
+              );
+              result.add(
+                Rect.fromCircle(
+                  center: layer.globalToLocal(board.localToGlobal(anchor)),
+                  radius: 28,
+                ),
+              );
+            }
           } else {
             worldPoint(20, game.left, 28);
             worldPoint(340, game.right, 28);
@@ -1392,7 +1566,9 @@ class _GameScreenState extends State<GameScreen>
           );
         } else {
           switch (step) {
-            case TutorialStep.controls:
+            case TutorialStep.controls ||
+                TutorialStep.controlsLift ||
+                TutorialStep.controlsRegrab:
               controls();
             case TutorialStep.heartsHoles:
               if (tutorialRun?.hole case final hole?)
@@ -1428,15 +1604,10 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  Future<void> showModes() => showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: menuBackground,
-    showDragHandle: true,
-    isScrollControlled: true,
-    constraints: BoxConstraints(
-      maxHeight: MediaQuery.sizeOf(context).height * .9,
-    ),
-    builder: (sheetContext) {
+  Future<void> showModes() => openPage(
+    '/arcade',
+    pageOrigin(tutorialDailyKey, const Offset(40, 40)),
+    (sheetContext) {
       Widget choice(
         String title,
         String subtitle,
@@ -1465,51 +1636,16 @@ class _GameScreenState extends State<GameScreen>
                   subtitle: 'A new challenge. Your next personal best.',
                 ),
                 choice(
-                  'Classic levels',
-                  'Master every board and collect stars',
-                  Icons.grid_view_rounded,
-                  selectLevel,
-                ),
-                choice(
                   'DAILY',
                   'A fresh board, every day',
                   Icons.today_outlined,
                   showDaily,
                 ),
                 choice(
-                  'PRACTICE',
-                  'Find your balance at your own pace',
-                  Icons.touch_app,
-                  () => start(GameMode.practice),
-                ),
-                const SizedBox(height: 12),
-                const MenuSection('MAKE IT YOURS'),
-                const SizedBox(height: 12),
-                choice(
-                  'GEAR SHOP',
-                  'Balls, worlds, platforms and upgrades',
-                  Icons.palette_outlined,
-                  showBallShop,
-                ),
-                choice(
-                  profile.achievementsReady > 0
-                      ? 'ACHIEVEMENTS (${profile.achievementsReady} ready)'
-                      : 'ACHIEVEMENTS',
-                  'Milestones worth celebrating',
-                  Icons.workspace_premium_outlined,
-                  showAchievements,
-                ),
-                choice(
                   'Goals, friends & backup',
                   'Your progress, connected',
                   Icons.emoji_events_outlined,
                   showClub,
-                ),
-                choice(
-                  'HOW TO PLAY',
-                  'Learn the art of balance',
-                  Icons.help_outline,
-                  showGuide,
                 ),
               ],
             ),
@@ -1518,6 +1654,10 @@ class _GameScreenState extends State<GameScreen>
       );
     },
   );
+
+  String get hudScore => game.mode == GameMode.classic
+      ? '${game.completed}/10'
+      : formatCompactScore(game.score);
 
   Widget wideBoardChrome() => Align(
     alignment: Alignment.topCenter,
@@ -1529,7 +1669,7 @@ class _GameScreenState extends State<GameScreen>
         child: AnimatedBuilder(
           animation: Listenable.merge([hud, backdrop]),
           builder: (context, _) {
-            const detail = TextStyle(
+            final detail = TextStyle(
               color: menuText,
               fontSize: 14,
               fontWeight: FontWeight.w700,
@@ -1574,80 +1714,82 @@ class _GameScreenState extends State<GameScreen>
                                 ),
                         ),
                         const SizedBox(width: 20),
-                        IgnorePointer(
-                          key: tutorialScoreKey,
-                          child: Column(
-                            key: const ValueKey('board-hud'),
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                game.mode == GameMode.classic
-                                    ? '${game.completed}/10'
-                                    : '${game.score}',
-                                key: game.infinite
-                                    ? const ValueKey('infinite-score')
-                                    : null,
-                                style: const TextStyle(
-                                  color: menuText,
-                                  fontSize: 32,
-                                  height: 1.1,
-                                  fontWeight: FontWeight.w800,
-                                  fontFamily: 'monospace',
-                                ),
-                              ),
-                              if (game.infinite)
+                        AnimatedOpacity(
+                          opacity: bossHidesHud ? 0 : 1,
+                          duration: const Duration(milliseconds: 250),
+                          child: IgnorePointer(
+                            key: tutorialScoreKey,
+                            child: Column(
+                              key: const ValueKey('board-hud'),
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                                 Text(
-                                  '${game.survival.combo}×${game.survival.combo == InfiniteTuning.maxCombo ? ' MAX' : ''}',
-                                  style: detail,
-                                )
-                              else if (game.merging) ...[
-                                Text(
-                                  'TOP ${formatMergeNumber(game.mergeRun.highest)}',
-                                  style: detail,
-                                ),
-                                MergeStatus(
-                                  run: game.mergeRun,
-                                  color: menuText,
-                                ),
-                              ] else
-                                Text(
-                                  game.practice
-                                      ? 'PRACTICE · ${formatRunTime(game.elapsed)}'
-                                      : game.daily
-                                      ? 'L${game.level} · TARGET ${game.target.clamp(1, 10)}/10 · ${formatRunTime(game.elapsed)}'
-                                      : 'LEVEL ${game.level} · ${formatRunTime(game.elapsed)}',
-                                  style: detail,
-                                ),
-                              if (game.mode == GameMode.classic)
-                                Row(
-                                  key: const ValueKey(
-                                    'classic-bonus-star-status',
+                                  hudScore,
+                                  key: game.infinite
+                                      ? const ValueKey('infinite-score')
+                                      : null,
+                                  style: TextStyle(
+                                    color: menuText,
+                                    fontSize: scoreFontSize(32, hudScore),
+                                    height: 1.1,
+                                    fontWeight: FontWeight.w800,
+                                    fontFamily: 'monospace',
                                   ),
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.star_rounded,
-                                      color: menuGold,
-                                      size: 16,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      game.levelStarAlreadyOwned
-                                          ? 'COLLECTED'
-                                          : game.levelStarCollected
-                                          ? 'WIN TO KEEP'
-                                          : 'BONUS STAR',
-                                      style: detail,
-                                    ),
-                                  ],
                                 ),
-                              if (game.infinite && !offeringRevive)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 6),
-                                  child: coinChip(menuText),
-                                ),
-                            ],
+                                if (game.infinite)
+                                  Text(
+                                    '${game.survival.combo}×${game.survival.combo == InfiniteTuning.maxCombo ? ' MAX' : ''}',
+                                    style: detail,
+                                  )
+                                else if (game.merging) ...[
+                                  Text(
+                                    'TOP ${formatMergeNumber(game.mergeRun.highest)}',
+                                    style: detail,
+                                  ),
+                                  MergeStatus(
+                                    run: game.mergeRun,
+                                    color: menuText,
+                                  ),
+                                ] else
+                                  Text(
+                                    game.practice
+                                        ? 'PRACTICE · ${formatRunTime(game.elapsed)}'
+                                        : game.daily
+                                        ? 'L${game.level} · TARGET ${game.target.clamp(1, 10)}/10 · ${formatRunTime(game.elapsed)}'
+                                        : 'LEVEL ${game.level} · ${formatRunTime(game.elapsed)}',
+                                    style: detail,
+                                  ),
+                                if (game.mode == GameMode.classic)
+                                  Row(
+                                    key: const ValueKey(
+                                      'classic-bonus-star-status',
+                                    ),
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.star_rounded,
+                                        color: menuGold,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        game.levelStarAlreadyOwned
+                                            ? 'COLLECTED'
+                                            : game.levelStarCollected
+                                            ? 'WIN TO KEEP'
+                                            : 'BONUS STAR',
+                                        style: detail,
+                                      ),
+                                    ],
+                                  ),
+                                if (game.infinite && !offeringRevive)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: coinChip(menuText),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       ],
@@ -1658,8 +1800,9 @@ class _GameScreenState extends State<GameScreen>
                 IconButton.filledTonal(
                   key: const ValueKey('board-pause'),
                   tooltip: game.paused ? 'Resume' : 'Pause',
-                  onPressed: pause,
+                  onPressed: uiAction(context, pause),
                   style: IconButton.styleFrom(
+                    fixedSize: const Size.square(64),
                     backgroundColor: menuRaised,
                     foregroundColor: menuText,
                   ),
@@ -1667,7 +1810,7 @@ class _GameScreenState extends State<GameScreen>
                     game.paused
                         ? Icons.play_arrow_rounded
                         : Icons.pause_rounded,
-                    size: 24,
+                    size: 32,
                   ),
                 ),
               ],
@@ -1677,6 +1820,10 @@ class _GameScreenState extends State<GameScreen>
       ),
     ),
   );
+
+  /// A boss fight clears score, combo and coins from the HUD so the attacks
+  /// read clearly; they return when the boss leaves. Hearts stay visible.
+  bool get bossHidesHud => game.infinite && game.boss != null;
 
   /// Infinite's coin counter under the combo; [ink] is the HUD text color.
   Widget coinChip(Color ink) => KeyedSubtree(
@@ -1697,11 +1844,22 @@ class _GameScreenState extends State<GameScreen>
       if (!playArmed) return const SizedBox();
       return Center(
         child: IgnorePointer(
-          child: MenuPanel(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 360),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            decoration: BoxDecoration(
+              color: const Color(0xB3121419),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0x26FFFFFF)),
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.touch_app_rounded, color: menuGold, size: 32),
+                const Icon(
+                  Icons.touch_app_rounded,
+                  color: Color(0xFFA9CBEF),
+                  size: 32,
+                ),
                 const SizedBox(height: 12),
                 Text(
                   startInstruction,
@@ -1709,7 +1867,7 @@ class _GameScreenState extends State<GameScreen>
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 18,
-                    color: menuText,
+                    color: Color(0xFFF4F5F7),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1717,7 +1875,7 @@ class _GameScreenState extends State<GameScreen>
                 const Text(
                   'Your run starts when you move.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, color: menuMuted),
+                  style: TextStyle(fontSize: 13, color: Color(0xFFBFC3CB)),
                 ),
               ],
             ),
@@ -1743,7 +1901,10 @@ class _GameScreenState extends State<GameScreen>
                 children: [
                   FilledButton.icon(
                     key: const ValueKey('choose-level'),
-                    onPressed: carouselMoving ? null : selectLevel,
+                    onPressed: uiAction(
+                      context,
+                      carouselMoving ? null : selectLevel,
+                    ),
                     icon: const Icon(Icons.grid_view_rounded, size: 18),
                     label: const Text('Choose Level'),
                   ),
@@ -1762,7 +1923,7 @@ class _GameScreenState extends State<GameScreen>
                         'Level ${game.level}',
                         key: const ValueKey('board-level-name'),
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: menuText,
@@ -1781,7 +1942,8 @@ class _GameScreenState extends State<GameScreen>
     return Align(
       alignment: Alignment.topCenter,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        // Clear of notches that report little or no inset in immersive mode.
+        padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
         child: AnimatedBuilder(
           animation: Listenable.merge([hud, backdrop]),
           builder: (context, _) {
@@ -1840,92 +2002,94 @@ class _GameScreenState extends State<GameScreen>
                             ),
                     ),
                     Expanded(
-                      child: IgnorePointer(
-                        key: tutorialScoreKey,
-                        child: Column(
-                          key: const ValueKey('board-hud'),
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                game.mode == GameMode.classic
-                                    ? '${game.completed}/10'
-                                    : '${game.score}',
-                                key: game.infinite
-                                    ? const ValueKey('infinite-score')
-                                    : null,
-                                style: TextStyle(
-                                  color: color,
-                                  fontSize: 30,
-                                  height: 1.15,
-                                  fontWeight: FontWeight.w800,
-                                  fontFamily: 'monospace',
-                                ),
-                              ),
-                            ),
-                            if (game.infinite)
-                              Text(
-                                '${game.survival.combo}×${game.survival.combo == InfiniteTuning.maxCombo ? ' MAX' : ''}',
-                                style: detail,
-                              )
-                            else if (game.merging) ...[
-                              Text(
-                                'TOP ${formatMergeNumber(game.mergeRun.highest)}',
-                                style: detail,
-                              ),
-                              MergeStatus(run: game.mergeRun, color: color),
-                            ] else
+                      child: AnimatedOpacity(
+                        opacity: bossHidesHud ? 0 : 1,
+                        duration: const Duration(milliseconds: 250),
+                        child: IgnorePointer(
+                          key: tutorialScoreKey,
+                          child: Column(
+                            key: const ValueKey('board-hud'),
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
                               FittedBox(
                                 fit: BoxFit.scaleDown,
                                 child: Text(
-                                  game.mode == GameMode.classic
-                                      ? 'LEVEL ${game.level} · ${formatRunTime(game.elapsed)}'
-                                      : game.practice
-                                      ? 'PRACTICE · ${formatRunTime(game.elapsed)}'
-                                      : 'L${game.level} · TARGET ${game.target.clamp(1, 10)}/10 · ${formatRunTime(game.elapsed)}',
-                                  maxLines: 1,
+                                  hudScore,
+                                  key: game.infinite
+                                      ? const ValueKey('infinite-score')
+                                      : null,
+                                  style: TextStyle(
+                                    color: color,
+                                    fontSize: scoreFontSize(30, hudScore),
+                                    height: 1.15,
+                                    fontWeight: FontWeight.w800,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ),
+                              if (game.infinite)
+                                Text(
+                                  '${game.survival.combo}×${game.survival.combo == InfiniteTuning.maxCombo ? ' MAX' : ''}',
+                                  style: detail,
+                                )
+                              else if (game.merging) ...[
+                                Text(
+                                  'TOP ${formatMergeNumber(game.mergeRun.highest)}',
                                   style: detail,
                                 ),
-                              ),
-                            if (game.mode == GameMode.classic)
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Row(
-                                  key: const ValueKey(
-                                    'classic-bonus-star-status',
-                                  ),
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      game.levelStarAlreadyOwned ||
-                                              game.levelStarCollected
-                                          ? Icons.star_rounded
-                                          : Icons.star_outline_rounded,
-                                      size: 16,
-                                      color: const Color(0xFFE9B853),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      game.levelStarAlreadyOwned
-                                          ? 'COLLECTED'
-                                          : game.levelStarCollected
-                                          ? 'WIN TO KEEP'
-                                          : 'BONUS STAR',
-                                      style: detail.copyWith(fontSize: 10),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            if (game.infinite && !offeringRevive)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 6),
-                                child: FittedBox(
+                                MergeStatus(run: game.mergeRun, color: color),
+                              ] else
+                                FittedBox(
                                   fit: BoxFit.scaleDown,
-                                  child: coinChip(color),
+                                  child: Text(
+                                    game.mode == GameMode.classic
+                                        ? 'LEVEL ${game.level} · ${formatRunTime(game.elapsed)}'
+                                        : game.practice
+                                        ? 'PRACTICE · ${formatRunTime(game.elapsed)}'
+                                        : 'L${game.level} · TARGET ${game.target.clamp(1, 10)}/10 · ${formatRunTime(game.elapsed)}',
+                                    maxLines: 1,
+                                    style: detail,
+                                  ),
                                 ),
-                              ),
-                          ],
+                              if (game.mode == GameMode.classic)
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Row(
+                                    key: const ValueKey(
+                                      'classic-bonus-star-status',
+                                    ),
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        game.levelStarAlreadyOwned ||
+                                                game.levelStarCollected
+                                            ? Icons.star_rounded
+                                            : Icons.star_outline_rounded,
+                                        size: 16,
+                                        color: const Color(0xFFE9B853),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        game.levelStarAlreadyOwned
+                                            ? 'COLLECTED'
+                                            : game.levelStarCollected
+                                            ? 'WIN TO KEEP'
+                                            : 'BONUS STAR',
+                                        style: detail.copyWith(fontSize: 10),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              if (game.infinite && !offeringRevive)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 6),
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: coinChip(color),
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -1936,7 +2100,7 @@ class _GameScreenState extends State<GameScreen>
                         child: IconButton.filledTonal(
                           key: const ValueKey('board-pause'),
                           tooltip: game.paused ? 'Resume' : 'Pause',
-                          onPressed: pause,
+                          onPressed: uiAction(context, pause),
                           style: IconButton.styleFrom(
                             backgroundColor: color.withAlpha(24),
                             foregroundColor: color,
@@ -1975,7 +2139,7 @@ class _GameScreenState extends State<GameScreen>
 
   String worldSubtitle(int index) => switch (index) {
     0 => 'NO FINISH LINE. FIND YOUR FLOW.',
-    1 => 'Classic • Level ${worldLevel(index)}',
+    1 => 'REACH EVERY TARGET. EARN EVERY STAR.',
     _ => 'SMALL NUMBERS. BIG POSSIBILITIES.',
   };
 
@@ -2074,6 +2238,7 @@ class _GameScreenState extends State<GameScreen>
               game: game,
               frame: frame,
               fillWidth: expansion,
+              fitHeight: MediaQuery.viewPaddingOf(context).horizontal > 0,
               bottomInset:
                   controlStrip(game) +
                   bottomControlHeight(context) * expansion +
@@ -2083,16 +2248,20 @@ class _GameScreenState extends State<GameScreen>
                 // The board extends behind the status bar; its HUD stays below it.
                 padding: EdgeInsets.only(
                   top: MediaQuery.paddingOf(context).top * expansion,
+                  left: MediaQuery.paddingOf(context).left,
+                  right: MediaQuery.paddingOf(context).right,
                 ),
                 child: boardChrome(),
               ),
               dimUntilInput:
-                  game.infinite &&
                   game.waitingForInput &&
                   (tutorialBoard || playArmed) &&
                   !returning,
               showHint:
                   (tutorialBoard || playArmed) &&
+                  !(tutorialBoard &&
+                      tutorialStep.teachesControls &&
+                      game.controlMode == ControlMode.twoFinger) &&
                   game.waitingForInput &&
                   !carouselMoving &&
                   !returning &&
@@ -2143,11 +2312,84 @@ class _GameScreenState extends State<GameScreen>
                       profile.selectedBall,
                       drift,
                       mode: arcadeModes[index],
+                      platform: profile.selectedPlatform,
                       reducedMotion: MediaQuery.disableAnimationsOf(context),
                     ),
                   ),
                 ),
               ),
+            ),
+          ),
+        // Classic's next level, or Infinite's endless mark, sits under the
+        // floating rail on the stage pool that MenuBallStage lights, so it
+        // swipes with its world.
+        if (chromeOpacity > 0 &&
+            (arcadeModes[index] == GameMode.classic ||
+                arcadeModes[index] == GameMode.infinite))
+          Opacity(
+            opacity: chromeOpacity * visibility,
+            child: LayoutBuilder(
+              builder: (context, bounds) {
+                final radius = math.min(
+                  bounds.maxWidth * .17,
+                  bounds.maxHeight * .19,
+                );
+                final desiredSummaryTop =
+                    bounds.maxHeight * .47 + radius * 1.75;
+                final summaryHeight = compactMenu ? 36.0 : 46.0;
+                final screenSize = MediaQuery.sizeOf(context);
+                // Match the tablet menu's larger controls, while reserving
+                // enough room below the rail in short landscape windows.
+                final levelScale = usesWideStage(screenSize)
+                    ? math.min(
+                        wideMenuScale(screenSize) * 1.25,
+                        math.max(
+                          1.0,
+                          (bounds.maxHeight - desiredSummaryTop - 8) /
+                              summaryHeight,
+                        ),
+                      )
+                    : 1.0;
+                final labelHeight = arcadeModes[index] == GameMode.classic
+                    ? summaryHeight * levelScale
+                    : math.min(
+                        compactMenu ? 52.0 : 72.0,
+                        (bounds.maxHeight * .2).clamp(36.0, 72.0),
+                      );
+                final summaryTop = math.min(
+                  desiredSummaryTop,
+                  math.max(0.0, bounds.maxHeight - labelHeight - 8),
+                );
+                return Stack(
+                  children: [
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      top: summaryTop,
+                      height: labelHeight,
+                      child: arcadeModes[index] == GameMode.classic
+                          ? ScaledMenuChrome(
+                              scale: levelScale,
+                              child: classicLevelSummary(worldLevel(index)),
+                            )
+                          : FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                '∞',
+                                key: ValueKey('menu-infinite-mark'),
+                                semanticsLabel: 'Endless',
+                                style: TextStyle(
+                                  color: menuSceneryText,
+                                  fontSize: 72,
+                                  fontWeight: FontWeight.w300,
+                                  height: 1,
+                                ),
+                              ),
+                            ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
       ],
@@ -2217,7 +2459,10 @@ class _GameScreenState extends State<GameScreen>
   int savedWorldScore(int index) => switch (arcadeModes[index]) {
     GameMode.infinite => profile.infiniteBestScore,
     GameMode.merge2048 => profile.mergeBest,
-    _ => profile.levelRecord(worldLevel(index), profile.controlMode).bestScore,
+    _ =>
+      profile
+          .levelRecord(worldLevel(index), controlForMode(arcadeModes[index]))
+          .bestScore,
   };
 
   bool get compactMenu =>
@@ -2250,32 +2495,39 @@ class _GameScreenState extends State<GameScreen>
           badge: profile.dailyPrizes.canClaim(DateTime.now()),
           onPressed: carouselMoving ? null : showDailyPrizes,
         ),
-        const Expanded(
+        Expanded(
           child: Center(
             child: FittedBox(
               fit: BoxFit.scaleDown,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    'ROLLRISE',
-                    style: TextStyle(
-                      fontFamily: 'sans-serif',
-                      color: menuText,
-                      fontSize: 30,
-                      letterSpacing: 4,
-                      fontWeight: FontWeight.w300,
-                      height: 1.15,
+                  // Bold ROLL, thin gold RISE: the Montserrat wordmark.
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: 'ROLL',
+                          style: TextStyle(
+                            color: menuSceneryText,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        TextSpan(
+                          text: 'RISE',
+                          style: TextStyle(
+                            color: menuGold,
+                            fontWeight: FontWeight.w200,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'THE ART OF BALANCE',
+                    semanticsLabel: 'ROLLRISE',
                     style: TextStyle(
-                      color: menuMuted,
-                      fontSize: 8,
-                      letterSpacing: 2,
-                      fontWeight: FontWeight.w500,
+                      fontFamily: 'RollriseTitle',
+                      fontSize: 30,
+                      letterSpacing: 3,
+                      height: 1.15,
                     ),
                   ),
                 ],
@@ -2306,9 +2558,12 @@ class _GameScreenState extends State<GameScreen>
           tooltip: step < 0 ? 'Previous mode' : 'Next mode',
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints.tightFor(width: 44, height: 44),
-          onPressed: enabled && !carouselMoving
-              ? () => carouselKey.currentState?.select(target)
-              : null,
+          onPressed: uiAction(
+            context,
+            enabled && !carouselMoving
+                ? () => carouselKey.currentState?.select(target)
+                : null,
+          ),
           icon: Icon(
             step < 0 ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
             color: menuGold,
@@ -2344,8 +2599,8 @@ class _GameScreenState extends State<GameScreen>
                         child: Text(
                           worldTitle(index),
                           key: const ValueKey('selected-mode-title'),
-                          style: const TextStyle(
-                            color: menuText,
+                          style: TextStyle(
+                            color: menuSceneryText,
                             fontSize: 28,
                             fontWeight: FontWeight.w500,
                             letterSpacing: -.4,
@@ -2364,8 +2619,8 @@ class _GameScreenState extends State<GameScreen>
                   child: Text(
                     worldSubtitle(index),
                     key: const ValueKey('selected-mode-subtitle'),
-                    style: const TextStyle(
-                      color: menuMuted,
+                    style: TextStyle(
+                      color: menuSceneryMuted,
                       fontSize: 9,
                       letterSpacing: 1,
                       fontWeight: FontWeight.w500,
@@ -2375,54 +2630,27 @@ class _GameScreenState extends State<GameScreen>
               ),
               SizedBox(
                 height: 48,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: classic
-                          ? MenuEarnedStars(stars: profile.totalStars)
-                          : MenuBestScore(score: savedWorldScore(index)),
-                    ),
-                    if (classic) ...[
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Center(
+                child: classic
+                    ? Center(
+                        child: FractionallySizedBox(
+                          widthFactor: 1,
                           child: Tooltip(
                             key: tutorialLevelsKey,
                             message: 'Level ${worldLevel(index)}',
-                            child: SizedBox(
-                              height: 40,
-                              child: FilledButton.icon(
-                                key: const ValueKey('choose-level'),
-                                onPressed: carouselMoving ? null : selectLevel,
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: menuGold,
-                                  foregroundColor: menuBackground,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                  ),
-                                  minimumSize: const Size(0, 40),
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                  textStyle: const TextStyle(
-                                    fontFamily: 'sans-serif',
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                icon: const Icon(Icons.route_rounded, size: 20),
-                                label: const FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Text('Choose Level'),
-                                ),
-                              ),
+                            child: MenuActionButton(
+                              key: const ValueKey('choose-level'),
+                              label: 'All levels',
+                              icon: Icons.route_rounded,
+                              tooltip: 'All levels',
+                              // Shorter than the row, so it clears the subtitle.
+                              height: 42,
+                              tint: BallWorld.of(profile.selectedBall).accent,
+                              onPressed: carouselMoving ? null : selectLevel,
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ],
-                ),
+                      )
+                    : MenuBestScore(score: savedWorldScore(index)),
               ),
               const SizedBox(height: 8),
               Row(
@@ -2438,6 +2666,7 @@ class _GameScreenState extends State<GameScreen>
                         icon: Icons.storefront_outlined,
                         tooltip: 'Gear shop',
                         upgradeAvailable: profile.shopUpgradeAvailable,
+                        tint: BallWorld.of(profile.selectedBall).accent,
                         onPressed: carouselMoving ? null : showBallShop,
                       ),
                     ),
@@ -2445,12 +2674,14 @@ class _GameScreenState extends State<GameScreen>
                   const SizedBox(width: 12),
                   Expanded(
                     child: MenuActionButton(
+                      key: achievementsOriginKey,
                       label: 'Achievements',
                       icon: Icons.emoji_events_outlined,
                       tooltip: 'Achievements',
                       upgradeAvailable: profile.achievementsReady > 0,
                       hintLabel: 'Achievement rewards ready',
                       hintKey: 'achievement-ready-hint',
+                      tint: BallWorld.of(profile.selectedBall).accent,
                       onPressed: carouselMoving ? null : showAchievements,
                     ),
                   ),
@@ -2461,6 +2692,9 @@ class _GameScreenState extends State<GameScreen>
                 key: tutorialPlayKey,
                 child: PremiumPlayButton(
                   height: compactMenu ? 56 : 64,
+                  label: arcadeModes[index] == GameMode.classic
+                      ? 'PLAY LEVEL ${worldLevel(index)}'
+                      : 'PLAY',
                   key: game.waitingForInput
                       ? const ValueKey('menu-play')
                       : null,
@@ -2489,10 +2723,13 @@ class _GameScreenState extends State<GameScreen>
                                   color: Colors.transparent,
                                   child: InkWell(
                                     key: ValueKey('mode-$mode'),
-                                    onTap: carouselMoving
-                                        ? null
-                                        : () => carouselKey.currentState
-                                              ?.select(mode),
+                                    onTap: uiAction(
+                                      context,
+                                      carouselMoving
+                                          ? null
+                                          : () => carouselKey.currentState
+                                                ?.select(mode),
+                                    ),
                                     borderRadius: BorderRadius.circular(18),
                                     child: SizedBox(
                                       width: 48,
@@ -2511,7 +2748,7 @@ class _GameScreenState extends State<GameScreen>
                                           decoration: BoxDecoration(
                                             color: selectedMode == mode
                                                 ? menuGold
-                                                : menuMuted.withAlpha(80),
+                                                : menuSceneryMuted.withAlpha(80),
                                             borderRadius: BorderRadius.circular(
                                               4,
                                             ),
@@ -2589,7 +2826,7 @@ class _GameScreenState extends State<GameScreen>
           final controlHeight = bottomControlHeight(context);
           final stageBackground = Color.lerp(
             background,
-            menuBackground,
+            menuSceneryShade,
             chromeOpacity,
           )!;
           final stageBrightness = ThemeData.estimateBrightnessForColor(
@@ -2643,6 +2880,9 @@ class _GameScreenState extends State<GameScreen>
                     ),
                   SafeArea(
                     key: const ValueKey('arcade-stage'),
+                    // Side cutouts constrain chrome, not the painted arena.
+                    left: false,
+                    right: false,
                     top: false,
                     bottom: false,
                     minimum: EdgeInsets.only(
@@ -2679,7 +2919,11 @@ class _GameScreenState extends State<GameScreen>
                                               animation: reveal,
                                               child: ScaledMenuChrome(
                                                 scale: menuScale,
-                                                child: selectionHeader(page),
+                                                child: SafeArea(
+                                                  top: false,
+                                                  bottom: false,
+                                                  child: selectionHeader(page),
+                                                ),
                                               ),
                                             ),
                                           ),
@@ -2760,7 +3004,11 @@ class _GameScreenState extends State<GameScreen>
                                 MediaQuery.paddingOf(context).bottom *
                                     expansion +
                                 menuFooterHeight * (1 - expansion),
-                            child: bottomInput(controlHeight),
+                            child: SafeArea(
+                              top: false,
+                              bottom: false,
+                              child: bottomInput(controlHeight),
+                            ),
                           ),
                       ],
                     ),
@@ -2768,13 +3016,19 @@ class _GameScreenState extends State<GameScreen>
                   if (!returning &&
                       resumeSeconds == 0 &&
                       (game.paused || game.finished))
-                    SafeArea(
-                      key: const ValueKey('run-overlay'),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
+                    if (game.paused && !briefing && !offeringRevive)
+                      Positioned.fill(
+                        key: const ValueKey('run-overlay'),
                         child: responsiveRunOverlay(context),
+                      )
+                    else
+                      SafeArea(
+                        key: const ValueKey('run-overlay'),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: responsiveRunOverlay(context),
+                        ),
                       ),
-                    ),
                   if (resumeSeconds > 0)
                     Positioned.fill(
                       child: Stack(
@@ -2848,7 +3102,7 @@ class _GameScreenState extends State<GameScreen>
         width: double.infinity,
         height: 54,
         child: FilledButton(
-          onPressed: action,
+          onPressed: uiAction(context, action),
           style: FilledButton.styleFrom(
             backgroundColor: menuGold,
             foregroundColor: menuBackground,
@@ -2883,7 +3137,7 @@ class _GameScreenState extends State<GameScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
+          Text(
             'Double your coins',
             textAlign: TextAlign.center,
             style: TextStyle(
@@ -2898,7 +3152,7 @@ class _GameScreenState extends State<GameScreen>
             '${game.coinsCollected} to ${game.coinsCollected * 2} coins.\n'
             'Your collected coins are already saved.',
             textAlign: TextAlign.center,
-            style: const TextStyle(color: menuText, fontSize: 12, height: 1.5),
+            style: TextStyle(color: menuText, fontSize: 12, height: 1.5),
           ),
           if (coinDoubleError != null)
             Padding(
@@ -2906,13 +3160,13 @@ class _GameScreenState extends State<GameScreen>
               child: Text(
                 coinDoubleError!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: menuGold, fontSize: 12),
+                style: TextStyle(color: menuGold, fontSize: 12),
               ),
             ),
           const SizedBox(height: 12),
           FilledButton.icon(
             key: const ValueKey('watch-coin-double-ad'),
-            onPressed: adBusy ? null : watchCoinDoubleAd,
+            onPressed: uiAction(context, adBusy ? null : watchCoinDoubleAd),
             icon: adBusy
                 ? const SizedBox(
                     width: 18,
@@ -2992,7 +3246,10 @@ class _GameScreenState extends State<GameScreen>
                     width: double.infinity,
                     child: FilledButton.icon(
                       key: const ValueKey('watch-revive-ad'),
-                      onPressed: adBusy ? null : watchReviveAd,
+                      onPressed: uiAction(
+                        context,
+                        adBusy ? null : watchReviveAd,
+                      ),
                       style: FilledButton.styleFrom(
                         backgroundColor: brass,
                         foregroundColor: ink,
@@ -3021,7 +3278,7 @@ class _GameScreenState extends State<GameScreen>
                   SizedBox(height: compact ? 4 : 10),
                   TextButton(
                     key: const ValueKey('decline-revive'),
-                    onPressed: adBusy ? null : declineRevive,
+                    onPressed: uiAction(context, adBusy ? null : declineRevive),
                     child: const Text(
                       'No thanks · End run',
                       style: TextStyle(color: cream),
@@ -3041,6 +3298,9 @@ class _GameScreenState extends State<GameScreen>
     final scale = wideMenuScale(MediaQuery.sizeOf(context));
     final overlay = boardOverlay();
     if (scale == 1) return overlay;
+    if (game.paused && !briefing) {
+      return ScaledMenuChrome(scale: scale, child: overlay);
+    }
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: 520 * scale),
@@ -3060,232 +3320,426 @@ class _GameScreenState extends State<GameScreen>
           onHome: home,
         )
       : briefing
-      ? FinaleBriefing(game: game, onPlay: pause)
+      ? FinaleBriefing(
+          game: game,
+          onPlay: pause,
+          onBack: () async {
+            setState(() => briefing = false);
+            await home();
+            if (mounted) unawaited(selectLevel());
+          },
+        )
       : PopScope(
           canPop: !adBusy,
           child: Container(
+            key: game.paused ? const ValueKey('pause-panel') : null,
             decoration: BoxDecoration(
-              color: menuBackground.withAlpha(245),
-              borderRadius: BorderRadius.circular(28),
+              color: game.paused
+                  ? const Color(0xB3121419)
+                  : menuBackground.withAlpha(245),
+              borderRadius: game.paused
+                  ? BorderRadius.zero
+                  : BorderRadius.circular(28),
             ),
-            child: Center(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.all(25),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        game.paused
-                            ? Icons.pause_circle_outline
-                            : game.won
-                            ? Icons.workspace_premium_outlined
-                            : Icons.refresh_rounded,
-                        size: 48,
-                        color: menuGold,
-                      ),
-                      const SizedBox(height: 14),
-                      Text(
-                        game.paused
-                            ? 'Take a breath.'
-                            : game.won
-                            ? (game.merging
-                                  ? 'A brilliant chain.'
-                                  : 'Pure precision.')
-                            : 'So close.\nGo again.',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 30,
-                          color: cream,
-                          fontWeight: FontWeight.w800,
-                          height: 1.1,
-                          letterSpacing: -1,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      if (game.finished) ...[
-                        Text(
-                          game.mode == GameMode.classic
-                              ? game.won
-                                    ? 'LEVEL COMPLETE'
-                                    : 'TRY AGAIN'
-                              : newBest
-                              ? 'NEW PERSONAL BEST'
-                              : game.practice
-                              ? 'PRACTICE COMPLETE'
-                              : game.infinite
-                              ? 'INFINITE RUN COMPLETE'
-                              : 'RUN COMPLETE',
-                          style: label(brass),
-                        ),
-                        const SizedBox(height: 8),
-                        if (game.mode != GameMode.classic)
-                          Text(
-                            '${game.score}',
-                            style: const TextStyle(
-                              fontSize: 42,
-                              fontFamily: 'monospace',
-                              color: cream,
-                            ),
-                          ),
-                        Text(
-                          !game.won || game.merging
-                              ? (game.infinite
-                                    ? '${game.metres}m · Best combo x${game.survival.bestCombo}\n${game.message}  ${game.coinsCollected * (profile.infiniteCoinsDoubled(game) ? 2 : 1)} coins saved.'
-                                    : game.message)
-                              : '${game.completed}/10 holes  •  ${game.bestStreak} best streak',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: menuMuted,
-                          ),
-                        ),
-                        if (game.mode == GameMode.classic && game.won)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 16),
-                            child: Text(
-                              '+$classicLevelCoinPrize coins · Level complete',
-                              key: const ValueKey('level-coin-prize'),
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: menuGold,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        if (offeringCoinDouble) coinDoubleOffer(),
-                        if (game.infinite && profile.infiniteCoinsDoubled(game))
-                          Padding(
-                            padding: const EdgeInsets.only(top: 16),
-                            child: Text(
-                              'Coins doubled! +${game.coinsCollected} bonus coins saved.',
-                              key: const ValueKey('coins-doubled'),
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: menuGold,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        if (profile.achievementsReady > 0)
-                          TextButton.icon(
-                            onPressed: adBusy ? null : showAchievements,
-                            style: TextButton.styleFrom(foregroundColor: brass),
-                            icon: const Icon(Icons.emoji_events_outlined),
-                            label: Text(
-                              '${profile.achievementsReady} achievement rewards ready',
-                            ),
-                          ),
-                        if (!game.infinite && !game.practice && !game.merging)
-                          MasteryResult(
-                            game: game,
-                            record: game.daily
-                                ? profile.dailyRecord(
-                                    game.dailyKey,
-                                    game.controlMode,
-                                  )
-                                : profile.levelRecord(
-                                    game.level,
-                                    game.controlMode,
-                                  ),
-                            unlocks: const [],
-                          ),
-                      ] else
-                        const Text(
-                          'Your run is right where you left it.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: menuMuted, fontSize: 12),
-                        ),
-                      const SizedBox(height: 22),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 60,
-                        child: FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: menuGold,
-                            foregroundColor: menuBackground,
-                          ),
-                          onPressed: adBusy
-                              ? null
-                              : game.paused
-                              ? pause
-                              : () {
-                                  if (game.won &&
-                                      game.mode == GameMode.classic &&
-                                      game.level < ClassicLevels.count) {
-                                    if (!profile.selectClassicLevel(
-                                      game.level + 1,
-                                    )) {
-                                      unawaited(selectLevel());
-                                      return;
-                                    }
-                                    unawaited(profile.save());
-                                  }
-                                  start(
-                                    game.mode,
-                                    challengeDate: game.dailyDate,
-                                  );
-                                },
-                          child: Text(
+            child: Stack(
+              children: [
+                if (celebrateLevel)
+                  const Positioned.fill(child: LevelFireworks()),
+                Center(
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding:
+                          const EdgeInsets.all(25) +
+                          (game.paused
+                              ? MediaQuery.paddingOf(context)
+                              : EdgeInsets.zero),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
                             game.paused
-                                ? 'RESUME RUN'
-                                : game.won &&
-                                      game.mode == GameMode.classic &&
-                                      game.level < ClassicLevels.count
-                                ? profile.isClassicLevelUnlocked(game.level + 1)
-                                      ? 'NEXT LEVEL'
-                                      : 'EARN MORE STARS'
-                                : 'ONE MORE RUN',
+                                ? Icons.pause_circle_outline
+                                : game.won
+                                ? Icons.workspace_premium_outlined
+                                : Icons.refresh_rounded,
+                            size: 48,
+                            color: game.paused ? Colors.white : menuGold,
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            game.paused
+                                ? 'Paused'
+                                : game.won
+                                ? (game.merging
+                                      ? 'A brilliant chain.'
+                                      : 'Pure precision.')
+                                : 'So close.\nGo again.',
+                            textAlign: TextAlign.center,
                             style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
+                              fontSize: 30,
+                              color: cream,
+                              fontWeight: FontWeight.w800,
+                              height: 1.1,
+                              letterSpacing: -1,
                             ),
                           ),
-                        ),
-                      ),
-                      if (game.won &&
-                          game.mode == GameMode.classic &&
-                          game.level < ClassicLevels.count &&
-                          !profile.isClassicLevelUnlocked(game.level + 1))
-                        Padding(
-                          padding: const EdgeInsets.only(top: 10),
-                          child: Text(
-                            'Level ${game.level + 1} needs ${ClassicLevels.requiredStars(game.level + 1)} stars · You have ${profile.totalStars}',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: cream, fontSize: 12),
+                          if (game.finished) ...[
+                            const SizedBox(height: 12),
+                            Text(
+                              game.mode == GameMode.classic
+                                  ? game.won
+                                        ? 'LEVEL COMPLETE'
+                                        : 'TRY AGAIN'
+                                  : newBest
+                                  ? 'NEW PERSONAL BEST'
+                                  : game.practice
+                                  ? 'PRACTICE COMPLETE'
+                                  : game.infinite
+                                  ? 'INFINITE RUN COMPLETE'
+                                  : 'RUN COMPLETE',
+                              style: label(brass),
+                            ),
+                            if (tutorialActive &&
+                                tutorialStep == TutorialStep.dailyChallenge &&
+                                game.mode == GameMode.classic &&
+                                game.level == 1)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 12),
+                                child: TutorialCard(
+                                  title: 'Daily Challenge',
+                                  icon: Icons.today_rounded,
+                                  lesson: tutorialStep.lesson,
+                                  lessons: TutorialStep.lessons,
+                                  message:
+                                      'Try a new board each day. Go back to the menu and tap Modes to finish the tutorial.',
+                                ),
+                              ),
+                            const SizedBox(height: 8),
+                            if (game.mode != GameMode.classic)
+                              Text(
+                                formatCompactScore(game.score),
+                                style: TextStyle(
+                                  fontSize: scoreFontSize(
+                                    42,
+                                    formatCompactScore(game.score),
+                                  ),
+                                  fontFamily: 'monospace',
+                                  color: cream,
+                                ),
+                              ),
+                            Text(
+                              !game.won || game.merging
+                                  ? (game.infinite
+                                        ? '${game.metres}m · Best combo x${game.survival.bestCombo}\n${game.message}  ${game.coinsCollected * (profile.infiniteCoinsDoubled(game) ? 2 : 1)} coins saved.'
+                                        : game.message)
+                                  : '${game.completed}/10 holes  •  ${game.bestStreak} best streak',
+                              style: TextStyle(fontSize: 12, color: menuMuted),
+                            ),
+                            if (game.mode == GameMode.classic && game.won)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 16),
+                                child: Text(
+                                  '+$classicLevelCoinPrize coins · Level complete',
+                                  key: const ValueKey('level-coin-prize'),
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: menuGold,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            if (offeringCoinDouble) coinDoubleOffer(),
+                            if (game.infinite &&
+                                profile.infiniteCoinsDoubled(game))
+                              Padding(
+                                padding: const EdgeInsets.only(top: 16),
+                                child: Text(
+                                  'Coins doubled! +${game.coinsCollected} bonus coins saved.',
+                                  key: const ValueKey('coins-doubled'),
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: menuGold,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            if (profile.achievementsReady > 0)
+                              TextButton.icon(
+                                onPressed: uiAction(
+                                  context,
+                                  adBusy ? null : showAchievements,
+                                ),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: brass,
+                                ),
+                                icon: const Icon(Icons.emoji_events_outlined),
+                                label: Text(
+                                  '${profile.achievementsReady} achievement rewards ready',
+                                ),
+                              ),
+                            if (!game.infinite &&
+                                !game.practice &&
+                                !game.merging)
+                              MasteryResult(
+                                game: game,
+                                onStarRevealed: game.mode == GameMode.classic
+                                    ? (_) => unawaited(
+                                        feedback.playStarReveal(profile),
+                                      )
+                                    : null,
+                                record: game.daily
+                                    ? profile.dailyRecord(
+                                        game.dailyKey,
+                                        game.controlMode,
+                                      )
+                                    : profile.levelRecord(
+                                        game.level,
+                                        game.controlMode,
+                                      ),
+                                unlocks: const [],
+                              ),
+                          ],
+                          if (game.paused) ...[
+                            const SizedBox(height: 20),
+                            pauseAudioControls(),
+                          ],
+                          const SizedBox(height: 22),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 60,
+                            child: FilledButton(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: menuGold,
+                                foregroundColor: menuBackground,
+                              ),
+                              onPressed: uiAction(
+                                context,
+                                adBusy
+                                    ? null
+                                    : game.paused
+                                    ? pause
+                                    : () {
+                                        if (game.won &&
+                                            game.mode == GameMode.classic &&
+                                            game.level < ClassicLevels.count) {
+                                          if (!profile.selectClassicLevel(
+                                            game.level + 1,
+                                          )) {
+                                            unawaited(selectLevel());
+                                            return;
+                                          }
+                                          unawaited(profile.save());
+                                        }
+                                        start(
+                                          game.mode,
+                                          challengeDate: game.dailyDate,
+                                        );
+                                      },
+                                cue: game.paused && _usesResumeCountdown
+                                    ? null
+                                    : UiCue.tap,
+                              ),
+                              child: Text(
+                                game.paused
+                                    ? 'RESUME RUN'
+                                    : game.won &&
+                                          game.mode == GameMode.classic &&
+                                          game.level < ClassicLevels.count
+                                    ? profile.isClassicLevelUnlocked(
+                                            game.level + 1,
+                                          )
+                                          ? 'NEXT LEVEL'
+                                          : 'EARN MORE STARS'
+                                    : 'ONE MORE RUN',
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                      if (game.won && !game.practice)
-                        pauseAction(
-                          'RETRY THIS BOARD',
-                          Icons.refresh_rounded,
-                          () {
-                            // The win already moved progress to the next level.
-                            if (game.mode == GameMode.classic) {
-                              profile.selectClassicLevel(game.level);
-                            }
-                            start(game.mode, challengeDate: game.dailyDate);
-                          },
-                        ),
-                      // A paused run can be dropped for a fresh one in any mode.
-                      if (game.paused)
-                        pauseAction(
-                          'RESTART RUN',
-                          Icons.restart_alt_rounded,
-                          () => start(game.mode, challengeDate: game.dailyDate),
-                        ),
-                      if (tutorialActive)
-                        TextButton(
-                          onPressed: skipTutorial,
-                          child: const Text('Skip Tutorial'),
-                        ),
-                      pauseAction('BACK TO MENU', Icons.home_outlined, home),
-                    ],
+                          if (game.won &&
+                              game.mode == GameMode.classic &&
+                              game.level < ClassicLevels.count &&
+                              !profile.isClassicLevelUnlocked(game.level + 1))
+                            Padding(
+                              padding: const EdgeInsets.only(top: 10),
+                              child: Text(
+                                'Level ${game.level + 1} needs ${ClassicLevels.requiredStars(game.level + 1)} stars · You have ${profile.totalStars}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: cream,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          if (game.finished &&
+                              game.won &&
+                              game.mode == GameMode.classic)
+                            pauseAction(
+                              'LEVELS',
+                              Icons.route_rounded,
+                              selectLevel,
+                            ),
+                          if (game.won && !game.practice)
+                            pauseAction(
+                              'RETRY THIS BOARD',
+                              Icons.refresh_rounded,
+                              () {
+                                // The win already moved progress to the next level.
+                                if (game.mode == GameMode.classic) {
+                                  profile.selectClassicLevel(game.level);
+                                }
+                                start(game.mode, challengeDate: game.dailyDate);
+                              },
+                            ),
+                          // A paused run can be dropped for a fresh one in any mode.
+                          if (game.paused)
+                            pauseAction(
+                              'RESTART RUN',
+                              Icons.restart_alt_rounded,
+                              () => start(
+                                game.mode,
+                                challengeDate: game.dailyDate,
+                              ),
+                            ),
+                          if (tutorialActive)
+                            TextButton(
+                              onPressed: uiAction(context, skipTutorial),
+                              child: const Text('Skip Tutorial'),
+                            ),
+                          pauseAction(
+                            'BACK TO MENU',
+                            Icons.home_outlined,
+                            home,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
           ),
         );
+
+  Widget pauseAudioControls() => Center(
+    child: Container(
+      constraints: const BoxConstraints(maxWidth: 460),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xF02C3038),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0x45FFFFFF)),
+      ),
+      child: Column(children: [pauseVolumeRow(true), pauseVolumeRow(false)]),
+    ),
+  );
+
+  Widget pauseVolumeRow(bool music) {
+    final name = music ? 'music' : 'sound';
+    final level = music
+        ? profile.effectiveMusicVolume
+        : profile.effectiveSoundVolume;
+    void change(double value, {bool save = false}) {
+      setState(
+        () => profile.setAudioLevel(forMusic: music, value: value / 100),
+      );
+      syncMusic();
+      if (save) unawaited(profile.save());
+    }
+
+    return Row(
+      children: [
+        IconButton(
+          key: ValueKey('pause-$name-mute'),
+          tooltip: '${level > 0 ? 'Mute' : 'Unmute'} $name',
+          color: level > 0 ? Colors.white : const Color(0xFF92969E),
+          onPressed: uiAction(context, () {
+            setState(() => profile.toggleAudioMute(forMusic: music));
+            syncMusic();
+            unawaited(profile.save());
+          }),
+          icon: Icon(
+            music
+                ? (level > 0
+                      ? Icons.music_note_rounded
+                      : Icons.music_off_rounded)
+                : (level > 0
+                      ? Icons.volume_up_rounded
+                      : Icons.volume_off_rounded),
+          ),
+        ),
+        SizedBox(
+          width: 49,
+          child: Text(
+            music ? 'Music' : 'Sound',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Slider(
+            key: ValueKey('pause-$name-slider'),
+            value: (level * 100).clamp(0.0, 100.0),
+            min: 0,
+            max: 100,
+            divisions: 100,
+            activeColor: menuGold,
+            inactiveColor: const Color(0x33FFFFFF),
+            label: '${(level * 100).round()}%',
+            semanticFormatterCallback: (value) =>
+                '${value.round()} percent $name volume',
+            onChanged: (value) => change(value),
+            onChangeEnd: (value) => change(value, save: true),
+          ),
+        ),
+        SizedBox(
+          width: 32,
+          child: Text(
+            '${(level * 100).round()}',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white, fontSize: 12),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// The Options counterpart of [pauseVolumeRow], sharing the same levels.
+  Widget settingsVolume(
+    StateSetter update, {
+    required bool music,
+    required String title,
+    required String subtitle,
+  }) {
+    void change(double value, {bool save = false}) {
+      update(() => profile.setAudioLevel(forMusic: music, value: value));
+      syncMusic();
+      if (save) unawaited(profile.save());
+    }
+
+    return MenuVolumeSlider(
+      name: music ? 'music' : 'sound',
+      title: title,
+      subtitle: subtitle,
+      icon: music ? Icons.music_note_rounded : Icons.graphic_eq_rounded,
+      mutedIcon: music ? Icons.music_off_rounded : Icons.volume_off_rounded,
+      level: music
+          ? profile.effectiveMusicVolume
+          : profile.effectiveSoundVolume,
+      onChanged: change,
+      onChangeEnd: (value) => change(value, save: true),
+      onToggleMute: () {
+        update(() => profile.toggleAudioMute(forMusic: music));
+        syncMusic();
+        unawaited(profile.save());
+      },
+    );
+  }
 
   Widget pauseAction(String text, IconData icon, VoidCallback onPressed) =>
       Padding(
@@ -3295,8 +3749,14 @@ class _GameScreenState extends State<GameScreen>
           child: FilledButton.icon(
             style: FilledButton.styleFrom(
               minimumSize: const Size(0, 58),
-              backgroundColor: const Color(0xFF2C4448),
-              foregroundColor: menuText,
+              backgroundColor: game.paused
+                  ? (icon == Icons.restart_alt_rounded
+                        ? menuGold
+                        : const Color(0xD9434751))
+                  : menuHighlight,
+              foregroundColor: game.paused && icon == Icons.restart_alt_rounded
+                  ? menuOnAccent
+                  : menuText,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -3306,150 +3766,12 @@ class _GameScreenState extends State<GameScreen>
                 fontWeight: FontWeight.w600,
               ),
             ),
-            onPressed: adBusy ? null : onPressed,
+            onPressed: uiAction(context, adBusy ? null : onPressed),
             icon: Icon(icon, size: 23),
             label: Text(text, textAlign: TextAlign.center),
           ),
         ),
       );
-
-  Future<void> showGuide() => showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: menuBackground,
-    showDragHandle: true,
-    isScrollControlled: true,
-    // Leave a visible strip above the sheet so tapping outside also closes it.
-    constraints: BoxConstraints(
-      maxHeight: MediaQuery.sizeOf(context).height * .9,
-    ),
-    builder: (context) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 28),
-            child: MenuHeading(
-              'A game of balance.',
-              eyebrow: 'HOW TO PLAY',
-              trailing: MenuIconButton(
-                key: const ValueKey('guide-close'),
-                icon: Icons.close_rounded,
-                tooltip: 'Close how to play',
-                onPressed: () => Navigator.pop(context),
-              ),
-            ),
-          ),
-          Flexible(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(28, 2, 28, 26),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  guideRow(
-                    '01',
-                    'One finger. Full control.',
-                    'Drag in the thumb pad below the board: left or right tilts the platform, up or down raises or lowers it with your finger. Holding still keeps its height. Release and grab anywhere to continue without a jump. The same controls work in Levels, Infinite and Merge.',
-                  ),
-                  guideRow(
-                    '02',
-                    'Prefer two fingers?',
-                    'Choose One-finger or Two-finger in Options. With two fingers, drag up or down anywhere on the left or right half of the board. Each side moves its end of the platform, so keep your thumbs low and clear of the ball. Move both together to lift, or one to tilt and roll. Release to hold the platform.',
-                  ),
-                  guideRow(
-                    '03',
-                    'Levels: follow the light.',
-                    'Lift and tilt into the glowing numbered holes in order, 1–10. Dark holes are traps. Each target returns the platform to the bottom; clear all ten with three balls. Consecutive targets build a multiplier and faster climbs earn bonus points. Choose your board with Choose Level.',
-                  ),
-                  guideRow(
-                    '04',
-                    'Infinite: keep climbing.',
-                    'Start with ${profile.startingHearts} hearts and steer as the board climbs. A hit costs one heart and resets your combo. You keep your position and controls, with ${InfiniteTuning.recoverySeconds} seconds of protection. Keep moving to escape the rising red floor. Pace grows from x1 to x${InfiniteTuning.maxPace} as you climb; gold crystals build your combo up to x${InfiniteTuning.maxCombo}. Missing a crystal keeps the combo; losing a heart resets it.',
-                  ),
-                  const Text(
-                    'Desktop: W / S = left end. ↑ / ↓ = right end. Esc = pause.',
-                    style: TextStyle(fontSize: 12, height: 1.5),
-                  ),
-                  guideRow(
-                    '05',
-                    'Collect the power-ups.',
-                    'Blue shields protect you for ${profile.shieldDuration.toInt()} seconds. Red-and-blue magnets pull in nearby coins, crystals, shields and hearts for ${profile.magnetDuration.toInt()} seconds; the magnet icon and countdown show time left. Another pickup refreshes its timer. Hearts restore a life up to your upgraded limit. Pausing freezes pickup timers.',
-                  ),
-                  guideRow(
-                    '06',
-                    'Read the warnings.',
-                    'Infinite adds forming holes, moving holes and lasers as you climb. Temporary platform cuts unlock at 1,000,000 points. Leave red warnings before they activate. During laser mazes, steer through the openings in the descending walls. Spiders fire aimed webs and later enemies attack in turns. In Levels, entering a spider territory starts a chase; contact ends the run. Each target resets the spiders.',
-                  ),
-                  guideRow(
-                    '07',
-                    'Merge: grow your number.',
-                    'Swipe to Number Merge before starting. Collect numbers equal to or smaller than your head and dodge larger numbers. Matching values merge and grow your chain. Build enough value to pass each numbered gate. Use the same tilt and lift controls to line up your next catch.',
-                  ),
-                  guideRow(
-                    '08',
-                    'Three ways to master it.',
-                    'Earn a star for finishing, one for a finish without misses, and one for beating the active-time target in the HUD. Classic also has one gold star to collect on each board: it adds a permanent star immediately, even if the run ends later. Each bonus star can only be earned once across all controls. Pauses and ball resets do not count toward active time.',
-                  ),
-                  guideRow(
-                    '09',
-                    'Make your coins count.',
-                    'Infinite coins save to your wallet. Shop offers balls with their own backgrounds, platforms, and permanent Infinite upgrades for hearts, shields and magnets. Stronger gear increases Infinite points; some balls add a built-in magnet. A gold dot on Shop means you can afford stronger gear or an upgrade. Equipment keeps the same movement and collision size.',
-                  ),
-                  guideRow(
-                    '10',
-                    'Choose your next run.',
-                    'Swipe between Infinite, Levels and Number Merge, tap Play, then touch your controls to begin. Arcade opens Daily, Practice and How to Play. Daily changes at midnight UTC; retry the same board to improve your record. Replay Tutorial in Options walks you through the controls, pickups and shop again.',
-                  ),
-                  primary('TRY PRACTICE', () {
-                    Navigator.pop(context);
-                    start(GameMode.practice);
-                  }),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      replayTutorial();
-                    },
-                    child: const Text('Replay Tutorial'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-
-  Widget guideRow(String number, String title, String body) => Padding(
-    padding: const EdgeInsets.only(bottom: 20),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(number, style: label(menuGold)),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                body,
-                style: TextStyle(fontSize: 13, height: 1.5, color: menuMuted),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
 
   Future<void> showClub() async {
     await Navigator.of(context).push(
@@ -3543,7 +3865,7 @@ class _GameScreenState extends State<GameScreen>
                     'Optional usage data to help improve Rollrise',
                   ),
                   value: analytics.collectionEnabled,
-                  onChanged: (enabled) async {
+                  onChanged: uiChange(context, (enabled) async {
                     final saved = await analytics.setCollectionEnabled(enabled);
                     if (!context.mounted) return;
                     update(() {});
@@ -3555,7 +3877,7 @@ class _GameScreenState extends State<GameScreen>
                           ),
                         ),
                       );
-                  },
+                  }),
                 ),
                 const SizedBox(height: 14),
                 const MenuSection('Choose your controls'),
@@ -3575,54 +3897,32 @@ class _GameScreenState extends State<GameScreen>
                     unawaited(profile.save());
                   },
                 ),
-                if (profile.infiniteBestScore >
-                    InfiniteTuning.fastStartUnlockScore) ...[
-                  const SizedBox(height: 26),
-                  const MenuSection('Infinite'),
-                  const SizedBox(height: 12),
-                  MenuToggle(
-                    key: const ValueKey('infinite-fast-start'),
-                    title: 'Faster start',
-                    icon: Icons.speed_rounded,
-                    subtitle:
-                        'Start up to ${InfiniteTuning.startingSpeedMultiplier(profile.infiniteBestScore).toStringAsFixed(2)}× faster with a higher pace. Turn off for a relaxed opening. Applies to your next run.',
-                    value: profile.infiniteFastStart,
-                    onChanged: (value) {
-                      update(() => profile.infiniteFastStart = value);
-                      setState(() {
-                        if (game.infinite && game.waitingForInput) {
-                          prepareInfinite(retry: readyRetry);
-                        }
-                      });
-                      unawaited(profile.save());
-                    },
-                  ),
-                ],
                 const SizedBox(height: 26),
-                const MenuSection('Feel & sound'),
+                const MenuSection('Theme (trial)'),
                 const SizedBox(height: 12),
-                MenuToggle(
-                  title: 'Sound Effects',
-                  icon: Icons.graphic_eq_rounded,
-                  subtitle: 'Shots, lasers, rewards, and game cues',
-                  value: profile.sound,
-                  onChanged: (v) {
-                    update(() => profile.sound = v);
-                    syncMusic();
+                UiThemePicker(
+                  value: currentUiTheme,
+                  onChanged: (theme) {
+                    profile.uiTheme = theme.name;
+                    applyUiTheme(theme);
                     unawaited(profile.save());
                   },
                 ),
+                const SizedBox(height: 26),
+                const MenuSection('Feel & sound'),
+                const SizedBox(height: 12),
+                settingsVolume(
+                  update,
+                  music: false,
+                  title: 'Sound Effects',
+                  subtitle: 'Shots, lasers, rewards, and game cues',
+                ),
                 if (InfiniteMusic.bundled)
-                  MenuToggle(
+                  settingsVolume(
+                    update,
+                    music: true,
                     title: 'Music',
-                    icon: Icons.music_note_rounded,
-                    subtitle: 'Background soundtrack',
-                    value: profile.music,
-                    onChanged: (v) {
-                      update(() => profile.music = v);
-                      syncMusic();
-                      unawaited(profile.save());
-                    },
+                    subtitle: 'Level and adaptive Infinite soundtracks',
                   ),
                 MenuToggle(
                   title: 'Haptic feedback',
@@ -3634,36 +3934,13 @@ class _GameScreenState extends State<GameScreen>
                     unawaited(profile.save());
                   },
                 ),
-                if (InfiniteMusic.bundled)
-                  MenuAction(
-                    title: 'Music credits',
-                    subtitle: 'The Complex · Kevin MacLeod',
-                    icon: Icons.piano_rounded,
-                    onTap: () => showMusicCredits(context),
+                if (!profile.available) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    'Local storage is unavailable. Records will last for this session.',
+                    style: TextStyle(color: menuMuted),
                   ),
-                const SizedBox(height: 16),
-                MenuPanel(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const MenuSection('Your records'),
-                      const SizedBox(height: 10),
-                      Text(
-                        '${profile.totalStars} Classic stars  •  ${profile.runs} runs',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Infinite best ${profile.infiniteBest}m',
-                        style: const TextStyle(color: menuMint),
-                      ),
-                      if (!profile.available)
-                        const Text(
-                          'Local storage is unavailable. Records will last for this session.',
-                        ),
-                    ],
-                  ),
-                ),
+                ],
                 const SizedBox(height: 18),
                 MenuAction(
                   title: 'Goals, friends & backup',
@@ -3674,7 +3951,7 @@ class _GameScreenState extends State<GameScreen>
                   },
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Rollrise / No rush. Just precision.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 11, color: menuMuted),

@@ -3,6 +3,7 @@ analyzer:
     - .tools/**
     - .pub-cache/**
     - build/**
+    - artifacts/**
     - ios/**
     - web/**
     - android/**

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/services.dart';
@@ -39,16 +40,18 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
-    'music is left out of the build while sound effects stay',
+    'only the three adaptive arrangements are bundled alongside sound effects',
     () async {
-      expect(InfiniteMusic.bundled, isFalse);
-      Object? missing;
-      try {
-        await rootBundle.load('assets/${InfiniteMusic.asset}');
-      } catch (error) {
-        missing = error;
+      expect(InfiniteMusic.bundled, isTrue);
+      for (final asset in InfiniteMusic.assets) {
+        final data = await rootBundle.load('assets/$asset');
+        expect(data.lengthInBytes, greaterThan(0));
+        expect(data.getUint32(24, Endian.little), 44100);
+        expect(
+          data.getUint32(40, Endian.little),
+          32750 * 44100 ~/ 1000 * 2 * 2,
+        );
       }
-      expect(missing, isNotNull);
       for (final asset in [
         'target.wav',
         'miss.wav',
@@ -61,7 +64,11 @@ void main() {
         );
       }
       final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
-      for (final asset in ['theme_infinite.wav', 'theme_dark.wav']) {
+      for (final asset in [
+        'theme_infinite.wav',
+        'theme_dark.wav',
+        'theme_infinite_complex.mp3',
+      ]) {
         expect(manifest.listAssets(), isNot(contains('assets/audio/$asset')));
       }
     },
@@ -139,23 +146,45 @@ void main() {
     },
   );
 
-  test('Infinite tempo builds with active time and pace, then caps', () {
-    double rate(double seconds, double pace) =>
-        InfiniteMusic.rateFor(seconds: seconds, pace: pace);
-    expect(rate(0, 1), 1.00);
-    expect(rate(60, 1), 1.03);
-    expect(rate(180, 1), 1.08);
-    expect(rate(0, 5), 1.04);
-    expect(rate(180, 5), 1.12);
-    expect(rate(10000, 100), 1.12);
-    expect(rate(-10, -1), 1.00);
-    for (var seconds = 0; seconds < 240; seconds++) {
-      expect(
-        rate(seconds + 1.0, 3),
-        greaterThanOrEqualTo(rate(seconds.toDouble(), 3)),
-      );
-    }
-  });
+  test(
+    'Infinite arrangement builds smoothly with active time and pace, then caps',
+    () {
+      double intensity(double seconds, double pace) =>
+          InfiniteMusic.intensityFor(seconds: seconds, pace: pace);
+      expect(intensity(0, 1), 0);
+      expect(intensity(20, 1), 0);
+      expect(intensity(120, 1), greaterThan(0));
+      expect(intensity(0, 5), greaterThan(intensity(240, 1)));
+      expect(intensity(240, 5), 1);
+      expect(intensity(10000, 100), 1);
+      expect(intensity(-10, -1), 0);
+      for (var seconds = 0; seconds < 240; seconds++) {
+        expect(
+          intensity(seconds + 1.0, 3),
+          greaterThanOrEqualTo(intensity(seconds.toDouble(), 3)),
+        );
+      }
+    },
+  );
+
+  test(
+    'boss overrides either climb arrangement and clearing restores current intensity',
+    () {
+      for (final seconds in [0.0, 120.0, 300.0]) {
+        expect(
+          InfiniteMusic.mixFor(seconds: seconds, pace: 4, boss: true),
+          const MusicMix(0, 0, 1),
+        );
+        final climb = InfiniteMusic.mixFor(
+          seconds: seconds,
+          pace: 4,
+          boss: false,
+        );
+        expect(climb.boss, 0);
+        expect(climb.climb + climb.fast, closeTo(1, 1e-9));
+      }
+    },
+  );
 
   test(
     'tempo changes update one player without restarting its track',

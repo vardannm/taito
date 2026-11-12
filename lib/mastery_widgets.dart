@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+import 'ui_audio.dart';
 import 'menu_design.dart';
 import 'package:flutter/material.dart';
 import 'board_painter.dart';
@@ -18,25 +20,130 @@ class StarRow extends StatelessWidget {
   final double size;
   final bool dark;
   @override
+  Widget build(BuildContext context) {
+    // Earned stars fill from the left whichever goals earned them; the goal
+    // list beside a result says which ones they were.
+    final earned = LevelRecord.starCount(mask & ((1 << count) - 1));
+    return Semantics(
+      label: '$earned of $count stars',
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < count; i++)
+            Icon(
+              i < earned ? Icons.star_rounded : Icons.star_outline_rounded,
+              size: size,
+              color: i < earned
+                  ? (dark ? brass : const Color(0xFFA76D20))
+                  : (dark ? cream.withAlpha(80) : ink.withAlpha(80)),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The earned stars pop in one at a time, each calling [onReveal] with its
+/// index as it lands so the caller can play a sound. Reduced motion shows them
+/// all at once, silently.
+class StarReveal extends StatefulWidget {
+  const StarReveal(
+    this.mask, {
+    super.key,
+    this.size = 34,
+    this.count = 3,
+    this.onReveal,
+  });
+  final int mask, count;
+  final double size;
+  final ValueChanged<int>? onReveal;
+
+  /// Pause before the first star, gap between stars, and one star's pop.
+  static const lead = .35, gap = .38, pop = .45;
+
+  @override
+  State<StarReveal> createState() => _StarRevealState();
+}
+
+class _StarRevealState extends State<StarReveal>
+    with SingleTickerProviderStateMixin {
+  late final int earned = LevelRecord.starCount(
+    widget.mask & ((1 << widget.count) - 1),
+  );
+  late final double total = earned == 0
+      ? 0
+      : StarReveal.lead + StarReveal.gap * (earned - 1) + StarReveal.pop;
+  late final _controller = AnimationController(
+    vsync: this,
+    duration: Duration(milliseconds: (total * 1000).round()),
+  )..addListener(_announce);
+  int _announced = 0;
+  bool _still = false;
+
+  double get _seconds => _controller.value * total;
+  double _start(int i) => StarReveal.lead + StarReveal.gap * i;
+
+  void _announce() {
+    while (_announced < earned && _seconds >= _start(_announced)) {
+      widget.onReveal?.call(_announced++);
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _still = MediaQuery.disableAnimationsOf(context) || earned == 0;
+    if (!_still && !_controller.isAnimating && _controller.value == 0) {
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) => Semantics(
-    label:
-        '${LevelRecord.starCount(mask & ((1 << count) - 1))} of $count stars',
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (var i = 0; i < count; i++)
-          Icon(
-            (mask & (1 << i)) != 0
-                ? Icons.star_rounded
-                : Icons.star_outline_rounded,
-            size: size,
-            color: (mask & (1 << i)) != 0
-                ? (dark ? brass : const Color(0xFFA76D20))
-                : (dark ? cream.withAlpha(80) : ink.withAlpha(80)),
-          ),
-      ],
+    label: '$earned of ${widget.count} stars',
+    child: AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < widget.count; i++)
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                Icon(
+                  Icons.star_outline_rounded,
+                  size: widget.size,
+                  color: cream.withAlpha(80),
+                ),
+                if (i < earned) _star(i),
+              ],
+            ),
+        ],
+      ),
     ),
   );
+
+  Widget _star(int i) {
+    final t = _still
+        ? 1.0
+        : ((_seconds - _start(i)) / StarReveal.pop).clamp(0.0, 1.0);
+    return Opacity(
+      opacity: Curves.easeOut.transform(math.min(1, t * 2.5)),
+      child: Transform.rotate(
+        angle: (1 - Curves.easeOutBack.transform(t)) * -.6,
+        child: Transform.scale(
+          scale: Curves.elasticOut.transform(t),
+          child: Icon(Icons.star_rounded, size: widget.size, color: brass),
+        ),
+      ),
+    );
+  }
 }
 
 class MasteryResult extends StatelessWidget {
@@ -45,20 +152,32 @@ class MasteryResult extends StatelessWidget {
     required this.game,
     required this.record,
     required this.unlocks,
+    this.onStarRevealed,
   });
   final BalanceGame game;
   final LevelRecord record;
   final List<CabinetStyle> unlocks;
+
+  /// When set, the stars appear one by one and this hears each one land.
+  final ValueChanged<int>? onStarRevealed;
   @override
   Widget build(BuildContext context) => Column(
     children: [
       const SizedBox(height: 14),
-      StarRow(
-        game.earnedStarMask | (record.starMask & 8),
-        size: 34,
-        dark: true,
-        count: game.mode == GameMode.classic ? 4 : 3,
-      ),
+      if (onStarRevealed != null)
+        StarReveal(
+          game.earnedStarMask | (record.starMask & 8),
+          size: 34,
+          count: game.mode == GameMode.classic ? 4 : 3,
+          onReveal: onStarRevealed,
+        )
+      else
+        StarRow(
+          game.earnedStarMask | (record.starMask & 8),
+          size: 34,
+          dark: true,
+          count: game.mode == GameMode.classic ? 4 : 3,
+        ),
       const SizedBox(height: 8),
       for (final (bit, label) in [
         (1, 'Finish the board'),
@@ -85,7 +204,7 @@ class MasteryResult extends StatelessWidget {
                 color:
                     ((game.earnedStarMask | (record.starMask & 8)) & bit) != 0
                     ? brass
-                    : const Color(0xFFB5C5BB),
+                    : menuMuted,
               ),
               const SizedBox(width: 6),
               Flexible(
@@ -98,7 +217,7 @@ class MasteryResult extends StatelessWidget {
                         ((game.earnedStarMask | (record.starMask & 8)) & bit) !=
                             0
                         ? brass
-                        : const Color(0xFFB5C5BB),
+                        : menuMuted,
                   ),
                 ),
               ),
@@ -175,10 +294,7 @@ class DailyCard extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 '${DailyChallenge.key(date)} · UTC',
-                style: const TextStyle(
-                  color: menuText,
-                  fontFamily: 'monospace',
-                ),
+                style: TextStyle(color: menuText, fontFamily: 'monospace'),
               ),
               const SizedBox(height: 16),
               SizedBox(
@@ -208,7 +324,10 @@ class DailyCard extends StatelessWidget {
                 style: TextStyle(fontSize: 11, color: menuMuted),
               ),
               const SizedBox(height: 18),
-              FilledButton(onPressed: onPlay, child: const Text('PLAY DAILY')),
+              FilledButton(
+                onPressed: uiAction(context, onPlay),
+                child: const Text('PLAY DAILY'),
+              ),
             ],
           ),
         ),
@@ -255,7 +374,10 @@ class CabinetPicker extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               key: ValueKey('cabinet-${style.name}'),
-              onTap: profile.isUnlocked(style) ? () => onSelected(style) : null,
+              onTap: uiAction(
+                context,
+                profile.isUnlocked(style) ? () => onSelected(style) : null,
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(14),
                 child: Row(
@@ -314,9 +436,14 @@ class CabinetPicker extends StatelessWidget {
 }
 
 class FinaleBriefing extends StatelessWidget {
-  const FinaleBriefing({super.key, required this.game, required this.onPlay});
+  const FinaleBriefing({
+    super.key,
+    required this.game,
+    required this.onPlay,
+    required this.onBack,
+  });
   final BalanceGame game;
-  final VoidCallback onPlay;
+  final VoidCallback onPlay, onBack;
   @override
   Widget build(BuildContext context) => ColoredBox(
     color: menuBackground.withAlpha(245),
@@ -335,7 +462,9 @@ class FinaleBriefing extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'FINALE',
+                ClassicLevels.definition(game.level).finaleTitle.isEmpty
+                    ? 'NEW HAZARD'
+                    : 'FINALE',
                 style: const TextStyle(
                   color: brass,
                   fontSize: 11,
@@ -369,8 +498,15 @@ class FinaleBriefing extends StatelessWidget {
                   backgroundColor: menuGold,
                   foregroundColor: menuBackground,
                 ),
-                onPressed: onPlay,
-                child: const Text('START FINALE'),
+                onPressed: uiAction(context, onPlay),
+                child: const Text('START LEVEL'),
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                style: TextButton.styleFrom(foregroundColor: cream),
+                onPressed: uiAction(context, onBack),
+                icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                label: const Text('BACK TO LEVELS'),
               ),
             ],
           ),

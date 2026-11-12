@@ -5,27 +5,45 @@ import 'package:balance_arcade/late_enemies.dart';
 import 'infinite_boss_test.dart' show advance, run;
 
 void main() {
-  test('the six slots use the set windows and any boss can fill any slot', () {
+  test('Colossus opens; each later group shuffles within its score slots', () {
     expect(bossScoreWindows, [
+      (25000, 32000),
       (70000, 110000),
       (220000, 250000),
       (450000, 520000),
       (700000, 780000),
       (1000000, 1100000),
       (1300000, 1400000),
+      (1650000, 1750000),
     ]);
-    final bySlot = List.generate(6, (_) => <BossKind>{});
+    expect(bossScoreWindows.length, BossKind.values.length);
+    final bySlot = List.generate(BossKind.values.length, (_) => <BossKind>{});
+    const early = {BossKind.tideHerald, BossKind.skyWarden};
+    const middle = {
+      BossKind.chronoKeeper,
+      BossKind.eclipseSeraph,
+      BossKind.prismReaver,
+    };
+    const finalGroup = {BossKind.venomCrown, BossKind.novaPulsar};
+    final orders = <String>{};
     for (var seed = 0; seed < 300; seed++) {
       final game = BalanceGame(seed: seed)..start(gameMode: GameMode.infinite);
+      expect(game.bossOrder, hasLength(BossKind.values.length));
       expect(game.bossOrder.toSet(), BossKind.values.toSet());
+      expect(game.bossOrder.first, BossKind.stormColossus);
+      expect(game.bossOrder.sublist(1, 3).toSet(), early);
+      expect(game.bossOrder.sublist(3, 6).toSet(), middle);
+      expect(game.bossOrder.sublist(6, 8).toSet(), finalGroup);
+      orders.add(game.bossOrder.join(','));
       for (final (slot, kind) in game.bossOrder.indexed) {
         bySlot[slot].add(kind);
       }
     }
-    // Venom Crown can open a run, Sky Warden can close it, and so on.
-    for (final kinds in bySlot) {
-      expect(kinds, BossKind.values.toSet());
-    }
+    expect(bySlot.first, {BossKind.stormColossus});
+    for (final kinds in bySlot.sublist(1, 3)) expect(kinds, early);
+    for (final kinds in bySlot.sublist(3, 6)) expect(kinds, middle);
+    for (final kinds in bySlot.sublist(6, 8)) expect(kinds, finalGroup);
+    expect(orders, hasLength(24));
   });
 
   test(
@@ -63,6 +81,51 @@ void main() {
     },
   );
 
+  test('after every boss, Overdrive bosses return on time and run faster', () {
+    final game = run()
+      ..lateEnemiesEnabled = false
+      ..snakeEncountersEnabled = false
+      ..bossesEncountered = BossKind.values.length
+      ..survival.points = 2000000;
+    // Untouchable, so the test follows the schedule rather than dodging.
+    game.survival.shield = 1e6;
+    double waitForBoss(double limit) {
+      var waited = 0.0;
+      while (game.boss == null && waited < limit) {
+        advance(game, .5);
+        waited += .5;
+      }
+      return waited;
+    }
+
+    waitForBoss(60);
+    final first = game.boss!;
+    expect(first.lap, 1);
+    expect(first.kind, game.bossOrder.first);
+    expect(first.displayName, '${first.kind.name} II');
+    expect(first.pace, closeTo(1.12, 1e-9));
+    // The whole fight plays 12% faster: 28 seconds of attacks in 25.
+    advance(game, InfiniteBoss.duration / first.pace + .1);
+    expect(game.boss, isNull);
+    expect(game.bossesCleared, 1);
+    // No score can rush the next one: it waits for play time.
+    game.survival.points = 50000000;
+    advance(game, InfiniteBoss.overdriveGapSeconds - 5);
+    expect(game.boss, isNull);
+    expect(waitForBoss(60), lessThan(60));
+    expect(game.boss!.kind, game.bossOrder[1]);
+    expect(game.boss!.lap, 1);
+  });
+  test('Overdrive speed stops growing after the fourth lap', () {
+    expect(InfiniteBoss(lap: 0).pace, 1);
+    expect(InfiniteBoss(lap: 3).pace, closeTo(1.36, 1e-9));
+    expect(InfiniteBoss(lap: 9).pace, closeTo(1.36, 1e-9));
+    expect(
+      InfiniteBoss(kind: BossKind.novaPulsar, lap: 2).displayName,
+      'NOVA PULSAR III',
+    );
+    expect(InfiniteBoss.training().pace, 1);
+  });
   test('arrival warning lasts three active seconds and freezes on pause', () {
     final game = run()..survival.points = 120000;
     advance(game, .1);

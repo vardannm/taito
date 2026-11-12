@@ -1,14 +1,104 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/ball_cosmetics.dart';
+import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/platforms.dart';
 import 'package:balance_arcade/profile.dart';
 import 'package:balance_arcade/progress_backup.dart';
 import 'package:balance_arcade/daily_prize_sheet.dart';
+import 'package:balance_arcade/daily_prizes.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 void main() {
+  for (final size in [
+    const Size(820, 1180),
+    const Size(1024, 1366),
+    const Size(1114, 720),
+    const Size(390, 844),
+  ]) {
+    testWidgets(
+      'daily prizes adapts presentation and keeps claims accessible $size',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final p = PlayerProfile()
+          ..tutorialSeen = true
+          ..sound = false
+          ..music = false;
+        await tester.pumpWidget(ArcadeApp(profile: p));
+        await tester.pump(const Duration(milliseconds: 700));
+        await tester.tap(find.byTooltip('Daily prizes'));
+        await tester.pumpAndSettle();
+        if (size.width >= 600) {
+          final panel = tester.getRect(
+            find.byKey(const ValueKey('daily-prizes-dialog')),
+          );
+          expect(panel.center.dx, closeTo(size.width / 2, 1));
+          expect(panel.center.dy, closeTo(size.height / 2, 1));
+          expect(panel.width, lessThanOrEqualTo(680));
+          expect(
+            tester.getSize(find.byTooltip('Close daily prizes')).width,
+            greaterThanOrEqualTo(64),
+          );
+          final claim = find.widgetWithText(FilledButton, 'CLAIM 10 COINS');
+          expect(claim.hitTestable(), findsOneWidget);
+          expect(tester.getSize(claim).height, greaterThanOrEqualTo(72));
+          await tester.tap(claim);
+          await tester.pumpAndSettle();
+          expect(p.wallet, 10);
+          expect(find.text('CLAIMED TODAY'), findsOneWidget);
+        } else {
+          expect(find.byType(BottomSheet), findsOneWidget);
+        }
+        await tester.tap(find.byTooltip('Close daily prizes'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 700));
+        expect(find.byType(DailyPrizeSheet), findsNothing);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
+  }
+
+  testWidgets(
+    'landscape tablet keeps both gear choices accessible with large text',
+    (tester) async {
+      tester.view.physicalSize = const Size(1114, 720);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = 1.8;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final p = PlayerProfile()
+        ..tutorialSeen = true
+        ..sound = false
+        ..music = false;
+      p.dailyPrizes.claimed = 4;
+      p.dailyPrizes.lastClaim = DateTime.now().toUtc().subtract(
+        const Duration(days: 1),
+      );
+      await tester.pumpWidget(ArcadeApp(profile: p));
+      await tester.pump(const Duration(milliseconds: 700));
+      await tester.tap(find.byTooltip('Daily prizes'));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('daily-claim-ball')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('daily-claim-platform')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(
+        find.byTooltip('Close daily prizes').hitTestable(),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
   for (final platform in [false, true]) {
     testWidgets(
       'day five claim choices stay separate with large text: $platform',
@@ -99,7 +189,7 @@ void main() {
   );
 
   test(
-    'five-day cycle keeps missed days, unlocks chosen gear and repeats',
+    'daily count continues past day five and keeps progress across missed days',
     () async {
       for (final platform in [false, true]) {
         final p = PlayerProfile();
@@ -120,10 +210,14 @@ void main() {
         expect(p.selectedBall, BallCosmetic.steel);
         expect(p.selectedPlatform, PlatformStyle.classic);
         expect(p.dailyPrizes.displayedDay(DateTime.utc(2026, 9, 10)), 5);
+        expect(p.dailyPrizes.nextDay, 6);
+        expect(p.dailyPrizes.displayedDay(DateTime.utc(2026, 9, 11)), 6);
         expect(
           await p.claimDailyPrize(now: DateTime.utc(2026, 9, 11)),
           '10 coins',
         );
+        expect(p.dailyPrizes.displayedDay(DateTime.utc(2026, 9, 11)), 6);
+        expect(p.dailyPrizes.nextDay, 7);
       }
     },
   );
@@ -141,6 +235,100 @@ void main() {
       expect(p.wallet, 170);
     },
   );
+
+  test(
+    'day ten awards gear and day eleven returns to the coin reward',
+    () async {
+      final p = PlayerProfile();
+      for (var day = 1; day <= 10; day++) {
+        await p.claimDailyPrize(
+          now: DateTime.utc(2026, 9, day),
+          platform: day == 10,
+        );
+      }
+      expect(p.dailyPrizes.claimed, 10);
+      expect(p.dailyPrizes.nextDay, 11);
+      expect(p.ownedBalls, contains(BallCosmetic.coral));
+      expect(p.ownedPlatforms, contains(PlatformStyle.copper));
+      expect(p.wallet, 140);
+      expect(await p.claimDailyPrize(now: DateTime.utc(2026, 9, 10)), isNull);
+      expect(
+        await p.claimDailyPrize(now: DateTime.utc(2026, 9, 11)),
+        '10 coins',
+      );
+      expect(p.dailyPrizes.displayedDay(DateTime.utc(2026, 9, 11)), 11);
+      expect(p.wallet, 150);
+    },
+  );
+
+  test('saved day counts keep increasing after reload and backup', () async {
+    for (final count in [5, 9, 10, 24, 99, 1000]) {
+      final date = DateTime.utc(2026, 9, 25);
+      final p = PlayerProfile();
+      p.dailyPrizes.claimed = count;
+      p.dailyPrizes.lastClaim = date;
+      await p.saveEconomy();
+      final restored = PlayerProfile();
+      await restored.load();
+      expect(restored.dailyPrizes.nextDay, count + 1);
+      expect(restored.dailyPrizes.displayedDay(date), count);
+      expect(
+        restored.dailyPrizes.displayedDay(date.add(const Duration(days: 4))),
+        count + 1,
+      );
+      final decoded = ProgressBackup.decode(
+        ProgressBackup.encode(restored),
+        testEconomy: false,
+      );
+      final target = PlayerProfile();
+      await ProgressBackup.restore(target, decoded);
+      expect(target.dailyPrizes.nextDay, count + 1);
+      expect(await target.claimDailyPrize(now: date), isNull);
+    }
+  });
+
+  for (final count in [5, 9, 10, 99]) {
+    testWidgets('prize sheet shows continuing day ${count + 1}', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final p = PlayerProfile();
+      p.dailyPrizes.claimed = count;
+      p.dailyPrizes.lastClaim = DateTime.now().toUtc().subtract(
+        const Duration(days: 1),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: DailyPrizeSheet(profile: p)),
+        ),
+      );
+      final start =
+          count ~/ DailyPrizes.rewardInterval * DailyPrizes.rewardInterval + 1;
+      for (var day = start; day < start + DailyPrizes.rewardInterval; day++) {
+        expect(find.text('Day $day'), findsOneWidget);
+      }
+      expect(find.text('Day 1'), findsNothing);
+      expect(find.text('TODAY'), findsOneWidget);
+      if (DailyPrizes.isGearDay(count + 1)) {
+        final choice = find.byKey(const ValueKey('daily-claim-ball'));
+        await tester.ensureVisible(choice);
+        await tester.tap(choice);
+      } else {
+        final claim = find.text(
+          'CLAIM ${DailyPrizes.coinReward(count + 1)} COINS',
+        );
+        await tester.ensureVisible(claim);
+        await tester.tap(claim);
+      }
+      await tester.pumpAndSettle();
+      expect(p.dailyPrizes.claimed, count + 1);
+      expect(find.text('Day ${count + 1}'), findsOneWidget);
+      expect(find.text('CLAIMED TODAY'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
 
   test('backup restores prize progress with the wallet', () async {
     final p = PlayerProfile();

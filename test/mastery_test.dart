@@ -27,10 +27,38 @@ void finish(
 }
 
 void main() {
+  testWidgets('earned stars fill from the left, empty stars come last', (
+    tester,
+  ) async {
+    // Finished, missed the no-miss goal, beat the time, took the bonus star.
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: StarRow(1 | 4 | 8, count: 4))),
+    );
+    final icons = tester
+        .widgetList<Icon>(find.byType(Icon))
+        .map((icon) => icon.icon)
+        .toList();
+    expect(icons, [
+      Icons.star_rounded,
+      Icons.star_rounded,
+      Icons.star_rounded,
+      Icons.star_outline_rounded,
+    ]);
+    expect(find.bySemanticsLabel('3 of 4 stars'), findsOneWidget);
+  });
   setUp(
     () => SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty(),
   );
+  test('the winning sink already knows the stars the result will show', () {
+    final g = BalanceGame()..start();
+    finish(g, misses: 1);
+    g.phase = GamePhase.sinking;
+    expect(g.earnedStarMask, 0);
+    expect(g.winStarMask, 5);
+    g.phase = GamePhase.over;
+    expect(g.earnedStarMask, g.winStarMask);
+  });
   test(
     'stars require completion, track independent goals, and merge across runs',
     () {

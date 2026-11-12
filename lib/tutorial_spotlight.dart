@@ -1,3 +1,4 @@
+import 'ui_audio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'menu_design.dart';
@@ -154,7 +155,7 @@ class _TutorialSpotlightState extends State<TutorialSpotlight>
                           child: child,
                         ),
                       ),
-                      child: _TutorialCard(
+                      child: TutorialCard(
                         key: ValueKey('${widget.title}|${widget.message}'),
                         title: widget.title,
                         message: widget.message,
@@ -162,6 +163,7 @@ class _TutorialSpotlightState extends State<TutorialSpotlight>
                         badge: widget.badge,
                         lesson: widget.lesson,
                         lessons: widget.lessons,
+                        reserveSkipSpace: true,
                       ),
                     ),
                     Positioned(
@@ -169,13 +171,13 @@ class _TutorialSpotlightState extends State<TutorialSpotlight>
                       right: 12,
                       child: TextButton(
                         key: const ValueKey('skip-tutorial'),
-                        onPressed: widget.onSkip,
+                        onPressed: uiAction(context, widget.onSkip),
                         style: TextButton.styleFrom(
                           foregroundColor: menuMuted,
                           backgroundColor: menuBackground.withAlpha(150),
                           minimumSize: const Size(54, 34),
                           padding: const EdgeInsets.symmetric(horizontal: 12),
-                          shape: const StadiumBorder(
+                          shape: StadiumBorder(
                             side: BorderSide(color: menuLine),
                           ),
                           textStyle: const TextStyle(
@@ -200,10 +202,9 @@ class _TutorialSpotlightState extends State<TutorialSpotlight>
   );
 }
 
-/// The lesson card: a lit icon, the lesson count and title, the instruction
-/// and a progress bar. It ignores touches, so play continues beneath it.
-class _TutorialCard extends StatelessWidget {
-  const _TutorialCard({
+/// The lesson title, instruction and progress indicator.
+class TutorialCard extends StatelessWidget {
+  const TutorialCard({
     super.key,
     required this.message,
     required this.icon,
@@ -211,12 +212,14 @@ class _TutorialCard extends StatelessWidget {
     this.badge,
     this.lesson,
     this.lessons,
+    this.reserveSkipSpace = false,
   });
   final String message;
   final String? title;
   final IconData icon;
   final Widget? badge;
   final int? lesson, lessons;
+  final bool reserveSkipSpace;
 
   @override
   Widget build(BuildContext context) {
@@ -254,7 +257,7 @@ class _TutorialCard extends StatelessWidget {
                 Container(
                   width: 38,
                   height: 38,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
                       center: Alignment(-.3, -.4),
@@ -271,7 +274,7 @@ class _TutorialCard extends StatelessWidget {
                   children: [
                     Text(
                       count > 0 ? 'TUTORIAL · $current OF $count' : 'TUTORIAL',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: menuGold,
                         fontSize: 9,
                         letterSpacing: 1.6,
@@ -282,7 +285,7 @@ class _TutorialCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         title!,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: menuText,
                           fontSize: 17,
                           height: 1.15,
@@ -294,8 +297,7 @@ class _TutorialCard extends StatelessWidget {
                   ],
                 ),
               ),
-              // Room for the Skip chip laid over this corner.
-              const SizedBox(width: 62),
+              if (reserveSkipSpace) const SizedBox(width: 62),
             ],
           ),
           const SizedBox(height: 10),
@@ -341,7 +343,10 @@ class _TutorialCard extends StatelessWidget {
 Rect? tutorialTarget(GlobalKey key, RenderBox layer) {
   final target = key.currentContext?.findRenderObject();
   if (target is! RenderBox || !target.hasSize || !target.attached) return null;
-  return layer.globalToLocal(target.localToGlobal(Offset.zero)) & target.size;
+  return MatrixUtils.transformRect(
+    target.getTransformTo(layer),
+    Offset.zero & target.size,
+  );
 }
 
 class _SpotlightPainter extends CustomPainter {

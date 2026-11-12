@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:convert';
 import 'dart:async';
 import 'ball_cosmetics.dart';
@@ -12,6 +13,8 @@ import 'game.dart';
 import 'enemy_sounds.dart';
 import 'enemy_audio.dart';
 import 'music_output.dart';
+import 'adaptive_music_output.dart';
+import 'infinite_music.dart';
 import 'levels.dart';
 import 'rewards.dart';
 import 'onboarding.dart';
@@ -68,13 +71,93 @@ class PlayerProfile {
 
   /// Most bosses outlasted in one Infinite run.
   int infiniteBestBosses = 0;
-  bool infiniteFastStart = true;
+
+  /// Hidden opening pace. It follows the score a player reaches again and
+  /// again, not one lucky run, moves one small step per run, and eases off
+  /// after a streak of early falls. Nothing about it is shown to the player.
+  final recentInfiniteScores = <int>[];
+  double? _infiniteStartSpeed;
+  int _infiniteEarlyFalls = 0;
+  int? _legacyBestScore;
+
+  /// Players who upgrade keep the opening their best score earned until ten
+  /// new runs describe them; a fresh install starts with no such credit.
+  int get _legacyBest => _legacyBestScore ?? infiniteBestScore;
+
+  int get infiniteSkillScore {
+    final sorted = [...recentInfiniteScores]..sort((a, b) => b.compareTo(a));
+    final repeated = sorted.length >= InfiniteTuning.paceRepeatRuns
+        ? sorted[InfiniteTuning.paceRepeatRuns - 1]
+        : 0;
+    return recentInfiniteScores.length >= InfiniteTuning.paceRecentRuns
+        ? repeated
+        : math.max(repeated, _legacyBest);
+  }
+
+  double get infiniteStartSpeed =>
+      _infiniteStartSpeed ??
+      InfiniteTuning.startingSpeedMultiplier(infiniteSkillScore);
+
+  void recordInfinitePace(int score) {
+    final skillBefore = infiniteSkillScore;
+    var speed = infiniteStartSpeed;
+    recentInfiniteScores.add(score);
+    while (recentInfiniteScores.length > InfiniteTuning.paceRecentRuns) {
+      recentInfiniteScores.removeAt(0);
+    }
+    final early =
+        speed > 1 && score < skillBefore * InfiniteTuning.paceEarlyFallShare;
+    _infiniteEarlyFalls = early ? _infiniteEarlyFalls + 1 : 0;
+    if (_infiniteEarlyFalls >= InfiniteTuning.paceEarlyFallRuns) {
+      _infiniteEarlyFalls = 0;
+      speed -= InfiniteTuning.fastStartSpeedStep;
+    } else {
+      final target = InfiniteTuning.startingSpeedMultiplier(infiniteSkillScore);
+      speed += (target - speed).clamp(
+        -InfiniteTuning.fastStartSpeedStep,
+        InfiniteTuning.fastStartSpeedStep,
+      );
+    }
+    _infiniteStartSpeed = speed.clamp(
+      1.0,
+      InfiniteTuning.maxStartingSpeedMultiplier,
+    );
+  }
+
+  Map<String, Object?> get infinitePacing => {
+    'recent': recentInfiniteScores,
+    'speed': _infiniteStartSpeed,
+    'falls': _infiniteEarlyFalls,
+    'legacy': _legacyBest,
+  };
+
+  void restoreInfinitePacing(Object? raw) {
+    if (raw is! Map) return;
+    final recent = raw['recent'];
+    recentInfiniteScores
+      ..clear()
+      ..addAll(
+        recent is List
+            ? recent
+                  .whereType<int>()
+                  .map((v) => v.clamp(0, 1 << 30))
+                  .take(InfiniteTuning.paceRecentRuns)
+            : const <int>[],
+      );
+    final speed = raw['speed'];
+    _infiniteStartSpeed = speed is num
+        ? speed.toDouble().clamp(1.0, InfiniteTuning.maxStartingSpeedMultiplier)
+        : null;
+    final falls = raw['falls'];
+    _infiniteEarlyFalls = falls is int ? falls.clamp(0, 9) : 0;
+    final legacy = raw['legacy'];
+    _legacyBestScore = legacy is int ? legacy.clamp(0, 1 << 30) : 0;
+  }
 
   void applyInfiniteStart(BalanceGame game, {bool tutorial = false}) {
-    final bestScore = infiniteFastStart && !tutorial ? infiniteBestScore : 0;
-    game.infiniteStartingPace = InfiniteTuning.startingPace(bestScore);
-    game.infiniteStartingSpeedMultiplier =
-        InfiniteTuning.startingSpeedMultiplier(bestScore);
+    final speed = tutorial ? 1.0 : infiniteStartSpeed;
+    game.infiniteStartingPace = speed;
+    game.infiniteStartingSpeedMultiplier = speed;
   }
 
   int wallet = 0;
@@ -203,8 +286,8 @@ class PlayerProfile {
     if (!dailyPrizes.canClaim(date)) return null;
     final day = dailyPrizes.nextDay;
     final String reward;
-    if (day < 5) {
-      final coins = DailyPrizes.coins[day - 1];
+    if (!DailyPrizes.isGearDay(day)) {
+      final coins = DailyPrizes.coinReward(day);
       wallet += coins;
       reward = '$coins coins';
     } else {
@@ -377,6 +460,31 @@ class PlayerProfile {
 
   int mergeBest = 0, mergeHighest = 2, mergeRuns = 0;
   bool sound = true, music = true, haptics = true;
+  double soundVolume = 1, musicVolume = 1;
+  double get effectiveSoundVolume => sound ? soundVolume : 0;
+  double get effectiveMusicVolume => music ? musicVolume : 0;
+
+  void setAudioLevel({required bool forMusic, required double value}) {
+    final level = value.clamp(0.0, 1.0);
+    if (forMusic) {
+      music = level > 0;
+      if (level > 0) musicVolume = level;
+    } else {
+      sound = level > 0;
+      if (level > 0) soundVolume = level;
+    }
+  }
+
+  void toggleAudioMute({required bool forMusic}) {
+    if (forMusic) {
+      music = !music;
+      if (music && musicVolume <= 0) musicVolume = 1;
+    } else {
+      sound = !sound;
+      if (sound && soundVolume <= 0) soundVolume = 1;
+    }
+  }
+
   bool available = true;
 
   /// A failed read leaves defaults in memory; writing them would erase the
@@ -387,8 +495,11 @@ class PlayerProfile {
   bool tutorialSeen = false;
   TutorialProgress tutorial = TutorialProgress();
   Future<void> _tutorialWrites = Future<void>.value();
-  ControlMode _controlMode = ControlMode.oneFinger;
+  ControlMode _controlMode = ControlMode.twoFinger;
   bool haloJoystick = false;
+
+  /// Menu color theme being trialled, by `UiTheme` name.
+  String uiTheme = 'deepTeal';
   bool _oneFingerPadAvailable = true;
   bool get oneFingerPadAvailable => _oneFingerPadAvailable;
   bool _needsInitialControlDefault = false;
@@ -410,16 +521,14 @@ class PlayerProfile {
     _oneFingerPadAvailable = allowsOneFingerPad(shortestSide);
   }
 
-  /// Choose once from the first usable app window, including foldable screens.
+  /// Persist the default once the app has a usable window.
   bool applyInitialControlDefault({required double shortestSide}) {
     if (!_needsInitialControlDefault ||
         !shortestSide.isFinite ||
         shortestSide <= 0) {
       return false;
     }
-    controlMode = allowsOneFingerPad(shortestSide)
-        ? ControlMode.oneFinger
-        : ControlMode.twoFinger;
+    controlMode = ControlMode.twoFinger;
     return true;
   }
 
@@ -537,7 +646,7 @@ class PlayerProfile {
 
   Future<void> replayTutorial() {
     tutorialSeen = false;
-    tutorial = TutorialProgress();
+    tutorial = TutorialProgress(twoFingerReplay: true);
     return saveTutorial();
   }
 
@@ -592,6 +701,7 @@ class PlayerProfile {
       _pendingRuns = 0;
       infiniteRuns++;
       final improved = game.score > infiniteBestScore;
+      recordInfinitePace(game.score);
       if (improved) infiniteBestScore = game.score;
       if (game.metres > infiniteBest) infiniteBest = game.metres;
       if (game.bossesCleared > infiniteBestBosses) {
@@ -682,15 +792,16 @@ class PlayerProfile {
       tutorialSeen = await storage.getBool('gilt.tutorial.v1.seen') ?? false;
       final savedOneFinger = await storage.getBool('gilt.oneFinger');
       haloJoystick = await storage.getBool('gilt.haloJoystick') ?? false;
-      controlMode = savedOneFinger == false
-          ? ControlMode.twoFinger
-          : ControlMode.oneFinger;
+      controlMode = (savedOneFinger ?? haloJoystick)
+          ? ControlMode.oneFinger
+          : ControlMode.twoFinger;
       final savedMode = await storage.getString('gilt.controlMode');
       controlMode =
           (ControlMode.values.where((m) => m.name == savedMode).firstOrNull ??
                   _controlMode)
               .supportedMode;
-      _needsInitialControlDefault = savedMode == null && savedOneFinger == null;
+      _needsInitialControlDefault =
+          savedMode == null && savedOneFinger == null && !haloJoystick;
       classicLevel = (await storage.getInt('gilt.classicLevel') ?? 1).clamp(
         1,
         ClassicLevels.count,
@@ -702,15 +813,25 @@ class PlayerProfile {
       mergeRuns = await storage.getInt('gilt.merge.runs') ?? 0;
       infiniteBest = await storage.getInt('gilt.ascent.best') ?? 0;
       infiniteRuns = await storage.getInt('gilt.ascent.runs') ?? 0;
-      infiniteFastStart =
-          await storage.getBool('gilt.ascent.fastStart') ?? true;
       sound = await storage.getBool('gilt.sound') ?? true;
       // Preserve an existing player's mute preference when migrating.
       music = await storage.getBool('gilt.music') ?? sound;
+      final savedSound = await storage.getDouble('gilt.soundVolume') ?? 1;
+      final savedMusic = await storage.getDouble('gilt.musicVolume') ?? 1;
+      soundVolume = savedSound.isFinite ? savedSound.clamp(0.0, 1.0) : 1;
+      musicVolume = savedMusic.isFinite ? savedMusic.clamp(0.0, 1.0) : 1;
       haptics = await storage.getBool('gilt.haptics') ?? true;
+      uiTheme = await storage.getString('gilt.uiTheme') ?? uiTheme;
       _loadRecords(await storage.getString('gilt.mastery.v1'));
       final legacyMaze = await storage.getString('gilt.maze.v1');
       _loadEconomy(await storage.getString(_economyKey));
+      final pacing = await storage.getString('gilt.ascent.pacing.v1');
+      try {
+        restoreInfinitePacing(pacing == null ? null : jsonDecode(pacing));
+      } catch (_) {
+        /* A damaged pacing save only resets the hidden opening pace. */
+      }
+      if (pacing == null) _legacyBestScore = infiniteBestScore;
       final savedTutorial = await storage.getString('gilt.tutorial.v2');
       if (savedTutorial != null) {
         try {
@@ -749,10 +870,16 @@ class PlayerProfile {
         infiniteBest > _pendingBest ? infiniteBest : _pendingBest,
       );
       await storage.setInt('gilt.ascent.runs', infiniteRuns + _pendingRuns);
-      await storage.setBool('gilt.ascent.fastStart', infiniteFastStart);
+      await storage.setString(
+        'gilt.ascent.pacing.v1',
+        jsonEncode(infinitePacing),
+      );
       await storage.setBool('gilt.sound', sound);
       await storage.setBool('gilt.music', music);
+      await storage.setDouble('gilt.soundVolume', soundVolume);
+      await storage.setDouble('gilt.musicVolume', musicVolume);
       await storage.setBool('gilt.haptics', haptics);
+      await storage.setString('gilt.uiTheme', uiTheme);
       await storage.setBool(
         'gilt.oneFinger',
         _controlMode == ControlMode.oneFinger,
@@ -780,11 +907,44 @@ class PlayerProfile {
 }
 
 class GameFeedback {
-  GameFeedback({MusicOutput Function()? musicOutput})
-    : _musicFactory = musicOutput ?? AudioMusicOutput.new;
+  GameFeedback({
+    MusicOutput Function()? musicOutput,
+    Future<void> Function(String asset, double volume)? effectOutput,
+    Duration Function()? soundClock,
+  }) : _musicFactory = musicOutput ?? AdaptiveAudioMusicOutput.new,
+       _effectOutput = effectOutput {
+    final watch = Stopwatch()..start();
+    _soundClock = soundClock ?? () => watch.elapsed;
+  }
   final MusicOutput Function() _musicFactory;
+  final Future<void> Function(String asset, double volume)? _effectOutput;
+  late final Duration Function() _soundClock;
+  Duration? _lastPickupSound;
   // One low-latency player per effect, so a coin cannot cut off a target.
   final _players = <String, AudioPlayer>{};
+  final _effectLevels = <String, double>{};
+  double _soundGain = 1;
+  Future<void> setSoundVolume(double value) async {
+    if (_soundGain == value) return;
+    _soundGain = value;
+    _enemyAudio.volume = value;
+    if (value == 0) _enemyAudio.setEnabled(false);
+    for (final entry in _players.entries.toList()) {
+      if (_soundGain != value) return;
+      try {
+        if (value == 0) {
+          await entry.value.stop();
+        } else {
+          await entry.value.setVolume(
+            (_effectLevels[entry.key] ?? .55) * value,
+          );
+        }
+      } catch (_) {
+        /* Audio may be unavailable. */
+      }
+    }
+  }
+
   final _enemyAudio = EnemyAudio();
   void setEnemyEffectsEnabled(bool enabled) => _enemyAudio.setEnabled(enabled);
   Future<void> playEnemy(EnemyCue cue) => _enemyAudio.play(cue);
@@ -804,7 +964,15 @@ class GameFeedback {
     }
   }
 
-  Future<void> play(GameEvent event, PlayerProfile profile) async {
+  /// [mode] lets a mode replace a shared cue: Infinite has its own lost-heart
+  /// sound, and the classic levels their own target-hole sound and a win
+  /// sound chosen by the [stars] the level earned.
+  Future<void> play(
+    GameEvent event,
+    PlayerProfile profile, {
+    GameMode? mode,
+    int? stars,
+  }) async {
     if (profile.haptics) {
       if (event == GameEvent.miss) {
         HapticFeedback.heavyImpact();
@@ -812,26 +980,84 @@ class GameFeedback {
         HapticFeedback.mediumImpact();
       }
     }
-    if (!profile.sound) return;
+    if (profile.effectiveSoundVolume <= 0) return;
+    final pickup = event == GameEvent.coin;
+    if (pickup) {
+      final now = _soundClock();
+      if (_lastPickupSound != null &&
+          now - _lastPickupSound! < const Duration(milliseconds: 500))
+        return;
+      // Reserve before loading: magnet collections must not queue or overlap.
+      _lastPickupSound = now;
+    }
+    final infiniteHeart = mode == GameMode.infinite && event == GameEvent.miss;
+    final levelTarget = mode == GameMode.classic && event == GameEvent.target;
+    final levelWin =
+        mode == GameMode.classic &&
+        event == GameEvent.complete &&
+        stars != null;
+    final bigWin = levelWin && stars >= 3;
     try {
-      await _shareAudioFocus();
-      final sound = switch (event) {
-        GameEvent.merge || GameEvent.coin || GameEvent.star => 'target',
-        _ => event.name,
+      final baseVolume = switch (event) {
+        GameEvent.coin => .025,
+        GameEvent.merge => .16,
+        // The Infinite heart cue peaks about twice as loud as miss.wav.
+        GameEvent.miss when infiniteHeart => .14,
+        GameEvent.miss => .28,
+        GameEvent.star => .22,
+        GameEvent.life => .16,
+        // The level cue peaks about twice as loud as target.wav.
+        GameEvent.target when levelTarget => .12,
+        GameEvent.target => .25,
+        // Both win cues peak near full scale, louder than complete.wav.
+        GameEvent.complete when bigWin => .36,
+        GameEvent.complete when levelWin => .4,
+        _ => .55,
       };
-      final key = '$sound:${event == GameEvent.coin}';
-      var player = _players[key];
-      if (player == null) {
-        player = _players[key] = AudioPlayer();
-        await player.setPlayerMode(PlayerMode.lowLatency);
-      }
-      await player.play(
-        AssetSource('audio/$sound.wav'),
-        volume: event == GameEvent.coin ? .25 : .55,
-      );
+      final sound = infiniteHeart
+          ? 'infinite_heart_loss'
+          : levelTarget
+          ? 'level_target'
+          : bigWin
+          ? 'level_win_big'
+          : levelWin
+          ? 'level_win'
+          : event.name;
+      await _playEffect(sound, baseVolume, profile);
     } catch (_) {
       /* Audio restrictions must never interrupt a run. */
     }
+  }
+
+  /// One pop per result star as it appears.
+  Future<void> playStarReveal(PlayerProfile profile) async {
+    if (profile.effectiveSoundVolume <= 0) return;
+    try {
+      await _playEffect('star_reveal', .2, profile);
+    } catch (_) {
+      /* Audio restrictions must never interrupt a result screen. */
+    }
+  }
+
+  Future<void> _playEffect(
+    String sound,
+    double baseVolume,
+    PlayerProfile profile,
+  ) async {
+    final volume = baseVolume * profile.effectiveSoundVolume;
+    if (_effectOutput != null) {
+      await _effectOutput('audio/$sound.wav', volume);
+      return;
+    }
+    await _shareAudioFocus();
+    final key = '$sound:${sound == GameEvent.coin.name}';
+    _effectLevels[key] = baseVolume;
+    var player = _players[key];
+    if (player == null) {
+      player = _players[key] = createGameAudioPlayer();
+      await player.setPlayerMode(PlayerMode.lowLatency);
+    }
+    await player.play(AssetSource('audio/$sound.wav'), volume: volume);
   }
 
   MusicOutput? _music;
@@ -840,9 +1066,23 @@ class GameFeedback {
   bool _musicPlaying = false;
   bool _disposed = false;
   double _musicRate = 1, _musicVolume = .32;
-  ({String? track, bool playing, double volume, double rate, int? session})?
+  ({
+    String? track,
+    bool playing,
+    double volume,
+    double rate,
+    int? session,
+    MusicMix mix,
+  })?
   _wantedMusic;
-  ({String? track, bool playing, double volume, double rate, int? session})?
+  ({
+    String? track,
+    bool playing,
+    double volume,
+    double rate,
+    int? session,
+    MusicMix mix,
+  })?
   _handledMusic;
   Future<void>? _musicUpdate;
 
@@ -855,6 +1095,7 @@ class GameFeedback {
     double volume = .32,
     double playbackRate = 1,
     int? playbackSession,
+    MusicMix mix = const MusicMix(1, 0, 0),
   }) async {
     if (_disposed ||
         (track == null && _track == null && _musicUpdate == null)) {
@@ -866,6 +1107,7 @@ class GameFeedback {
       volume: volume.clamp(0.0, 1.0),
       rate: playbackRate.clamp(.5, 2.0),
       session: playbackSession,
+      mix: mix,
     );
     _wantedMusic = request;
     // Coalesce ticker updates during asset loading. A later mute, pause or
@@ -901,7 +1143,14 @@ class GameFeedback {
   }
 
   Future<void> _applyMusic(
-    ({String? track, bool playing, double volume, double rate, int? session})
+    ({
+      String? track,
+      bool playing,
+      double volume,
+      double rate,
+      int? session,
+      MusicMix mix,
+    })
     request,
   ) async {
     final track = request.track;
@@ -925,6 +1174,7 @@ class GameFeedback {
       return;
     }
     final music = _music ??= _musicFactory();
+    if (music is AdaptiveMusicOutput) await music.setMix(request.mix);
     if (newRecording) {
       await music.play(track, request.volume);
       _track = track;

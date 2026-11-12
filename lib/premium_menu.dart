@@ -1,3 +1,5 @@
+import 'ui_audio.dart';
+import 'dart:ui' as ui;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -7,6 +9,8 @@ import 'ball_painter.dart';
 import 'ball_world.dart';
 import 'menu_design.dart';
 import 'game.dart' show GameMode;
+import 'platform_painter.dart';
+import 'platforms.dart';
 
 /// Menu clocks repaint the decorative canvases only. They never advance a run.
 class MenuMotion extends StatefulWidget {
@@ -134,159 +138,43 @@ class PremiumMenuBackdrop extends CustomPainter {
       return Color.lerp(colors[p.floor()], colors[p.ceil()], p - p.floor())!;
     }
 
-    final horizon = Color.lerp(
-      modeColor(const [
-        Color(0xFF3A6666),
-        Color(0xFF907442),
-        Color(0xFF8265AF),
-      ]),
-      world.accent,
-      .18,
-    )!;
     final night = modeColor(const [
       Color(0xFF07171E),
       Color(0xFF201B14),
       Color(0xFF1C162E),
     ]);
-    final middle = modeColor(const [
-      Color(0xFF183336),
-      Color(0xFF36352A),
-      Color(0xFF302944),
-    ]);
+    // The equipped ball's own world fills the screen, scaled to cover it, so
+    // a new ball changes the whole menu. The scenery picture is cached.
+    final scale = math.max(w / 340, h / 540);
+    final art = Rect.fromCenter(
+      center: Offset(w / 2, h * .42),
+      width: 340 * scale,
+      height: 540 * scale,
+    );
+    canvas.drawRect(Offset.zero & size, Paint()..color = world.bottom);
+    canvas.save();
+    // A slow breath of movement keeps the scene alive without distraction.
+    canvas.translate(0, math.sin(phase) * 2);
+    paintBallWorld(canvas, art.inflate(4), ball);
+    canvas.restore();
+    // Dim the top behind the title and fade into the menu colour behind the
+    // buttons, so text stays readable and the ball stays the brightest thing.
     canvas.drawRect(
       Offset.zero & size,
       Paint()
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          stops: const [0, .38, .64, 1],
+          stops: const [0, .3, .62, .84, 1],
           colors: [
-            night,
-            Color.lerp(const Color(0xFF24474D), horizon, .45)!,
-            middle,
-            menuBackground,
+            night.withAlpha(150),
+            night.withAlpha(60),
+            night.withAlpha(40),
+            menuSceneryShade.withAlpha(185),
+            menuSceneryShade,
           ],
         ).createShader(Offset.zero & size),
     );
-    final light = Offset(w * (.58 + .012 * math.sin(phase)), h * .31);
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()
-        ..shader = RadialGradient(
-          colors: [horizon.withAlpha(95), horizon.withAlpha(0)],
-        ).createShader(Rect.fromCircle(center: light, radius: w * .95)),
-    );
-
-    if (ball == BallCosmetic.steel) {
-      // The starter sphere sits in an open atelier, with light instead of
-      // oversized scenery competing with the ball and menu controls.
-      final glow = Rect.fromCenter(
-        center: Offset(w * .5, h * .39),
-        width: w * 1.2,
-        height: h * .7,
-      );
-      canvas.drawOval(
-        glow,
-        Paint()
-          ..shader = RadialGradient(
-            colors: [world.accent.withAlpha(24), world.accent.withAlpha(0)],
-          ).createShader(glow),
-      );
-      return;
-    }
-
-    // Far architecture: large quiet silhouettes, softened by the lit horizon.
-    for (final side in [-1.0, 1.0]) {
-      final x = w * .5 + side * w * .35;
-      final shift = math.sin(phase) * side * 1.5;
-      final top = h * .23 + shift;
-      canvas.drawPath(
-        Path()
-          ..moveTo(x - w * .09, h * .58)
-          ..lineTo(x - w * .09, top + h * .07)
-          ..lineTo(x, top)
-          ..lineTo(x + w * .09, top + h * .04)
-          ..lineTo(x + w * .09, h * .58)
-          ..close(),
-        Paint()..color = const Color(0xFF142F38).withAlpha(140),
-      );
-      canvas.drawLine(
-        Offset(x, top),
-        Offset(x, h * .53),
-        Paint()
-          ..color = horizon.withAlpha(40)
-          ..strokeWidth = 1,
-      );
-    }
-    final arch = Rect.fromCenter(
-      center: Offset(w * .5, h * .37),
-      width: w * .9,
-      height: w * .9,
-    );
-    canvas.drawArc(
-      arch,
-      math.pi * 1.04,
-      math.pi * .92,
-      false,
-      Paint()
-        ..color = const Color(0xFF6D9591).withAlpha(30)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = w * .055,
-    );
-    canvas.drawArc(
-      arch.deflate(w * .026),
-      math.pi * 1.05,
-      math.pi * .9,
-      false,
-      Paint()
-        ..color = menuGold.withAlpha(25)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1,
-    );
-
-    // A shaft of warm light and distant terraces add depth without a texture.
-    canvas.drawPath(
-      Path()
-        ..moveTo(w * .62, h * .14)
-        ..lineTo(w * .8, h * .14)
-        ..lineTo(w * .46, h * .62)
-        ..lineTo(w * .28, h * .62)
-        ..close(),
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-          colors: [menuGold.withAlpha(13), menuGold.withAlpha(0)],
-        ).createShader(Offset.zero & size),
-    );
-    for (var i = 0; i < 3; i++) {
-      final y = h * (.55 + i * .075);
-      canvas.drawPath(
-        Path()
-          ..moveTo(0, y + h * .05)
-          ..lineTo(w * .25, y)
-          ..lineTo(w * .75, y + h * .015)
-          ..lineTo(w, y - h * .025)
-          ..lineTo(w, h)
-          ..lineTo(0, h)
-          ..close(),
-        Paint()
-          ..color = Color.lerp(
-            const Color(0xFF233F42),
-            menuBackground,
-            (i + 1) / 4,
-          )!,
-      );
-    }
-    for (var i = 0; i < 7; i++) {
-      final x = w * (.14 + ((i * .137) % .72)) + math.sin(phase + i) * 4;
-      final y = h * (.22 + ((i * .081) % .31)) + math.cos(phase + i) * 5;
-      canvas.drawCircle(
-        Offset(x, y),
-        i.isEven ? 1.2 : .7,
-        Paint()..color = menuGold.withAlpha(35 + (i % 3) * 8),
-      );
-    }
   }
 
   @override
@@ -300,9 +188,11 @@ class MenuBallStage extends CustomPainter {
     this.drift, {
     required this.reducedMotion,
     this.mode = GameMode.infinite,
+    this.platform = PlatformStyle.classic,
   }) : super(repaint: drift);
   final BallCosmetic ball;
   final GameMode mode;
+  final PlatformStyle platform;
   final Animation<double> drift;
   final bool reducedMotion;
 
@@ -312,87 +202,34 @@ class MenuBallStage extends CustomPainter {
     final w = size.width, h = size.height;
     final radius = math.min(w * .17, h * .19);
     final center = Offset(w * .5, h * .47 + math.sin(phase) * 3);
+    final tint = Color(platform.color);
     final baseY = h * .47 + radius * 1.75;
-    final rx = radius * 2.2, ry = radius * .55;
 
     if (mode == GameMode.merge2048) {
       paintMergeStage(canvas, center.dx, baseY, radius, phase);
-    } else if (mode == GameMode.classic) {
-      paintClassicStage(canvas, center.dx, baseY, radius, phase);
-    } else if (ball == BallCosmetic.steel) {
-      final surface = Rect.fromCenter(
-        center: Offset(center.dx, baseY),
-        width: rx * 2,
-        height: ry * 2,
-      );
-      canvas.drawOval(
-        surface.shift(Offset(0, radius * .16)),
-        Paint()..color = const Color(0xFF0E252D),
-      );
-      canvas.drawOval(
-        surface,
-        Paint()
-          ..shader = const RadialGradient(
-            center: Alignment(-.25, -.3),
-            radius: 1,
-            colors: [Color(0xFF719393), Color(0xFF345A63), Color(0xFF183B47)],
-          ).createShader(surface),
-      );
-      canvas.drawOval(
-        surface,
-        Paint()
-          ..color = const Color(0xFF9BC9CB).withAlpha(100)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1,
-      );
-    } else {
-      // Three suspended stone steps, rendered with the game's native canvas.
-      for (var i = 2; i >= 0; i--) {
-        final spread = 1 + i * .16;
-        final y = baseY + i * radius * .28;
-        final edge = Path()
-          ..moveTo(center.dx - rx * spread, y)
-          ..lineTo(center.dx, y + ry * spread)
-          ..lineTo(center.dx + rx * spread, y)
-          ..lineTo(center.dx + rx * spread, y + radius * .2)
-          ..lineTo(center.dx, y + ry * spread + radius * .2)
-          ..lineTo(center.dx - rx * spread, y + radius * .2)
-          ..close();
-        canvas.drawPath(
-          edge,
-          Paint()
-            ..shader = const LinearGradient(
-              colors: [Color(0xFF152C31), Color(0xFF29464A), Color(0xFF10262C)],
-            ).createShader(edge.getBounds()),
-        );
-        final top = Path()
-          ..moveTo(center.dx, y - ry * spread)
-          ..lineTo(center.dx + rx * spread, y)
-          ..lineTo(center.dx, y + ry * spread)
-          ..lineTo(center.dx - rx * spread, y)
-          ..close();
-        canvas.drawPath(
-          top,
-          Paint()
-            ..shader = const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF648481), Color(0xFF335359)],
-            ).createShader(top.getBounds()),
-        );
-        canvas.drawPath(
-          top,
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = .8
-            ..color = menuGold.withAlpha(i == 0 ? 70 : 25),
-        );
-      }
     }
+    // No pedestal in Infinite or Classic: the rail floats, lighting the
+    // ground below.
+    // The equipped rail lights the stage below it.
+    final pool = Rect.fromCenter(
+      center: Offset(center.dx, baseY),
+      width: radius * 5.2,
+      height: radius * .9,
+    );
+    canvas.drawOval(
+      pool,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            tint.withAlpha(platform.energized ? 75 : 45),
+            tint.withAlpha(0),
+          ],
+        ).createShader(pool),
+    );
     final shadow = Rect.fromCenter(
       center: Offset(center.dx, baseY),
-      width: radius * (2.5 - math.sin(phase) * .04),
-      height: radius * .48,
+      width: radius * (4.8 - math.sin(phase) * .08),
+      height: radius * .42,
     );
     canvas.save();
     canvas.translate(shadow.center.dx, shadow.center.dy);
@@ -418,6 +255,7 @@ class MenuBallStage extends CustomPainter {
           colors: [BallWorld.of(ball).accent.withAlpha(30), Colors.transparent],
         ).createShader(Rect.fromCircle(center: center, radius: radius * 2.5)),
     );
+    paintRail(canvas, center + Offset(0, radius * 1.15), radius, phase);
     paintCosmetic(
       canvas,
       center,
@@ -427,6 +265,80 @@ class MenuBallStage extends CustomPainter {
       rotation: math.sin(phase) * .035,
       reducedMotion: reducedMotion,
     );
+  }
+
+  /// The equipped rail, held level under the ball like a display plinth.
+  /// Drawn in game units so every style keeps its in-game detail.
+  void paintRail(Canvas canvas, Offset mid, double r, double phase) {
+    final tint = Color(platform.color);
+    const half = 2.35 * 18;
+    final scale = r / 18;
+    const a = Offset(-half, 0), b = Offset(half, 0);
+    canvas.save();
+    canvas.translate(mid.dx, mid.dy);
+    canvas.scale(scale);
+    canvas.drawLine(
+      a,
+      b,
+      Paint()
+        ..color = tint.withAlpha(platform.energized ? 90 : 50)
+        ..strokeWidth = 15
+        ..strokeCap = StrokeCap.round
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
+    );
+    canvas.drawLine(
+      a + const Offset(0, 5),
+      b + const Offset(0, 5),
+      Paint()
+        ..color = Colors.black.withAlpha(80)
+        ..strokeWidth = 7
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+    );
+    canvas.drawLine(
+      a,
+      b,
+      Paint()
+        ..color = const Color(0xFF2C3A37)
+        ..strokeWidth = 7
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.drawLine(
+      a - const Offset(0, 1),
+      b - const Offset(0, 1),
+      Paint()
+        ..color = tint
+        ..strokeWidth = 4
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.drawLine(
+      a - const Offset(0, 2.5),
+      b - const Offset(0, 2.5),
+      Paint()
+        ..color = const Color(0xFFFFFFE8)
+        ..strokeWidth = 1.2,
+    );
+    paintPlatformDetail(
+      canvas,
+      a,
+      b,
+      platform,
+      time: phase / (math.pi * 2) * 24,
+      reducedMotion: reducedMotion,
+    );
+    // A soft sheen where the ball rests on the rail.
+    final sheen = Rect.fromCenter(
+      center: const Offset(0, -1.5),
+      width: 30,
+      height: 4,
+    );
+    canvas.drawOval(
+      sheen,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [Colors.white.withAlpha(150), Colors.white.withAlpha(0)],
+        ).createShader(sheen),
+    );
+    canvas.restore();
   }
 
   void paintMergeStage(
@@ -463,7 +375,7 @@ class MenuBallStage extends CustomPainter {
           ..close();
         canvas.drawPath(
           side,
-          Paint()..color = Color.lerp(color, menuBackground, .55)!,
+          Paint()..color = Color.lerp(color, menuSceneryShade, .55)!,
         );
         canvas.drawPath(
           top,
@@ -486,7 +398,7 @@ class MenuBallStage extends CustomPainter {
               fontFamily: 'sans-serif',
               fontSize: r * .19,
               fontWeight: FontWeight.w800,
-              color: menuBackground.withAlpha(170),
+              color: menuSceneryShade.withAlpha(170),
             ),
           ),
           textDirection: TextDirection.ltr,
@@ -512,103 +424,11 @@ class MenuBallStage extends CustomPainter {
     }
   }
 
-  void paintClassicStage(
-    Canvas canvas,
-    double x,
-    double y,
-    double r,
-    double phase,
-  ) {
-    final base = Rect.fromCenter(
-      center: Offset(x, y + r * .17),
-      width: r * 4.5,
-      height: r * 1.2,
-    );
-    canvas.drawOval(
-      base,
-      Paint()
-        ..shader = const LinearGradient(
-          colors: [Color(0xFF785C37), Color(0xFF302F2A)],
-        ).createShader(base),
-    );
-    final top = Rect.fromCenter(
-      center: Offset(x, y),
-      width: r * 4.5,
-      height: r * .95,
-    );
-    canvas.drawOval(
-      top,
-      Paint()
-        ..shader = const LinearGradient(
-          colors: [Color(0xFFE1C88D), Color(0xFF927B53)],
-        ).createShader(top),
-    );
-    canvas.drawOval(
-      top.deflate(r * .12),
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = r * .025
-        ..color = const Color(0xFF655638),
-    );
-    for (var i = 0; i < 16; i++) {
-      final angle = i * math.pi * 2 / 16;
-      canvas.drawLine(
-        Offset(x + math.cos(angle) * r * 1.95, y + math.sin(angle) * r * .37),
-        Offset(x + math.cos(angle) * r * 2.12, y + math.sin(angle) * r * .42),
-        Paint()
-          ..color = const Color(0xFF6D5638)
-          ..strokeWidth = r * .025,
-      );
-    }
-    for (final side in [-1, 1]) {
-      final postX = x + side * r * 1.8;
-      final post = RRect.fromRectAndRadius(
-        Rect.fromLTRB(postX - r * .1, y - r * .65, postX + r * .1, y),
-        Radius.circular(r * .05),
-      );
-      canvas.drawRRect(
-        post,
-        Paint()
-          ..shader = const LinearGradient(
-            colors: [Color(0xFFFADE99), Color(0xFF75643F)],
-          ).createShader(post.outerRect),
-      );
-      canvas.drawCircle(
-        Offset(postX, y - r * .72),
-        r * .13,
-        Paint()..color = menuGold,
-      );
-    }
-    final arch = Path()
-      ..moveTo(x - r * 1.8, y - r * .65)
-      ..cubicTo(
-        x - r * 1.9,
-        y - r * 3.6,
-        x + r * 1.9,
-        y - r * 3.6,
-        x + r * 1.8,
-        y - r * .65,
-      );
-    canvas.drawPath(
-      arch,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = r * .055
-        ..color = menuGold.withAlpha(105),
-    );
-    canvas.drawPath(
-      arch,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = r * .013
-        ..color = menuGold,
-    );
-  }
-
   @override
   bool shouldRepaint(MenuBallStage old) =>
       old.mode != mode ||
       old.ball != ball ||
+      old.platform != platform ||
       old.drift != drift ||
       old.reducedMotion != reducedMotion;
 }
@@ -619,9 +439,13 @@ class PremiumPlayButton extends StatefulWidget {
     super.key,
     required this.onPressed,
     this.height = 64,
+    this.label = 'PLAY',
   });
   final VoidCallback? onPressed;
   final double height;
+
+  /// Says what Play starts, such as "PLAY LEVEL 12" on the Classic page.
+  final String label;
   @override
   State<PremiumPlayButton> createState() => _PremiumPlayButtonState();
 }
@@ -644,10 +468,10 @@ class _PremiumPlayButtonState extends State<PremiumPlayButton> {
           height: widget.height,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            gradient: const LinearGradient(
+            gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFFF5D9A0), Color(0xFFDDB574)],
+              colors: [Color.lerp(menuGold, Colors.white, .3)!, menuGold],
             ),
             boxShadow: [
               BoxShadow(
@@ -655,7 +479,10 @@ class _PremiumPlayButtonState extends State<PremiumPlayButton> {
                 blurRadius: 22,
                 offset: const Offset(0, 9),
               ),
-              const BoxShadow(color: Color(0xFF99783F), offset: Offset(0, 3)),
+              BoxShadow(
+                color: Color.lerp(menuGold, Colors.black, .4)!,
+                offset: const Offset(0, 3),
+              ),
             ],
           ),
           child: Material(
@@ -663,7 +490,7 @@ class _PremiumPlayButtonState extends State<PremiumPlayButton> {
             borderRadius: BorderRadius.circular(20),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
-              onTap: widget.onPressed,
+              onTap: uiAction(context, widget.onPressed),
               onHighlightChanged: (value) => setState(() => pressed = value),
               splashColor: Colors.white.withAlpha(30),
               highlightColor: Colors.black.withAlpha(12),
@@ -672,15 +499,15 @@ class _PremiumPlayButtonState extends State<PremiumPlayButton> {
                 child: Row(
                   children: [
                     const SizedBox(width: 24),
-                    const Expanded(
+                    Expanded(
                       child: Center(
                         child: FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Text(
-                            'PLAY',
+                            widget.label,
                             style: TextStyle(
                               fontFamily: 'sans-serif',
-                              color: Color(0xFF243239),
+                              color: menuOnAccent,
                               fontSize: 19,
                               letterSpacing: 4,
                               fontWeight: FontWeight.w800,
@@ -689,10 +516,10 @@ class _PremiumPlayButtonState extends State<PremiumPlayButton> {
                         ),
                       ),
                     ),
-                    const Icon(
+                    Icon(
                       Icons.play_arrow_rounded,
                       size: 24,
-                      color: Color(0xFF243239),
+                      color: menuOnAccent,
                     ),
                   ],
                 ),
@@ -726,7 +553,7 @@ class MenuQuietButton extends StatelessWidget {
     child: Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onPressed,
+        onTap: uiAction(context, onPressed),
         borderRadius: BorderRadius.circular(14),
         child: SizedBox(
           width: label == null ? 48 : 64,
@@ -737,7 +564,7 @@ class MenuQuietButton extends StatelessWidget {
               Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  Icon(icon, size: 21, color: menuMuted),
+                  Icon(icon, size: 21, color: menuSceneryMuted),
                   if (badge)
                     Positioned(
                       right: -4,
@@ -745,7 +572,7 @@ class MenuQuietButton extends StatelessWidget {
                       child: Container(
                         width: 5,
                         height: 5,
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           color: menuGold,
                           shape: BoxShape.circle,
                         ),
@@ -762,10 +589,10 @@ class MenuQuietButton extends StatelessWidget {
                       fit: BoxFit.scaleDown,
                       child: Text(
                         label!,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'sans-serif',
                           fontSize: 10,
-                          color: menuMuted,
+                          color: menuSceneryMuted,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -785,6 +612,30 @@ String formatMenuScore(int score) => score.toString().replaceAllMapped(
   (match) => '${match[1]},',
 );
 
+/// Scores below 10,000 stay exact; larger ones shorten to 28.6K, 148.6K, 1.2M.
+String formatCompactScore(int score) {
+  if (score.abs() < 10000) return formatMenuScore(score);
+  const units = ['K', 'M', 'B', 'T'];
+  var value = score / 1000;
+  var unit = 0;
+  while (value.abs() >= 999.95 && unit < units.length - 1) {
+    value /= 1000;
+    unit++;
+  }
+  final digits = value.toStringAsFixed(1);
+  return '${digits.endsWith('.0') ? digits.substring(0, digits.length - 2) : digits}${units[unit]}';
+}
+
+/// Longer score labels get a smaller font so big numbers keep their layout.
+double scoreFontSize(double base, String text) =>
+    base *
+    switch (text.length) {
+      <= 4 => 1.0,
+      5 => .9,
+      6 => .8,
+      _ => .7,
+    };
+
 class MenuBestScore extends StatelessWidget {
   const MenuBestScore({super.key, required this.score});
   final int score;
@@ -797,12 +648,12 @@ class MenuBestScore extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.emoji_events_outlined, color: menuGold, size: 15),
+          Icon(Icons.emoji_events_outlined, color: menuGold, size: 15),
           const SizedBox(width: 7),
-          const Text(
+          Text(
             'BEST',
             style: TextStyle(
-              color: menuMuted,
+              color: menuSceneryMuted,
               fontSize: 10,
               letterSpacing: 1.5,
               fontWeight: FontWeight.w600,
@@ -810,11 +661,11 @@ class MenuBestScore extends StatelessWidget {
           ),
           const SizedBox(width: 9),
           Text(
-            formatMenuScore(score),
+            formatCompactScore(score),
             key: const ValueKey('menu-best-score'),
-            style: const TextStyle(
-              color: menuText,
-              fontSize: 18,
+            style: TextStyle(
+              color: menuSceneryText,
+              fontSize: scoreFontSize(18, formatCompactScore(score)),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -837,13 +688,13 @@ class MenuEarnedStars extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.star_rounded, color: menuGold, size: 25),
+          Icon(Icons.star_rounded, color: menuGold, size: 25),
           const SizedBox(width: 7),
           Text(
             formatMenuScore(stars),
             key: const ValueKey('menu-earned-stars'),
-            style: const TextStyle(
-              color: menuText,
+            style: TextStyle(
+              color: menuSceneryText,
               fontSize: 22,
               fontWeight: FontWeight.w600,
             ),
@@ -864,44 +715,66 @@ class MenuActionButton extends StatelessWidget {
     this.upgradeAvailable = false,
     this.hintLabel = 'Upgrade available in Shop',
     this.hintKey = 'shop-upgrade-hint',
+    this.tint = const Color(0xFF91C7C5),
+    this.height = 60,
   });
+  final double height;
   final String label, tooltip;
   final IconData icon;
   final VoidCallback? onPressed;
   final bool upgradeAvailable;
 
+  /// The equipped world's accent, lightly tinting the frosted glass.
+  final Color tint;
+
   /// What the gold dot announces to screen readers, and its test key.
   final String hintLabel, hintKey;
   @override
-  Widget build(BuildContext context) => Tooltip(
-    message: tooltip,
-    child: SizedBox(
-      height: 60,
-      child: FilledButton.icon(
-        style: FilledButton.styleFrom(
-          backgroundColor: const Color(0xFF2C4448),
-          foregroundColor: menuText,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          textStyle: const TextStyle(
-            fontFamily: 'sans-serif',
-            fontSize: 19,
-            fontWeight: FontWeight.w600,
+  Widget build(BuildContext context) {
+    // Frosted glass over the world behind the menu: blurred, darkened enough
+    // for the label, and tinted toward the equipped world so it belongs there.
+    final glass = Color.lerp(const Color(0xFF0C1C21), tint, .16)!;
+    return Tooltip(
+      message: tooltip,
+      child: SizedBox(
+        height: height,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+            child: buildButton(context, glass),
           ),
         ),
-        onPressed: onPressed,
-        icon: ShopHintIcon(
-          icon,
-          size: 26,
-          available: upgradeAvailable,
-          hintLabel: hintLabel,
-          hintKey: hintKey,
-        ),
-        label: FittedBox(fit: BoxFit.scaleDown, child: Text(label)),
+      ),
+    );
+  }
+
+  Widget buildButton(BuildContext context, Color glass) => FilledButton.icon(
+    style: FilledButton.styleFrom(
+      backgroundColor: glass.withAlpha(140),
+      disabledBackgroundColor: glass.withAlpha(140),
+      foregroundColor: menuSceneryText,
+      disabledForegroundColor: menuSceneryText.withAlpha(150),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      side: BorderSide(
+        color: Color.lerp(Colors.white, tint, .4)!.withAlpha(55),
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      textStyle: const TextStyle(
+        fontFamily: 'sans-serif',
+        fontSize: 19,
+        fontWeight: FontWeight.w600,
       ),
     ),
+    onPressed: uiAction(context, onPressed),
+    icon: ShopHintIcon(
+      icon,
+      size: 26,
+      available: upgradeAvailable,
+      hintLabel: hintLabel,
+      hintKey: hintKey,
+    ),
+    label: FittedBox(fit: BoxFit.scaleDown, child: Text(label)),
   );
 }
 
@@ -931,6 +804,54 @@ class ShopHintIcon extends StatelessWidget {
       backgroundColor: menuGold,
       smallSize: 8,
       child: Icon(icon, size: size, color: color),
+    ),
+  );
+}
+
+/// A full-screen menu page opened like the shop: a back button that stays
+/// above [child] while it scrolls, and a right swipe that closes the page
+/// like going back.
+class SwipeBackPage extends StatefulWidget {
+  const SwipeBackPage({super.key, required this.child});
+  final Widget child;
+
+  @override
+  State<SwipeBackPage> createState() => _SwipeBackPageState();
+}
+
+class _SwipeBackPageState extends State<SwipeBackPage> {
+  double swipeDistance = 0;
+
+  void finishSwipe(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    if (swipeDistance < 56 && velocity < 500) return;
+    Navigator.maybePop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) => MenuSurface(
+    child: GestureDetector(
+      key: const ValueKey('page-swipe-area'),
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragStart: (_) => swipeDistance = 0,
+      onHorizontalDragUpdate: (details) => swipeDistance += details.delta.dx,
+      onHorizontalDragEnd: finishSwipe,
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: MenuBackButton(
+                  onPressed: () => Navigator.maybePop(context),
+                ),
+              ),
+            ),
+            Expanded(child: widget.child),
+          ],
+        ),
+      ),
     ),
   );
 }

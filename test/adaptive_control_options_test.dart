@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/main.dart';
+import 'package:balance_arcade/premium_menu.dart';
 import 'package:balance_arcade/profile.dart';
 import 'package:balance_arcade/progress_backup.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +18,7 @@ Future<PlayerProfile> launchControls(WidgetTester tester, Size size) async {
   addTearDown(tester.view.reset);
   final profile = PlayerProfile()
     ..tutorialSeen = true
+    ..controlMode = ControlMode.oneFinger
     ..sound = false
     ..music = false
     ..haptics = false;
@@ -25,7 +27,11 @@ Future<PlayerProfile> launchControls(WidgetTester tester, Size size) async {
 }
 
 Future<void> openSettings(WidgetTester tester) async {
-  await tester.tap(find.byTooltip('Settings'));
+  await tester.tap(
+    find.byWidgetPredicate(
+      (w) => w is MenuQuietButton && w.tooltip == 'Settings',
+    ),
+  );
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 400));
 }
@@ -128,16 +134,17 @@ void main() {
     },
   );
 
-  testWidgets('large level picker offers Halo instead of the original pad', (
+  testWidgets('level picker has no control chooser and keeps Settings', (
     tester,
   ) async {
     final profile = await launchControls(tester, const Size(1114, 720));
+    profile
+      ..haloJoystick = true
+      ..controlMode = ControlMode.oneFinger;
     await openClassicLevels(tester);
-    expect(find.text('One-finger'), findsNothing);
-    expect(find.text('Halo Joystick'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('level-control-oneFinger')));
-    await tester.pump();
-    expect(profile.haloJoystick, isTrue);
+    for (final mode in ControlMode.values) {
+      expect(find.byKey(ValueKey('level-control-${mode.name}')), findsNothing);
+    }
     await tester.tap(find.byKey(const ValueKey('level-1')));
     await tester.pump();
     final game = tester.widget<PivotBoard>(find.byType(PivotBoard)).game;

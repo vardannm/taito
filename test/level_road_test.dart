@@ -12,6 +12,39 @@ import 'start_flow_test.dart' show launch;
 import 'support/mode_navigation.dart';
 
 void main() {
+  testWidgets('swiping right closes the roadmap like the back button', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: navigator,
+        home: const Scaffold(body: Text('menu')),
+      ),
+    );
+    navigator.currentState!.push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            Scaffold(body: LevelPicker(selected: 1, onSelected: (_) {})),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final area = find.byKey(const ValueKey('levels-swipe-area'));
+    await tester.dragFrom(const Offset(200, 420), const Offset(-140, 0));
+    await tester.pumpAndSettle();
+    expect(area, findsOneWidget);
+    await tester.dragFrom(const Offset(200, 420), const Offset(0, -200));
+    await tester.pumpAndSettle();
+    expect(area, findsOneWidget);
+    await tester.dragFrom(const Offset(200, 420), const Offset(140, 0));
+    await tester.pumpAndSettle();
+    expect(area, findsNothing);
+    expect(find.text('menu'), findsOneWidget);
+  });
+
   for (final (stars, last) in [
     (0, 4),
     (18, 13),
@@ -81,8 +114,7 @@ void main() {
             selected: 21,
             totalStars: 40,
             records: {
-              for (var n = 1; n <= 20; n++)
-                n: const LevelRecord(starMask: 1),
+              for (var n = 1; n <= 20; n++) n: const LevelRecord(starMask: 1),
             },
             onSelected: (_) {},
           ),

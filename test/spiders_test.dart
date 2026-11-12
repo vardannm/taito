@@ -96,7 +96,7 @@ void main() {
     },
   );
   test(
-    'spider contact costs one heart; capture preserves pursuit and replay resets it',
+    'a target calls off pursuit and a spider catch still costs one heart',
     () {
       final g = BalanceGame()..start(levelNumber: 31);
       final s = g.spiders.first;
@@ -104,13 +104,24 @@ void main() {
       advance(g, 2);
       expect(s.time, 0);
       g.setPaused(false);
-      s.chasing = true;
-      placeAt(g, g.activeHole!);
-      advance(g, 1.5);
+      placeAt(g, Hole(s.zoneX - s.zoneRadius, s.zoneY));
       expect(s.chasing, isTrue);
+      advance(g, .2);
+      final hearts = g.lives;
+      placeAt(g, g.activeHole!);
+      expect(g.completed, 1);
+      expect(g.phase, GamePhase.sinking);
+      advance(g, .05);
+      expect(s.chasing, isFalse);
+      expect(s.returning, isTrue);
+      advance(g, 1.5);
+      expect(g.phase, GamePhase.playing);
+      expect(g.lives, hearts);
+      expect(g.misses, 0);
+      expect(s.chasing, isFalse);
+      expect(s.returning, isFalse);
       expect(s.time, greaterThan(1.5));
       final score = g.score;
-      final hearts = g.lives;
       final hunter = BoardSpider(g.ballX, g.ballY, 40);
       g.spiders
         ..clear()

@@ -1,16 +1,25 @@
 import 'rewards.dart';
 
-/// Five visits, with one claim per UTC calendar day. Missed days keep progress.
+/// A continuous visit count, with one claim per UTC calendar day.
+/// Rewards repeat every five claims; missed days keep the accumulated count.
 class DailyPrizes {
   int claimed = 0;
   DateTime? lastClaim;
   static const coins = [10, 15, 20, 25];
+  static const rewardInterval = 5;
 
-  int get nextDay => claimed % 5 + 1;
+  int get nextDay => claimed + 1;
+  static bool isGearDay(int day) => day % rewardInterval == 0;
+
+  /// Gear days grant these coins when the eligible collection is complete.
+  static int coinReward(int day) =>
+      isGearDay(day) ? 100 : coins[(day - 1) % rewardInterval];
   bool canClaim(DateTime now) =>
       lastClaim == null || DailyChallenge.day(now).isAfter(lastClaim!);
-  int displayedDay(DateTime now) =>
-      canClaim(now) ? nextDay : (claimed - 1) % 5 + 1;
+  int displayedDay(DateTime now) => canClaim(now) ? nextDay : claimed;
+
+  int firstDisplayedDay(DateTime now) =>
+      (displayedDay(now) - 1) ~/ rewardInterval * rewardInterval + 1;
 
   Map<String, Object?> toJson() => {
     'claimed': claimed,

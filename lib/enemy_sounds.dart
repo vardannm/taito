@@ -11,13 +11,20 @@ enum EnemyCue {
   wardenArrival,
   colossusArrival,
   seraphArrival,
+  prismArrival,
+  venomArrival,
+  novaArrival,
+  tideArrival,
+  chronoArrival,
   bullet,
+  seedSpit,
   ricochet,
   bounce,
   petal,
   crystal,
   laserCharge,
   laserFire,
+  mazeGateFire,
   bombThrow,
   poolLand,
   mineCharge,
@@ -29,7 +36,17 @@ enum EnemyCue {
 }
 
 extension EnemyCueAudio on EnemyCue {
-  String get asset => 'audio/enemy_$name.wav';
+  String get asset {
+    // These cues borrow existing recordings at their own volume.
+    final sample = switch (this) {
+      EnemyCue.mazeGateFire => EnemyCue.laserFire,
+      EnemyCue.tideArrival => EnemyCue.venomArrival,
+      EnemyCue.chronoArrival => EnemyCue.prismArrival,
+      _ => this,
+    };
+    return 'audio/enemy_${sample.name}.wav';
+  }
+
   double get seconds => switch (this) {
     EnemyCue.insectArrival => .28,
     EnemyCue.wingArrival => .4,
@@ -37,13 +54,19 @@ extension EnemyCueAudio on EnemyCue {
     EnemyCue.wardenArrival => .85,
     EnemyCue.colossusArrival => .95,
     EnemyCue.seraphArrival => 1.05,
+    EnemyCue.prismArrival ||
+    EnemyCue.venomArrival ||
+    EnemyCue.novaArrival ||
+    EnemyCue.tideArrival ||
+    EnemyCue.chronoArrival => .9,
     EnemyCue.bullet => .14,
+    EnemyCue.seedSpit => .4,
     EnemyCue.ricochet => .22,
     EnemyCue.bounce => .16,
     EnemyCue.petal => .28,
     EnemyCue.crystal => .32,
     EnemyCue.laserCharge => .8,
-    EnemyCue.laserFire => .75,
+    EnemyCue.laserFire || EnemyCue.mazeGateFire => .75,
     EnemyCue.bombThrow => .3,
     EnemyCue.poolLand => .36,
     EnemyCue.mineCharge => .85,
@@ -56,8 +79,16 @@ extension EnemyCueAudio on EnemyCue {
   double get volume => switch (this) {
     EnemyCue.wardenArrival ||
     EnemyCue.colossusArrival ||
-    EnemyCue.seraphArrival => .5,
-    EnemyCue.laserFire || EnemyCue.mineFire => .4,
+    EnemyCue.seraphArrival ||
+    EnemyCue.prismArrival ||
+    EnemyCue.venomArrival ||
+    EnemyCue.novaArrival => .5,
+    EnemyCue.tideArrival || EnemyCue.chronoArrival => .4,
+    EnemyCue.laserCharge => .5,
+    EnemyCue.laserFire => .65,
+    EnemyCue.mazeGateFire => .18,
+    EnemyCue.web || EnemyCue.quills => .16,
+    EnemyCue.mineFire => .8,
     EnemyCue.insectArrival || EnemyCue.wingArrival || EnemyCue.snakeHiss => .27,
     _ => .3,
   };
@@ -108,13 +139,14 @@ class EnemySoundDirector {
         if (previous == null && shot.age < 0) {
           if (shot.kind == LateShotKind.laser) emit(EnemyCue.laserCharge);
           if (shot.kind == LateShotKind.mine) emit(EnemyCue.mineCharge);
-          if (seraph && shot.kind == LateShotKind.shard)
+          if ((seraph || bossKind == BossKind.chronoKeeper) &&
+              shot.kind == LateShotKind.shard)
             emit(EnemyCue.cometCharge);
         }
         if ((previous ?? double.negativeInfinity) < 0 && shot.age >= 0) {
           emit(switch (shot.kind) {
             LateShotKind.shard => seraph ? EnemyCue.cometFire : EnemyCue.bullet,
-            LateShotKind.seed => EnemyCue.bullet,
+            LateShotKind.seed => EnemyCue.seedSpit,
             LateShotKind.ricochet => EnemyCue.ricochet,
             LateShotKind.moth => seraph ? EnemyCue.crystal : EnemyCue.petal,
             LateShotKind.laser => EnemyCue.laserFire,
@@ -134,12 +166,14 @@ class EnemySoundDirector {
     final boss = game.boss;
     if (boss != null) {
       arrival(boss, switch (boss.kind) {
+        BossKind.tideHerald => EnemyCue.tideArrival,
         BossKind.skyWarden => EnemyCue.wardenArrival,
         BossKind.stormColossus => EnemyCue.colossusArrival,
         BossKind.eclipseSeraph => EnemyCue.seraphArrival,
-        BossKind.prismReaver => EnemyCue.colossusArrival,
-        BossKind.venomCrown => EnemyCue.seraphArrival,
-        BossKind.novaPulsar => EnemyCue.wardenArrival,
+        BossKind.prismReaver => EnemyCue.prismArrival,
+        BossKind.venomCrown => EnemyCue.venomArrival,
+        BossKind.novaPulsar => EnemyCue.novaArrival,
+        BossKind.chronoKeeper => EnemyCue.chronoArrival,
       });
       shots(boss.shots, boss.kind);
     }
@@ -160,20 +194,8 @@ class EnemySoundDirector {
         onBoard: visible(game.screenY(snake.y)),
       );
     }
-    for (final spider in game.spiders) {
-      arrival(
-        spider,
-        EnemyCue.insectArrival,
-        onBoard: visible(game.screenY(spider.y)),
-      );
-    }
-    for (final porcupine in game.porcupines) {
-      arrival(
-        porcupine,
-        EnemyCue.insectArrival,
-        onBoard: visible(game.screenY(porcupine.y)),
-      );
-    }
+    // Spider and porcupine appearances are deliberately silent. Their web
+    // releases and quill bursts still announce the actual dangerous action.
     for (final web in game.webShots) {
       present.add(web);
       final previous = _ages[web] ?? 0;
@@ -197,7 +219,7 @@ class EnemySoundDirector {
         emit(EnemyCue.laserFire);
     }
     for (final gate in game.mazeGates) {
-      arrival(gate, EnemyCue.laserFire, onBoard: visible(gate.y));
+      arrival(gate, EnemyCue.mazeGateFire, onBoard: visible(gate.y));
     }
     _ages.removeWhere((object, _) => !present.contains(object));
     _arrivals.removeWhere((object) => !present.contains(object));

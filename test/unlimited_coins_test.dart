@@ -86,10 +86,13 @@ void main() {
       ),
     );
     expect(find.text('\u221e'), findsOneWidget);
-    await tester.tap(find.text('Platforms'));
+    final next = find.byKey(const ValueKey('next-platform'));
+    await tester.ensureVisible(next);
+    await tester.tap(next);
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     final buy = find.byKey(const ValueKey('buy-platform-copper'));
-    await tester.scrollUntilVisible(buy.hitTestable(), 150);
+    await tester.ensureVisible(buy);
     await tester.tap(buy);
     await tester.pump();
     expect(profile.selectedPlatform, PlatformStyle.copper);

@@ -157,7 +157,8 @@ void main() {
       isTrue,
     ); // Normal application opening always starts here.
     await selectWorld(tester, 1);
-    expect(find.text('Classic • Level 18'), findsOneWidget);
+    expect(find.text('Level 18'), findsOneWidget);
+    expect(find.text('PLAY LEVEL 18'), findsOneWidget);
     await startWorld(tester);
     expect(game.level, 18);
     expect(game.waitingForInput, isFalse);
@@ -254,7 +255,8 @@ void main() {
       final game = await launch(tester, ControlMode.oneFinger);
       await selectWorld(tester, arcadeModes.indexOf(mode));
       await startWorld(tester);
-      await tester.tap(find.byTooltip('Pause'));
+      final pauseButton = find.byKey(const ValueKey('board-pause'));
+      await tester.tap(pauseButton);
       await tester.pump();
       final elapsed = game.elapsed;
       final camera = game.cameraOffset;
@@ -280,7 +282,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
       expect(game.elapsed, greaterThan(elapsed));
 
-      await tester.tap(find.byTooltip('Pause'));
+      await tester.tap(pauseButton);
       await tester.pump();
       await tester.tap(find.text('RESUME RUN'));
       await tester.pump();

@@ -147,7 +147,7 @@ class HoleMotion {
 
 enum GamePhase { playing, sinking, returning, over }
 
-enum GameEvent { target, miss, complete, coin, merge, star }
+enum GameEvent { target, miss, complete, coin, merge, star, life }
 
 // Preserve mode identifiers for saved data and analytics. The displayed name
 // of merge2048 is Number Merge.
@@ -156,7 +156,7 @@ enum GameMode { classic, infinite, practice, daily, merge2048 }
 enum ControlMode { twoFinger, oneFinger, analog, tiltLift, boardTilt }
 
 // Keep legacy modes for saved records and backups, but offer only these controls.
-const selectableControlModes = [ControlMode.oneFinger, ControlMode.twoFinger];
+const selectableControlModes = [ControlMode.twoFinger, ControlMode.oneFinger];
 
 extension ControlModeLabel on ControlMode {
   ControlMode get supportedMode =>
@@ -173,8 +173,11 @@ extension ControlModeLabel on ControlMode {
 
 /// Fixed-step simulation. No Flutter imports: physics can be tested in isolation.
 class BalanceGame {
-  BalanceGame({int? seed}) : _runRandom = math.Random(seed);
+  BalanceGame({int? seed, bool legacyCapturePhysics = false})
+    : _runRandom = math.Random(seed),
+      _legacyCapturePhysics = legacyCapturePhysics;
   final math.Random _runRandom;
+  final bool _legacyCapturePhysics;
   // Match the baked Infinite carousel image without consuming run randomness.
   math.Random? _previewRandom;
   math.Random get _random => _previewRandom ?? _runRandom;
@@ -187,6 +190,12 @@ class BalanceGame {
   double magnetDuration = InfiniteTuning.magnetSeconds;
   BallCosmetic cosmetic = BallCosmetic.steel;
   PlatformStyle platformStyle = PlatformStyle.classic;
+  // Capture replay appearance may change while recorded equipment physics stay fixed.
+  BallCosmetic? visualBallOverride;
+  PlatformStyle? visualPlatformOverride;
+  BallCosmetic get renderCosmetic => visualBallOverride ?? cosmetic;
+  PlatformStyle get renderPlatformStyle =>
+      visualPlatformOverride ?? platformStyle;
   double get equipmentMultiplier =>
       1 + cosmetic.scoreBonus + platformStyle.scoreBonus;
   ControlMode controlMode = ControlMode.twoFinger;
@@ -292,13 +301,17 @@ class BalanceGame {
   double _classicSceneTime = 0;
   final _spawnOverlappingHazards = <SpecialHazard>{};
   final _spawnOverlappingSpiders = <BoardSpider>{};
-  int get earnedStarMask =>
-      (mode == GameMode.classic && finished && won && levelStarCollected
-          ? 8
-          : 0) |
-      (!finished || !won || practice || infinite || merging
-          ? 0
-          : 1 | (misses == 0 ? 2 : 0) | (elapsed <= targetTime ? 4 : 0));
+  int get earnedStarMask => finished ? winStarMask : 0;
+
+  /// The stars a winning run earns, readable from the moment the last ball
+  /// starts sinking (the active-time clock is already stopped), so the win
+  /// sound can match the result screen that appears afterwards.
+  int get winStarMask => !won || practice || infinite || merging
+      ? 0
+      : (mode == GameMode.classic && levelStarCollected ? 8 : 0) |
+            1 |
+            (misses == 0 ? 2 : 0) |
+            (elapsed <= targetTime ? 4 : 0);
   InfiniteSection get section => sectionAt(maxHeight / 10);
 
   final spiders = <BoardSpider>[];
@@ -321,7 +334,9 @@ class BalanceGame {
     // A ball sinking into a moving hole travels with it.
     if (phase == GamePhase.playing) _sinkingHole = null;
     final sinking = _sinkingHole;
-    if (phase == GamePhase.sinking && sinking != null && sinking < holes.length) {
+    if (phase == GamePhase.sinking &&
+        sinking != null &&
+        sinking < holes.length) {
       captureX = holes[sinking].x;
       captureY = holes[sinking].y;
     }
@@ -442,6 +457,9 @@ class BalanceGame {
   int bossesCleared = 0;
   List<BossKind> _bossOrder = List.unmodifiable(BossKind.values);
   List<BossKind> get bossOrder => _bossOrder;
+
+  /// Explicit encounter choice for temporary capture scenarios only.
+  BossKind? firstBossOverride;
   List<int> _bossScoreThresholds = [
     for (final (low, high) in bossScoreWindows) (low + high) ~/ 2,
   ];
@@ -452,13 +470,20 @@ class BalanceGame {
   int? get bossWarningSeconds => _bossWarningAt == null
       ? null
       : math.max(1, (_bossWarningAt! + 3 - elapsed).ceil());
+
+  /// The first lap meets each boss at its score window. Overdrive laps
+  /// follow on time instead: top gear multiplies points, not the clock.
   bool get bossPending =>
       infinite &&
       !tutorialCourse &&
       bossesEnabled &&
-      bossesEncountered < BossKind.values.length &&
       elapsed >= _nextBossAt &&
-      score >= bossScoreThresholds[bossesEncountered];
+      (bossesEncountered >= BossKind.values.length ||
+          score >= bossScoreThresholds[bossesEncountered]);
+
+  /// The boss the next encounter brings, cycling through the run's order.
+  BossKind get nextBossKind =>
+      bossOrder[bossesEncountered % BossKind.values.length];
   EncounterDirector enemyDirector = EncounterDirector(0);
   // Like mazeSectionsEnabled, lets callers isolate the ordinary hazard stream.
   bool snakeEncountersEnabled = true;
@@ -788,8 +813,7 @@ class BalanceGame {
     if (survival.noticeTime > 0) message = survival.notice;
     if (boss != null) message = boss!.hint;
     if (bossWarningSeconds != null)
-      message =
-          'BOSS · ${bossOrder[bossesEncountered].name} IN $bossWarningSeconds';
+      message = 'BOSS · ${nextBossKind.name} IN $bossWarningSeconds';
   }
 
   void _loseClimb(String reason, {Hole? hole}) {
@@ -818,6 +842,20 @@ class BalanceGame {
   }
 
   double left = 526, right = 526, ballX = 180, velocity = 0;
+  static const _idleRollSeconds = .4;
+  static const _idleRollSpeed = .15;
+
+  /// How long a fully slowed ball takes to pick its speed back up once the
+  /// platform is controlled again.
+  static const _resumeRollSeconds = .3;
+  double _idleRollTime = 0;
+
+  double get _rollSpeedScale {
+    final t = _idleRollTime / _idleRollSeconds;
+    final eased = t * t * (3 - 2 * t);
+    return _idleRollSpeed + (1 - _idleRollSpeed) * (1 - eased);
+  }
+
   double ballRotation = 0;
   final ballTrail = <({double x, double y, double time})>[];
   double motionSpeed = 0;
@@ -854,6 +892,7 @@ class BalanceGame {
     inputLocked = false;
     clearInput();
     velocity = leftSpeed = rightSpeed = 0;
+    _idleRollTime = 0;
     ballTrail.clear();
     motionSpeed = 0;
     fellThroughGap = caughtBySpider = false;
@@ -891,13 +930,33 @@ class BalanceGame {
     final encounterSeed = _random.nextInt(1 << 30);
     enemyDirector = EncounterDirector(encounterSeed);
     final bossRandom = math.Random(encounterSeed ^ 0xB055);
-    _bossOrder = List.unmodifiable(
-      BossKind.values.toList()..shuffle(bossRandom),
-    );
-    _bossScoreThresholds = List.unmodifiable([
-      // Score windows belong to encounter slots, independently of boss order.
-      for (final (low, high) in bossScoreWindows)
+    // Keep the opener fixed, then shuffle within each progression group.
+    // Each boss appears once before the same order repeats in Overdrive.
+    _bossOrder = List.unmodifiable([
+      BossKind.stormColossus,
+      ...([BossKind.tideHerald, BossKind.skyWarden]..shuffle(bossRandom)),
+      ...([BossKind.chronoKeeper, BossKind.eclipseSeraph, BossKind.prismReaver]
+        ..shuffle(bossRandom)),
+      ...([BossKind.venomCrown, BossKind.novaPulsar]..shuffle(bossRandom)),
+    ]);
+    final first = firstBossOverride;
+    if (first != null) {
+      final order = _bossOrder.toList();
+      final index = order.indexOf(first);
+      order[index] = order.first;
+      order[0] = first;
+      _bossOrder = List.unmodifiable(order);
+    }
+    // Score windows belong to encounter slots, independently of boss order.
+    // The later slots draw first, as they did before the early slot existed.
+    final later = [
+      for (final (low, high) in bossScoreWindows.skip(1))
         low + bossRandom.nextInt(high - low + 1),
+    ];
+    final (earlyLow, earlyHigh) = bossScoreWindows.first;
+    _bossScoreThresholds = List.unmodifiable([
+      earlyLow + bossRandom.nextInt(earlyHigh - earlyLow + 1),
+      ...later,
     ]);
   }
 
@@ -952,9 +1011,21 @@ class BalanceGame {
 
   final pivotTargets = <double?>[null, null];
   final _released = [false, false];
+  bool pivotHeld(int side) => pivotTargets[side] != null && !_released[side];
+  bool get _rollControlHeld =>
+      controlHeld ||
+      pivotHeld(0) ||
+      pivotHeld(1) ||
+      leftInput != 0 ||
+      rightInput != 0;
+
+  /// Optional command journal for the separate App Store capture build.
+  /// Runs before an accepted input changes state; normal games leave it null.
+  void Function(String command, int side, double delta)? onPivotInput;
 
   void grabPivot(int side) {
     if (!canControl) return;
+    onPivotInput?.call('grab', side, 0);
     beginInput();
     _released[side] = false;
     pivotTargets[side] = side == 0 ? left : right;
@@ -962,6 +1033,7 @@ class BalanceGame {
 
   void dragPivot(int side, double delta) {
     if (!canControl || !delta.isFinite || pivotTargets[side] == null) return;
+    onPivotInput?.call('drag', side, delta);
     final other = side == 0 ? right : left;
     final minimum = infinite ? math.max(other - 180, minPivot) : minPivot;
     final maximum = infinite ? math.min(maxPivot, other + 180) : maxPivot;
@@ -977,6 +1049,7 @@ class BalanceGame {
   }
 
   void releasePivot(int side) {
+    onPivotInput?.call('release', side, 0);
     final position = side == 0 ? left : right;
     _released[side] =
         pivotTargets[side] != null &&
@@ -1016,6 +1089,7 @@ class BalanceGame {
     ballX = 180;
     ballRotation = 0;
     velocity = leftSpeed = rightSpeed = 0;
+    _idleRollTime = 0;
     legTime = 0;
     controlPosition = 0;
     clearInput();
@@ -1224,7 +1298,7 @@ class BalanceGame {
       final oldX = ballX, oldY = ballY;
       _tick(h);
       if (!paused) {
-        if (started && phase == GamePhase.playing) {
+        if (infinite && started && phase == GamePhase.playing) {
           final distance = math.sqrt(
             math.pow((ballX - oldX) * arenaStretch, 2) +
                 math.pow(ballY - oldY, 2),
@@ -1291,11 +1365,10 @@ class BalanceGame {
       _moveHoles(dt);
       if (phase == GamePhase.sinking || phase == GamePhase.returning) {
         // The ball is hidden, but the level's patrols and hazard cycle keep
-        // advancing. Pause still freezes everything at the top of _tick. A
-        // lost heart calls off every chase: spiders walk back to patrol and
-        // cannot notice the hidden ball until it is back in play.
+        // advancing. Spiders call off every chase and walk back to patrol
+        // while the ball sinks and returns to play.
         for (final spider in spiders) {
-          if (!lastSuccess) spider.calm();
+          spider.calm();
           spider.step(
             dt,
             captureX,
@@ -1423,12 +1496,29 @@ class BalanceGame {
         right = left - 180;
       }
     }
-    // A rolling sphere: 5/7 of gravity projected onto the bar, then onto x.
+    var rollSpeedScale = 1.0;
+    if (!_legacyCapturePhysics) {
+      final previousScale = _rollSpeedScale;
+      // Letting go eases the ball down; taking hold again eases it back up
+      // along the same curve, instead of snapping to full speed in one tick.
+      _idleRollTime = _rollControlHeld
+          ? math.max(
+              0,
+              _idleRollTime - dt * _idleRollSeconds / _resumeRollSeconds,
+            )
+          : math.min(_idleRollSeconds, _idleRollTime + dt);
+      rollSpeedScale = _rollSpeedScale;
+      // Scale the ball's existing momentum along with the downhill pull.
+      velocity *= rollSpeedScale / previousScale;
+    }
+    // Gravity projected onto the bar, then onto x.
     final slope = (right - left) / (320 * arenaStretch);
-    velocity +=
+    final gravityStep =
         (6 / 7) * 1700 * slope / (1 + slope * slope) * dt / arenaStretch;
+    velocity += gravityStep * rollSpeedScale;
     velocity *= math.exp(-.48 * dt);
-    velocity = velocity.clamp(-265.0 / arenaStretch, 265.0 / arenaStretch);
+    final maxRollSpeed = 265.0 / arenaStretch * rollSpeedScale;
+    velocity = velocity.clamp(-maxRollSpeed, maxRollSpeed);
     ballX += velocity * dt;
     final laserContactX =
         sideRailX + (sideLaserWidth / 2 + ballRadius) / arenaStretch;
@@ -1518,7 +1608,7 @@ class BalanceGame {
             q.x < -12 ||
             q.x > 372 ||
             screenY(q.y) < visibleTop - 30 ||
-            screenY(q.y) > 622,
+            screenY(q.y) > math.max(622, visibleBottom + 30),
       );
       webShots.removeWhere(
         (shot) =>
@@ -1733,9 +1823,7 @@ class BalanceGame {
         dashLength: wave.dashLength,
         dashGap: wave.dashGap,
         dashSpeed: wave.dashSpeed,
-        laserBottom: wave.stopAboveStart
-            ? SpecialHazard.startClearBottom
-            : 537,
+        laserBottom: wave.stopAboveStart ? SpecialHazard.startClearBottom : 537,
       ),
     );
     _finaleSequence++;

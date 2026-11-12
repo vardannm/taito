@@ -103,15 +103,14 @@ void main() {
           home: Scaffold(body: BallShop(profile: p)),
         ),
       );
-      await tester.tap(find.text('Upgrades'));
-      await tester.pump();
       final buy = find.byKey(const ValueKey('upgrade-magnet'));
-      await tester.scrollUntilVisible(buy, 150);
+      await tester.ensureVisible(buy);
       await tester.tap(buy);
       await tester.pump();
       expect(p.magnetDuration, 11);
       expect(p.wallet, 0);
-      expect(find.text('Current: 11 seconds'), findsOneWidget);
+      expect(find.text('11s'), findsOneWidget);
+      expect(find.text('13s duration'), findsOneWidget);
       expect(tester.widget<FilledButton>(buy).onPressed, isNull);
       expect(tester.takeException(), isNull);
       await p.saveEconomy();

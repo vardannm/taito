@@ -83,9 +83,7 @@ void main() {
   }
 
   for (final mode in [1, 2]) {
-    testWidgets('start dimming is exclusive to Infinite, not world $mode', (
-      tester,
-    ) async {
+    testWidgets('start dimming also covers world $mode', (tester) async {
       await launch(tester, ControlMode.oneFinger);
       await selectWorld(tester, mode);
       await armWorld(tester);
@@ -93,7 +91,10 @@ void main() {
         find.byKey(const ValueKey('start-control-prompt')),
         findsOneWidget,
       );
-      expect(find.byKey(const ValueKey('infinite-start-dimmer')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('infinite-start-dimmer')),
+        findsOneWidget,
+      );
       await tester.pumpWidget(const SizedBox());
     });
   }

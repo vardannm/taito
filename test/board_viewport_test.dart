@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/board_painter.dart';
+import 'package:balance_arcade/game.dart';
 
 void main() {
   test(
@@ -21,6 +22,31 @@ void main() {
       );
     },
   );
+  test('side-cutout board stays fixed while the platform moves', () {
+    final game = BalanceGame()..start(gameMode: GameMode.classic);
+    const size = Size(466, 678);
+    for (final inset in [0.0, 96.0, 140.0]) {
+      Offset? origin;
+      for (final y in [30.0, 160.0, 280.0, 440.0, 526.0]) {
+        game.left = game.right = y;
+        final view = BoardViewport.forGame(
+          size,
+          game,
+          fillWidth: 1,
+          bottomInset: inset,
+          fitHeight: true,
+        );
+        origin ??= view.offset;
+        expect(view.offset, origin);
+        expect(view.project(Offset.zero).dy, greaterThanOrEqualTo(-.001));
+        expect(
+          view.project(const Offset(360, 560)).dy,
+          lessThanOrEqualTo(size.height - inset + .001),
+        );
+      }
+    }
+  });
+
   for (final size in [
     const Size(1130, 776),
     const Size(390, 680),

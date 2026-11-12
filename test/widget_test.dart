@@ -6,6 +6,7 @@ import 'package:balance_arcade/profile.dart';
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/board_painter.dart';
 import 'package:balance_arcade/one_finger_controls.dart';
+import 'package:balance_arcade/level_picker.dart';
 
 void main() {
   for (final size in [
@@ -13,7 +14,7 @@ void main() {
     const Size(320, 568),
     const Size(430, 932),
   ]) {
-    testWidgets('home, guide and gameplay fit $size', (tester) async {
+    testWidgets('home, modes and gameplay fit $size', (tester) async {
       tester.view.physicalSize = size;
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -33,26 +34,38 @@ void main() {
       await tester.tap(find.byTooltip('Modes'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
-      await tester.ensureVisible(find.text('HOW TO PLAY'));
-      await tester.tap(find.text('HOW TO PLAY'));
+      expect(find.text('HOW TO PLAY'), findsNothing);
+      expect(find.text('PRACTICE'), findsNothing);
+      expect(find.text('DAILY'), findsOneWidget);
+      expect(find.text('Classic levels'), findsNothing);
+      Navigator.of(tester.element(find.text('Your arcade'))).pop();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
-      expect(find.text('A game of balance.'), findsOneWidget);
-      expect(find.text('One finger. Full control.'), findsOneWidget);
-      expect(find.text('Merge: grow your number.'), findsOneWidget);
-      expect(find.textContaining('unlock cabinet styles'), findsNothing);
-      await tester.ensureVisible(find.text('TRY PRACTICE'));
+      final dynamic state = tester.state(find.byType(GameScreen));
+      state.start(
+        GameMode.practice,
+      ); // Obsolete mode requests cannot launch it.
       await tester.pump();
-      await tester.tap(find.text('TRY PRACTICE'));
+      expect(
+        tester.widget<PivotBoard>(find.byType(PivotBoard)).game.mode,
+        GameMode.infinite,
+      );
+      await openClassicLevels(tester);
+      expect(find.byType(LevelPicker), findsOneWidget);
+      Navigator.of(tester.element(find.byType(LevelPicker))).pop();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
-      expect(find.textContaining('PRACTICE · '), findsOneWidget);
+      await tester.tap(find.byTooltip('Settings'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byKey(const ValueKey('replay-tutorial')), findsOneWidget);
+      expect(find.textContaining('PRACTICE · '), findsNothing);
       expect(find.byType(PivotBoard), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
     });
   }
-  testWidgets('guide closes and side arrows switch modes', (tester) async {
+  testWidgets('side arrows switch modes', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -78,18 +91,6 @@ void main() {
     await tapArrow('mode-previous');
     expect(title(), 'Infinite');
 
-    await tester.tap(find.byTooltip('Modes'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
-    await tester.ensureVisible(find.text('HOW TO PLAY'));
-    await tester.tap(find.text('HOW TO PLAY'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
-    expect(find.text('A game of balance.'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('guide-close')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
-    expect(find.text('A game of balance.'), findsNothing);
     expect(find.textContaining('PRACTICE · '), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
@@ -176,15 +177,15 @@ void main() {
     expect(rect.top, closeTo(0, .001));
     expect(
       tester.getTopLeft(find.byKey(const ValueKey('board-hud'))).dy,
-      closeTo(56, .001),
+      closeTo(66, .001),
     );
     expect(
       tester.getTopLeft(find.byKey(const ValueKey('board-pause'))).dy,
-      closeTo(56, .001),
+      closeTo(66, .001),
     );
     expect(
       tester.getTopLeft(find.byKey(const ValueKey('board-hearts'))).dy,
-      closeTo(66, .001),
+      closeTo(76, .001),
     );
     expect(rect.height, greaterThan(700));
     expect(tester.takeException(), isNull);

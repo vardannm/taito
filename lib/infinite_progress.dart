@@ -43,7 +43,7 @@ abstract final class InfiniteTuning {
   static const webInterval = 3.5, maxWebShots = 2;
   static const quillCount = 12, maxPorcupines = 2;
   static const quillSpeed = 95.0, quillRadius = 3.0;
-  static const quillWarningSeconds = 1.1, quillLifeSeconds = 3.6;
+  static const quillWarningSeconds = 1.1;
   static const quillInterval = 4.8, porcupineSpacing = 2200.0;
   static const snakeSideSpeed = 65.0, snakeDownSpeed = 72.0;
   static const lateEnemyWarning = 1.2;
@@ -78,6 +78,12 @@ abstract final class InfiniteTuning {
   static const fastStartScoreStep = 30000;
   static const fastStartSpeedStep = .05, maxStartingSpeedMultiplier = 2.5;
   static const fastStartEaseSeconds = 2.5;
+
+  /// Hidden pacing: the opening follows the score reached in at least
+  /// [paceRepeatRuns] of the last [paceRecentRuns] runs, and steps down after
+  /// [paceEarlyFallRuns] runs in a row below [paceEarlyFallShare] of it.
+  static const paceRecentRuns = 10, paceRepeatRuns = 3, paceEarlyFallRuns = 3;
+  static const paceEarlyFallShare = .25;
 
   /// Add 5% of the original opening speed per 30,000 points above 300,000.
   /// Fractional progress keeps personal-best improvements smooth.

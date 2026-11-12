@@ -4,14 +4,14 @@ Status: prepared, not run. Do not fill the results table with simulated test out
 
 ## Setup
 
-Use the same version on both Android and iPhone. Recruit five people who have not played GILT. Assign at least one to each control mode; include both small and large phones. Ask permission before taking notes or recording the device. Use anonymous IDs P01–P05.
+Use the same version on both Android and iPhone. Recruit five people who have not played Rollrise. Include both small and large phones and start with a fresh profile on each device. Ask permission before taking notes or recording the device. Use anonymous IDs P01–P05.
 
 Open Goals, friends & backup → Playtest session → Start new session. This is an optional local recorder: no account, analytics upload or participant identity. Keep the app open, stop and copy the report when finished. Starting a new session clears the previous in-memory report. The events supplement observation; they do not prove next-day return or explain why a person quit.
 
 ## 10–15 minute session
 
-1. Open How to Play → Replay quick tutorial. Say: “Try this game. Tell me what you think you need to do.” Do not explain the controls unless they ask or are stuck for 60 seconds; record assistance.
-2. Observe each of lift/release, tilt and target capture. Record completion, skip or confusion. Let them choose a different control mode if needed.
+1. Open the app with a fresh profile or use Settings → Replay Tutorial. Say “Try this game. Tell me what you think you need to do.” Let the player try without coaching. Offer help if they ask or are stuck for 60 seconds, and record what you told them.
+2. Watch whether they find both drag zones, tilt with one thumb, lift with both, and release and grab again. Record any confusion, skipped steps, and switches to One-Finger or Halo.
 3. Let them follow the displayed next goal. Record first target success, each confusing death and whether the cause was understood.
 4. After a finished run, wait without suggesting a retry. Record whether the participant chooses another run.
 5. Ask them to find a friend challenge and a progress backup. Test restore only in a disposable test profile with a saved rollback copy.

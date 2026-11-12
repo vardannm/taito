@@ -13,6 +13,7 @@ import 'package:balance_arcade/profile.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'package:flutter/rendering.dart';
+import '../test/support/shop_navigation.dart';
 
 void main() {
   testWidgets('render the four premium ball and platform sets and real shop', (
@@ -156,18 +157,7 @@ void main() {
         ),
       ),
     );
-    final scroll = find
-        .descendant(
-          of: find.byType(BallShop),
-          matching: find.byType(Scrollable),
-        )
-        .first;
-    await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('buy-genesis')),
-      650,
-      scrollable: scroll,
-      maxScrolls: 60,
-    );
+    await revealShopBall(tester, BallCosmetic.genesis);
     await tester.pump();
     final render =
         boundary.currentContext!.findRenderObject() as RenderRepaintBoundary;
@@ -180,19 +170,7 @@ void main() {
       image.dispose();
     });
     expect(tester.takeException(), isNull);
-    await tester.tap(find.text('Platforms'));
-    await tester.pump();
-    await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('buy-platform-genesis')),
-      350,
-      scrollable: find
-          .descendant(
-            of: find.byType(BallShop),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-      maxScrolls: 80,
-    );
+    await revealShopPlatform(tester, PlatformStyle.genesis);
     await tester.pump();
     await tester.runAsync(() async {
       final image = await render.toImage(pixelRatio: 2);

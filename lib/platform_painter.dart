@@ -10,6 +10,7 @@ void paintPlatformDetail(
   PlatformStyle style, {
   double time = 0,
   bool reducedMotion = false,
+  bool particlesEnabled = true,
 }) {
   if (style == PlatformStyle.classic) return;
   final tint = Color(style.color), span = (b - a).distance;
@@ -17,7 +18,14 @@ void paintPlatformDetail(
   canvas.translate(a.dx, a.dy);
   canvas.rotate(math.atan2(b.dy - a.dy, b.dx - a.dx));
   if (style.purchaseOnly) {
-    paintPremiumPlatform(canvas, span, style, time, reducedMotion);
+    paintPremiumPlatform(
+      canvas,
+      span,
+      style,
+      time,
+      reducedMotion,
+      particlesEnabled: particlesEnabled,
+    );
     canvas.restore();
     return;
   }
@@ -61,21 +69,23 @@ void paintPlatformDetail(
         ..color = tint.withAlpha(45)
         ..strokeWidth = 13,
     );
-    final sparks = Path();
-    for (var i = 0; i < 6; i++) {
-      final phase = reducedMotion ? i / 6 : (time * .18 + i / 6) % 1;
-      final x = phase * span;
-      sparks.addOval(
-        Rect.fromCircle(
-          center: Offset(x, -4 - 4 * math.sin(phase * math.pi)),
-          radius: 1.2,
-        ),
+    if (particlesEnabled) {
+      final sparks = Path();
+      for (var i = 0; i < 6; i++) {
+        final phase = reducedMotion ? i / 6 : (time * .18 + i / 6) % 1;
+        final x = phase * span;
+        sparks.addOval(
+          Rect.fromCircle(
+            center: Offset(x, -4 - 4 * math.sin(phase * math.pi)),
+            radius: 1.2,
+          ),
+        );
+      }
+      canvas.drawPath(
+        sparks,
+        Paint()..color = tint.withAlpha(reducedMotion ? 70 : 155),
       );
     }
-    canvas.drawPath(
-      sparks,
-      Paint()..color = tint.withAlpha(reducedMotion ? 70 : 155),
-    );
   }
   canvas.drawLine(
     const Offset(0, -1.6),
@@ -132,8 +142,11 @@ class PlatformPreview extends CustomPainter {
   final AnimationController? animation;
   @override
   void paint(Canvas canvas, Size size) {
-    final a = Offset(3, size.height * .6),
-        b = Offset(size.width - 3, size.height * .4);
+    // Inset from the card edges, below the badge and above the name and
+    // price along the bottom, so the rail sits framed.
+    final inset = size.width * .12;
+    final a = Offset(inset, size.height * .44),
+        b = Offset(size.width - inset, size.height * .3);
     canvas.drawLine(
       a,
       b,
@@ -147,7 +160,8 @@ class PlatformPreview extends CustomPainter {
       b,
       Paint()
         ..color = Color(style.color)
-        ..strokeWidth = 5,
+        ..strokeWidth = 5
+        ..strokeCap = StrokeCap.round,
     );
     paintPlatformDetail(
       canvas,

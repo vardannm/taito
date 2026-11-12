@@ -19,10 +19,16 @@ class PivotBoard extends StatefulWidget {
     this.showHint = false,
     this.dimUntilInput = false,
     this.overlay,
+    this.fitHeight = false,
+    this.contentTop,
   });
   final BalanceGame game;
   final Listenable frame;
   final double fillWidth;
+
+  /// Fit the complete route when a side cutout leaves a short, wide display.
+  final bool fitHeight;
+  final double? contentTop;
 
   /// Keeps gameplay above the controls while scenery fills the whole widget.
   final double? bottomInset;
@@ -32,12 +38,28 @@ class PivotBoard extends StatefulWidget {
   final bool showHint;
   final bool dimUntilInput;
   final Widget? overlay;
+
+  // Only landscape arenas narrow; scenery still paints the full window.
+  double _arenaWidthFraction(Size window) =>
+      usesWideStage(window) && window.width > window.height ? .41 : .74;
+
+  double get _bottomInset => bottomInset ?? controlStrip(game);
+
+  BoardViewport viewportFor(Size size, Size window) => BoardViewport.forGame(
+    size,
+    game,
+    fillWidth: fillWidth,
+    bottomInset: _bottomInset,
+    fitHeight: fitHeight,
+    contentTop: contentTop,
+    arenaWidthFraction: _arenaWidthFraction(window),
+  );
+
   @override
   State<PivotBoard> createState() => _PivotBoardState();
 }
 
 class _PivotBoardState extends State<PivotBoard> {
-  double get bottomInset => widget.bottomInset ?? controlStrip(widget.game);
   final pointers = <int, int>{};
   // Where each side's finger is, for the two-finger feedback overlay.
   final fingers = <int, Offset>{};
@@ -57,12 +79,9 @@ class _PivotBoardState extends State<PivotBoard> {
       if (!widget.game.oneFinger || widget.game.haloJoystick) {
         return buildBoard(context, bounds);
       }
-      final scale = BoardViewport.forGame(
-        bounds.biggest,
-        widget.game,
-        fillWidth: widget.fillWidth,
-        bottomInset: bottomInset,
-      ).scale;
+      final scale = widget
+          .viewportFor(bounds.biggest, MediaQuery.sizeOf(context))
+          .scale;
       return Stack(
         fit: StackFit.expand,
         children: [
@@ -99,13 +118,9 @@ class _PivotBoardState extends State<PivotBoard> {
 
   Widget buildBoard(BuildContext context, BoxConstraints bounds) {
     final game = widget.game;
+    final window = MediaQuery.sizeOf(context);
     synchronize();
-    BoardViewport viewportNow() => BoardViewport.forGame(
-      bounds.biggest,
-      game,
-      fillWidth: widget.fillWidth,
-      bottomInset: bottomInset,
-    );
+    BoardViewport viewportNow() => widget.viewportFor(bounds.biggest, window);
     game.arenaStretch = viewportNow().stretch;
     game.visibleTop = -viewportNow().topExtension;
     game.visibleBottom = viewportNow().paintBottom;
@@ -176,7 +191,10 @@ class _PivotBoardState extends State<PivotBoard> {
                   repaint: widget.frame,
                   reducedMotion: MediaQuery.of(context).disableAnimations,
                   fillWidth: widget.fillWidth,
-                  bottomInset: bottomInset,
+                  fitHeight: widget.fitHeight,
+                  contentTop: widget.contentTop,
+                  arenaWidthFraction: widget._arenaWidthFraction(window),
+                  bottomInset: widget._bottomInset,
                   showHud: widget.overlay == null,
                 ),
                 child: const SizedBox.expand(),
@@ -195,23 +213,6 @@ class _PivotBoardState extends State<PivotBoard> {
                   child: const SizedBox.expand(),
                 ),
               ),
-            if (widget.dimUntilInput)
-              Positioned.fill(
-                bottom: game.oneFinger && !game.haloJoystick ? bottomInset : 0,
-                child: IgnorePointer(
-                  child: ExcludeSemantics(
-                    child: AnimatedBuilder(
-                      animation: widget.frame,
-                      builder: (context, _) => game.waitingForInput
-                          ? const ColoredBox(
-                              key: ValueKey('infinite-start-dimmer'),
-                              color: Color(0x73000000),
-                            )
-                          : const SizedBox.shrink(),
-                    ),
-                  ),
-                ),
-              ),
             if (game.oneFinger && game.haloJoystick)
               OneFingerControls(
                 key: const ValueKey('halo-joystick'),
@@ -223,8 +224,43 @@ class _PivotBoardState extends State<PivotBoard> {
               ControlHint(
                 anchors: [
                   for (final side in [0, 1])
-                    TwoFingerFeedbackPainter.halfCenter(viewportNow(), game, side),
+                    TwoFingerFeedbackPainter.halfCenter(
+                      viewportNow(),
+                      game,
+                      side,
+                    ),
                 ],
+              ),
+            if (widget.dimUntilInput)
+              Positioned.fill(
+                bottom: game.oneFinger && !game.haloJoystick
+                    ? widget._bottomInset
+                    : 0,
+                child: IgnorePointer(
+                  child: ExcludeSemantics(
+                    child: AnimatedBuilder(
+                      animation: widget.frame,
+                      builder: (context, _) => game.waitingForInput
+                          ? CustomPaint(
+                              key: const ValueKey('infinite-start-dimmer'),
+                              painter: _StartDimmerPainter(
+                                holes: twoFinger
+                                    ? [
+                                        for (final side in [0, 1])
+                                          TwoFingerFeedbackPainter.halfCenter(
+                                            viewportNow(),
+                                            game,
+                                            side,
+                                          ),
+                                      ]
+                                    : const [],
+                              ),
+                              child: const SizedBox.expand(),
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+                  ),
+                ),
               ),
             if (widget.overlay != null)
               Positioned.fromRect(
@@ -242,5 +278,30 @@ class _PivotBoardState extends State<PivotBoard> {
     return game.boardTilt
         ? BoardTiltControls(game: game, frame: widget.frame, child: board)
         : board;
+  }
+}
+
+/// Neutral shade with clear windows over the in-board two-finger controls.
+class _StartDimmerPainter extends CustomPainter {
+  const _StartDimmerPainter({required this.holes});
+  final List<Offset> holes;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..fillType = PathFillType.evenOdd
+      ..addRect(Offset.zero & size);
+    for (final center in holes) {
+      path.addOval(Rect.fromCircle(center: center, radius: 66));
+    }
+    canvas.drawPath(path, Paint()..color = const Color(0xB3000000));
+  }
+
+  @override
+  bool shouldRepaint(_StartDimmerPainter old) {
+    if (old.holes.length != holes.length) return true;
+    for (var i = 0; i < holes.length; i++) {
+      if (old.holes[i] != holes[i]) return true;
+    }
+    return false;
   }
 }
