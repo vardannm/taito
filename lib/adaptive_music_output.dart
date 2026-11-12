@@ -20,7 +20,7 @@ abstract interface class LoopVoice {
 }
 
 class _AudioLoopVoice implements LoopVoice {
-  final _player = AudioPlayer();
+  final _player = createGameAudioPlayer();
 
   @override
   Future<void> prepare(String asset) async {

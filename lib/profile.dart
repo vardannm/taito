@@ -1054,7 +1054,7 @@ class GameFeedback {
     _effectLevels[key] = baseVolume;
     var player = _players[key];
     if (player == null) {
-      player = _players[key] = AudioPlayer();
+      player = _players[key] = createGameAudioPlayer();
       await player.setPlayerMode(PlayerMode.lowLatency);
     }
     await player.play(AssetSource('audio/$sound.wav'), volume: volume);
