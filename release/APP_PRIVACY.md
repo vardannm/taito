@@ -27,7 +27,7 @@ Apple's labels include third-party SDK practices. A local save file alone is not
 | Progress backups | Explicit clipboard copy and pasted import | No automatic upload; recipients and clipboard/device sync may retain exported copies |
 | Optional playtest recording | In memory, max 1,000 events, explicitly copied report | No automatic upload; if collected from testers by support, review the support data flow |
 | Google Mobile Ads | UMP-gated optional rewarded revive or run-coin doubling; real Android IDs in release, sample units in QA | Include the SDK's collection even when no game account exists. Final configuration determines purposes, linkage and tracking |
-| Firebase Analytics | Off by default; explicit Options opt-in enables collection and gameplay events; live reporting not yet verified | Include SDK collection and gameplay usage in App Store privacy and Google Play Data Safety disclosures; verify final configuration, linkage, tracking, and consent |
+| Firebase Analytics | On by default for new installations; Options allows opt-out; saved choices are respected; live reporting not yet verified | Include SDK collection and gameplay usage in App Store privacy and Google Play Data Safety disclosures; verify final configuration, linkage, tracking, and consent |
 
 For an ads-enabled candidate, start with **Yes, data is collected from this app**, then review these categories against the exact native SDK's manifests and Xcode's aggregate Privacy Report:
 

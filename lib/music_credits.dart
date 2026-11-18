@@ -1,13 +1,14 @@
+import 'ui_audio.dart';
 import 'package:flutter/material.dart';
 
 const _musicCredit =
-    'Music by Kevin MacLeod (incompetech.com)\n\n'
-    'Infinite: “The Complex”\n'
-    'https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300025\n\n'
-    'Licensed under Creative Commons Attribution 4.0\n'
-    'https://creativecommons.org/licenses/by/4.0/\n\n'
-    'Used in ROLLRISE with playback level adjustment and gradual playback tempo '
-    'changes during Infinite. The original recording is otherwise unchanged.';
+    'Soundtracks created for Rollrise with ElevenLabs Music.\n\n'
+    'Classic levels 1–40: the opening level theme.\n'
+    'Classic levels 41 onward: the later theme with reduced ticking percussion.\n'
+    'Daily challenges use the opening theme.\n\n'
+    'Three arrangements of one theme: Climb, Fast Climb, and Boss.\n\n'
+    'Edited into synchronized loops with lighter bass, matched playback levels, '
+    'and crossfades driven by gameplay speed and boss encounters.';
 
 Future<void> showMusicCredits(BuildContext context) => showDialog<void>(
   context: context,
@@ -17,7 +18,7 @@ Future<void> showMusicCredits(BuildContext context) => showDialog<void>(
     content: const SelectableText(_musicCredit),
     actions: [
       TextButton(
-        onPressed: () => Navigator.of(context).pop(),
+        onPressed: uiAction(context, () => Navigator.of(context).pop()),
         child: const Text('Close'),
       ),
     ],

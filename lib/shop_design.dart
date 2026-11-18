@@ -1,5 +1,4 @@
-import 'dart:math' as math;
-
+import 'ui_audio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -13,8 +12,9 @@ class ShopRevealRoute extends PageRouteBuilder<void> {
     required Rect origin,
     required WidgetBuilder builder,
     required bool reducedMotion,
+    String name = '/collection',
   }) : super(
-         settings: const RouteSettings(name: '/collection'),
+         settings: RouteSettings(name: name),
          opaque: false,
          barrierDismissible: false,
          barrierColor: Colors.black.withAlpha(45),
@@ -26,7 +26,7 @@ class ShopRevealRoute extends PageRouteBuilder<void> {
              : const Duration(milliseconds: 360),
          pageBuilder: (context, animation, secondaryAnimation) =>
              AnnotatedRegion<SystemUiOverlayStyle>(
-               value: const SystemUiOverlayStyle(
+               value: SystemUiOverlayStyle(
                  statusBarColor: Colors.transparent,
                  statusBarIconBrightness: Brightness.light,
                  statusBarBrightness: Brightness.dark,
@@ -114,11 +114,11 @@ class ShopPurchaseButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => FilledButton(
     key: buttonKey,
-    onPressed: onPressed,
+    onPressed: uiAction(context, onPressed),
     style: FilledButton.styleFrom(
       backgroundColor: menuGold,
       foregroundColor: menuBackground,
-      disabledBackgroundColor: equipped ? const Color(0xFF233D39) : menuRaised,
+      disabledBackgroundColor: equipped ? menuHighlight : menuRaised,
       disabledForegroundColor: equipped ? menuMint : menuMuted,
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
       minimumSize: const Size(96, 48),
@@ -146,189 +146,4 @@ class ShopPurchaseButton extends StatelessWidget {
       ),
     ),
   );
-}
-
-class ShopGalleryCard extends StatelessWidget {
-  const ShopGalleryCard({
-    super.key,
-    required this.name,
-    required this.description,
-    required this.artwork,
-    required this.action,
-    required this.status,
-    required this.detail,
-    this.worldName,
-    this.selected = false,
-    this.artHeight = 188,
-  });
-  final String name, description, status, detail;
-  final String? worldName;
-  final Widget artwork, action;
-  final bool selected;
-  final double artHeight;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 24),
-    child: DecoratedBox(
-      decoration: BoxDecoration(
-        color: menuPanel,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(25),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(
-              height: artHeight,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  RepaintBoundary(child: artwork),
-                  if (worldName != null)
-                    const DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          stops: [0, .5, 1],
-                          colors: [
-                            Colors.transparent,
-                            Colors.transparent,
-                            Color(0xAA07171E),
-                          ],
-                        ),
-                      ),
-                    ),
-                  Positioned(
-                    left: 16,
-                    top: 14,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: menuBackground.withAlpha(220),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        status,
-                        style: TextStyle(
-                          color: selected ? menuMint : menuText,
-                          fontSize: 9,
-                          letterSpacing: 1,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (worldName != null)
-                    Positioned(
-                      left: 18,
-                      right: 18,
-                      bottom: 16,
-                      child: Text(
-                        worldName!,
-                        style: const TextStyle(
-                          color: menuText,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      color: menuText,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: -.5,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    description,
-                    style: const TextStyle(
-                      color: menuMuted,
-                      fontSize: 12,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          detail,
-                          style: const TextStyle(
-                            color: menuMint,
-                            fontSize: 11,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Flexible(child: action),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-class ShopPlatformStage extends CustomPainter {
-  ShopPlatformStage(this.preview, {Listenable? animation})
-    : super(repaint: animation);
-  final CustomPainter preview;
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFDEE6D8), Color(0xFFACC5C0), Color(0xFF739497)],
-        ).createShader(Offset.zero & size),
-    );
-    for (var i = 0; i < 3; i++) {
-      canvas.drawLine(
-        Offset(0, size.height * (.2 + i * .3)),
-        Offset(size.width, size.height * (.05 + i * .3)),
-        Paint()
-          ..color = Colors.white.withAlpha(35)
-          ..strokeWidth = 1,
-      );
-    }
-    canvas.save();
-    final scale = math.min(2.0, size.width / 160);
-    canvas.scale(scale);
-    preview.paint(canvas, Size(size.width / scale, size.height / scale));
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(ShopPlatformStage old) => old.preview != preview;
 }

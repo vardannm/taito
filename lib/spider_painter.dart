@@ -59,8 +59,8 @@ void paintSpiderBackdrop(Canvas c, BalanceGame game) {
       continue;
     // Dark Classic worlds get light webs, like the steel world always did.
     final webInk =
-        game.cosmetic == BallCosmetic.steel ||
-            (!game.infinite && BallWorld.of(game.cosmetic).dark)
+        game.renderCosmetic == BallCosmetic.steel ||
+            (!game.infinite && BallWorld.of(game.renderCosmetic).dark)
         ? const Color(0xFFCCE6E2)
         : game.infinite
         ? infiniteBoardInk(game, center)
@@ -120,9 +120,9 @@ void paintSpiders(Canvas c, BalanceGame game, bool reducedMotion) {
     // A light spider on dark boards (Infinite's dark sections and dark
     // Classic worlds), a dark one on light boards; never dark on dark.
     final lightSpider =
-        game.cosmetic == BallCosmetic.steel ||
+        game.renderCosmetic == BallCosmetic.steel ||
         webInk == Colors.white ||
-        (!game.infinite && BallWorld.of(game.cosmetic).dark);
+        (!game.infinite && BallWorld.of(game.renderCosmetic).dark);
     final color = lightSpider
         ? (spider.chasing ? const Color(0xFFFFB5A3) : const Color(0xFFF5EFDC))
         : spider.chasing

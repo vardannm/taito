@@ -289,7 +289,7 @@ void main() {
     },
   );
   testWidgets(
-    'shop platform tab equips a paid rail and shows its added points',
+    'shop platform carousel equips a paid rail and shows its added points',
     (tester) async {
       tester.view.physicalSize = const Size(320, 568);
       tester.view.devicePixelRatio = 1;
@@ -300,11 +300,13 @@ void main() {
           home: Scaffold(body: BallShop(profile: p)),
         ),
       );
-      await tester.tap(find.text('Platforms'));
+      final next = find.byKey(const ValueKey('next-platform'));
+      await tester.ensureVisible(next);
+      await tester.tap(next);
       await tester.pump();
-      await tester.scrollUntilVisible(
-        find.byKey(const ValueKey('buy-platform-copper')).hitTestable(),
-        140,
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('buy-platform-copper')),
       );
       await tester.tap(find.byKey(const ValueKey('buy-platform-copper')));
       await tester.pump();

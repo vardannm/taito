@@ -234,13 +234,21 @@ class LateEnemyEncounter {
 /// openings, sliding [speed] units a second from the beam's start toward its
 /// end (negative: back toward the start). Only lit dashes hurt.
 class LaserDashes {
-  const LaserDashes({required this.length, required this.gap, this.speed = 0});
+  const LaserDashes({
+    required this.length,
+    required this.gap,
+    this.speed = 0,
+    this.offset = 0,
+  });
   final double length, gap, speed;
+
+  /// Where the pattern starts along the beam before it begins to slide.
+  final double offset;
 
   /// Lit stretches, as distances from the beam start, clipped to the beam.
   List<(double, double)> segments(double beamLength, double time) {
     final cycle = length + math.max(0.0, gap);
-    final shift = (speed * time) % cycle;
+    final shift = (offset + speed * time) % cycle;
     return [
       for (var a = shift - cycle; a < beamLength; a += cycle)
         if (math.min(beamLength, a + length) > math.max(0.0, a))

@@ -3,9 +3,9 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const crypto = require('crypto');
-const root = path.resolve(process.argv[2] || 'release/google-play/2026-10-23');
+const root = path.resolve(process.argv[2] || 'release/google-play/2026-11-19');
 const sizes = {phone: [1080, 1920], 'tablet-7': [1440, 2560], 'tablet-10': [1800, 3200]};
-const shots = ['01-precision', '02-infinite', '03-classic', '04-boss', '05-merge', '06-gear'];
+const shots = ['01-boss', '02-infinite-mid', '03-shop', '04-level-23', '05-level-76', '06-infinite'];
 const images = [], checksums = [];
 function assert(condition, message) { if (!condition) throw Error(message); }
 function crc32(data) {
@@ -58,7 +58,7 @@ for (const [device, size] of Object.entries(sizes)) {
 }
 fs.writeFileSync(path.join(root, 'checksums.sha256'), checksums.join('\n') + '\n');
 fs.writeFileSync(path.join(root, 'validation.json'), JSON.stringify({
-  status: 'passed', date: '2026-10-23', screenshotCount: images.length,
+  status: 'passed', date: new Date().toLocaleDateString('en-CA'), screenshotCount: images.length,
   checks: ['six screenshots per device', 'exact 9:16 dimensions', 'Google Play size bounds', '24-bit RGB/no alpha', 'PNG chunk CRC and decoded pixels', 'unaltered Android UI captures', 'manifest provenance'],
   images,
 }, null, 2) + '\n');

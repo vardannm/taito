@@ -41,6 +41,7 @@ void main() {
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.reset);
         final profile = PlayerProfile(temporaryLevelAccess: true)
+          ..controlMode = mode
           ..tutorialSeen = true
           ..sound = false
           ..music = false
@@ -48,10 +49,6 @@ void main() {
         await tester.pumpWidget(ArcadeApp(profile: profile));
         await tester.pump();
         await openClassicLevels(tester);
-        final option = find.byKey(ValueKey('level-control-${mode.name}'));
-        await tester.ensureVisible(option);
-        await tester.tap(option);
-        await tester.pump();
         expect(profile.controlMode, mode);
         final level = find.byKey(const ValueKey('level-80'));
         await tester.scrollUntilVisible(

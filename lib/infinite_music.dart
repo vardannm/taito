@@ -1,21 +1,52 @@
-/// Changes tempo without restarting the recording. Active gameplay time and
-/// height-based pace both increase pressure; pauses advance neither input.
+/// Alternate arrangements of one theme, edited to the same beat and loop length.
 abstract final class InfiniteMusic {
-  // The Complex keeps its recorded opening and build; use a modest tempo ramp
-  // so the synths retain their character while pressure grows with the climb.
-  // Music is switched off: the track is not bundled, so runs stay quiet and
-  // Settings hides the Music switch and credits. Sound effects still play.
-  static const bundled = false;
-  static const asset = 'audio/theme_infinite_complex.mp3';
-  static const sourceBpm = 104.0;
-  static const openingRate = 1.0, maximumRate = 1.12;
+  static const bundled = true;
+  static const asset = 'audio/theme_infinite_climb.wav';
+  static const fastAsset = 'audio/theme_infinite_fast.wav';
+  static const bossAsset = 'audio/theme_infinite_boss.wav';
+  static const assets = [asset, fastAsset, bossAsset];
+  static const sourceBpm = 96.0;
+  static const loopDuration = Duration(seconds: 30);
+  static const loopOverlap = Duration(milliseconds: 2500);
+  static const fileDuration = Duration(milliseconds: 32750);
 
-  static double rateFor({required double seconds, required double pace}) {
-    final timeGrowth = (seconds / 180).clamp(0.0, 1.0);
+  static double intensityFor({required double seconds, required double pace}) {
+    final timeGrowth = ((seconds - 20) / 220).clamp(0.0, 1.0);
     final paceGrowth = ((pace - 1) / 4).clamp(0.0, 1.0);
-    final rate = openingRate + .08 * timeGrowth + .04 * paceGrowth;
-    // 1% increments keep the per-frame sync cheap while making small,
-    // progressive tempo changes rather than a jump at each pace label.
-    return ((rate * 100).round() / 100).clamp(openingRate, maximumRate);
+    final growth = (.35 * timeGrowth + .65 * paceGrowth).clamp(0.0, 1.0);
+    // Smooth the build, and avoid issuing a new platform request every frame.
+    return (growth * growth * (3 - 2 * growth) * 100).round() / 100;
   }
+
+  static MusicMix mixFor({
+    required double seconds,
+    required double pace,
+    required bool boss,
+  }) => boss
+      ? const MusicMix(0, 0, 1)
+      : MusicMix.forClimb(intensityFor(seconds: seconds, pace: pace));
+}
+
+/// Linear complementary gains keep complete arrangements from stacking loudly.
+class MusicMix {
+  const MusicMix(this.climb, this.fast, this.boss)
+    : assert(climb >= 0 && fast >= 0 && boss >= 0),
+      assert(climb + fast + boss <= 1.000001);
+
+  factory MusicMix.forClimb(double intensity) {
+    final value = intensity.clamp(0.0, 1.0);
+    return MusicMix(1 - value, value, 0);
+  }
+
+  final double climb, fast, boss;
+  List<double> get gains => [climb, fast, boss];
+
+  @override
+  bool operator ==(Object other) =>
+      other is MusicMix &&
+      other.climb == climb &&
+      other.fast == fast &&
+      other.boss == boss;
+  @override
+  int get hashCode => Object.hash(climb, fast, boss);
 }

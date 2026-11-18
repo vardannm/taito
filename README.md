@@ -15,17 +15,17 @@ Alternatively:
 .\scripts\flutter.ps1 run --device-id=chrome
 ```
 
-Controls: drag the left or right handle up and down. Two-finger handles sit 64 screen pixels below their connected platform ends so your thumbs stay clear of the ball; near the bottom edge, they use the space above instead. Both fingers work independently; release to hold that pivot. In Infinite, release and grab again for another upward swipe. Carousel previews fit the complete board. Phone gameplay keeps its existing full-width scale and vertical framing. From 600 logical pixels wide, the complete board fits the available height; the connected rails and platform span about 74% of the window width. Horizontal positions spread across this arena while balls, targets, platform thickness and text retain their proportions. Input and collisions follow the visible geometry, including after resizing or unfolding. Infinite's actual climbing camera is unchanged. On desktop use **W/S** for the left end, **Up/Down** for the right, and **Esc** to pause.
+Drag up or down on either half of the board to move that end of the platform. Each thumb works independently. Drag both sides up together to lift, or release and grab again for another swipe. Carousel previews fit the complete board. Phone gameplay keeps its full-width scale and vertical framing. From 600 logical pixels wide, the complete board fits the available height. Input and collisions follow the visible geometry, including after resizing or unfolding. On desktop use **W/S** for the left end, **Up/Down** for the right, and **Esc** to pause.
 
 Wide menus scale their typography and main controls by 1.15–1.5 while retaining accessibility text scaling. Landscape windows at least 1000 pixels wide place the mode preview beside the actions; portrait tablets keep the stacked arrangement. Settings and other menu sheets constrain reading width, and pause/results use a larger centered panel. Phone menu dimensions are unchanged. `tool/render_wide_layout.dart` exports menu, Classic gameplay, pause and Settings previews for phones, closed/expanded Duo, tablets and desktop windows.
 
-During wide-screen play, the equipped world's scenery fills the entire window. Background blur increases smoothly from zero around the sharp playfield to full strength at the outer edges. A darker backdrop, continuous ambient ribbons and restrained gold effects keep gameplay readable. The wide HUD groups lives and progress on the left, with the wallet, distinct run earnings and pause control on the right. This applies to Classic, Infinite, Number Merge, Daily and Practice. The scenery picture is cached by palette and viewport; two blended blur passes affect only background artwork. Phone and carousel artwork retain their original layout and have no extra blur passes. `tool/render_wide_panorama.dart` exports all five modes in phone, Duo, desktop and Nebula-theme samples, plus maximum-combo scenes.
+During wide-screen play, the equipped world's scenery fills the entire window. Background blur increases smoothly from zero around the sharp playfield to full strength at the outer edges. A darker backdrop, continuous ambient ribbons and restrained gold effects keep gameplay readable. The wide HUD groups lives and progress on the left, with the wallet, distinct run earnings and pause control on the right. This applies to Classic, Infinite, Number Merge and Daily. The scenery picture is cached by palette and viewport; two blended blur passes affect only background artwork. Phone and carousel artwork retain their original layout and have no extra blur passes. `tool/render_wide_panorama.dart` exports all five modes in phone, Duo, desktop and Nebula-theme samples, plus maximum-combo scenes.
 
-Settings offers illustrated, animated cards for **One-Finger Control** (default for compact windows), **Two-Finger Control**, and **Vertical Analog Control**. Movement response is fixed at 1.0, including older saves and imported backups. Settings closes with its pinned X or a rightward swipe; vertical gestures scroll its content. Vertical analog places two independent joysticks at the bottom inside the safe area. Drag up to raise that platform end, down to lower it; the platform follows directly with about 19% less sensitivity. There is no dead zone. Horizontal movement is ignored. Release centers the knob and holds the final platform position; grab again to continue moving. One finger drags the lower handle left/right to set tilt and up/down to raise or lower both ends. Once held, vertical dragging continues beyond the thumb area and reverses immediately, without a pad-edge movement cap. The visible pad and knob keep the same design; the knob stays drawn within the pad. Holding the handle pauses the control mode’s automatic lift in Classic; release resumes it. Infinite’s continuous board ascent remains active. Classic automatically lifts at 20 world units/second and waits at the current target height, so a target cannot be left behind. All three modes share ball physics. All touch targets are consumed on the next 120 Hz physics tick without smoothing or an added delay. Keyboard motor easing remains. Ball acceleration and its speed cap increased by about 8%.
+Settings offers illustrated, animated cards for **Two-Finger Control** (default), **One-Finger Control**, and **Halo Joystick**. The One-Finger pad and floating Halo use sideways drag for tilt and vertical drag for lift. In Classic, holding either one-finger control pauses its automatic lift. Release to resume the climb, which waits at the current target height. Infinite’s continuous board ascent remains active. Movement response is fixed at 1.0, including older saves and imported backups. Touch targets take effect on the next 120 Hz physics tick. Settings closes with its pinned X or a rightward swipe. Vertical gestures scroll its content.
 
-Swipe to Classic to continue the saved level directly. The small arcade icon → Classic levels opens a winding road with only five levels around the furthest unlocked level. The window moves forward as stars unlock new levels; distant levels and chapter counts stay hidden. Normal builds enforce star requirements; the developer level bypass is off by default and disabled in release builds. Each Classic board has ten targets, three lives and four available stars, with no points score. Level 1 is open initially; level N requires `2 × (N − 1)` total Classic stars (level 2: 2, level 10: 18, level 50: 98). Stars are permanent, not spent, and each distinct objective counts once across control methods. Daily stars do not unlock Classic boards. Locked cards show the earned/required count. Winning offers **NEXT LEVEL** when its requirement is met, or **EARN MORE STARS** and replay options otherwise; the selected level is remembered. Deterministic scattered layouts vary target positions, heights, and numbering so targets no longer follow a single route. Trap layouts develop through wider steering, slaloms, gates and alternate routes, easing when a new hazard appears. Practice retains its original board and unlimited attempts.
+Swipe to Classic to continue the saved level directly. Classic’s Choose Level action opens a winding road with only five levels around the furthest unlocked level. The window moves forward as stars unlock new levels; distant levels and chapter counts stay hidden. Normal builds enforce star requirements; the developer level bypass is off by default and disabled in release builds. Each Classic board has ten targets, three lives and four available stars, with no points score. Level 1 is open initially; level N requires `2 × (N − 1)` total Classic stars (level 2: 2, level 10: 18, level 50: 98). Stars are permanent, not spent, and each distinct objective counts once across control methods. Daily stars do not unlock Classic boards. Locked cards show the earned/required count. Winning offers **NEXT LEVEL** when its requirement is met, or **EARN MORE STARS** and replay options otherwise; the selected level is remembered. Deterministic scattered layouts vary target positions, heights, and numbering so targets no longer follow a single route. Trap layouts develop through wider steering, slaloms, gates and alternate routes, easing when a new hazard appears.
 
-Levels 31â€“50 form **The web**: one slow patrolling spider at first, two from level 36, and three from level 43. Dashed circles and background webs mark their territories. Crossing a boundary starts a persistent chase; physical contact instantly ends the run and removes the ball, without an eating animation. Territories and spiders turn red during pursuit. Spider patrols and chases continue while the ball sinks and the platform returns. Only starting or replaying the whole level resets them; pause freezes them. Territory placement keeps target holes clear and checks connected space from the launch area to every target. Human difficulty still needs playtesting.
+Levels 31–50 form **The web**, with one slow patrolling spider at first, two from level 36, and three from level 43. Dashed circles and background webs mark their territories. Crossing a boundary starts a chase, and contact costs one heart. Territories and spiders turn red during pursuit. When the ball reaches a target or loses a heart, pursuing spiders walk back to their patrols. Pause freezes them. Territory placement keeps target holes clear and checks connected space from the launch area to every target. Human difficulty still needs playtesting.
 
 ## Mastery, daily boards and cabinet styles
 
@@ -33,7 +33,7 @@ Classic and Daily award three independent objective stars: finish, finish withou
 
 Active time excludes pauses, capture animations, and the bar returning to launch. Initial time targets use board elevation, the control mode's lift speed, trap count and a finale/spider allowance. They are provisional until human playtesting; adjust the `targetTime` calculation in `BalanceGame.start` in `lib/game.dart`.
 
-Classic's single optional star sits in reachable space, clear of holes and spider territories. Daily retains optional brass coins beside traps: each adds 250 points and can be collected once per run across ball resets. Infinite spawns random coins ahead of the climb, with a separate in-run coin counter. Coins stay clear of holes and beams and disappear after scrolling below the board. Practice has no collectibles or progression rewards.
+Classic's single optional star sits in reachable space, clear of holes and spider territories. Daily retains optional brass coins beside traps: each adds 250 points and can be collected once per run across ball resets. Infinite spawns random coins ahead of the climb, with a separate in-run coin counter. Coins stay clear of holes and beams and disappear after scrolling below the board.
 
 Milestone Classic boards introduce or combine mechanics; learned hazards also return between milestones. Level 10 introduces a warned laser lane; level 20 a warned roaming hole; level 30 alternates them; level 40 has a larger spider keeper; level 50 combines the keepers with alternating laser lanes and roaming holes. A briefing pauses the simulation until the player starts. Finale lasers/roaming holes cost one ball, while spider contact ends the run. Warnings last at least 2.4 seconds; first introductions allow longer warnings and a six-second opening. Their movement, warning/live phases and wave schedule continue through target captures and ball returns; only a new level run resets them. The hidden ball takes no damage during its return, and an enemy already overlapping the respawn point cannot hit it until they separate.
 
@@ -54,29 +54,29 @@ Classic levels temporarily always use **Tilt Only**, including previews, retries
 - Original ivory, brass, and deep-teal art direction; procedural engraved playfield and original app icons.
 - Fixed 120 Hz physics with rolling-sphere acceleration, motor smoothing, inertia, speed limits, and swept hole collision detection.
 - Ten targets in sequence. Each capture animates the ball sinking and the bar returning to the launch position.
-- Three-ball Classic; an endless Infinite climb; and unlimited-attempt Practice with slower motors and slightly more forgiving target capture.
+- Three-ball Classic, an endless Infinite climb, Number Merge and Daily challenges. The tutorial provides the learning path; standalone Practice has been removed.
 - Streak multipliers up to 4Ã— and speed bonuses. Time rewards precision without ending slow runs.
 - Original synthesized audio, optional haptics, separate persistent Classic/Infinite records and run counts.
 - Tutorial, settings, pause, replay, lifecycle pause, input cancellation, and reduced-motion support for board effects.
-- iOS project with portrait orientation and GILT branding; web build support with bundled renderer assets.
+- Compact iPhones and the collapsed Duo stay in portrait. An expanded Duo (shortest side at least 600 logical points) supports portrait and landscape; folding restores portrait. Layout follows the native window and preserves safe insets and the active run during rotation. iPads support rotation. Android retains portrait orientation. Web builds include bundled renderer assets.
 
-Daily and Practice scoring: (target number * 100 + max(0, 35 - climb seconds) * 10) * multiplier. Multiplier increases every three consecutive targets; misses reset the streak. Classic has no points score. Infinite and Number Merge retain their own scoring rules.
+Daily scoring: (target number * 100 + max(0, 35 - climb seconds) * 10) * multiplier. Multiplier increases every three consecutive targets; misses reset the streak. Classic has no points score. Infinite and Number Merge retain their own scoring rules.
 
 ## First-time onboarding
 
-On first launch without a saved control preference, the app selects **Two-Finger Control** when the app window's shortest side is at least 600 logical pixels, otherwise **One-Finger Control**. Compact layouts, including a closed Duo, offer One-Finger, Two-Finger and Halo Joystick. Expanded Duo and other large layouts hide the original One-Finger pad and offer Two-Finger and Halo. The same rule applies in Settings and the level picker. A saved pad preference temporarily uses Two-Finger while expanded, then returns when compact again; an explicit new choice remains saved. Rotating a compact phone does not make it a large layout. Saves and backups preserve the preferred control, rather than the temporary fallback. Folding only clears held input when the effective control changes, without restarting the run.
+On first launch without a saved control preference, the app selects **Two-Finger Control** on every window size. Compact layouts, including a closed Duo, also offer One-Finger and Halo Joystick. Expanded Duo and other large layouts offer Two-Finger and Halo. A saved pad preference temporarily uses Two-Finger while expanded and returns when compact again. Saves and backups preserve the preferred control. Folding only clears held input when the effective control changes, without restarting the run.
 
-New players begin inside Infinite with the selected control. A short, interactive course highlights the controls, one avoidable hole and hearts, a coin, a shield, score, and a combo crystal. Real input and swept contacts advance the lessons; missed pickups return, and an accidental hit costs one heart without resetting the run. Afterward, 45 seconds of active, ordinary Infinite play run without overlays, or a natural run ending finishes that section. Guidance resumes only back at the menu.
+New players begin inside Infinite. The opening lesson highlights both drag zones and lets players practice tilting with one thumb, lifting with both, and releasing and grabbing again. The course applies those gestures to a hole and a coin, then introduces the shield, magnet, score, combo crystal and boss. Real input and contacts advance the lessons. Missed pickups return, and an accidental hit costs one heart without resetting the run. After the course, 45 seconds of active Infinite play or a natural run ending finishes that section. Guidance resumes back at the menu.
 
 The Shop introduces one free ball and platform through actual Equip actions, then allows normal browsing. Levels highlights Level 1, whose gradual target route and three simple hazards form the final gameplay test. Winning Level 1 completes gameplay onboarding. Daily is introduced only on the subsequent menu visit. Number Merge receives no onboarding in this flow.
 
-Spotlights follow live board and widget coordinates, with short tooltips, pulsing outlines, reduced-motion support, and Skip Tutorial. Settings → Replay Tutorial restarts only onboarding and selects One-Finger; coins, owned gear, records, and stars are retained. Existing saved control preferences are respected on normal launch, and legacy profiles with play history bypass automatic onboarding.
+Spotlights follow live board and widget coordinates, with short tooltips, pulsing outlines, reduced-motion support, and Skip Tutorial. Settings → Replay Tutorial uses Two-Finger for the replay and preserves the saved control preference. Legacy profiles with play history bypass automatic onboarding.
 
 `lib/onboarding.dart` defines the checkpoints and course controller. `gilt.tutorial.v2` saves stages and free-play time separately from records, with ordered writes. An interrupted session recreates the unfinished stage instead of repeating completed lessons. `tool/render_onboarding.dart` exports actual phone layouts to `artifacts/onboarding/`.
 
 ## Infinite mode
 
-The app opens directly onto the Infinite board, including on first launch. The board waits without advancing physics, timers or score. Touch the selected joystick, thumb area or platform grip to begin; the same held gesture immediately controls movement. W/S or the arrow keys also start the run and move the platform. Swipe across the environment, header or free space to select three worlds: Infinite, Classic Continue, and Number Merge. Classic shows its saved level (level 1 for a new profile); Classic still respects star locks. All three prepared boards start on their selected controller or movement keys, without a Play button. Page edges, parallax, scale, title fades and a three-position indicator guide navigation. Swipes snap one world at a time and never claim touches in the actual control areas. Once a run begins, swipe recognition is removed. The selected scene expands from an 88%-width carousel viewport into the full gameplay area over 437 ms; neighboring previews fade away. The remaining selector chrome fades out during the final 123 ms. The same board and controllers stay mounted and preserve the starting touch as their layout grows. Returning home freezes the run and reverses this animation before preparing the current world; a normal application opening always selects Infinite. The arcade icon retains level picker, Daily, Practice, Gear Shop, goals and the guide. Settings offers Replay Tutorial. Start with three hearts. Holes, live lasers, moving holes, platform gaps and the rising red floor cost one heart. A hit resets combo to x1 and removes combo effects. When hearts remain, the ball and platform stay on their current trajectory with the same tilt, momentum and held controls. A small heart appears above the platform, floats upward and fades out over 0.85 seconds; this independent effect never changes input or life state. They blink gently during 2.5 seconds of protection so the player can steer away; there is no relocation, platform reset or touch reset. The camera, holes, hazards, rising floor and generation progress continue normally. Reduced motion uses a steady protection ring. The third loss ends the run. Pausing freezes all gameplay and power-up timers.
+The app opens directly onto the Infinite board, including on first launch. The board waits without advancing physics, timers or score. Touch the selected joystick, thumb area or platform grip to begin; the same held gesture immediately controls movement. W/S or the arrow keys also start the run and move the platform. Swipe across the environment, header or free space to select three worlds: Infinite, Classic Continue, and Number Merge. Classic shows its saved level (level 1 for a new profile); Classic still respects star locks. All three prepared boards start on their selected controller or movement keys, without a Play button. Page edges, parallax, scale, title fades and a three-position indicator guide navigation. Swipes snap one world at a time and never claim touches in the actual control areas. Once a run begins, swipe recognition is removed. The selected scene expands from an 88%-width carousel viewport into the full gameplay area over 437 ms; neighboring previews fade away. The remaining selector chrome fades out during the final 123 ms. The same board and controllers stay mounted and preserve the starting touch as their layout grows. Returning home freezes the run and reverses this animation before preparing the current world; a normal application opening always selects Infinite. The Arcade menu contains Daily and Goals, friends & backup; Classic level selection stays in Classic. Replay Tutorial is available in Settings. Settings offers Replay Tutorial. Start with three hearts. Holes, live lasers, moving holes, platform gaps and the rising red floor cost one heart. A hit resets combo to x1 and removes combo effects. When hearts remain, the ball and platform stay on their current trajectory with the same tilt, momentum and held controls. A small heart appears above the platform, floats upward and fades out over 0.85 seconds; this independent effect never changes input or life state. They blink gently during 2.5 seconds of protection so the player can steer away; there is no relocation, platform reset or touch reset. The camera, holes, hazards, rising floor and generation progress continue normally. Reduced motion uses a steady protection ring. The third loss ends the run. Pausing freezes all gameplay and power-up timers.
 
 **Pace x1–x5** advances continuously by one level per 600m. Every run starts at 68 world units/second. Base speed uses a smoothstep curve over 2,400m (previously 900m), with the same 216-unit extreme cap including pace bonuses. Hole density takes the lower of the 60,000-point curve and distance difficulty, so high-tier gear and combos cannot skip the opening. Initial spacing is 210–240 units, tightening toward the existing dense patterns later. Distance points still count only new peak height.
 
@@ -86,7 +86,7 @@ Shield pickup, refresh and expiration preserve active touch ownership, drag posi
 
 Coins appear more often than crystals; shields and hearts are much rarer. Offscreen pickups are pruned and the extra collectible list is capped at 12. Each 360m cycle has a rush and recovery; encounter time grows gradually after 600m to its full share at 2,400m. Special hazards unlock at 450m (forming holes), 900m (moving holes), 1,500m (lasers), and 2,250m (platform gaps). Warnings begin farther apart, reaching the same minimum spacing late in a run. Complex sweeping/zigzag variants gradually become common from 2,400m to 4,200m. Spider encounters begin later and closer spacing develops with distance. Only one special hazard runs at once, with harmless warnings before activation. Once a forming hole opens, its world coordinates are fixed and it remains until it scrolls off-screen. Camera movement from manual lifting is included in both rendering and collision. Moving-hole types retain their intended movement. Off-screen pruning happens after swept collisions, so a fast camera lift cannot skip a hole. A winding clear route and hole separation remain. After three seconds without steering the red floor rises; deliberate steering stops its active rise.
 
-**GEAR SHOP** in the Modes menu spends Infinite and Laser Endless coins. It contains **11 balls and 6 platforms**, each with a permanent point bonus displayed before purchase. The active gear multiplier is `1 + ball bonus + platform bonus`, up to x5. Gear multiplies Normal Infinite distance and combo points; other modes retain their scoring rules. Physics, collision size and platform handling stay the same. Existing owned balls automatically receive their new bonus; no repurchase is needed. Coins and gear ownership save locally without an account. The Number Merge mode retains its numbered ball for readability. Cabinet styles remain in Settings.
+**GEAR SHOP** opens from the board's Shop control or Modes menu. One screen combines independent ball and platform carousels with permanent Magnet, Shield, and Hearts upgrades. Browse with the chevrons or swipe each preview; browsing keeps equipped gear and coins unchanged. The shop starts at your equipped loadout. Each of the **23 balls and 16 platforms** shows its point bonus and coin price; owned items offer Equip, and equipped items are marked. Ball previews show their included world and any built-in magnet. Upgrade rows show the current and next benefit, saved level segments, and the next price. A pinned wallet opens Get coins, and unaffordable items show the shortfall. Compact phones scroll vertically, wide screens arrange the showcases beside the upgrades, and large text and reduced motion are supported. The active gear multiplier is `1 + ball bonus + platform bonus`, up to x12.5. Gear multiplies Normal Infinite distance and combo points; other modes retain their scoring rules. Coins, gear ownership, and upgrades save locally without an account. Physics, collision size, and platform handling stay the same. `tool/render_shop_redesign.dart` exports phone, large-text, empty-wallet, max-upgrade, premium, and desktop previews to `artifacts/shop-redesign/`.
 
 Tune lives, durations, starting speed, pace levels, the 60,000-point density threshold, collectible spacing, coin spacing and visual intensity in `lib/infinite_progress.dart`. Survival integration is in `lib/infinite_gameplay.dart`; visuals are in `lib/infinite_painter.dart`. Economy saves use ordered snapshots to prevent an older coin save from undoing a purchase. This is device-local progress, with no account sync.
 
@@ -137,7 +137,7 @@ This is a playable, tested game build, not an App Store submission or a revenue 
 - `lib/spiders.dart` and `lib/spider_painter.dart`: patrol, swept territory/contact detection, pursuit, and web visuals.
 - `lib/board_painter.dart`: procedural board, ball, and capture effects.
 - `lib/hazards.dart` and `lib/hazard_painter.dart`: timed Infinite traps, swept collision, and warning visuals.
-- `lib/tutorial.dart`: optional illustrated tutorial, opened from Modes → How to play.
+- `lib/onboarding.dart`: saved tutorial checkpoints and the live Infinite course.
 - `lib/main.dart`: responsive screens, tutorial, keyboard/touch controls, and lifecycle.
 - `lib/profile.dart`: persistent per-board/per-control records, daily history, cosmetic unlocks, settings, sound, and haptics.
 - `lib/rewards.dart`: star records, stable daily seed, Infinite section tuning, and cosmetic thresholds.
@@ -184,7 +184,7 @@ New app profiles start with zero coins. Automatic testing credits and the `GILT_
 
 ## Interactive onboarding and arcade club (0.11.0)
 
-The first-run tutorial now uses a real isolated practice game. Pick Two-finger, One-finger or Vertical Analog, lift and release, tilt the ball, and catch the glowing target. NEXT unlocks after doing the action; reset, back and skip remain available. Replay it from How to Play. Tutorial progress does not award coins or game records.
+The live first-run course is described in [First-time onboarding](#first-time-onboarding). Replay it from Settings.
 
 Open the arcade icon or Settings → Goals, friends & backup. Goals follow the selected control scheme: finish the campaign, then earn clean and time stars. The club shows cabinet unlock progress and opens the suggested level directly.
 
@@ -215,7 +215,7 @@ anywhere on the board and drag sideways to tilt or vertically to lift/lower.
 The Halo appears at that touch point at 42% opacity and disappears on release,
 cancel or pause. It has no fixed bottom pad. Re-grabbing starts at the new touch
 point without jumping the platform; holding still does not create extra lift.
-The original one-finger option remains the default and can be selected again.
+The original One-Finger option can be selected again.
 The trial preference saves locally and travels with progress backups; it shares
 the original one-finger physics, stars and score records.
 
@@ -284,23 +284,43 @@ transitions at 120 Hz, groups volleys and suppresses nearly simultaneous repeats
 `lib/enemy_audio.dart` preloads short PCM assets into low-latency pools, mixes
 without stealing music focus, and caps playback at four enemy voices. Pause,
 mute, background, home and disposal cancel active/pending effects. Hit/coin
-feedback retains its separate player. Regenerate cues with
-`scripts/generate_enemy_audio.py` (NumPy); the script also writes
-`artifacts/enemy-sound-preview.wav`. Laser charge/fire use transformer buzz,
-corona hiss and irregular electrical arcs; rebuild just those two with
-`scripts/generate_enemy_audio.py --only laserCharge laserFire`.
+feedback retains its separate player. All 34 effects now come from the refreshed
+ElevenLabs pack: 24 enemy effects, six distinct gameplay/reward cues, and four
+button/toggle/navigation cues. Enabled menu actions across shops, settings,
+rewards, dialogs, tutorials and result screens share muted-aware UI feedback.
+Regenerate with `python3 tool/refresh_sound_effects.py` (macOS; private API-key
+prompt). It caches downloads, backs up previous files, trims/normalizes the PCM
+and installs only after the complete pack decodes. Effects total about 1.4 MB.
+Restart the game to clear cached old sounds. The full listening montage is
+`artifacts/audio_refresh/sound_pack_preview.wav`; processed hashes are in
+`assets/audio/SFX_MANIFEST.json`. Legacy synthesis scripts recreate the old pack.
 
-Infinite uses `assets/audio/theme_infinite_complex.mp3`, **The Complex** by
-Kevin MacLeod: futuristic synths and percussion with its recorded opening and
-gradual build intact. The original stereo MP3 loops continuously, with playback
-level reduced to leave effects headroom. `lib/infinite_music.dart` gently raises
-playback from 104 to about 116 BPM as active time and height-based pace increase.
-Music starts with the first playing input. A new run restarts the opening;
-pause and resume preserve its position. Tempo updates retain the track's position
-and are coalesced during loading. Other modes are quiet. Previous WAV soundtracks
-remain archived outside the asset bundle. Attribution is available in Settings >
-Music credits. Source, CC BY 4.0 license and the original recording checksum are in
-`assets/audio/CREDITS.md`; music and effect switches remain independent.
+Infinite uses three arrangements of an original ElevenLabs Music theme:
+`theme_infinite_climb.wav`, `theme_infinite_fast.wav`, and
+`theme_infinite_boss.wav`. Each has a 12-bar, 30-second repeating body at 96 BPM,
+plus a natural continuation for a 2.5-second equal-power loop crossfade and
+250 ms of scheduling headroom (32.75 seconds per file). Two prepared copies
+overlap before either file ends, avoiding native end/seek/restart gaps.
+Bass and backing levels remain restrained. Assets total 17,331,432 bytes.
+`lib/infinite_music.dart` gradually blends normal and fast climbing from active
+play time and height-based pace. A boss warning/encounter crossfades to the boss
+arrangement; departure returns to the current climbing intensity. Playback stays
+at its original tempo and pitch. All arrangements share a timeline, prepare at
+zero volume, and re-align while silent before fading in. First input starts the
+music, pause holds it, and a new run resets it. Mute, home and disposal stop all
+players. Music and effects have independent switches. Classic now uses the approved
+opening theme for levels 1–40 and the later de-ticked theme from level 41 onward;
+Daily uses the opening theme. These tracks also overlap at repeats, with matching
+continuations and complementary fades. Level assets total 6,954,320 bytes.
+Merge has no background track.
+Archived soundtracks and audition files stay outside the bundle. Credits are in
+`assets/audio/CREDITS.md`. Pause offers separate Music and Sound sliders (0–100);
+tap an icon to mute/unmute while remembering its previous level. Levels persist
+across launches and scale the existing mix, including quiet pickups and UI cues.
+Options retains the on/off switches; its Music credits link has been removed.
+To reproduce the edits,
+decode the generated two-minute master to stereo PCM WAV, then run
+`tool/prepare_infinite_music.py source.wav` with NumPy installed.
 
 The main Shop contains Balls (23), Platforms (16), and Cabinet Styles. New gear
 includes pearl, malachite, titanium, opal, plasma, comet, quasar and singularity
@@ -318,6 +338,11 @@ daily gift system are retained.
 
 After Singularity (Black Hole), the reserved store-purchase tier adds Aether,
 Phoenix, Chronosphere and Genesis, with four matching platforms after Sovereign.
+Genesis now uses the quiet Genesis Sanctuary world: deep violet-charcoal,
+pearlescent orbital arches, layered nacre terraces and fine champagne accents, with an open central
+play lane. Its scenery is a cached static display list; high combos use only
+three to six faint motes rather than falling petals. `tool/render_genesis.dart`
+exports shop/world, Classic, Infinite, maximum-combo and wide gameplay previews.
 Each has distinct procedural artwork; every ball also includes its own world.
 Ball bonuses rise from +4x to +6.5x with permanent magnet radii of 78, 90, 105 and
 120; platform bonuses rise from +3.5x to +5x, for a maximum combined x12.5.
@@ -349,11 +374,26 @@ The simulation is in `lib/late_enemies.dart` and vector art in
 `lib/late_enemy_painter.dart`. Render the warning/attack gallery with
 `scripts/flutter.ps1 test tool/render_late_enemies.dart`.
 
-Infinite shuffles all six second-tier bosses once per run, with no repeats.
-The six encounter score windows are 70,000–110,000, 220,000–250,000,
-450,000–520,000, 700,000–780,000, 1,000,000–1,100,000 and
-1,300,000–1,400,000 points (`bossScoreWindows` in `lib/infinite_boss.dart`);
-any boss can occupy any slot.
+Storm Colossus always opens Infinite at 25,000–32,000 points. Tide Herald and
+Sky Warden shuffle into slots 2–3; Chrono Keeper, Eclipse Seraph and Prism
+Reaver shuffle into slots 4–6; Venom Crown and Nova Pulsar shuffle into slots
+7–8. These groups produce 24 possible orders with no repeats per lap.
+The later encounter score windows
+are 70,000–110,000, 220,000–250,000, 450,000–520,000, 700,000–780,000,
+1,000,000–1,100,000, 1,300,000–1,400,000 and 1,650,000–1,750,000 points
+(`bossScoreWindows` in `lib/infinite_boss.dart`). After all eight, Overdrive
+repeats that run's order with 150 active seconds between encounters and
+12% faster fights per lap, capped at 36% faster.
+
+Chrono Keeper is a gold-and-mint clockwork guardian with hourglass satellites.
+Its three phases send nine stop/start clock bolts, six paired pendulum bolts,
+then nine rewind bolts that descend and return along their original trails.
+Every volley marks its full route for 0.75 seconds before release. Pause rings
+and direction arrows make stops and return trips visible; paths never home
+and all shots finish before the 26-second exit phase. Its visuals are drawn
+in code and its sounds reuse bundled audio, adding no media assets. It shares
+the existing clear arena, pause, shield, recovery and Overdrive rules.
+Preview: `artifacts/infinite-chrono-keeper.png`.
 
 Nova Pulsar is the laser boss. Nova rings grow from its core with two or three
 turning openings (the first always faces down; dashed rays mark every opening
@@ -442,7 +482,7 @@ Debug and release launches both use the normal saved wallet with no automatic te
 
 ### Number Merge difficulty configuration
 
-Edit `lib/merge_difficulty.dart`, just like `lib/infinite_difficulty.dart`, then hot restart and begin a fresh Merge run. The 22 October harder defaults start at 42 units/second, add 8 per doubling, cap at 112, and space waves 96 units apart.
+Edit `lib/merge_difficulty.dart`, just like `lib/infinite_difficulty.dart`, then hot restart and begin a fresh Merge run. The current defaults start at 35.7 units/second, add 6.8 per doubling, cap at 95.2, and space waves 128 units apart.
 
 - `startSpeed`, `speedPerDoubling`, `maxSpeed`: falling-ball speed and its growth.
 - `waveSpacing`: distance between waves; higher values give more time to react.

@@ -6,11 +6,26 @@ import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/hazards.dart';
 import 'package:balance_arcade/infinite_boss.dart';
 import 'package:balance_arcade/late_enemies.dart';
+import 'package:balance_arcade/maze_gates.dart';
 import 'package:balance_arcade/porcupines.dart';
 import 'package:balance_arcade/spider_web.dart';
+import 'package:balance_arcade/spiders.dart';
 import 'infinite_boss_test.dart' show run;
 
 void main() {
+  test(
+    'spider and porcupine appearances are silent but attacks still sound',
+    () {
+      final game = run();
+      final sound = EnemySoundDirector();
+      game.spiders.add(BoardSpider(180, 160, 60));
+      final porcupine = BoardPorcupine(180, 160);
+      game.porcupines.add(porcupine);
+      expect(sound.capture(game), isEmpty);
+      game.quills.addAll(porcupine.burst());
+      expect(sound.capture(game), [EnemyCue.quills]);
+    },
+  );
   test(
     'every cue has a bounded, unclipped PCM asset with a matching duration',
     () {
@@ -61,6 +76,31 @@ void main() {
     },
   );
 
+  test(
+    'seed spitter spits with its own cue; the three-way split stays a bullet',
+    () {
+      final game = run();
+      final sound = EnemySoundDirector();
+      final visitor = LateEnemyEncounter(
+        kind: LateEnemyKind.seedSpitter,
+        origin: (x: 180, y: 130),
+        target: (x: 180, y: 430),
+      );
+      game.lateEnemy = visitor;
+      final heard = <EnemyCue>[];
+      for (var i = 0; i < 4 * 120; i++) {
+        visitor.step(1 / 120);
+        game.elapsed += 1 / 120;
+        heard.addAll(sound.capture(game));
+      }
+      expect(heard, [
+        EnemyCue.insectArrival,
+        EnemyCue.seedSpit,
+        EnemyCue.bullet,
+      ]);
+    },
+  );
+
   test('laser charge and fire happen once at their actual transitions', () {
     final game = run();
     final sound = EnemySoundDirector();
@@ -83,6 +123,22 @@ void main() {
     laser.step(.11, 0);
     game.elapsed += .11;
     expect(sound.capture(game), [EnemyCue.laserFire]);
+    expect(sound.capture(game), isEmpty);
+  });
+
+  test('an Infinite maze gate keeps its quiet cue when it enters view', () {
+    final game = run();
+    final sound = EnemySoundDirector();
+    final gate = MazeGate(
+      y: game.visibleTop + 31,
+      gapCenter: 180,
+      gapWidth: 110,
+    );
+    game.mazeGates.add(gate);
+    expect(sound.capture(game), isEmpty);
+
+    gate.y += 2;
+    expect(sound.capture(game), [EnemyCue.mazeGateFire]);
     expect(sound.capture(game), isEmpty);
   });
 
@@ -109,6 +165,13 @@ void main() {
         expect(bounces, isNull);
       }
       expect(counts, switch (kind) {
+        // Four bubble volleys, three waves and four sets of geysers.
+        BossKind.tideHerald => {
+          EnemyCue.tideArrival: 1,
+          EnemyCue.bullet: 4,
+          EnemyCue.laserCharge: 7,
+          EnemyCue.laserFire: 7,
+        },
         BossKind.skyWarden => {
           EnemyCue.wardenArrival: 1,
           EnemyCue.bullet: 5,
@@ -133,15 +196,20 @@ void main() {
           EnemyCue.cometFire: 3,
         },
         BossKind.prismReaver => {
-          EnemyCue.colossusArrival: 1,
+          EnemyCue.prismArrival: 1,
           EnemyCue.laserCharge: 4,
           EnemyCue.laserFire: 4,
           EnemyCue.ricochet: 3,
         },
-        BossKind.venomCrown => {EnemyCue.seraphArrival: 1, EnemyCue.bullet: 17},
+        BossKind.venomCrown => {EnemyCue.venomArrival: 1, EnemyCue.bullet: 17},
+        BossKind.chronoKeeper => {
+          EnemyCue.chronoArrival: 1,
+          EnemyCue.cometCharge: 9,
+          EnemyCue.bullet: 9,
+        },
         // Six rings, two pairs of rails (one cue per pair) and one lance.
         BossKind.novaPulsar => {
-          EnemyCue.wardenArrival: 1,
+          EnemyCue.novaArrival: 1,
           EnemyCue.laserCharge: 9,
           EnemyCue.laserFire: 9,
         },

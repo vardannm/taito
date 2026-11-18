@@ -23,6 +23,8 @@ void main() {
           ))
           .load();
       final times = switch (kind) {
+        BossKind.tideHerald => [3.0, 5.5, 11.0, 18.5, 19.5],
+        BossKind.chronoKeeper => [2.8, 4.1, 12.7, 19.7, 21.3],
         BossKind.skyWarden => [3.6, 10.7, 11.6, 18.5, 19.5],
         BossKind.stormColossus => [4.1, 11.5, 13.1, 18.6, 19.5],
         BossKind.eclipseSeraph => [4.5, 10.8, 11.7, 18.5, 20.4],
@@ -31,6 +33,20 @@ void main() {
         BossKind.novaPulsar => [3.2, 5.6, 12.6, 16.4, 21.5],
       };
       final labels = switch (kind) {
+        BossKind.tideHerald => [
+          'BUBBLE WARNING',
+          'DRIFT BUBBLES',
+          'TIDE WAVES',
+          'GEYSER WARNING',
+          'GEYSERS',
+        ],
+        BossKind.chronoKeeper => [
+          'CLOCK TRAILS',
+          'TIME PAUSE',
+          'PENDULUM',
+          'REWIND DOWN',
+          'RETURNING BOLTS',
+        ],
         BossKind.skyWarden => [
           'BULLETS',
           'LASER WARNING',
@@ -127,6 +143,8 @@ void main() {
         final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
         await Directory('artifacts').create(recursive: true);
         await File(switch (kind) {
+          BossKind.tideHerald => 'artifacts/infinite-tide-herald.png',
+          BossKind.chronoKeeper => 'artifacts/infinite-chrono-keeper.png',
           BossKind.skyWarden => 'artifacts/infinite-boss.png',
           BossKind.stormColossus => 'artifacts/infinite-colossus.png',
           BossKind.eclipseSeraph => 'artifacts/infinite-seraph.png',

@@ -197,15 +197,21 @@ void main() {
     );
   }
 
-  testWidgets('Modes opens the achievements screen', (tester) async {
+  testWidgets('the menu button opens achievements; Modes does not list them', (
+    tester,
+  ) async {
     final p = PlayerProfile()..tutorialSeen = true;
     await tester.pumpWidget(ArcadeApp(profile: p));
     await tester.pump();
     await tester.tap(find.byTooltip('Modes'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    await tester.ensureVisible(find.text('ACHIEVEMENTS'));
-    await tester.tap(find.text('ACHIEVEMENTS'));
+    expect(find.text('ACHIEVEMENTS'), findsNothing);
+    expect(find.text('GEAR SHOP'), findsNothing);
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.byTooltip('Achievements').first);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.byType(AchievementSheet), findsOneWidget);
@@ -214,18 +220,48 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets('the big menu button opens achievements; Modes is in the corner', (
+  testWidgets(
+    'the big menu button opens achievements; Modes is in the corner',
+    (tester) async {
+      final p = PlayerProfile()..tutorialSeen = true;
+      await tester.pumpWidget(ArcadeApp(profile: p));
+      await tester.pump();
+      expect(find.byTooltip('Modes'), findsOneWidget);
+      expect(find.text('Arcade'), findsNothing);
+      await tester.tap(find.text('Achievements'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byType(AchievementSheet), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets('achievements and the arcade open full screen and swipe closed', (
     tester,
   ) async {
     final p = PlayerProfile()..tutorialSeen = true;
     await tester.pumpWidget(ArcadeApp(profile: p));
     await tester.pump();
-    expect(find.byTooltip('Modes'), findsOneWidget);
-    expect(find.text('Arcade'), findsNothing);
     await tester.tap(find.text('Achievements'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 600));
     expect(find.byType(AchievementSheet), findsOneWidget);
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.byTooltip('Back'), findsOneWidget);
+    await tester.dragFrom(const Offset(120, 420), const Offset(160, 0));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byType(AchievementSheet), findsNothing);
+    await tester.tap(find.byTooltip('Modes'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('Your arcade'), findsOneWidget);
+    expect(find.byType(BottomSheet), findsNothing);
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('Your arcade'), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

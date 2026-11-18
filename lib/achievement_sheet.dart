@@ -1,3 +1,4 @@
+import 'ui_audio.dart';
 import 'menu_design.dart';
 import 'package:flutter/material.dart';
 import 'achievements.dart';
@@ -70,15 +71,7 @@ class _AchievementSheetState extends State<AchievementSheet> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              MenuHeading(
-                'Achievements',
-                eyebrow: 'YOUR MILESTONES',
-                trailing: MenuIconButton(
-                  icon: Icons.close,
-                  tooltip: 'Close achievements',
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ),
+              const MenuHeading('Achievements', eyebrow: 'YOUR MILESTONES'),
               Text(
                 '$earned of ${Achievement.values.length} earned',
                 style: const TextStyle(fontWeight: FontWeight.w700),
@@ -98,9 +91,7 @@ class _AchievementSheetState extends State<AchievementSheet> {
                 const SizedBox(height: 12),
                 Card(
                   key: a == _firstReady ? _firstReadyKey : null,
-                  color: p.achievementEarned(a)
-                      ? const Color(0xFF2C4140)
-                      : menuPanel,
+                  color: p.achievementEarned(a) ? menuHighlight : menuPanel,
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
@@ -149,7 +140,10 @@ class _AchievementSheetState extends State<AchievementSheet> {
                           const SizedBox(height: 8),
                           FilledButton(
                             key: ValueKey('claim-${a.name}'),
-                            onPressed: busy ? null : () => claim(a),
+                            onPressed: uiAction(
+                              context,
+                              busy ? null : () => claim(a),
+                            ),
                             child: Text('CLAIM ${a.coins} COINS'),
                           ),
                         ],

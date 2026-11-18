@@ -2,34 +2,40 @@ import 'dart:math' as math;
 import 'late_enemies.dart';
 
 enum BossKind {
+  tideHerald,
   skyWarden,
   stormColossus,
   eclipseSeraph,
   prismReaver,
   venomCrown,
   novaPulsar,
+  chronoKeeper,
 }
 
-/// Score windows for the 1st to 6th boss of a run. Each run picks one score
-/// inside every window; the bosses themselves are shuffled, so any of the
-/// six can fill any slot.
+/// Score windows for the 1st to 8th boss of a run. Each run picks one score
+/// inside every window. Storm Colossus opens the run; the remaining bosses
+/// shuffle within the early, middle and final groups in game.dart.
 const bossScoreWindows = [
+  (25000, 32000),
   (70000, 110000),
   (220000, 250000),
   (450000, 520000),
   (700000, 780000),
   (1000000, 1100000),
   (1300000, 1400000),
+  (1650000, 1750000),
 ];
 
 extension BossKindDetails on BossKind {
   String get name => switch (this) {
+    BossKind.tideHerald => 'TIDE HERALD',
     BossKind.skyWarden => 'SKY WARDEN',
     BossKind.stormColossus => 'STORM COLOSSUS',
     BossKind.eclipseSeraph => 'ECLIPSE SERAPH',
     BossKind.prismReaver => 'PRISM REAVER',
     BossKind.venomCrown => 'VENOM CROWN',
     BossKind.novaPulsar => 'NOVA PULSAR',
+    BossKind.chronoKeeper => 'CHRONO KEEPER',
   };
 }
 
@@ -53,25 +59,39 @@ enum BossPhase {
   novaRings,
   dashedRails,
   novaLance,
+  driftBubbles,
+  tideWaves,
+  geysers,
+  tickRain,
+  pendulum,
+  rewind,
   leaving,
 }
 
 /// A timed survival encounter. The boss stays in screen space as the board
 /// climbs; thrown pools attach to the scrolling floor only after landing.
 class InfiniteBoss {
-  InfiniteBoss({this.top = 0, this.kind = BossKind.skyWarden, int seed = 0})
-    : training = false,
-      _random = math.Random(seed);
+  InfiniteBoss({
+    this.top = 0,
+    this.kind = BossKind.skyWarden,
+    int seed = 0,
+    this.lap = 0,
+  }) : training = false,
+       _random = math.Random(seed);
 
   /// The tutorial's practice boss: a smaller Sky Warden with one short round
   /// each of slow three-shot volleys and single lasers, and no pools.
   InfiniteBoss.training({this.top = 0})
     : kind = BossKind.skyWarden,
       training = true,
+      lap = 0,
       _random = math.Random(0);
 
   static const duration = 28.0;
   static const trainingDuration = 16.0;
+
+  /// Play time between Overdrive bosses, once every boss has been met.
+  static const overdriveGapSeconds = 150.0;
   static const laserWarning = 1.1;
   static const laserLife = 1.3;
   static const throwFlight = .9;
@@ -80,12 +100,27 @@ class InfiniteBoss {
   static const name = 'SKY WARDEN';
   static const mineWarning = 1.35, mineLife = .65, mineRadius = 40.0;
   static const toxicWarning = .9, toxicLife = 2.5;
+  static const chronoWarning = .75;
 
   final BossKind kind;
   final bool training;
+
+  /// 0 for a run's first meeting with this boss; each Overdrive lap after
+  /// every boss adds one, up to a speed cap.
+  final int lap;
   final math.Random _random;
-  String get displayName => training ? 'PRACTICE WARDEN' : kind.name;
+  String get displayName => training
+      ? 'PRACTICE WARDEN'
+      : lap == 0
+      ? kind.name
+      : '${kind.name} ${const ['II', 'III', 'IV', 'V'][math.min(lap, 4) - 1]}${lap > 4 ? '+' : ''}';
+
+  /// How fast the fight plays: 12% faster per Overdrive lap, capped at 36%.
+  double get pace => 1 + .12 * math.min(lap, 3);
   double get lifetime => training ? trainingDuration : duration;
+
+  /// Real seconds left in the fight, at this boss's pace.
+  double get secondsLeft => (lifetime - age) / pace;
   double age = 0, top;
   final shots = <LateEnemyShot>[];
   final toxicWalls = <ToxicWall>[];
@@ -117,7 +152,9 @@ class InfiniteBoss {
     var result = 0.0;
     for (final shot in shots) {
       if (shot.age >= 0 || shot.cancelled) continue;
-      final warning = kind == BossKind.venomCrown
+      final warning = kind == BossKind.chronoKeeper
+          ? chronoWarning
+          : kind == BossKind.venomCrown
           ? toxicWarning
           : shot.kind == LateShotKind.mine
           ? mineWarning
@@ -125,6 +162,7 @@ class InfiniteBoss {
           ? 1.2
           : laserWarning;
       if (shot.kind == LateShotKind.laser ||
+          (kind == BossKind.chronoKeeper && shot.kind == LateShotKind.shard) ||
           (kind == BossKind.venomCrown && shot.kind == LateShotKind.shard) ||
           shot.kind == LateShotKind.mine ||
           (kind == BossKind.eclipseSeraph && shot.kind == LateShotKind.shard)) {
@@ -144,30 +182,36 @@ class InfiniteBoss {
             : BossPhase.leaving
       : age < 10
       ? switch (kind) {
+          BossKind.tideHerald => BossPhase.driftBubbles,
           BossKind.skyWarden => BossPhase.bullets,
           BossKind.stormColossus => BossPhase.ricochets,
           BossKind.eclipseSeraph => BossPhase.petals,
           BossKind.prismReaver => BossPhase.sweepingLaser,
           BossKind.venomCrown => BossPhase.toxicSlalom,
           BossKind.novaPulsar => BossPhase.novaRings,
+          BossKind.chronoKeeper => BossPhase.tickRain,
         }
       : age < 18
       ? switch (kind) {
+          BossKind.tideHerald => BossPhase.tideWaves,
           BossKind.skyWarden => BossPhase.lasers,
           BossKind.stormColossus => BossPhase.blades,
           BossKind.eclipseSeraph => BossPhase.curtains,
           BossKind.prismReaver => BossPhase.twinLasers,
           BossKind.venomCrown => BossPhase.toxicPulse,
           BossKind.novaPulsar => BossPhase.dashedRails,
+          BossKind.chronoKeeper => BossPhase.pendulum,
         }
       : age < 26
       ? switch (kind) {
+          BossKind.tideHerald => BossPhase.geysers,
           BossKind.skyWarden => BossPhase.pools,
           BossKind.stormColossus => BossPhase.mines,
           BossKind.eclipseSeraph => BossPhase.comets,
           BossKind.prismReaver => BossPhase.rotors,
           BossKind.venomCrown => BossPhase.toxicGauntlet,
           BossKind.novaPulsar => BossPhase.novaLance,
+          BossKind.chronoKeeper => BossPhase.rewind,
         }
       : BossPhase.leaving;
   bool get expired => age >= lifetime;
@@ -178,8 +222,7 @@ class InfiniteBoss {
     BossPhase.pools => 'BOSS · Keep clear of the amber pools',
     BossPhase.ricochets => 'BOSS · Watch the energy orbs bounce off the rails',
     BossPhase.blades => 'BOSS · Dodge the curving blade volleys',
-    BossPhase.mines =>
-      'BOSS · Leave the black circles before their lasers fire',
+    BossPhase.mines => 'BOSS · Leave the marked circles before they discharge',
     BossPhase.petals => 'BOSS · Slip between the crystal petals',
     BossPhase.curtains => 'BOSS · Find a lane between the laser curtains',
     BossPhase.comets => 'BOSS · Move away from the comet trails',
@@ -194,6 +237,12 @@ class InfiniteBoss {
     BossPhase.dashedRails =>
       'BOSS · Slip through the gaps as the side lasers pass',
     BossPhase.novaLance => 'BOSS · Cross the sweeping laser through its gaps',
+    BossPhase.driftBubbles => 'BOSS · Slip between the drifting bubbles',
+    BossPhase.tideWaves => 'BOSS · Wait under a gap as the wave rolls down',
+    BossPhase.geysers => 'BOSS · Step out of the marked geyser columns',
+    BossPhase.tickRain => 'BOSS · The clock bolts pause, then keep falling',
+    BossPhase.pendulum => 'BOSS · Watch the paired bolts swing together',
+    BossPhase.rewind => 'BOSS · Watch out! The bolts return along their trails',
     BossPhase.leaving => 'BOSS · Clear! Keep climbing',
   };
 
@@ -204,10 +253,14 @@ class InfiniteBoss {
       final exit = time > 13.5 ? -170 * math.pow((time - 13.5) / 2.5, 2) : 0.0;
       return (x: x, y: top + 105 + entrance + exit);
     }
-    final x = kind == BossKind.venomCrown
+    final x = kind == BossKind.chronoKeeper
+        ? 180 + math.sin(time * .7) * 24
+        : kind == BossKind.venomCrown
         ? 180 + math.sin(time * .65) * 35
         : kind == BossKind.novaPulsar
         ? 180 + math.sin(time * .55) * 28
+        : kind == BossKind.tideHerald
+        ? 180 + math.sin(time * .6) * 38
         : kind == BossKind.prismReaver
         ? 180 + math.sin(time * 1.05) * 52 + math.sin(time * 1.83) * 16
         : time < 10
@@ -219,7 +272,12 @@ class InfiniteBoss {
         : 180.0;
     final entrance = time < 2 ? -150 * math.pow(1 - time / 2, 2) : 0.0;
     final exit = time > 26 ? -170 * math.pow((time - 26) / 2, 2) : 0.0;
-    final drift = kind == BossKind.prismReaver ? math.sin(time * 1.4) * 8 : 0.0;
+    // The Reaver jitters; the Herald bobs slowly like a jellyfish.
+    final drift = kind == BossKind.prismReaver
+        ? math.sin(time * 1.4) * 8
+        : kind == BossKind.tideHerald
+        ? math.sin(time * 1.7) * 5
+        : 0.0;
     return (x: x, y: top + 105 + entrance + exit + drift);
   }
 
@@ -258,6 +316,10 @@ class InfiniteBoss {
         _prismWeapons(before, target);
       } else if (kind == BossKind.novaPulsar) {
         _novaWeapons(before, target);
+      } else if (kind == BossKind.tideHerald) {
+        _tideWeapons(before, target);
+      } else if (kind == BossKind.chronoKeeper) {
+        _chronoWeapons(before, target);
       } else {
         _toxicWeapons(before, target);
       }
@@ -360,6 +422,90 @@ class InfiniteBoss {
     }
   }
 
+  /// Clockwork bolts use premarked paths, never home, and finish before exit.
+  /// Only their travel changes: stop/start, paired swings, then a return trip.
+  void _chronoWeapons(double before, EnemyPoint target) {
+    void bolt(
+      double at,
+      EnemyPoint Function(double) path,
+      double life,
+      String reason,
+    ) {
+      _lastVolleyAt = at + chronoWarning;
+      shots.add(
+        LateEnemyShot(
+          kind: LateShotKind.shard,
+          origin: path(0),
+          velocity: (x: 0, y: 0),
+          delay: at - before + chronoWarning,
+          life: life,
+          positionPath: path,
+          radiusOverride: 6,
+          reasonOverride: reason,
+        ),
+      );
+    }
+
+    while (_bulletWave < 3 && age >= 2.4 + _bulletWave * 1.7) {
+      final wave = _bulletWave++;
+      final at = 2.4 + wave * 1.7;
+      final startY = top + 190;
+      final speed = (560 - startY) / 2.8;
+      for (final column in [68.0, 180.0, 292.0]) {
+        final x = column + (wave.isEven ? -12 : 12);
+        bolt(
+          at,
+          (t) {
+            // A half-second hold is visible on the trail; no teleport or jump.
+            final travel = t < .85
+                ? t
+                : t < 1.35
+                ? .85
+                : t - .5;
+            return (x: x, y: startY + speed * travel);
+          },
+          3.3,
+          'Clock bolt. It pauses, then continues down the marked trail.',
+        );
+      }
+    }
+    while (_laserWave < 3 && age >= 10.2 + _laserWave * 1.8) {
+      final wave = _laserWave++;
+      final at = 10.2 + wave * 1.8;
+      final startY = top + 190;
+      for (final side in [-1.0, 1.0]) {
+        bolt(
+          at,
+          (t) => (
+            x: 180 + side * 68 + 28 * math.sin(t * 2.1 + wave * math.pi),
+            y: startY + (560 - startY) * t / 3.3,
+          ),
+          3.3,
+          'Pendulum bolt. Slip between the swinging pair.',
+        );
+      }
+    }
+    while (_poolWave < 3 && age >= 18.2 + _poolWave * 1.9) {
+      final wave = _poolWave++;
+      final at = 18.2 + wave * 1.9;
+      final startY = top + 190;
+      // Lock the turn point when the warning starts, even if the ball moves.
+      final turnY = (target.y + 72).clamp(top + 260, 510.0);
+      for (final column in [80.0, 180.0, 280.0]) {
+        final x = column + (wave.isEven ? -16 : 16);
+        bolt(
+          at,
+          (t) => (
+            x: x,
+            y: startY + (turnY - startY) * math.sin(math.pi * t / 3.2),
+          ),
+          3.2,
+          'Rewind bolt. Its marked trail is dangerous on the return too.',
+        );
+      }
+    }
+  }
+
   /// Three slow, three-shot volleys with wide gaps, then two single lasers.
   /// The same marked warnings as the real Sky Warden, at a gentler pace.
   void _trainingWeapons(double before, EnemyPoint target) {
@@ -413,6 +559,112 @@ class InfiniteBoss {
       );
     }
   }
+
+  /// Tide Herald, the early boss: slow swaying bubbles, then rolling waves
+  /// with two wide openings, then broad geyser columns that alternate. Every
+  /// attack is slow, locked before it starts and leaves generous room.
+  void _tideWeapons(double before, EnemyPoint target) {
+    // Phase 1: four volleys of three bubbles. They fan out to fixed columns
+    // 104 units apart and sway together, so the lanes between them stay open.
+    while (_bulletWave < 4 && age >= 2.6 + _bulletWave * 1.7) {
+      final at = 2.6 + _bulletWave++ * 1.7;
+      _lastVolleyAt = at;
+      final body = positionAt(at);
+      final origin = (x: body.x, y: body.y + 30);
+      final aimed = target.x.clamp(60.0, 300.0);
+      final speed = math.max(105.0, (target.y - origin.y) / 3.0);
+      final life = ((548 - origin.y) / speed).clamp(1.0, 5.0);
+      for (final offset in [-tideBubbleSpacing, 0.0, tideBubbleSpacing]) {
+        var column = aimed + offset;
+        // A column that would leave the board wraps to the far side instead.
+        if (column < 40) column += tideBubbleSpacing * 3;
+        if (column > 320) column -= tideBubbleSpacing * 3;
+        shots.add(
+          LateEnemyShot(
+            kind: LateShotKind.shard,
+            origin: origin,
+            velocity: (x: 0, y: 0),
+            delay: at - before,
+            life: life,
+            positionPath: (t) {
+              final spread = (t / .9).clamp(0.0, 1.0);
+              final eased = spread * spread * (3 - 2 * spread);
+              return (
+                x:
+                    origin.x +
+                    (column - origin.x) * eased +
+                    tideBubbleSway * math.sin(t * 2.4) * eased,
+                y: origin.y + speed * t,
+              );
+            },
+            radiusOverride: tideBubbleRadius,
+            reasonOverride: 'Herald bubble. Slip between the drifting bubbles.',
+          ),
+        );
+      }
+    }
+    // Phase 2: three waves roll down the whole board. Each has two wide
+    // openings, marked first. They drift sideways too slowly to carry a
+    // ball waiting at the middle of an opening into the lit part.
+    while (_laserWave < 3 && age >= 10.2 + _laserWave * 2.3) {
+      final wave = _laserWave++;
+      final at = 10.2 + wave * 2.3;
+      _lastVolleyAt = at + laserWarning;
+      final from = top + 175;
+      EnemyBeam path(double time) {
+        final y = from + (560 - from) * (time / tideWaveLife).clamp(0.0, 1.0);
+        return (start: (x: 24.0, y: y), end: (x: 336.0, y: y));
+      }
+
+      final first = path(0);
+      shots.add(
+        LateEnemyShot(
+          kind: LateShotKind.laser,
+          origin: first.start,
+          velocity: (x: 0, y: 0),
+          delay: at - before + laserWarning,
+          life: tideWaveLife,
+          beamEnd: first.end,
+          beamPath: path,
+          radiusOverride: 4,
+          // Two dashes and two openings span the board exactly.
+          dashes: LaserDashes(
+            length: 156 - tideWaveGap,
+            gap: tideWaveGap,
+            speed: wave.isEven ? 10 : -10,
+            offset: const [0.0, 78.0, 39.0][wave],
+          ),
+          reasonOverride: 'Herald wave. Wait under one of its openings.',
+        ),
+      );
+    }
+    // Phase 3: geysers. The outer and middle columns erupt, then the two
+    // between them, twice over. The next set is marked while one is live.
+    while (_poolWave < 4 && age >= 18 + _poolWave * 1.8) {
+      final wave = _poolWave++;
+      final at = 18 + wave * 1.8;
+      _lastVolleyAt = at + laserWarning;
+      for (final x in wave.isEven ? [55.0, 180.0, 305.0] : [117.5, 242.5]) {
+        shots.add(
+          LateEnemyShot(
+            kind: LateShotKind.laser,
+            origin: (x: x, y: top + 170),
+            velocity: (x: 0, y: 0),
+            delay: at - before + laserWarning,
+            life: tideGeyserLife,
+            beamEnd: (x: x, y: 537),
+            radiusOverride: tideGeyserRadius,
+            reasonOverride: 'Herald geyser. Step out of the marked column.',
+          ),
+        );
+      }
+    }
+  }
+
+  static const tideBubbleSpacing = 104.0, tideBubbleSway = 14.0;
+  static const tideBubbleRadius = 7.0;
+  static const tideWaveLife = 3.0, tideWaveGap = 100.0;
+  static const tideGeyserLife = 1.0, tideGeyserRadius = 22.0;
 
   /// Nova Pulsar: growing rings with turning openings, then dashed side
   /// lasers that cross the board, then one sweeping dashed lance. Every gap
@@ -477,15 +729,17 @@ class InfiniteBoss {
     }
 
     final beamTop = top + 150;
+    const verticalGap = 72.0;
     // Phase 1: four rings, 1.5 seconds (about 160 units) apart.
     while (_bulletWave < 4 && age >= 2.6 + _bulletWave * 1.5) {
       final wave = _bulletWave++;
+      // Several wide openings, so one is always within reach of the ball.
       ring(
         2.6 + wave * 1.5,
-        wave < 2 ? 3 : 2,
-        .36,
+        wave < 2 ? 6 : 5,
+        .78,
         105,
-        wave.isEven ? .22 : -.22,
+        wave.isEven ? .16 : -.16,
       );
     }
     // Phase 2: two dashed side lasers. First they cross the whole board in
@@ -506,7 +760,7 @@ class InfiniteBoss {
                   x: 180 + side * 60 + 70 * math.sin(math.pi * 2 * t / 2.6),
                   y: beamTop,
                 ),
-          LaserDashes(length: 62, gap: 54, speed: side * -45),
+          LaserDashes(length: 62, gap: verticalGap, speed: side * -45),
           'Nova rail. Slip through a gap as it passes.',
         );
       }
@@ -523,13 +777,15 @@ class InfiniteBoss {
           x: 180 + 138 * math.sin(math.pi * 2 * t / 3.4 + phase),
           y: beamTop,
         ),
-        const LaserDashes(length: 70, gap: 52, speed: 90),
+        const LaserDashes(length: 70, gap: verticalGap, speed: 90),
         'Nova lance. Cross it through a gap.',
       );
     }
-    while (_poolWave >= 1 && _poolWave < 3 && age >= 19.6 + (_poolWave - 1) * 3) {
+    while (_poolWave >= 1 &&
+        _poolWave < 3 &&
+        age >= 19.6 + (_poolWave - 1) * 3) {
       final wave = _poolWave++;
-      ring(19.6 + (wave - 1) * 3, 3, .38, 85, wave.isEven ? .18 : -.18);
+      ring(19.6 + (wave - 1) * 3, 5, .48, 85, wave.isEven ? .14 : -.14);
     }
   }
 
@@ -738,7 +994,7 @@ class InfiniteBoss {
             life: mineLife,
             radiusOverride: mineRadius,
             reasonOverride:
-                'Colossus laser mine. Leave the black circle before it fires.',
+                'Colossus shock mine. Move outside the marked circle.',
           ),
         );
       }

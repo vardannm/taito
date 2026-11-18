@@ -1,0 +1,240 @@
+{
+  "target": {
+    "seconds": 0.5,
+    "peak": 0.3,
+    "sha256": "afd37af1a6174be0c5371f6a5c3c5c63ec34e61909f878a900672ae7fe73ddd8",
+    "source": "ElevenLabs eleven_text_to_sound_v2: tool/regenerate_target_sound.py"
+  },
+  "coin": {
+    "seconds": 0.18,
+    "peak": 0.28,
+    "sha256": "1a407cd7bbebdfc108c23925173ff7000ff52f33b8fc9a659c9e81f59ab0c6aa",
+    "source": "Original subdued procedural design: tool/quiet_effects.py"
+  },
+  "merge": {
+    "seconds": 0.3,
+    "peak": 0.38,
+    "sha256": "43e788c7d9ab3364ceccaa3cb2f15351c745574245200734c398f88e014e4077",
+    "source": "Original sound refinement: tool/refine_audio.py"
+  },
+  "star": {
+    "seconds": 0.5,
+    "peak": 0.3,
+    "sha256": "ae6bc64b964d28679d013fe94d026108357416feee61032c7b8701463f4433f3",
+    "source": "ElevenLabs eleven_text_to_sound_v2: tool/regenerate_star_sound.py"
+  },
+  "miss": {
+    "seconds": 0.45,
+    "peak": 0.42,
+    "sha256": "ab02290fe5b4f8698c6e1387faef57c1e9672ae7da3d882a4047b5e1a2f0bc89",
+    "source": "Original sound refinement: tool/refine_audio.py"
+  },
+  "complete": {
+    "seconds": 0.85,
+    "peak": 0.68,
+    "sha256": "0ac912ee951c48fef812fe23bc6e890bc8d8583cf5b4fca3de6fde817cc701bb"
+  },
+  "ui_tap": {
+    "seconds": 0.06,
+    "peak": 0.3,
+    "sha256": "9d7f34227307165c9ab0e9559915d62586637c19a28aea65a31839001f54490b",
+    "source": "ElevenLabs eleven_text_to_sound_v2: tool/regenerate_button_sound.py"
+  },
+  "ui_back": {
+    "seconds": 0.06,
+    "peak": 0.3,
+    "sha256": "9d7f34227307165c9ab0e9559915d62586637c19a28aea65a31839001f54490b",
+    "source": "ElevenLabs eleven_text_to_sound_v2: tool/regenerate_button_sound.py"
+  },
+  "ui_toggle": {
+    "seconds": 0.06,
+    "peak": 0.3,
+    "sha256": "9d7f34227307165c9ab0e9559915d62586637c19a28aea65a31839001f54490b",
+    "source": "ElevenLabs eleven_text_to_sound_v2: tool/regenerate_button_sound.py"
+  },
+  "ui_select": {
+    "seconds": 0.06,
+    "peak": 0.3,
+    "sha256": "9d7f34227307165c9ab0e9559915d62586637c19a28aea65a31839001f54490b",
+    "source": "ElevenLabs eleven_text_to_sound_v2: tool/regenerate_button_sound.py"
+  },
+  "ui_countdown": {
+    "seconds": 0.18,
+    "peak": 0.45,
+    "sha256": "61f65acc4d90022506b3a195e8f8dcf96d19cbae3b42f83b6f36062385a821f6",
+    "source": "ElevenLabs Sound Effects v3, take 1, trimmed and mixed to mono"
+  },
+  "enemy_insectArrival": {
+    "seconds": 0.28,
+    "peak": 0.68,
+    "sha256": "4626b7f6a41b2614a7645fe1a338def392acb6f848f8ebfdce9890d4366c3816"
+  },
+  "enemy_wingArrival": {
+    "seconds": 0.4,
+    "peak": 0.68,
+    "sha256": "a99fc83f97db7fccb40c92023616dbf19a7d234065def96e2e3d0dd2f461db2e"
+  },
+  "enemy_snakeHiss": {
+    "seconds": 0.5,
+    "peak": 0.68,
+    "sha256": "bb758160dbb4c176d4eb5c0307b52e5c0e2ca093c2d23e6e043315c8e8398e44"
+  },
+  "enemy_wardenArrival": {
+    "seconds": 0.85,
+    "peak": 0.68,
+    "sha256": "fcf63b28a9aab8537ff2bafbfd880934587fb2e96d3321fce3b26cae5fa222c4"
+  },
+  "enemy_colossusArrival": {
+    "seconds": 0.95,
+    "peak": 0.68,
+    "sha256": "34c12fc6d175514c2d832173229fafff4ff08d4c0d24e80d6739850fef40f37d"
+  },
+  "enemy_seraphArrival": {
+    "seconds": 1.05,
+    "peak": 0.68,
+    "sha256": "27e851dc8767d449d8603cbe4847da27d47ccbfa9c2f370b524399f34c2777cd"
+  },
+  "enemy_prismArrival": {
+    "seconds": 0.9,
+    "peak": 0.68,
+    "sha256": "3c219dc0fd159e6c06bce94013916fd9ce6f9f6aa1eca0b8ebbafb70d99c59fc"
+  },
+  "enemy_venomArrival": {
+    "seconds": 0.9,
+    "peak": 0.68,
+    "sha256": "b00c0e7f9255a720b6c382218761825c11494395cbcacb89649d4088ece40dff"
+  },
+  "enemy_novaArrival": {
+    "seconds": 0.9,
+    "peak": 0.68,
+    "sha256": "013008e3649a36fb188fb8d1a1ce5a78945ce2671f609ed3b2719f66f2358bba"
+  },
+  "enemy_bullet": {
+    "seconds": 0.14,
+    "peak": 0.68,
+    "sha256": "2d6b9430419249cac347d67cb10901a5ef722f5e7b23fc13238eef73a21f326c"
+  },
+  "enemy_ricochet": {
+    "seconds": 0.22,
+    "peak": 0.68,
+    "sha256": "b69018b27096ad785cfa805fc55c837b982c8e93652a1b8af31df81ee8ae92f5"
+  },
+  "enemy_bounce": {
+    "seconds": 0.16,
+    "peak": 0.68,
+    "sha256": "62de51f43c79df56ca59766435e0341b50485681cab028173b97d0a71184be14"
+  },
+  "enemy_petal": {
+    "seconds": 0.28,
+    "peak": 0.68,
+    "sha256": "968c7b5b0899329673b5af96337ec406e7d8f7403e02bc28a4a2c868cf47b4a1"
+  },
+  "enemy_crystal": {
+    "seconds": 0.32,
+    "peak": 0.48,
+    "sha256": "3a23e8c7c95bd6c0b7297118797db4b5f361333f82a01082888bc4b5e7642054",
+    "source": "Original procedural design: tool/refine_seraph_shot.py"
+  },
+  "enemy_laserCharge": {
+    "seconds": 0.8,
+    "peak": 0.3,
+    "sha256": "e0c7f691848d910a79005ab4b311d9e57e5311de8d73b141a3552f93d5926f26",
+    "source": "Original subdued procedural design: tool/quiet_effects.py"
+  },
+  "enemy_laserFire": {
+    "seconds": 0.75,
+    "peak": 0.3,
+    "sha256": "87fdfdabc8015144514c834d6da93e4144c4552a825e5dbb4506c53e17b2dda2",
+    "source": "Original subdued procedural design: tool/quiet_effects.py"
+  },
+  "enemy_bombThrow": {
+    "seconds": 0.3,
+    "peak": 0.68,
+    "sha256": "f00683ac6c759378cabaa58e8787aa73baf6793bca05d7811212bba3a17a2379"
+  },
+  "enemy_poolLand": {
+    "seconds": 0.36,
+    "peak": 0.68,
+    "sha256": "d8d7b0f3b000436aaa67a409630daa32d529b9c7aa9b3f5521c08855e6c9d76b"
+  },
+  "enemy_mineCharge": {
+    "seconds": 0.85,
+    "peak": 0.68,
+    "sha256": "51b8d9ed12a6ed21e6f998b614c7523fbef6923d0d72e0f43e90f858e191b539"
+  },
+  "enemy_mineFire": {
+    "seconds": 0.4,
+    "peak": 0.68,
+    "sha256": "6f64b3a56d5df0fbbf323b63077f173289fe8ed75b47616dcc10f54a5bc8d0b4"
+  },
+  "enemy_cometCharge": {
+    "seconds": 0.65,
+    "peak": 0.68,
+    "sha256": "9fed22496ae1edc416fda1b62638f779ee2592b436607458fe1acd23db8667de"
+  },
+  "enemy_cometFire": {
+    "seconds": 0.38,
+    "peak": 0.68,
+    "sha256": "04ef8fa7c4eb25f98914c66e31605b800642aa1176fce8f5bce75cdf02f27cb0"
+  },
+  "enemy_web": {
+    "seconds": 0.22,
+    "peak": 0.38,
+    "sha256": "b1070cc0c052b8ca33e74ff5a7399a50e8972c40b0579412239c40bae73c865f",
+    "source": "ElevenLabs eleven_text_to_sound_v2: tool/regenerate_shot_sounds.py"
+  },
+  "enemy_quills": {
+    "seconds": 0.25,
+    "peak": 0.38,
+    "sha256": "c2ee4092b13f160f0e2ce13df0890cf96f68912433da93cf22c841fea9309ee0",
+    "source": "ElevenLabs eleven_text_to_sound_v2: tool/regenerate_shot_sounds.py"
+  },
+  "infinite_heart_loss": {
+    "seconds": 1.28,
+    "peak": 0.89,
+    "sha256": "f3c616e67ef83c879acfd1665c788bebedce4a17644024beb07a92826ac1baab",
+    "source": "User-supplied: Snappy_retro_arcade__#3 (Infinite mode heart loss)"
+  },
+  "enemy_seedSpit": {
+    "seconds": 0.4,
+    "peak": 0.61,
+    "sha256": "478016c39db5ee6dd136c368a248f21abeeb0eeb6d306d43109577de87e5ea02",
+    "source": "User-supplied: Snappy_retro_arcade__#1, mono 44.1 kHz, trimmed to 0.4 s (Seed Spitter shot)"
+  },
+  "life": {
+    "seconds": 0.49,
+    "peak": 0.68,
+    "sha256": "d313a1d58a845b8c64e2205e123c2f298bf6ea5c5fc8be6b038a3e8065bb9c9e",
+    "source": "User-supplied: Quick_positive_mobil_#2 (Infinite mode heart gained)"
+  },
+  "level_target": {
+    "seconds": 1.48,
+    "peak": 0.65,
+    "sha256": "0fd1afb55ce55adff431857ae2d386130fb5652a045b1bf05f371b0fb16b164a",
+    "source": "User-supplied: Short_casual_mobile__#3 (classic level target hole)"
+  },
+  "level_win": {
+    "seconds": 1.0,
+    "peak": 0.9,
+    "sha256": "e2e3b428bfb2e81970c2222fd28cec3895892e383bc9b760ac68be148083adf5",
+    "source": "User-supplied: A_short,_satisfying__#3 (classic level won, 1-2 stars)"
+  },
+  "level_win_big": {
+    "seconds": 3.4,
+    "peak": 1.0,
+    "sha256": "2770ed9a13c529c87989f595c4cb0f9730e60d776212ef4ac7039640deab7c71",
+    "source": "User-supplied: A_sleek,_powerful_vi_#4, trimmed from 5 s with a 0.9 s fade (classic level won, 3-4 stars)"
+  },
+  "star_reveal": {
+    "seconds": 0.49,
+    "peak": 0.92,
+    "sha256": "c5d5493a40984cfc32f9d20830d3bf7aa9f7c51ca9d3515d3252ab485f71b32b",
+    "source": "User-supplied: A_very_short,_satisf_#1 (each result star appearing)"
+  },
+  "ui_claim": {
+    "seconds": 0.49,
+    "peak": 0.56,
+    "sha256": "5496f25bd3e0739dcb1c3476e724decd0e160efd58cd68f437e31d77a8c6e648",
+    "source": "User-supplied: Quick_positive_mobil_#1 (daily prize claim button)"
+  }
+}

@@ -62,7 +62,7 @@ enum Achievement {
   ),
   boss6(
     'Master of the sky',
-    'Outlast all 6 bosses in one Infinite run.',
+    'Outlast 6 bosses in one Infinite run.',
     6,
     1500,
   ),

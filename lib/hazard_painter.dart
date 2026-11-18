@@ -82,7 +82,10 @@ void paintSpecialHazards(Canvas c, BalanceGame game, bool reducedMotion) {
           c.drawRect(rect, Paint()..color = _red.withAlpha(30));
           if (h.dashed) {
             c.drawRRect(
-              RRect.fromRectAndRadius(rect.deflate(6), const Radius.circular(4)),
+              RRect.fromRectAndRadius(
+                rect.deflate(6),
+                const Radius.circular(4),
+              ),
               Paint()
                 ..color = _red.withAlpha(alpha)
                 ..style = PaintingStyle.stroke
@@ -162,9 +165,7 @@ void paintSpecialHazards(Canvas c, BalanceGame game, bool reducedMotion) {
         p,
         13,
         Paint()
-          ..color = h.kind == HazardKind.movingHole
-              ? const Color(0xFF2ACAC6)
-              : _red
+          ..color = _red
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2,
       );

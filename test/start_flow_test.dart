@@ -226,7 +226,9 @@ void main() {
     'settings apply to the ready board and modal keys do not start it',
     (tester) async {
       final game = await launch(tester, ControlMode.twoFinger);
-      await tester.tap(find.byTooltip('Settings'));
+      await tester.tap(
+        find.byWidgetPredicate((w) => w is Tooltip && w.message == 'Settings'),
+      );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       await tester.sendKeyDownEvent(LogicalKeyboardKey.keyW);
@@ -237,7 +239,13 @@ void main() {
       );
       await tester.tap(find.byKey(const ValueKey('control-oneFinger')));
       await tester.pump();
-      Navigator.of(tester.element(find.byTooltip('Close settings'))).pop();
+      Navigator.of(
+        tester.element(
+          find.byWidgetPredicate(
+            (w) => w is Tooltip && w.message == 'Close settings',
+          ),
+        ),
+      ).pop();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       expect(game.oneFinger, isTrue);
@@ -269,7 +277,9 @@ void main() {
       final finger = await tester.startGesture(contact(tester, game));
       await tester.pump();
       await finger.up();
-      await tester.tap(find.byTooltip('Pause'));
+      await tester.tap(
+        find.byWidgetPredicate((w) => w is Tooltip && w.message == 'Pause'),
+      );
       await tester.pump();
       expect(game.paused, isTrue);
       await tester.tap(find.text('BACK TO MENU'));
@@ -321,7 +331,9 @@ void main() {
         expect(game.left, lessThan(l));
         expect(game.right, lessThan(r));
         expect(game.pivotTargets.every((target) => target != null), isTrue);
-        await tester.tap(find.byTooltip('Pause'));
+        await tester.tap(
+          find.byWidgetPredicate((w) => w is Tooltip && w.message == 'Pause'),
+        );
         await tester.pump();
         expect(game.pivotTargets, [null, null]);
         await tester.tap(find.text('RESUME RUN'));

@@ -1,0 +1,200 @@
+[
+  {
+    "device": "phone",
+    "width": 1080,
+    "height": 1920,
+    "shot": "01-boss",
+    "title": "Boss encounter",
+    "file": "screenshots/phone/01-boss.png",
+    "source": "source-ui/phone/01-boss.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "phone",
+    "width": 1080,
+    "height": 1920,
+    "shot": "02-infinite-mid",
+    "title": "Infinite, deep run",
+    "file": "screenshots/phone/02-infinite-mid.png",
+    "source": "source-ui/phone/02-infinite-mid.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "phone",
+    "width": 1080,
+    "height": 1920,
+    "shot": "03-shop",
+    "title": "Gear Shop",
+    "file": "screenshots/phone/03-shop.png",
+    "source": "source-ui/phone/03-shop.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "phone",
+    "width": 1080,
+    "height": 1920,
+    "shot": "04-level-23",
+    "title": "Classic level 23",
+    "file": "screenshots/phone/04-level-23.png",
+    "source": "source-ui/phone/04-level-23.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "phone",
+    "width": 1080,
+    "height": 1920,
+    "shot": "05-level-76",
+    "title": "Classic level 76",
+    "file": "screenshots/phone/05-level-76.png",
+    "source": "source-ui/phone/05-level-76.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "phone",
+    "width": 1080,
+    "height": 1920,
+    "shot": "06-infinite",
+    "title": "Infinite",
+    "file": "screenshots/phone/06-infinite.png",
+    "source": "source-ui/phone/06-infinite.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "tablet-7",
+    "width": 1440,
+    "height": 2560,
+    "shot": "01-boss",
+    "title": "Boss encounter",
+    "file": "screenshots/tablet-7/01-boss.png",
+    "source": "source-ui/tablet-7/01-boss.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "tablet-7",
+    "width": 1440,
+    "height": 2560,
+    "shot": "02-infinite-mid",
+    "title": "Infinite, deep run",
+    "file": "screenshots/tablet-7/02-infinite-mid.png",
+    "source": "source-ui/tablet-7/02-infinite-mid.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "tablet-7",
+    "width": 1440,
+    "height": 2560,
+    "shot": "03-shop",
+    "title": "Gear Shop",
+    "file": "screenshots/tablet-7/03-shop.png",
+    "source": "source-ui/tablet-7/03-shop.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "tablet-7",
+    "width": 1440,
+    "height": 2560,
+    "shot": "04-level-23",
+    "title": "Classic level 23",
+    "file": "screenshots/tablet-7/04-level-23.png",
+    "source": "source-ui/tablet-7/04-level-23.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "tablet-7",
+    "width": 1440,
+    "height": 2560,
+    "shot": "05-level-76",
+    "title": "Classic level 76",
+    "file": "screenshots/tablet-7/05-level-76.png",
+    "source": "source-ui/tablet-7/05-level-76.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "tablet-7",
+    "width": 1440,
+    "height": 2560,
+    "shot": "06-infinite",
+    "title": "Infinite",
+    "file": "screenshots/tablet-7/06-infinite.png",
+    "source": "source-ui/tablet-7/06-infinite.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "tablet-10",
+    "width": 1800,
+    "height": 3200,
+    "shot": "01-boss",
+    "title": "Boss encounter",
+    "file": "screenshots/tablet-10/01-boss.png",
+    "source": "source-ui/tablet-10/01-boss.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "tablet-10",
+    "width": 1800,
+    "height": 3200,
+    "shot": "02-infinite-mid",
+    "title": "Infinite, deep run",
+    "file": "screenshots/tablet-10/02-infinite-mid.png",
+    "source": "source-ui/tablet-10/02-infinite-mid.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "tablet-10",
+    "width": 1800,
+    "height": 3200,
+    "shot": "03-shop",
+    "title": "Gear Shop",
+    "file": "screenshots/tablet-10/03-shop.png",
+    "source": "source-ui/tablet-10/03-shop.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "tablet-10",
+    "width": 1800,
+    "height": 3200,
+    "shot": "04-level-23",
+    "title": "Classic level 23",
+    "file": "screenshots/tablet-10/04-level-23.png",
+    "source": "source-ui/tablet-10/04-level-23.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "tablet-10",
+    "width": 1800,
+    "height": 3200,
+    "shot": "05-level-76",
+    "title": "Classic level 76",
+    "file": "screenshots/tablet-10/05-level-76.png",
+    "source": "source-ui/tablet-10/05-level-76.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  },
+  {
+    "device": "tablet-10",
+    "width": 1800,
+    "height": 3200,
+    "shot": "06-infinite",
+    "title": "Infinite",
+    "file": "screenshots/tablet-10/06-infinite.png",
+    "source": "source-ui/tablet-10/06-infinite.png",
+    "capture": "Current Flutter app UI rendered with Android target platform; staged gameplay, not a physical-device capture",
+    "pngColorType": 2
+  }
+]

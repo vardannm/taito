@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
+import 'infinite_music.dart';
 
 /// One audio context for every game sound. It mixes with other apps instead
 /// of taking focus (so effects never stop the music), and on iOS it uses the
@@ -15,6 +16,12 @@ AudioContext gameAudioContext() => AudioContext(
       : null,
 );
 
+/// None of the game UI uses onPositionChanged. The plugin's default updater
+/// polls the platform every frame and starts another callback chain on every
+/// replay. Low-latency effects have no completion event to stop those chains.
+/// Music loop timing explicitly calls getCurrentPosition and still works.
+AudioPlayer createGameAudioPlayer() => AudioPlayer()..positionUpdater = null;
+
 abstract interface class MusicOutput {
   Future<void> play(String asset, double volume);
   Future<void> setVolume(double volume);
@@ -25,8 +32,12 @@ abstract interface class MusicOutput {
   void dispose();
 }
 
+abstract interface class AdaptiveMusicOutput implements MusicOutput {
+  Future<void> setMix(MusicMix mix);
+}
+
 class AudioMusicOutput implements MusicOutput {
-  final _player = AudioPlayer();
+  final _player = createGameAudioPlayer();
 
   @override
   Future<void> play(String asset, double volume) async {

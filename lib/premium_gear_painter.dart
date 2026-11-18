@@ -298,8 +298,9 @@ void paintPremiumPlatform(
   double span,
   PlatformStyle style,
   double time,
-  bool reducedMotion,
-) {
+  bool reducedMotion, {
+  bool particlesEnabled = true,
+}) {
   final phase = reducedMotion ? 0.0 : time * .3;
   final tint = Color(style.color);
   c.drawLine(
@@ -350,6 +351,7 @@ void paintPremiumPlatform(
         : (Paint()..color = tint.withAlpha(230)),
   );
   c.drawPath(highlights, _line(_rose, .8));
+  if (!particlesEnabled) return;
   final sparks = Path();
   for (var i = 0; i < 6; i++) {
     final x = ((phase + i / 6) % 1) * span;

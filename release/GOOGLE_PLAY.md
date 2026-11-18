@@ -29,25 +29,48 @@ Create the Android app in AdMob, using the Android application ID above. Supply 
 
 Cloud saves are not implemented. Progress is local with manual backup/import. Do not advertise automatic Firebase cloud saves or online rankings.
 
-## Store listing draft
+## Store listing
 
-Title: Rollrise: Ball Balance
+Updated 19 November 2026 against the launch source (coin store hidden,
+Practice and the Halo Joystick no longer offered). Paste each field as is.
 
-Short description: Tilt, lift and balance your ball through clever challenges and endless runs.
+App name (30 max):
 
-Full description:
+Rollrise: Ball Balance
 
-Find your balance in Rollrise: Ball Balance. Tilt and lift the rail to guide your ball through precise challenges, collect coins and keep each run alive.
+Short description (80 max):
 
-Take on 80 Classic levels, chase your best run in Infinite, or combine numbered pickups in Number Merge. Return for Daily challenges and sharpen your control in Practice.
+Tilt and lift the platform. 80 levels, endless climbs, bosses and Number Merge.
 
-Choose the control style that feels right: One-Finger, Two-Finger or the floating Halo Joystick. The Halo appears where you touch, giving you a subtle guide while you play.
+Full description (4000 max):
 
-Unlock different balls, build your collection and share challenge codes with friends. Progress stays on your device, with manual backup and import available in the game.
+One ball. A moving platform. One more try.
 
-Optional rewarded ads let you choose an extra chance or a coin reward in eligible Infinite runs. No account is required to play.
+Rollrise turns a simple balancing act into an arcade challenge. Lift and tilt the platform, control the ball's momentum and find your opening. Every small movement matters.
 
-Draft only: validate every statement against the final Android release candidate.
+Master 80 Classic levels
+Roll the ball into ten numbered holes in order. Read moving holes, laser rails and spider territories as the campaign mixes familiar skills into new challenges. Earn stars for finishing, playing clean and beating the time goal, and hunt for the bonus star in every level.
+
+Climb forever in Infinite
+Keep climbing through a course that never ends. Collect coins, build your combo, grab magnets and power-ups, and dodge incoming hazards. Face eight bosses, each with its own attack patterns, from the Storm Colossus to the Chrono Keeper.
+
+Match and merge in Number Merge
+Steer a numbered chain into equal or smaller numbers, combine matching values, avoid bigger ones and clear the gates. Build a longer chain with every run.
+
+Make it yours
+- Play with one finger, or control both ends of the platform with two.
+- Unlock balls, platforms and visual worlds with coins earned in play.
+- Upgrade your magnet, shield and hearts for Infinite runs.
+- Come back for a fresh Daily challenge and daily prizes.
+- Track achievements and personal records.
+- Send a challenge code to a friend and see who scores higher.
+
+No account needed. Your progress stays on your device, with a backup you can copy and restore. Optional rewarded ads can give you an extra heart or double your coins after an Infinite run.
+
+Learn the feel. Read the pattern. Take one more shot.
+
+Do not add: real-money coin packs, cloud saves, online rankings or Practice
+mode. None of these are in the launch build.
 
 ## Official references
 

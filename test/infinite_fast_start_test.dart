@@ -3,11 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/infinite_progress.dart';
 import 'package:balance_arcade/main.dart';
-import 'package:balance_arcade/menu_design.dart';
 import 'package:balance_arcade/profile.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
-import 'support/mode_navigation.dart';
 
 void main() {
   setUp(
@@ -126,7 +124,7 @@ void main() {
     },
   );
 
-  test('relaxed starts and tutorials preserve the gentle opening', () {
+  test('tutorials preserve the gentle opening', () {
     final profile = PlayerProfile()..infiniteBestScore = 2000000;
     final game = BalanceGame();
     profile.applyInfiniteStart(game, tutorial: true);
@@ -134,33 +132,65 @@ void main() {
     game.elapsed = 3;
     expect(game.ascentSpeed, InfiniteTuning.startSpeed);
     expect(game.pace, 1);
-    profile.infiniteFastStart = false;
-    profile.applyInfiniteStart(game);
-    game.start(gameMode: GameMode.infinite);
-    game.elapsed = 3;
-    expect(game.ascentSpeed, InfiniteTuning.startSpeed);
-    expect(game.pace, 1);
   });
 
-  test(
-    'fast start defaults on and the relaxed preference survives loading',
-    () async {
-      final profile = PlayerProfile();
-      await profile.load();
-      expect(profile.infiniteFastStart, isTrue);
-      profile.infiniteFastStart = false;
-      profile.infiniteBestScore = 1000000;
-      await profile.save();
-      final restored = PlayerProfile();
-      await restored.load();
-      expect(restored.infiniteFastStart, isFalse);
-      expect(restored.infiniteBestScore, 1000000);
-    },
-  );
+  test('one lucky run on a fresh install does not speed the opening', () async {
+    final profile = PlayerProfile();
+    await profile.load();
+    profile.recordInfinitePace(1200000);
+    profile.infiniteBestScore = 1200000;
+    expect(profile.infiniteStartSpeed, 1);
+    profile.recordInfinitePace(1200000);
+    expect(profile.infiniteStartSpeed, 1);
+    // The third run at that score makes it repeatable: one small step only.
+    profile.recordInfinitePace(1200000);
+    expect(profile.infiniteStartSpeed, closeTo(1.05, 1e-10));
+    profile.recordInfinitePace(1200000);
+    expect(profile.infiniteStartSpeed, closeTo(1.1, 1e-10));
+  });
 
-  testWidgets('unlocked option updates the prepared opening and persists', (
-    tester,
-  ) async {
+  test('repeated early falls step the opening down', () {
+    final profile = PlayerProfile()..infiniteBestScore = 600000;
+    expect(profile.infiniteStartSpeed, closeTo(1.5, 1e-10));
+    profile.recordInfinitePace(10000);
+    profile.recordInfinitePace(10000);
+    expect(profile.infiniteStartSpeed, closeTo(1.5, 1e-10));
+    profile.recordInfinitePace(10000);
+    expect(profile.infiniteStartSpeed, closeTo(1.45, 1e-10));
+  });
+
+  test('upgrading players keep their opening until ten new runs', () {
+    final profile = PlayerProfile()..infiniteBestScore = 600000;
+    for (var i = 0; i < 9; i++) {
+      profile.recordInfinitePace(400000);
+      expect(profile.infiniteStartSpeed, closeTo(1.5, 1e-10));
+    }
+    // Ten runs around 400,000 now describe the player: ease toward 1.1x.
+    profile.recordInfinitePace(400000);
+    expect(profile.infiniteStartSpeed, closeTo(1.45, 1e-10));
+    for (var i = 0; i < 20; i++) {
+      profile.recordInfinitePace(400000);
+    }
+    expect(
+      profile.infiniteStartSpeed,
+      closeTo(InfiniteTuning.startingSpeedMultiplier(400000), 1e-10),
+    );
+  });
+
+  test('hidden pacing survives saving and loading', () async {
+    final profile = PlayerProfile();
+    await profile.load();
+    for (var i = 0; i < 4; i++) {
+      profile.recordInfinitePace(900000);
+    }
+    await profile.save();
+    final restored = PlayerProfile();
+    await restored.load();
+    expect(restored.recentInfiniteScores, profile.recentInfiniteScores);
+    expect(restored.infiniteStartSpeed, profile.infiniteStartSpeed);
+  });
+
+  testWidgets('settings no longer show a faster start switch', (tester) async {
     final profile = PlayerProfile()
       ..tutorialSeen = true
       ..sound = false
@@ -173,30 +203,8 @@ void main() {
     await tester.tap(find.byTooltip('Settings'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    final toggle = find.byKey(const ValueKey('infinite-fast-start'));
-    await tester.ensureVisible(toggle);
-    await tester.pump();
-    expect(tester.widget<MenuToggle>(toggle).value, isTrue);
-    final switchTile = find.descendant(
-      of: toggle,
-      matching: find.byType(SwitchListTile),
-    );
-    await tester.tap(switchTile);
-    await tester.pump();
-    expect(profile.infiniteFastStart, isFalse);
-    expect(game.survival.startingPace, 1);
-    expect(game.waitingForInput, isTrue);
-    await tester.tap(switchTile);
-    await tester.pump();
-    expect(profile.infiniteFastStart, isTrue);
-    expect(game.survival.startingPace, closeTo(13 / 6, 1e-10));
-    Navigator.of(tester.element(toggle)).pop();
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
-    await selectWorld(tester, 1);
-    expect(game.survival.startingPace, 1);
-    await selectWorld(tester, 0);
-    expect(game.survival.startingPace, closeTo(13 / 6, 1e-10));
+    expect(find.byKey(const ValueKey('infinite-fast-start')), findsNothing);
+    expect(find.text('Faster start'), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

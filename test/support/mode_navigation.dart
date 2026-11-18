@@ -5,10 +5,8 @@ import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/one_finger_controls.dart';
 
 Future<void> openClassicLevels(WidgetTester tester) async {
-  await tester.tap(find.byTooltip('Modes'));
-  await tester.pump();
-  await tester.pump(const Duration(milliseconds: 400));
-  await tester.tap(find.text('Classic levels'));
+  await selectWorld(tester, 1);
+  await tester.tap(find.byKey(const ValueKey('choose-level')).hitTestable());
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 400));
 }

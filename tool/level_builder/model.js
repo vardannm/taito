@@ -4,7 +4,7 @@
   const clone = value => JSON.parse(JSON.stringify(value));
   // dashLength 0 is a solid laser; otherwise lit dashes with gaps slide dashSpeed units/s along the beam.
   const waveDefaults = {motion: 'legacy', orientation: 'vertical', radiusX: 40, radiusY: 25, period: 4, phase: 0,
-    dashLength: 0, dashGap: 30, dashSpeed: 0, stopAboveStart: false};
+    dashLength: 0, dashGap: 30, dashSpeed: 0, stopAboveStart: true};
   // A vertical beam ends at 537, or above the ball's launch spot (SpecialHazard.startClearBottom).
   const laserBottom = w => w.stopAboveStart ? 470 : 537;
   const dashDefaults = {dashLength: 60, dashGap: 36, dashSpeed: 40};
@@ -206,7 +206,7 @@
         `      period: ${num(w.period)},`, `      phase: ${num(w.phase)},`,
         ...(w.kind === 'laser' && w.dashLength > 0 ? [`      dashLength: ${num(w.dashLength)},`, `      dashGap: ${num(w.dashGap)},`,
           `      dashSpeed: ${num(w.dashSpeed)},`] : []),
-        ...(w.kind === 'laser' && w.stopAboveStart ? ['      stopAboveStart: true,'] : []),
+        ...(w.kind === 'laser' ? [`      stopAboveStart: ${w.stopAboveStart},`] : []),
         `      warningSeconds: ${num(w.warningSeconds)},`, `      liveSeconds: ${num(w.liveSeconds)},`, '      positions: [');
       for (const p of w.positions) lines.push(`        ClassicHazardPosition(target: ${p.target}, x: ${num(p.x)}, y: ${num(p.y)}),`);
       lines.push('      ],', '    ),');

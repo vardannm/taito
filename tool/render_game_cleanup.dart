@@ -85,7 +85,7 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 800));
         await capture('shop-$width');
-        await tester.tap(find.text('Upgrades'));
+        await tester.ensureVisible(find.byKey(const ValueKey('shop-upgrades')));
         await tester.pump();
         await capture('upgrades-$width');
         await tester.tap(find.byTooltip('Done shopping'));

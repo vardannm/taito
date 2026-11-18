@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/main.dart';
 import 'package:balance_arcade/profile.dart';
-import 'package:balance_arcade/menu_design.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import '../test/support/mode_navigation.dart';
@@ -100,24 +99,13 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('board-shop')));
       await settle();
       await capture('shop-$variant');
-      for (final category in ['Platforms', 'Cabinet Styles', 'Upgrades']) {
-        await tester.scrollUntilVisible(
-          find.text(category),
-          160,
-          scrollable: find.byType(Scrollable).last,
-        );
-        final tab = find
-            .ancestor(of: find.text(category), matching: find.byType(InkWell))
-            .first;
-        await tester.ensureVisible(tab);
-        await tester.pump();
-        await tester.tap(tab);
+      for (final (name, key) in [
+        ('platforms', 'platform-showcase'),
+        ('upgrades', 'shop-upgrades'),
+      ]) {
+        await tester.ensureVisible(find.byKey(ValueKey(key)));
         await settle();
-        expect(
-          tester.widget<MenuTabs>(find.byType(MenuTabs)).selected,
-          ['Platforms', 'Cabinet Styles', 'Upgrades'].indexOf(category) + 1,
-        );
-        await capture('${category.split(' ').first.toLowerCase()}-$variant');
+        await capture('$name-$variant');
       }
       Navigator.of(tester.element(find.byType(GameScreen))).pop();
       await settle();

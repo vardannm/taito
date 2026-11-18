@@ -8,6 +8,8 @@ import 'rewards.dart';
 /// interrupted launch from asking the player to collect the same reward again.
 enum TutorialStep {
   controls,
+  controlsLift,
+  controlsRegrab,
   heartsHoles,
   heartsFeedback,
   coins,
@@ -39,11 +41,12 @@ enum TutorialStep {
   bool get inInfinite => index <= freePlay.index;
   bool get scripted => index < freePlay.index;
   bool get inShop => index >= shop.index && index <= shopBrowse.index;
+  bool get teachesControls => index <= controlsRegrab.index;
 
   /// The lesson this checkpoint belongs to, from 1 to [lessons]. Feedback
   /// checkpoints share their lesson's place on the progress bar.
   int get lesson => switch (this) {
-    controls => 1,
+    controls || controlsLift || controlsRegrab => 1,
     heartsHoles || heartsFeedback => 2,
     coins || coinsFeedback => 3,
     shield || shieldFeedback => 4,
@@ -62,15 +65,18 @@ class TutorialProgress {
   TutorialProgress({
     this.step = TutorialStep.controls,
     this.freePlaySeconds = 0,
+    this.twoFingerReplay = false,
   });
   TutorialStep step;
   double freePlaySeconds;
+  final bool twoFingerReplay;
   bool get active => step != TutorialStep.completed;
   bool get gameplayComplete => step.index >= TutorialStep.dailyChallenge.index;
 
   Map<String, Object> toJson() => {
     'step': step.storageName,
     'freePlaySeconds': freePlaySeconds,
+    if (twoFingerReplay && active) 'twoFingerReplay': true,
   };
 
   factory TutorialProgress.fromJson(Map<String, dynamic> data) {
@@ -84,6 +90,7 @@ class TutorialProgress {
       freePlaySeconds: seconds is num && seconds.isFinite
           ? seconds.toDouble().clamp(0, 45)
           : 0,
+      twoFingerReplay: data['twoFingerReplay'] == true,
     );
   }
 }
@@ -94,7 +101,8 @@ class TutorialRun {
   final BalanceGame game;
   final TutorialProgress progress;
   final void Function() onChanged;
-  double age = 0, initialHeight = 0;
+  double age = 0, initialLeft = 0, initialRight = 0;
+  bool releasedForRegrab = false;
   int initialCoins = 0, initialLives = 3;
   Hole? hole;
   BrassCoin? coin;
@@ -113,7 +121,13 @@ class TutorialRun {
     coin = null;
     pickup = null;
     boss = null;
-    initialHeight = game.screenY((game.left + game.right) / 2);
+    initialLeft = game.left;
+    initialRight = game.right;
+    releasedForRegrab =
+        !game.pivotHeld(0) &&
+        !game.pivotHeld(1) &&
+        game.leftInput == 0 &&
+        game.rightInput == 0;
     initialCoins = game.coinsCollected;
     initialLives = game.lives;
     final step = progress.step;
@@ -122,7 +136,7 @@ class TutorialRun {
       return;
     }
     game.tutorialCourse = true;
-    game.tutorialAscent = step == TutorialStep.controls ? 0 : 30;
+    game.tutorialAscent = step.teachesControls ? 0 : 30;
     game.board.clear();
     game.coins.clear();
     game.survival.items.clear();
@@ -198,17 +212,10 @@ class TutorialRun {
     }
     age += dt;
     switch (progress.step) {
-      case TutorialStep.controls:
-        if ((game.controlHeld ||
-                game.pivotTargets.any((p) => p != null) ||
-                game.leftInput != 0 ||
-                game.rightInput != 0) &&
-            ((game.right - game.left).abs() >= 20 ||
-                (game.screenY((game.left + game.right) / 2) - initialHeight)
-                        .abs() >=
-                    18)) {
-          advance(TutorialStep.heartsHoles);
-        }
+      case TutorialStep.controls ||
+          TutorialStep.controlsLift ||
+          TutorialStep.controlsRegrab:
+        tickControls();
       case TutorialStep.heartsHoles:
         if (game.lives < initialLives || game.ballY < hole!.y - 28) {
           advance(TutorialStep.heartsFeedback);
@@ -267,6 +274,51 @@ class TutorialRun {
           advance(TutorialStep.shop);
         } else if (before != progress.freePlaySeconds ~/ 5) {
           onChanged();
+        }
+      default:
+        break;
+    }
+  }
+
+  void tickControls() {
+    final leftHeld = game.pivotHeld(0) || game.leftInput != 0;
+    final rightHeld = game.pivotHeld(1) || game.rightInput != 0;
+    final tilted = (game.right - game.left).abs() >= 20;
+    if (game.controlMode != ControlMode.twoFinger) {
+      final lift = (initialLeft + initialRight - game.left - game.right) / 2;
+      if ((game.controlHeld || leftHeld || rightHeld) &&
+          (tilted || lift.abs() >= 18)) {
+        advance(TutorialStep.heartsHoles);
+      }
+      return;
+    }
+    switch (progress.step) {
+      case TutorialStep.controls:
+        if (leftHeld != rightHeld && tilted) advance(TutorialStep.controlsLift);
+      case TutorialStep.controlsLift:
+        if (leftHeld && rightHeld) {
+          // A player at the top of their travel can lower the board and retry.
+          initialLeft = math.max(initialLeft, game.left);
+          initialRight = math.max(initialRight, game.right);
+          if (initialLeft - game.left >= 18 &&
+              initialRight - game.right >= 18) {
+            advance(TutorialStep.controlsRegrab);
+          }
+        } else {
+          initialLeft = game.left;
+          initialRight = game.right;
+        }
+      case TutorialStep.controlsRegrab:
+        if (!leftHeld && !rightHeld) {
+          releasedForRegrab = true;
+          initialLeft = game.left;
+          initialRight = game.right;
+        } else if (releasedForRegrab &&
+            leftHeld &&
+            rightHeld &&
+            (game.left - initialLeft).abs() >= 12 &&
+            (game.right - initialRight).abs() >= 12) {
+          advance(TutorialStep.heartsHoles);
         }
       default:
         break;

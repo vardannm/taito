@@ -91,6 +91,7 @@ void main() {
     ]));
     expect(rings, hasLength(6));
     expect(beams, hasLength(5), reason: 'two pairs of rails and one lance');
+    expect(beams.map((shot) => shot.dashes!.gap), everyElement(72.0));
     expect(boss.displayName, 'NOVA PULSAR');
   });
 
@@ -112,6 +113,8 @@ void main() {
         final (start, width) = ring.gaps.first;
         final down = start + width / 2;
         expect(down, inInclusiveRange(math.pi * .35, math.pi * .65));
+        // At least four openings, so one is always within reach.
+        expect(ring.gaps.length, greaterThanOrEqualTo(4));
         // Even 120 units from the core the opening fits the ball easily.
         for (final (_, w) in ring.gaps) {
           expect(w * 120, greaterThan(body * 1.5));

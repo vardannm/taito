@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:balance_arcade/ball_cosmetics.dart';
 import 'package:balance_arcade/ball_shop.dart';
+import 'support/shop_navigation.dart';
 import 'package:balance_arcade/game.dart';
 import 'package:balance_arcade/platforms.dart';
 import 'package:balance_arcade/profile.dart';
@@ -130,21 +131,10 @@ void main() {
           home: Scaffold(body: BallShop(profile: p)),
         ),
       );
-      final scroll = find
-          .descendant(
-            of: find.byType(BallShop),
-            matching: find.byType(Scrollable),
-          )
-          .first;
-      await tester.scrollUntilVisible(
-        find.byKey(const ValueKey('buy-aether')),
-        240,
-        scrollable: scroll,
-        maxScrolls: 100,
-      );
+      await revealShopBall(tester, BallCosmetic.aether);
       await tester.pump();
       expect(find.text('Coming soon'), findsNothing);
-      expect(find.text('25,000'), findsOneWidget);
+      expect(find.text('25,000'), findsWidgets);
       await tester.tap(find.byKey(const ValueKey('buy-aether')));
       await tester.pump();
       expect(p.ownedBalls.contains(BallCosmetic.aether), isTrue);
@@ -152,19 +142,7 @@ void main() {
       expect(p.wallet, 100000 - BallCosmetic.aether.cost);
       // Out of reach now: the price stays and the button waits.
       p.wallet = PlatformStyle.aether.cost - 1;
-      await tester.tap(find.text('Platforms'));
-      await tester.pump();
-      await tester.scrollUntilVisible(
-        find.byKey(const ValueKey('buy-platform-aether')),
-        240,
-        scrollable: find
-            .descendant(
-              of: find.byType(BallShop),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-        maxScrolls: 100,
-      );
+      await revealShopPlatform(tester, PlatformStyle.aether);
       expect(
         tester
             .widget<FilledButton>(

@@ -86,11 +86,12 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       await capture('gear-shop-${width.toInt()}');
-      await tester.ensureVisible(find.text('Platforms'));
-      await tester.tap(find.text('Platforms'));
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('platform-showcase')),
+      );
       await tester.pump();
       await capture('platform-shop-${width.toInt()}');
-      Navigator.of(tester.element(find.text('Platforms'))).pop();
+      await tester.tap(find.byTooltip('Done shopping'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       await tester.sendKeyDownEvent(LogicalKeyboardKey.keyW);

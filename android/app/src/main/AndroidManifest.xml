@@ -8,6 +8,8 @@
         <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-8791729869708798~4165679478" />
         <meta-data android:name="firebase_analytics_collection_enabled" android:value="false" />
+        <!-- Older Huawei EMUI builds need this to draw beside the notch. -->
+        <meta-data android:name="android.notch_support" android:value="true" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

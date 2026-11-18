@@ -12,7 +12,9 @@ abstract final class MergeDifficulty {
 
   // Distance between new waves (> 0). Larger means more breathing room.
   // Time between waves is waveSpacing / current falling speed.
-  static const waveSpacing = 96.0;
+  // Raised from 96 so about a quarter fewer balls share the screen.
+  // Keep <= ~138 so gates still leave 2.5 waves to grow past them.
+  static const waveSpacing = 128.0;
 
   // Opening: three rows starting at y=90. Spacing must be > 0 and <= 140
   // so all three rows start above the player's launch position.
