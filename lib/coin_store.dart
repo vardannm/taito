@@ -7,9 +7,9 @@ import 'premium_menu.dart' show formatMenuScore;
 import 'profile.dart';
 
 /// The coin store is a placeholder until App Store and Google Play billing
-/// are connected. App Review rejects purchases that do nothing, so switch
-/// this off for a store submission until then.
-const coinStoreVisible = true;
+/// are connected. App Review rejects purchases that do nothing, so it stays
+/// hidden for launch; turn it back on only once real billing works.
+const coinStoreVisible = false;
 
 /// A real-money coin pack. [id] is the intended store product id; [price] is
 /// a USD placeholder until the stores supply localized prices.

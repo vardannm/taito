@@ -1,0 +1,142 @@
+{
+  "status": "passed",
+  "date": "2026-11-19",
+  "screenshotCount": 18,
+  "checks": [
+    "six screenshots per device",
+    "exact 9:16 dimensions",
+    "Google Play size bounds",
+    "24-bit RGB/no alpha",
+    "PNG chunk CRC and decoded pixels",
+    "unaltered Android UI captures",
+    "manifest provenance"
+  ],
+  "images": [
+    {
+      "file": "screenshots/phone/01-boss.png",
+      "width": 1080,
+      "height": 1920,
+      "bytes": 584657,
+      "sha256": "a35a9f2fe1beb8c9dcd532a2a10e4530c392bc04a42b28187c947f4364550868"
+    },
+    {
+      "file": "screenshots/phone/02-infinite-mid.png",
+      "width": 1080,
+      "height": 1920,
+      "bytes": 764123,
+      "sha256": "2ada45228d1249eb36015e78905ed6d7a80610007f57b419106d83c73f522a69"
+    },
+    {
+      "file": "screenshots/phone/03-shop.png",
+      "width": 1080,
+      "height": 1920,
+      "bytes": 413502,
+      "sha256": "3176fe0c68f3bd608ea73115936508ece120885e5feb53dc4fc2396f79af2443"
+    },
+    {
+      "file": "screenshots/phone/04-level-23.png",
+      "width": 1080,
+      "height": 1920,
+      "bytes": 571341,
+      "sha256": "4caa1b276fbccce526b0a91b5eeae56fce5259be6fb982e42267a12edeeb8de7"
+    },
+    {
+      "file": "screenshots/phone/05-level-76.png",
+      "width": 1080,
+      "height": 1920,
+      "bytes": 883684,
+      "sha256": "4df2d1f41e946895708fff6d3f875e048d3d636ff624ce03621b09d0a7a22610"
+    },
+    {
+      "file": "screenshots/phone/06-infinite.png",
+      "width": 1080,
+      "height": 1920,
+      "bytes": 819316,
+      "sha256": "179e4501b20870fef7046e32166b4dbb786aa0f62444b08bf9ff16136a59ea87"
+    },
+    {
+      "file": "screenshots/tablet-7/01-boss.png",
+      "width": 1440,
+      "height": 2560,
+      "bytes": 579840,
+      "sha256": "2afdf1610ee6ed12c4aa13c16dc71b6ed3dc0774e93decd79a722000c9edaf6c"
+    },
+    {
+      "file": "screenshots/tablet-7/02-infinite-mid.png",
+      "width": 1440,
+      "height": 2560,
+      "bytes": 680768,
+      "sha256": "c62d5284be4946d85588f5111cd11e49eaf62be9be4505924e575a46a4202236"
+    },
+    {
+      "file": "screenshots/tablet-7/03-shop.png",
+      "width": 1440,
+      "height": 2560,
+      "bytes": 754254,
+      "sha256": "3e055055c13e38cc53da48a711d89bf0033f96eb6c3595eb456f08bb98be8815"
+    },
+    {
+      "file": "screenshots/tablet-7/04-level-23.png",
+      "width": 1440,
+      "height": 2560,
+      "bytes": 1237001,
+      "sha256": "f6b201322e5523d2674f6f7323db30a9e21e6e87f5f3f6ba186e1be399436616"
+    },
+    {
+      "file": "screenshots/tablet-7/05-level-76.png",
+      "width": 1440,
+      "height": 2560,
+      "bytes": 1175376,
+      "sha256": "19db80185c9d8cd1d6311966bf12cb0ff9de6a4e9a61c5ade55aa1ac8eb15615"
+    },
+    {
+      "file": "screenshots/tablet-7/06-infinite.png",
+      "width": 1440,
+      "height": 2560,
+      "bytes": 962239,
+      "sha256": "57fba7af81d0310071120585e86a1870b325818dca2bbe315fb14c43360f73b3"
+    },
+    {
+      "file": "screenshots/tablet-10/01-boss.png",
+      "width": 1800,
+      "height": 3200,
+      "bytes": 761764,
+      "sha256": "e3cffb1e6045f21f9dead1c3babf62a59910ee009735c57b9974664cde31e66a"
+    },
+    {
+      "file": "screenshots/tablet-10/02-infinite-mid.png",
+      "width": 1800,
+      "height": 3200,
+      "bytes": 864792,
+      "sha256": "a3d15e226cdc4785cabe84c1212d23efc348295aaa39be553b068db8ff03269b"
+    },
+    {
+      "file": "screenshots/tablet-10/03-shop.png",
+      "width": 1800,
+      "height": 3200,
+      "bytes": 1018782,
+      "sha256": "fa278ec53a6700f28f1fb4f072f209dd5ca42dc239d45ab7aaf516d4299cc453"
+    },
+    {
+      "file": "screenshots/tablet-10/04-level-23.png",
+      "width": 1800,
+      "height": 3200,
+      "bytes": 1674411,
+      "sha256": "85067fbf53c8e40f9ad0f04c9deaacf49a34f761501213ccd32f9ea9ee5ceaa5"
+    },
+    {
+      "file": "screenshots/tablet-10/05-level-76.png",
+      "width": 1800,
+      "height": 3200,
+      "bytes": 1562729,
+      "sha256": "6ca4c6e8dbaa949221bc914ea0b2717e90900a25b1fac45d4260569b4b4efddd"
+    },
+    {
+      "file": "screenshots/tablet-10/06-infinite.png",
+      "width": 1800,
+      "height": 3200,
+      "bytes": 1248493,
+      "sha256": "48c7f495575cfa7ca8a52966af0a4e62af15e30cf1d94a9c77684efc7c40369d"
+    }
+  ]
+}

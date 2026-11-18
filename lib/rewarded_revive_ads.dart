@@ -31,13 +31,14 @@ class GoogleRewardedReviveAds implements RewardedReviveAds {
   static const androidUnit = 'ca-app-pub-3940256099942544/5224354917';
   static const iosUnit = 'ca-app-pub-3940256099942544/1712485313';
   static const productionAndroidUnit = 'ca-app-pub-8791729869708798/6338923389';
+  static const productionIosUnit = 'ca-app-pub-8791729869708798/9566986836';
   static String unitFor(
     TargetPlatform platform, {
     required bool release,
     required bool testAds,
   }) => platform == TargetPlatform.android
       ? (release && !testAds ? productionAndroidUnit : androidUnit)
-      : iosUnit;
+      : (release && !testAds ? productionIosUnit : iosUnit);
   bool _disposed = false, _busy = false;
   Future<void>? _initialization;
   Completer<ReviveAdResult>? _result;

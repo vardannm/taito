@@ -60,7 +60,7 @@ void main() {
     );
   }
 
-  test('release Android IDs and test overrides stay separate', () {
+  test('release platform IDs and test overrides stay separate', () {
     expect(
       GoogleRewardedReviveAds.unitFor(
         TargetPlatform.android,
@@ -89,6 +89,22 @@ void main() {
       GoogleRewardedReviveAds.unitFor(
         TargetPlatform.iOS,
         release: true,
+        testAds: false,
+      ),
+      GoogleRewardedReviveAds.productionIosUnit,
+    );
+    expect(
+      GoogleRewardedReviveAds.unitFor(
+        TargetPlatform.iOS,
+        release: true,
+        testAds: true,
+      ),
+      GoogleRewardedReviveAds.iosUnit,
+    );
+    expect(
+      GoogleRewardedReviveAds.unitFor(
+        TargetPlatform.iOS,
+        release: false,
         testAds: false,
       ),
       GoogleRewardedReviveAds.iosUnit,

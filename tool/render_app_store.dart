@@ -30,7 +30,7 @@ const playStore = String.fromEnvironment('STORE_PLATFORM') == 'android';
 const outputRoot = String.fromEnvironment(
   'STORE_OUTPUT',
   defaultValue: playStore
-      ? 'release/google-play/2026-10-23'
+      ? 'release/google-play/2026-11-19'
       : 'release/app-store/2026-10-18',
 );
 
@@ -64,6 +64,8 @@ const appleDevices = [
   StoreDevice('duo-inner', 2853, 2007, 3, 28, 24),
 ];
 
+enum InfiniteScene { early, mid, boss }
+
 class StoreShot {
   const StoreShot(
     this.id,
@@ -71,14 +73,83 @@ class StoreShot {
     this.detail,
     this.tag,
     this.ball,
-    this.mode,
-  );
+    this.mode, {
+    this.level = 8,
+    this.scene = InfiniteScene.early,
+    this.bossKind = BossKind.prismReaver,
+  });
   final String id, title, detail, tag;
   final BallCosmetic ball;
   final GameMode? mode;
+
+  /// Classic level shown when [mode] is Classic.
+  final int level;
+
+  /// Infinite staging when [mode] is Infinite.
+  final InfiniteScene scene;
+  final BossKind bossKind;
 }
 
-const shots = [
+const shots = playStore ? playShots : appleShots;
+
+/// Google Play set. Titles only label the manifest; Play images are plain UI.
+const playShots = [
+  StoreShot(
+    '01-boss',
+    'Boss encounter',
+    'Read the attack. Find your opening.',
+    'BOSS',
+    BallCosmetic.neon,
+    GameMode.infinite,
+    scene: InfiniteScene.boss,
+    bossKind: BossKind.chronoKeeper,
+  ),
+  StoreShot(
+    '02-infinite-mid',
+    'Infinite, deep run',
+    'Keep climbing. Build your combo.',
+    'INFINITE',
+    BallCosmetic.aurora,
+    GameMode.infinite,
+    scene: InfiniteScene.mid,
+  ),
+  StoreShot(
+    '03-shop',
+    'Gear Shop',
+    'Discover new ball worlds and gear.',
+    'GEAR & WORLDS',
+    BallCosmetic.coral,
+    null,
+  ),
+  StoreShot(
+    '04-level-23',
+    'Classic level 23',
+    'Learn the patterns. Master the gaps.',
+    'CLASSIC',
+    BallCosmetic.pearl,
+    GameMode.classic,
+    level: 23,
+  ),
+  StoreShot(
+    '05-level-76',
+    'Classic level 76',
+    'Learn the patterns. Master the gaps.',
+    'CLASSIC',
+    BallCosmetic.steel,
+    GameMode.classic,
+    level: 76,
+  ),
+  StoreShot(
+    '06-infinite',
+    'Infinite',
+    'Find your flow.',
+    'INFINITE',
+    BallCosmetic.circuit,
+    GameMode.infinite,
+  ),
+];
+
+const appleShots = [
   StoreShot(
     '01-precision',
     'One ball.\nTotal focus.',
@@ -102,6 +173,7 @@ const shots = [
     'CLASSIC',
     BallCosmetic.steel,
     GameMode.classic,
+    level: 60,
   ),
   StoreShot(
     '04-boss',
@@ -110,6 +182,7 @@ const shots = [
     'BOSS ENCOUNTERS',
     BallCosmetic.neon,
     GameMode.infinite,
+    scene: InfiniteScene.boss,
   ),
   StoreShot(
     '05-merge',
@@ -187,16 +260,18 @@ void main() {
           ..sound = false
           ..music = false
           ..haptics = false
-          ..wallet = 420
+          // Play shows an affordable featured ball rather than a coin shortfall.
+          ..wallet = playStore ? 4820 : 420
           ..controlMode = device.tablet
               ? ControlMode.twoFinger
               : ControlMode.oneFinger
-          ..classicLevel = shot.id == '03-classic' ? 60 : 8
+          ..classicLevel = shot.level
           ..selectedBall = shot.ball;
         profile.ownedBalls.addAll([
           BallCosmetic.coral,
           BallCosmetic.circuit,
           BallCosmetic.neon,
+          shot.ball,
         ]);
         for (var level = 1; level < profile.classicLevel; level++) {
           profile.levelRecords[profile.recordKey(
@@ -240,18 +315,19 @@ void main() {
             await startWorld(tester);
             await tester.pump(const Duration(milliseconds: 650));
           }
-          if (find.text('START FINALE').evaluate().isNotEmpty) {
-            await tester.tap(find.text('START FINALE'));
+          // Finale levels open on a briefing card; start them like a player.
+          if (find.text('START LEVEL').evaluate().isNotEmpty) {
+            await tester.tap(find.text('START LEVEL'));
             await tester.pump();
           }
           state.ticker.stop();
           final game = tester.widget<PivotBoard>(find.byType(PivotBoard)).game;
           if (game.infinite) {
-            stageInfinite(game, shot.id == '04-boss');
+            stageInfinite(game, shot);
           } else if (game.merging) {
             stageMerge(game);
           } else {
-            stageClassic(game, shot.id == '03-classic');
+            stageClassic(game, shot.level);
           }
           // This updates the same HUD, backdrop and board notifiers as gameplay.
           state.previous = const Duration(milliseconds: 1000);
@@ -320,12 +396,19 @@ void main() {
   }, timeout: const Timeout(Duration(minutes: 8)));
 }
 
-void stageClassic(BalanceGame game, bool orbits) {
-  game.target = orbits ? 4 : 3;
+void stageClassic(BalanceGame game, int level) {
+  // Mid-level progress: target, score and time grow with the level.
+  final (target, score, elapsed) = switch (level) {
+    <= 8 => (3, 1760, 38.2),
+    <= 30 => (5, 3120, 51.6),
+    <= 60 => (4, 3810, 73.4),
+    _ => (5, 4970, 84.9),
+  };
+  game.target = target;
   game.completed = game.target - 1;
-  game.score = orbits ? 3810 : 1760;
+  game.score = score;
   game.streak = game.completed;
-  game.elapsed = orbits ? 73.4 : 38.2;
+  game.elapsed = elapsed;
   game.message = '';
   game.clock = 12.2;
   game.velocity = 0;
@@ -351,72 +434,101 @@ void stageClassic(BalanceGame game, bool orbits) {
       }
     }
   }
-  if (orbits) {
-    // Moving holes now persist from level start, rather than appearing as
-    // target-specific timed waves. Capture those real instances in motion.
-    for (final hazard in game.specialHazards) {
-      hazard.step(1.1, 0);
-    }
+  // Moving holes persist from level start, rather than appearing as
+  // target-specific timed waves. Capture those real instances in motion.
+  for (final hazard in game.specialHazards) {
+    hazard.step(1.1, 0);
   }
 }
 
-void stageInfinite(BalanceGame game, bool boss) {
-  final camera = boss ? 82000.0 : 7600.0;
+void stageInfinite(BalanceGame game, StoreShot shot) {
+  final boss = shot.scene == InfiniteScene.boss;
+  final mid = shot.scene == InfiniteScene.mid;
+  final camera = boss
+      ? 82000.0
+      : mid
+      ? 31200.0
+      : 7600.0;
   game.cameraOffset = camera;
   game.maxHeight = camera + 400;
   game.dangerY = 620 - camera;
-  game.ballX = boss ? 240 : 178;
+  game.ballX = boss
+      ? 240
+      : mid
+      ? 196
+      : 178;
   // A valid raised-platform pose keeps the boss in view on shorter displays.
-  game.left = (boss ? 338 : 438) - camera;
-  game.right = (boss ? 324 : 414) - camera;
+  game.left = (boss ? 338 : mid ? 414 : 438) - camera;
+  game.right = (boss ? 324 : mid ? 432 : 414) - camera;
   game.velocity = 0;
   game.controlPosition = (game.right - game.left) / 140;
-  game.score = boss ? 912840 : 18460;
+  game.score = boss
+      ? 912840
+      : mid
+      ? 186320
+      : 18460;
   game.survival.points = game.score.toDouble();
-  game.elapsed = boss ? 642 : 146;
+  game.elapsed = boss
+      ? 642
+      : mid
+      ? 318
+      : 146;
   game.clock = 13.2;
   game.survival.scoredMetres = game.metres.toDouble();
-  game.survival.combo = boss ? 4 : 7;
+  game.survival.combo = boss
+      ? 4
+      : mid
+      ? 9
+      : 7;
   game.survival.bestCombo = game.survival.combo;
   game.survival.visualCombo = (game.survival.combo - 1) / 9;
-  game.survival.shield = boss ? 0 : 6.4;
-  game.coinsCollected = boss ? 86 : 24;
+  game.survival.shield = boss || mid ? 0 : 6.4;
+  game.coinsCollected = boss
+      ? 86
+      : mid
+      ? 58
+      : 24;
+  // The deep run uses a denser, mirrored course so it reads differently.
+  final holes = mid
+      ? [
+          (284.0, 130.0),
+          (92.0, 172.0),
+          (210.0, 232.0),
+          (62.0, 300.0),
+          (250.0, 318.0),
+          (140.0, 372.0),
+        ]
+      : [(78.0, 155.0), (266.0, 190.0), (116.0, 284.0), (296.0, 340.0)];
+  final coins = mid
+      ? [(150.0, 118.0), (180.0, 150.0), (210.0, 182.0), (300.0, 262.0)]
+      : [(216.0, 140.0), (154.0, 237.0), (218.0, 315.0), (126.0, 370.0)];
   game.board
     ..clear()
-    ..addAll([
-      for (final p in [
-        (78.0, 155.0),
-        (266.0, 190.0),
-        (116.0, 284.0),
-        (296.0, 340.0),
-      ])
-        Hole(p.$1, p.$2 - camera),
-    ]);
+    ..addAll([for (final p in holes) Hole(p.$1, p.$2 - camera)]);
   game.coins
     ..clear()
-    ..addAll([
-      for (final p in [
-        (216.0, 140.0),
-        (154.0, 237.0),
-        (218.0, 315.0),
-        (126.0, 370.0),
-      ])
-        BrassCoin(p.$1, p.$2 - camera),
-    ]);
+    ..addAll([for (final p in coins) BrassCoin(p.$1, p.$2 - camera)]);
   game.survival.items
     ..clear()
-    ..addAll([
-      InfiniteItem(InfiniteItemKind.combo, 178, 190 - camera),
-      InfiniteItem(InfiniteItemKind.combo, 210, 360 - camera),
-      InfiniteItem(InfiniteItemKind.magnet, 68, 314 - camera),
-    ]);
+    ..addAll(
+      mid
+          ? [
+              InfiniteItem(InfiniteItemKind.combo, 120, 250 - camera),
+              InfiniteItem(InfiniteItemKind.magnet, 300, 200 - camera),
+            ]
+          : [
+              InfiniteItem(InfiniteItemKind.combo, 178, 190 - camera),
+              InfiniteItem(InfiniteItemKind.combo, 210, 360 - camera),
+              InfiniteItem(InfiniteItemKind.magnet, 68, 314 - camera),
+            ],
+    );
   game.specialHazards.clear();
   if (boss) {
     game.board.clear();
     game.survival.items.clear();
     game.coins.clear();
     final encounter = InfiniteBoss(
-      kind: BossKind.prismReaver,
+      kind: shot.bossKind,
       top: game.visibleTop,
       seed: 14,
     );

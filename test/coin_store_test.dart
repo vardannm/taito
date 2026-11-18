@@ -46,47 +46,36 @@ void main() {
     expect(coinPacks.last.coins, greaterThan(BallCosmetic.genesis.cost));
   });
 
-  testWidgets('the wallet opens the coin store; packs charge nothing yet', (
+  testWidgets('launch build hides every way into the coin store', (
     tester,
   ) async {
-    final p = await openShop(tester, wallet: 1234);
-    await tester.tap(find.byTooltip('Get coins'));
-    await settle(tester);
-    expect(find.text('Get coins'), findsWidgets);
-    expect(find.byKey(const ValueKey('coin-store-wallet')), findsOneWidget);
-    expect(find.text('1,234'), findsWidgets);
-    expect(find.byKey(const ValueKey('coin-store-notice')), findsNothing);
-    await tester.tap(find.byKey(const ValueKey('coin-pack-coins_30000')));
-    await settle(tester);
-    expect(find.byKey(const ValueKey('coin-store-notice')), findsOneWidget);
-    expect(find.textContaining('Nothing was charged'), findsOneWidget);
-    expect(p.wallet, 1234);
-    await tester.tap(find.byTooltip('Close coin store'));
-    await settle(tester);
+    expect(coinStoreVisible, isFalse);
+    final p = await openShop(tester, wallet: 50);
+    expect(find.byTooltip('Get coins'), findsNothing);
+    await revealShopBall(tester, BallCosmetic.coral);
+    expect(find.text('Need 10 more coins'), findsOneWidget);
+    expect(find.textContaining('Get coins'), findsNothing);
     expect(find.byType(CoinStoreSheet), findsNothing);
+    expect(p.wallet, 50);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('unaffordable gear links to the pack that covers it', (
-    tester,
-  ) async {
-    final p = await openShop(tester, wallet: 50);
-    // Coral costs 60: the first card the player cannot afford.
-    final link = find.byKey(const ValueKey('get-coins-buy-coral'));
-    await revealShopBall(tester, BallCosmetic.coral);
-    expect(find.text('Need 10 more · Get coins'), findsOneWidget);
-    // Owned gear never offers coins.
-    expect(find.byKey(const ValueKey('get-coins-buy-steel')), findsNothing);
-    await tester.ensureVisible(link);
-    await tester.pump();
-    await tester.tap(
-      find.descendant(of: link, matching: find.byType(TextButton)),
+  testWidgets('the hidden sheet still charges nothing', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final p = PlayerProfile()..wallet = 1234;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: CoinStoreSheet(profile: p, needed: 10)),
+      ),
     );
     await settle(tester);
-    expect(find.byType(CoinStoreSheet), findsOneWidget);
     expect(find.text('COVERS THIS ITEM'), findsOneWidget);
-    expect(find.text('Need 10'), findsOneWidget);
-    expect(p.wallet, 50);
+    await tester.tap(find.byKey(const ValueKey('coin-pack-coins_30000')));
+    await settle(tester);
+    expect(find.byKey(const ValueKey('coin-store-notice')), findsOneWidget);
+    expect(p.wallet, 1234);
     expect(tester.takeException(), isNull);
   });
 }

@@ -1,6 +1,29 @@
-# Rollrise Android AdMob preparation
+# Rollrise AdMob preparation
 
-Updated 23 October 2026.
+Updated 18 November 2026.
+
+## Production configuration checked — 18 November 2026
+
+Android release selection already points to the production rewarded unit below.
+A fresh Android bundle is built with `--dart-define=AD_TEST_MODE=false`; debug and
+profile builds keep sample ads. All 16 rewarded-ad and UMP tests pass. Account verification and actual ad delivery remain unverified; app readiness
+was checked in the console as described below.
+iOS app and rewarded unit were created in the signed-in AdMob console on
+18 November and connected to source:
+
+- App: `Rollrise: Ball Balance` (iOS; not yet linked to an App Store listing).
+- App ID: `ca-app-pub-8791729869708798~4597410384`.
+- Rewarded unit: `Rollrise_Rewarded_iOS`.
+- Rewarded unit ID: `ca-app-pub-8791729869708798/9566986836`.
+- Release builds select the real unit unless `AD_TEST_MODE=true`; debug/profile
+  select the iOS sample unit. The native plist uses the real iOS App ID.
+- UMP eligibility checks remain in place; iOS consent-message configuration and
+  device delivery have not been verified. No ATT message was created.
+- App Store linking and AdMob review remain outstanding. A signed iOS archive
+  and native ad playback must be checked on a Mac/iPhone.
+
+The console currently shows Android as requiring review with limited ad serving
+until a supported store listing is linked. No store listing was invented or linked.
 
 ## Registered app and rewarded unit
 
@@ -17,7 +40,7 @@ still showed Needs review; a public store link and app approval remain pending.
 The Android manifest now uses the real app ID. `GoogleRewardedReviveAds` uses
 the real rewarded unit in release builds and Google sample units in debug and
 profile builds. `--dart-define=AD_TEST_MODE=true` forces sample rewarded units
-in a release QA build. iOS retains its sample unit; this is an Android setup.
+in a release QA build. As of 18 November, iOS also selects its own production unit in release builds.
 
 ## app-ads.txt — published and verified publicly
 
@@ -104,8 +127,9 @@ An iOS ATT message is outside this Android setup and has not been created.
   Changing choices is rechecked before the next rewarded request.
 - Rewards still require the earned-reward callback and dismissal. Load failures,
   denied eligibility and closing early grant no reward.
-- Firebase Analytics is separate: collection is off by default. The optional
-  **Share gameplay analytics** switch persists the choice. Analytics advertising
+- Firebase Analytics is separate: collection is on by default for new installations
+  as of 18 November. The **Share gameplay analytics** switch allows opt-out and
+  persists the choice. Analytics advertising
   storage, ad-user-data and ad-personalization consent stay disabled.
 - The bundled and hosted policy source now describes these controls.
 

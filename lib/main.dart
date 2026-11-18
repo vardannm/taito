@@ -77,14 +77,9 @@ Future<void> main() async {
       systemNavigationBarIconBrightness: Brightness.light,
     ),
   );
-  // Store capture setup: open every level and keep at least 300,000 coins.
-  final profile = PlayerProfile(temporaryLevelAccess: true);
+  final profile = PlayerProfile();
   await profile.load();
   currentUiTheme = UiTheme.named(profile.uiTheme);
-  if (profile.wallet < 300000) {
-    profile.wallet = 300000;
-    await profile.saveEconomy();
-  }
   final analytics = await AppAnalytics.initialize();
   final adConsent = AdConsent();
   runApp(
@@ -3864,7 +3859,7 @@ class _GameScreenState extends State<GameScreen>
                   key: const ValueKey('analytics-opt-in'),
                   title: const Text('Share gameplay analytics'),
                   subtitle: const Text(
-                    'Optional usage data to help improve Rollrise',
+                    'On by default. Turn off to stop sharing gameplay usage data.',
                   ),
                   value: analytics.collectionEnabled,
                   onChanged: uiChange(context, (enabled) async {

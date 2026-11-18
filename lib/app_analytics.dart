@@ -52,7 +52,8 @@ class AppAnalytics {
       );
       final analytics = FirebaseAnalytics.instance;
       final preferences = SharedPreferencesAsync();
-      final enabled = await preferences.getBool('analytics_opt_in') ?? false;
+      // Keep the existing preference key so saved opt-outs stay respected.
+      final enabled = await preferences.getBool('analytics_opt_in') ?? true;
       Future<void> applyConsent(bool allow) async {
         await analytics.setConsent(
           analyticsStorageConsentGranted: allow,
