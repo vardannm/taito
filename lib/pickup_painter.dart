@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'arena_canvas.dart';
 
-/// Pickup faces: the brass coin and the three Infinite crystals. Every one is
+/// Pickup faces: brass coins and distinct Infinite power-ups. Every one is
 /// built from flat fills and gradients — no blurs, no layers — so a screenful
 /// of them costs the same handful of draws as a single one.
 
@@ -138,7 +138,7 @@ enum PickupFace { combo, shield, heart, magnet }
 
 const _faces = {
   PickupFace.magnet: (Color(0xFFEAF3FF), Color(0xFF3988DB), Color(0xFF243B59)),
-  PickupFace.combo: (Color(0xFFFFD873), Color(0xFFC27A15), Color(0xFF7A4A0C)),
+  PickupFace.combo: (Color(0xFFF2DDFF), Color(0xFFAD49F5), Color(0xFF501687)),
   PickupFace.shield: (Color(0xFF8FD9EC), Color(0xFF2489A6), Color(0xFF0F4B5E)),
   PickupFace.heart: (Color(0xFFFF8E97), Color(0xFFD5404C), Color(0xFF7C1F28)),
 };
@@ -150,17 +150,20 @@ void paintPickup(Canvas c, Offset p, PickupFace face, double glint) {
     return;
   }
   final (light, mid, dark) = _faces[face]!;
-  // A cream setting keeps every pickup readable on any board tint.
-  c.drawCircle(p, 13.5, Paint()..color = mid.withAlpha(46));
-  c.drawCircle(p, 11.5, Paint()..color = const Color(0xFFFBF6E7));
-  c.drawCircle(
-    p,
-    11.5,
-    Paint()
-      ..color = dark
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.6,
-  );
+  // The bolt keeps its own silhouette, with no coin-like setting.
+  if (face != PickupFace.combo) {
+    // A cream setting keeps other pickups readable on any board tint.
+    c.drawCircle(p, 13.5, Paint()..color = mid.withAlpha(46));
+    c.drawCircle(p, 11.5, Paint()..color = const Color(0xFFFBF6E7));
+    c.drawCircle(
+      p,
+      11.5,
+      Paint()
+        ..color = dark
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.6,
+    );
+  }
   final body = Path(), crown = Path();
   switch (face) {
     case PickupFace.magnet:
@@ -178,19 +181,22 @@ void paintPickup(Canvas c, Offset p, PickupFace face, double glint) {
         ..addRect(Rect.fromLTWH(p.dx - 7, p.dy - 7, 4, 4))
         ..addRect(Rect.fromLTWH(p.dx + 3, p.dy - 7, 4, 4));
     case PickupFace.combo:
-      // Brilliant cut: flat table, crown shoulders, deep pavilion.
+      // A sharp lightning silhouette, larger than a coin but the same hitbox.
       body
-        ..moveTo(p.dx - 4.6, p.dy - 4.4)
-        ..lineTo(p.dx + 4.6, p.dy - 4.4)
-        ..lineTo(p.dx + 7.6, p.dy - 1)
-        ..lineTo(p.dx, p.dy + 8.4)
-        ..lineTo(p.dx - 7.6, p.dy - 1)
+        ..moveTo(p.dx + 5, p.dy - 13)
+        ..lineTo(p.dx - 8, p.dy + 2)
+        ..lineTo(p.dx - 1, p.dy + 2)
+        ..lineTo(p.dx - 5, p.dy + 13)
+        ..lineTo(p.dx + 8, p.dy - 2)
+        ..lineTo(p.dx + 1, p.dy - 2)
         ..close();
       crown
-        ..moveTo(p.dx - 4.6, p.dy - 4.4)
-        ..lineTo(p.dx + 4.6, p.dy - 4.4)
-        ..lineTo(p.dx + 2.4, p.dy - 1)
-        ..lineTo(p.dx - 2.4, p.dy - 1)
+        ..moveTo(p.dx + 3.4, p.dy - 10)
+        ..lineTo(p.dx - 5.6, p.dy + .6)
+        ..lineTo(p.dx + 1.2, p.dy + .6)
+        ..lineTo(p.dx - 3.4, p.dy + 10)
+        ..lineTo(p.dx + 5.6, p.dy - .6)
+        ..lineTo(p.dx - 1.2, p.dy - .6)
         ..close();
     case PickupFace.shield:
       body
@@ -249,6 +255,16 @@ void paintPickup(Canvas c, Offset p, PickupFace face, double glint) {
         ..close();
   }
   final bounds = Rect.fromCircle(center: p, radius: 9);
+  if (face == PickupFace.combo) {
+    c.drawPath(
+      body,
+      Paint()
+        ..color = mid.withAlpha(55)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4
+        ..strokeJoin = StrokeJoin.round,
+    );
+  }
   c.drawPath(
     body,
     Paint()
@@ -266,36 +282,9 @@ void paintPickup(Canvas c, Offset p, PickupFace face, double glint) {
                     ))
               .createShader(bounds),
   );
-  // The upper facet catches the light; the lower body keeps its depth.
+  // The pale inset gives the bolt a luminous core and other faces a highlight.
   c.drawPath(crown, Paint()..color = light.withAlpha(150));
-  if (face == PickupFace.combo) {
-    // The cut is what makes it a gem: shoulders folding down to the tip.
-    final facets = Path()
-      ..moveTo(p.dx - 4.6, p.dy - 4.4)
-      ..lineTo(p.dx, p.dy + 8.4)
-      ..moveTo(p.dx + 4.6, p.dy - 4.4)
-      ..lineTo(p.dx, p.dy + 8.4)
-      ..moveTo(p.dx - 7.6, p.dy - 1)
-      ..lineTo(p.dx - 4.6, p.dy - 4.4)
-      ..moveTo(p.dx + 7.6, p.dy - 1)
-      ..lineTo(p.dx + 4.6, p.dy - 4.4);
-    c.drawPath(
-      facets,
-      Paint()
-        ..color = dark.withAlpha(120)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = .9,
-    );
-    // One face of the pavilion stays bright, the way a real stone does.
-    c.drawPath(
-      Path()
-        ..moveTo(p.dx - 4.6, p.dy - 4.4)
-        ..lineTo(p.dx, p.dy - 4.4)
-        ..lineTo(p.dx, p.dy + 8.4)
-        ..close(),
-      Paint()..color = light.withAlpha(58),
-    );
-  }
+
   c.drawPath(
     body,
     Paint()
@@ -304,6 +293,32 @@ void paintPickup(Canvas c, Offset p, PickupFace face, double glint) {
       ..strokeWidth = 1.1
       ..strokeJoin = StrokeJoin.round,
   );
+  if (face == PickupFace.combo) {
+    c.drawPath(
+      crown,
+      Paint()
+        ..color = light.withAlpha(210)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .65,
+    );
+    if (glint > 0) {
+      final spark = Path()
+        ..moveTo(p.dx + 5, p.dy - 13)
+        ..lineTo(p.dx + 4, p.dy - 15)
+        ..lineTo(p.dx + 7, p.dy - 16)
+        ..lineTo(p.dx + 6, p.dy - 18);
+      c.drawPath(
+        spark,
+        Paint()
+          ..color = mid.withAlpha(
+            90 + (100 * math.sin(glint * math.pi).abs()).round(),
+          )
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = .8,
+      );
+    }
+    return;
+  }
   if (glint <= 0) return;
   // A single travelling spark, brightest as it crosses the crown.
   final sweep = math.sin(glint * math.pi * 2);

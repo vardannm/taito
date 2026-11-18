@@ -1,6 +1,13 @@
 import 'dart:math' as math;
 import 'merge_difficulty.dart';
 
+class MergeCoin {
+  MergeCoin(this.x, this.y, this.value);
+  final double x;
+  double y;
+  final int value;
+}
+
 String formatMergeNumber(int value) {
   const suffixes = ['', 'k', 'm', 'b', 't', 'q'];
   var unit = 0;
@@ -80,6 +87,12 @@ class MergeRun {
   final segments = <int>[2];
   final orbs = <NumberOrb>[];
   final gates = <MergeGate>[];
+  final coins = <MergeCoin>[];
+  int coinsCollected = 0, _rows = 0;
+  MergeCoin? lastCoin;
+
+  /// One extra coin per doubling, capped to keep repeatable runs bounded.
+  int get coinValue => (head.bitLength - 1).clamp(1, 10);
   int score = 0, highest = 2, lastChain = 0, collected = 0, lastMergeScore = 0;
   int nextGateScore = gateInterval, gatesPassed = 0;
   int lastGateValue = 0;
@@ -208,6 +221,17 @@ class MergeRun {
   }
 
   void _row(double y) {
+    _rows++;
+    if (_rows % 3 == 0 && gates.every((g) => (g.y - (y - 55)).abs() > 80)) {
+      // Offset from number rows so the small gold pickup stays readable.
+      coins.add(
+        MergeCoin(
+          minHeadX + random.nextDouble() * (maxHeadX - minHeadX),
+          y - 55,
+          coinValue,
+        ),
+      );
+    }
     // One guaranteed tail match; two dangerous choices become possible later.
     // Keep the matching pickup reachable and all choices separated.
     final safeX = minHeadX + random.nextDouble() * (maxHeadX - minHeadX);
@@ -274,7 +298,21 @@ class MergeRun {
     final fallingSpeed = speed;
     final waveInterval = MergeDifficulty.waveSpacing / fallingSpeed;
     final travel = fallingSpeed * dt;
-    final contacts = <(double, NumberOrb?, MergeGate?)>[];
+    final contacts = <(double, NumberOrb?, MergeGate?, MergeCoin?)>[];
+    for (final coin in coins) {
+      final contact = _contact(
+        ax,
+        ay,
+        bx,
+        by,
+        coin.x,
+        coin.y,
+        travel,
+        ballRadius + 6.6,
+      );
+      coin.y += travel;
+      if (contact != null) contacts.add((contact, null, null, coin));
+    }
     for (final orb in orbs) {
       final contact = _contact(
         ax,
@@ -287,7 +325,7 @@ class MergeRun {
         ballRadius + fallingRadius,
       );
       orb.y += travel;
-      if (contact != null) contacts.add((contact, orb, null));
+      if (contact != null) contacts.add((contact, orb, null, null));
     }
     for (final gate in gates) {
       final from = ay - gate.y, to = by - (gate.y + gateSpeed * dt);
@@ -301,18 +339,26 @@ class MergeRun {
         contact = (-radius - from) / (to - from);
       }
       gate.y += gateSpeed * dt;
-      if (contact != null) contacts.add((contact, null, gate));
+      if (contact != null) contacts.add((contact, null, gate, null));
     }
     contacts.sort((a, b) {
       final order = a.$1.compareTo(b.$1);
       // A gate check takes priority at exactly simultaneous contact.
       if (order != 0) return order;
+      if ((a.$4 != null) != (b.$4 != null)) return a.$4 != null ? 1 : -1;
       if ((a.$3 != null) == (b.$3 != null)) return 0;
       return a.$3 != null ? -1 : 1;
     });
     var clearedGate = false;
     double? gateClearAt;
     for (final contact in contacts) {
+      if (contact.$4 != null) {
+        final coin = contact.$4!;
+        coinsCollected += coin.value;
+        lastCoin = coin;
+        coins.remove(coin);
+        continue;
+      }
       if (contact.$3 != null) {
         final gate = contact.$3!;
         if (head <= gate.requiredValue) {
@@ -335,6 +381,7 @@ class MergeRun {
       if (ended) return;
     }
     orbs.removeWhere((orb) => orb.y > 580);
+    coins.removeWhere((coin) => coin.y > 580);
     // Score gained while a gate was approaching is not a queue of old gates.
     // Start the next milestone after all pickups in this tick have resolved.
     if (clearedGate) nextGateScore = score + gateScoreGap;
@@ -342,6 +389,7 @@ class MergeRun {
     if (score >= nextGateScore && gates.isEmpty && gateCooldown == 0) {
       lastGateValue = upcomingGateValue;
       gates.add(MergeGate(lastGateValue, scoreAt: score));
+      coins.removeWhere((coin) => (coin.y - gates.last.y).abs() < 80);
       nextGateScore = score + gateScoreGap;
     }
     spawnTime += dt;

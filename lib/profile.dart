@@ -349,7 +349,7 @@ class PlayerProfile {
   }
 
   bool bankCoins(BalanceGame game) {
-    if (!game.infinite) return false;
+    if ((!game.infinite && !game.merging) || game.practice) return false;
     final previous = _bankedCoins[game];
     final count = previous?.serial == game.runSerial ? previous!.count : 0;
     final delta = game.coinsCollected - count;
@@ -668,6 +668,15 @@ class PlayerProfile {
     return save();
   }
 
+  final _levelPrizeRuns = Expando<int>();
+
+  bool earnedLevelCoinPrize(BalanceGame game) =>
+      _levelPrizeRuns[game] == game.runSerial;
+
+  bool hasCompletedLevel(int level) => ControlMode.values.any(
+    (mode) => (levelRecord(level, mode).starMask & 1) != 0,
+  );
+
   bool recordResult(BalanceGame game) {
     bankLevelStar(game);
     bankCoins(game);
@@ -678,11 +687,6 @@ class PlayerProfile {
         mergeHighest = game.mergeRun.highest;
       if (_recordedRuns[game] != game.runSerial) {
         mergeRuns++;
-        if (game.mergeRun.highest >= mergeCoinPrizeTarget) {
-          game.coinsCollected += mergeCoinPrize;
-          wallet += mergeCoinPrize;
-          unawaited(saveEconomy());
-        }
       }
       _recordedRuns[game] = game.runSerial;
       return improved;
@@ -692,9 +696,13 @@ class PlayerProfile {
         _recordedRuns[game] == game.runSerial)
       return false;
     _recordedRuns[game] = game.runSerial;
-    if (game.mode == GameMode.classic && game.won) {
-      game.coinsCollected += classicLevelCoinPrize;
-      wallet += classicLevelCoinPrize;
+    if (game.mode == GameMode.classic &&
+        game.won &&
+        !hasCompletedLevel(game.level)) {
+      _levelPrizeRuns[game] = game.runSerial;
+      final prize = classicLevelCoinPrize(game.level);
+      game.coinsCollected += prize;
+      wallet += prize;
       unawaited(saveEconomy());
     }
     if (game.infinite) {

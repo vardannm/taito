@@ -44,6 +44,7 @@ abstract final class InfiniteTuning {
   static const quillCount = 12, maxPorcupines = 2;
   static const quillSpeed = 95.0, quillRadius = 3.0;
   static const quillWarningSeconds = 1.1;
+  static const quillLifeSeconds = 4.0, quillFadeSeconds = .8;
   static const quillInterval = 4.8, porcupineSpacing = 2200.0;
   static const snakeSideSpeed = 65.0, snakeDownSpeed = 72.0;
   static const lateEnemyWarning = 1.2;

@@ -2,12 +2,17 @@ import 'dart:math' as math;
 
 import 'infinite_difficulty.dart';
 
-/// Coins banked for each successful Classic level, including replays.
-const classicLevelCoinPrize = 50;
-
-/// One repeatable prize per finished Merge run reaching 2,048 or higher.
-const mergeCoinPrize = 30;
-const mergeCoinPrizeTarget = 2048;
+/// Coins banked for the first successful completion of each Classic level.
+int classicLevelCoinPrize(int level) => const [
+  100,
+  200,
+  300,
+  400,
+  600,
+  800,
+  1000,
+  1500,
+][((level - 1) ~/ 10).clamp(0, 7)];
 
 enum CabinetStyle { brass, jade, porcelain, ember }
 

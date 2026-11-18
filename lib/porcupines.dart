@@ -37,12 +37,16 @@ class PorcupineQuill {
   bool consumed = false;
   double _oldX = 0, _oldY = 0;
   bool _stepped = false;
-  // The game prunes shots after they leave the viewport. A fixed lifetime
-  // makes upward shots vanish mid-board as the camera follows the climb.
-  bool get expired => consumed;
+  // Age advances with gameplay, without scheduling a timer per projectile.
+  bool get expired => consumed || age >= InfiniteTuning.quillLifeSeconds;
+  double get opacity => expired
+      ? 0
+      : ((InfiniteTuning.quillLifeSeconds - age) /
+                InfiniteTuning.quillFadeSeconds)
+            .clamp(0.0, 1.0);
 
   void step(double dt) {
-    if (consumed || dt <= 0 || !dt.isFinite) return;
+    if (expired || dt <= 0 || !dt.isFinite) return;
     _oldX = x;
     _oldY = y;
     _stepped = true;
@@ -54,7 +58,7 @@ class PorcupineQuill {
   /// Sweep relative motion so fast steering cannot pass through a quill.
   /// The small hit circle leaves the narrow decorative tip forgiving.
   double? contact(double ax, double ay, double bx, double by) {
-    if (consumed || !_stepped) return null;
+    if (expired || !_stepped) return null;
     return circleContact(
       ax - _oldX,
       ay - _oldY,

@@ -37,18 +37,32 @@ void main() {
     expect(p.burst().first.angle, closeTo(math.pi / 12, 1e-9));
   });
 
-  test('quills sweep fast crossings and remain live until consumed', () {
+  test('quills sweep fast crossings and stop colliding when consumed', () {
     final q = PorcupineQuill(x: 100, y: 200, angle: 0);
     q.step(.1);
     expect(q.contact(105, 140, 105, 260), isNotNull);
     expect(q.contact(105, 240, 105, 300), isNull);
-    q.step(4);
-    expect(q.expired, isFalse);
-    expect(q.contact(400, 200, 400, 200), isNotNull);
     q.consumed = true;
     q.step(.01);
     expect(q.contact(q.x, q.y, q.x, q.y), isNull);
     expect(q.expired, isTrue);
+  });
+
+  test('quills fade before expiry and cannot hit after their lifetime', () {
+    final q = PorcupineQuill(x: 100, y: 200, angle: 0);
+    expect(q.opacity, 1);
+    q.step(InfiniteTuning.quillLifeSeconds - InfiniteTuning.quillFadeSeconds);
+    expect(q.opacity, closeTo(1, 1e-9));
+    q.step(InfiniteTuning.quillFadeSeconds / 2);
+    expect(q.opacity, closeTo(.5, 1e-9));
+    expect(q.expired, isFalse);
+    q.step(InfiniteTuning.quillFadeSeconds / 2 + .001);
+    expect(q.expired, isTrue);
+    expect(q.opacity, 0);
+    expect(q.contact(q.x, q.y, q.x, q.y), isNull);
+    final x = q.x;
+    q.step(1);
+    expect(q.x, x);
   });
 
   test('visible porcupine warns, pauses, fires once and cools down', () {
@@ -172,19 +186,35 @@ void main() {
     expect(g.mazeSection, isTrue);
   });
 
-  test('upward quills stay live on screen beyond the old lifetime', () {
+  test('upward quills expire even while the camera keeps them on screen', () {
     final g = run();
     final q = PorcupineQuill(x: 85, y: 260, angle: -math.pi / 2);
     g.quills.add(q);
-    advance(g, 4);
+    advance(g, InfiniteTuning.quillLifeSeconds - .1);
     expect(g.screenY(q.y), inInclusiveRange(0, BalanceGame.height));
     expect(g.quills, contains(q));
     expect(q.expired, isFalse);
-    // The quill is removed after it fully leaves the visible board.
-    g.cameraOffset += 700;
-    g.left -= 700;
-    g.right -= 700;
-    g.step(1 / 120);
+    expect(q.opacity, lessThan(1));
+    advance(g, .2);
+    expect(g.screenY(q.y), inInclusiveRange(0, BalanceGame.height));
+    expect(q.expired, isTrue);
+    expect(g.quills, isEmpty);
+  });
+
+  test('pausing freezes quill age and fading', () {
+    final g = run();
+    final q = PorcupineQuill(x: 85, y: 260, angle: -math.pi / 2);
+    g.quills.add(q);
+    advance(g, InfiniteTuning.quillLifeSeconds - .4);
+    final age = q.age;
+    final opacity = q.opacity;
+    g.setPaused(true);
+    advance(g, 5);
+    expect(q.age, age);
+    expect(q.opacity, opacity);
+    expect(g.quills, contains(q));
+    g.setPaused(false);
+    advance(g, .5);
     expect(g.quills, isEmpty);
   });
 

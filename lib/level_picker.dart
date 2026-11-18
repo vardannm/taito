@@ -191,6 +191,12 @@ class _LevelPickerState extends State<LevelPicker> {
                           final number = first + index;
                           final open = unlocked(number);
                           final active = number == selected && open;
+                          final rewardClaimed = [
+                            records[number],
+                            if (widget.recordForControl != null)
+                              for (final mode in ControlMode.values)
+                                widget.recordForControl!(number, mode),
+                          ].any((r) => r != null && (r.starMask & 1) != 0);
                           final required = ClassicLevels.requiredStars(number);
                           final record =
                               control != null && widget.recordForControl != null
@@ -212,7 +218,7 @@ class _LevelPickerState extends State<LevelPicker> {
                                     button: true,
                                     enabled: open,
                                     label:
-                                        'Level $number, $classicLevelCoinPrize coin completion prize${number >= 31 ? ", spider territory" : ""}${open ? "" : ", locked, needs $required stars; you have $totalStars"}',
+                                        'Level $number, ${rewardClaimed ? "reward already claimed" : "${classicLevelCoinPrize(number)} coin first completion prize"}${number >= 31 ? ", spider territory" : ""}${open ? "" : ", locked, needs $required stars; you have $totalStars"}',
                                     child: Material(
                                       key: number == 1 ? firstLevelKey : null,
                                       color: Colors.transparent,
@@ -316,7 +322,9 @@ class _LevelPickerState extends State<LevelPicker> {
                                               const SizedBox(height: 7),
                                               Flexible(
                                                 child: Text(
-                                                  '+$classicLevelCoinPrize COINS',
+                                                  rewardClaimed
+                                                      ? 'REWARD CLAIMED'
+                                                      : '+${classicLevelCoinPrize(number)} COINS',
                                                   textAlign: TextAlign.center,
                                                   maxLines: 2,
                                                   overflow:

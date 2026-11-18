@@ -1563,7 +1563,13 @@ class BalanceGame {
     }
     if (merging) {
       final collectedBefore = mergeRun.collected;
+      final coinsBefore = mergeRun.coinsCollected;
       mergeRun.step(dt, oldX, oldY, ballX, ballY);
+      coinsCollected = mergeRun.coinsCollected;
+      if (coinsCollected > coinsBefore) {
+        lastCoinAge = 0;
+        event = GameEvent.coin;
+      }
       score = mergeRun.score;
       message = mergeRun.notice;
       if (mergeRun.collected != collectedBefore) event = GameEvent.merge;

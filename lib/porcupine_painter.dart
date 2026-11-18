@@ -102,6 +102,7 @@ void paintPorcupines(Canvas canvas, BalanceGame game, bool reducedMotion) {
   }
   for (final q in game.quills) {
     if (q.expired) continue;
+    final opacity = q.opacity;
     final ink = infiniteBoardInk(game, Offset(q.x, game.screenY(q.y)));
     canvas.save();
     canvas.translate(q.x, game.screenY(q.y));
@@ -115,19 +116,21 @@ void paintPorcupines(Canvas canvas, BalanceGame game, bool reducedMotion) {
     canvas.drawPath(
       shape,
       Paint()
-        ..color = ink == Colors.white
-            ? const Color(0xFF38291F)
-            : const Color(0xFFFFF3D8)
+        ..color =
+            (ink == Colors.white
+                    ? const Color(0xFF38291F)
+                    : const Color(0xFFFFF3D8))
+                .withValues(alpha: opacity)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.5
         ..strokeJoin = StrokeJoin.round,
     );
-    canvas.drawPath(shape, Paint()..color = ink);
+    canvas.drawPath(shape, Paint()..color = ink.withValues(alpha: opacity));
     canvas.drawLine(
       const Offset(-3, 0),
       const Offset(2, 0),
       Paint()
-        ..color = const Color(0xFFD99B4F)
+        ..color = const Color(0xFFD99B4F).withValues(alpha: opacity)
         ..strokeWidth = 1.4,
     );
     canvas.restore();

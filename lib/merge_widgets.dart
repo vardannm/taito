@@ -213,7 +213,7 @@ class MergeResult extends StatelessWidget {
             if (coinsEarned > 0) ...[
               const SizedBox(height: 12),
               Text(
-                '+$coinsEarned coins · 2,048 reached',
+                '+$coinsEarned coins collected · Saved to wallet',
                 key: const ValueKey('merge-coin-prize'),
                 textAlign: TextAlign.center,
                 style: TextStyle(color: menuGold, fontWeight: FontWeight.w700),

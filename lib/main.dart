@@ -807,7 +807,7 @@ class _GameScreenState extends State<GameScreen>
                       ),
                       const SizedBox(height: 16),
                       const Text(
-                        'Collect equal or smaller numbers with the head ball. Touching a larger number ends the run: dodge the red rings! The first gate arrives at ${MergeRun.gateInterval} score. After clearing it, earn at least ${MergeRun.gateInterval} fresh points for the next; this gap grows with your main ball. Gates scale with your ball and at least double each time. Your main ball must be strictly greater than its number to pass. Matching values merge anywhere in the snake. Keep merging to reach higher numbers.',
+                        'Collect equal or smaller numbers with the head ball. Touching a larger number ends the run: dodge the red rings! The first gate arrives at ${MergeRun.gateInterval} score. After clearing it, earn at least ${MergeRun.gateInterval} fresh points for the next; this gap grows with your main ball. Gates scale with your ball and at least double each time. Your main ball must be strictly greater than its number to pass. Matching values merge anywhere in the snake. Keep merging to reach higher numbers. Collect gold coins with the head ball: each is worth 1–10 coins as your ball grows, and collected coins are saved even when you lose.',
                       ),
                       const SizedBox(height: 16),
                       Text(
@@ -1412,14 +1412,14 @@ class _GameScreenState extends State<GameScreen>
               'Climb higher. Grow your score.',
             ),
             TutorialStep.combo => (
-              'Combo crystal',
-              Icons.diamond_rounded,
-              'Collect the gold crystal. Crystals multiply your points.',
+              'Multiplier bolt',
+              Icons.bolt_rounded,
+              'Collect the violet lightning bolt. Bolts multiply your points.',
             ),
             TutorialStep.comboFeedback => (
               'Combo',
-              Icons.diamond_rounded,
-              'Collect crystals to grow your Combo. A lost heart resets it.',
+              Icons.bolt_rounded,
+              'Collect lightning bolts to grow your Combo. A lost heart resets it.',
             ),
             TutorialStep.boss => (
               'Boss incoming',
@@ -1783,7 +1783,7 @@ class _GameScreenState extends State<GameScreen>
                                       ),
                                     ],
                                   ),
-                                if (game.infinite && !offeringRevive)
+                                if ((game.infinite || game.merging) && !offeringRevive)
                                   Padding(
                                     padding: const EdgeInsets.only(top: 6),
                                     child: coinChip(menuText),
@@ -2080,7 +2080,7 @@ class _GameScreenState extends State<GameScreen>
                                     ],
                                   ),
                                 ),
-                              if (game.infinite && !offeringRevive)
+                              if ((game.infinite || game.merging) && !offeringRevive)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 6),
                                   child: FittedBox(
@@ -3439,7 +3439,9 @@ class _GameScreenState extends State<GameScreen>
                               Padding(
                                 padding: const EdgeInsets.only(top: 16),
                                 child: Text(
-                                  '+$classicLevelCoinPrize coins · Level complete',
+                                  profile.earnedLevelCoinPrize(game)
+                                      ? '+${classicLevelCoinPrize(game.level)} coins · First completion'
+                                      : 'Level complete · Reward already claimed',
                                   key: const ValueKey('level-coin-prize'),
                                   textAlign: TextAlign.center,
                                   style: TextStyle(

@@ -436,6 +436,27 @@ class BoardPainter extends CustomPainter {
     canvas.save();
     canvas.clipRRect(field);
     if (game.merging) {
+      for (final coin in game.mergeRun.coins) {
+        paintBrassCoin(
+          canvas,
+          Offset(coin.x, coin.y),
+          6.6,
+          reducedMotion ? 1 : math.cos(game.clock * 1.9 + coin.x * .12),
+        );
+        if (coin.value > 1) {
+          text(canvas, '${coin.value}', Offset(coin.x, coin.y - 14), 9, ink);
+        }
+      }
+      final lastCoin = game.mergeRun.lastCoin;
+      if (lastCoin != null && game.lastCoinAge < .7) {
+        text(
+          canvas,
+          '+${lastCoin.value} COINS',
+          Offset(lastCoin.x, lastCoin.y - 18 - game.lastCoinAge * 20),
+          10,
+          ink,
+        );
+      }
       for (final orb in game.mergeRun.orbs) {
         paintNumberOrb(
           canvas,
@@ -707,7 +728,7 @@ class BoardPainter extends CustomPainter {
         reducedMotion ? 1 : math.cos(game.clock * 1.9 + coin.x * .12),
       );
     }
-    if (game.lastCoinAge < .7) {
+    if (!game.merging && game.lastCoinAge < .7) {
       text(
         canvas,
         game.scrolling ? '+1 COIN' : '+250',

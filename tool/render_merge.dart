@@ -103,6 +103,9 @@ void main() {
         NumberOrb(50, 215, 1048576),
       ]);
     game.mergeRun.gates.add(MergeGate(64, y: 240));
+    game.mergeRun.coins
+      ..clear()
+      ..addAll([MergeCoin(180, 150, 5), MergeCoin(310, 350, 5)]);
     await tester.pump(const Duration(milliseconds: 20));
     await capture('merge-centered-phone');
     game.mergeRun.orbs.add(NumberOrb(game.ballX, game.ballY, 2));
